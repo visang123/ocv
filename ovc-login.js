@@ -51,6 +51,55 @@ function withTimeout(promise, timeoutMs, timeoutMessage) {
   });
 }
 
+async function sha256Hex(value) {
+  const encoded = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(function (byte) {
+    return byte.toString(16).padStart(2, "0");
+  }).join("");
+}
+
+async function loginWithSupabaseRestFallback(name, password) {
+  const config = window.OVC_ONLINE_CONFIG || {};
+  if (!config.supabaseUrl || !config.supabaseKey || !config.accountsTable) {
+    throw new Error("온라인 설정이 없습니다.");
+  }
+
+  const passwordHash = await sha256Hex(password);
+  const url =
+    config.supabaseUrl.replace(/\/$/, "") +
+    "/rest/v1/" +
+    encodeURIComponent(config.accountsTable) +
+    "?select=id,name,color&name=eq." +
+    encodeURIComponent(name) +
+    "&password_hash=eq." +
+    encodeURIComponent(passwordHash) +
+    "&limit=1";
+
+  const response = await withTimeout(
+    fetch(url, {
+      method: "GET",
+      headers: {
+        apikey: config.supabaseKey,
+        Authorization: "Bearer " + config.supabaseKey
+      }
+    }),
+    8000,
+    "로그인 REST 요청이 지연되고 있습니다."
+  );
+
+  if (!response.ok) {
+    throw new Error("로그인 요청 실패: " + response.status);
+  }
+
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("이름 또는 비밀번호가 맞지 않습니다.");
+  }
+  return rows[0];
+}
+
 function startUiWatchdog(button, messageElement, timeoutMessage) {
   return setTimeout(function () {
     button.disabled = false;
@@ -182,11 +231,14 @@ async function handleLoginSubmit() {
       throw new Error("온라인 로그인 모듈을 불러오지 못했습니다. 페이지를 새로고침 해주세요.");
     }
     loginMessage.textContent = "로그인 중... (2/3 서버 요청)";
-    const account = await withTimeout(
+    let account = await withTimeout(
       window.OVCOnline.login(name, password),
       REQUEST_TIMEOUT_MS,
       "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
     );
+    if (!account || !account.id || !account.name) {
+      account = await loginWithSupabaseRestFallback(name, password);
+    }
     loginMessage.textContent = "로그인 중... (3/3 계정 저장)";
     localStorage.setItem(currentUserKey, account.name);
     localStorage.setItem(currentUserIdKey, account.id);
@@ -207,7 +259,35 @@ async function handleLoginSubmit() {
     loginMessage.textContent = "게임으로 이동 중...";
     window.location.replace("index.html?v=" + APP_VERSION);
   } catch (error) {
-    loginMessage.textContent = error.message;
+    const timeoutLikeMessage =
+      typeof error.message === "string" &&
+      (error.message.includes("지연") || error.message.includes("timeout"));
+    if (timeoutLikeMessage) {
+      try {
+        loginMessage.textContent = "로그인 지연 감지, 대체 경로 시도 중...";
+        const account = await loginWithSupabaseRestFallback(name, password);
+        localStorage.setItem(currentUserKey, account.name);
+        localStorage.setItem(currentUserIdKey, account.id);
+        localStorage.setItem(currentUserHasChosenColorKey, account.id);
+        const accountColor = normalizeHexColor(account.color);
+        const scopedKey = "ovcUserColorV1:" + account.id;
+        const scopedColor = normalizeHexColor(localStorage.getItem(scopedKey));
+        const storedColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
+        const fallbackColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
+        const finalColor = accountColor || scopedColor || storedColor || fallbackColor || "#ffffff";
+        localStorage.setItem(currentUserColorKey, finalColor);
+        localStorage.setItem(lastSelectedColorKey, finalColor);
+        localStorage.setItem(scopedKey, finalColor);
+        window.location.replace("index.html?v=" + APP_VERSION);
+        return;
+      } catch (fallbackError) {
+        loginMessage.textContent =
+          "로그인 실패: " +
+          (fallbackError && fallbackError.message ? fallbackError.message : "알 수 없는 오류");
+      }
+    } else {
+      loginMessage.textContent = error.message;
+    }
     if (error && error.message) {
       console.error("[OVC login error]", error.message);
     }
