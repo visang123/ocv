@@ -5,7 +5,8 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
-const APP_VERSION = "20260508b";
+const APP_VERSION = "20260508f";
+const loginHandoffKey = "ovcLoginHandoffV1";
 
 const loginForm = document.getElementById("login-form");
 const loginName = document.getElementById("login-name");
@@ -108,6 +109,15 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
 }
 
 function goToGame() {
+  const handoffColor = normalizeHexColor(localStorage.getItem(currentUserColorKey)) || "#ffffff";
+  const handoffPayload = {
+    id: localStorage.getItem(currentUserIdKey) || "",
+    name: localStorage.getItem(currentUserKey) || "",
+    color: handoffColor,
+    sessionToken: localStorage.getItem(currentSessionTokenKey) || "",
+    at: Date.now()
+  };
+  sessionStorage.setItem(loginHandoffKey, JSON.stringify(handoffPayload));
   const targetUrl = new URL("index.html", window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));

@@ -200,6 +200,7 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
+const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
 let currentSessionId = sessionStorage.getItem(currentSessionKey);
@@ -2826,7 +2827,32 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("ovc-login.html?v=20260508b");
+    const handoffRaw = sessionStorage.getItem(loginHandoffKey);
+    if (handoffRaw) {
+      try {
+        const handoff = JSON.parse(handoffRaw);
+        if (handoff && handoff.id && handoff.name) {
+          localStorage.setItem(currentUserIdKey, String(handoff.id));
+          localStorage.setItem(currentUserKey, String(handoff.name));
+          localStorage.setItem(currentUserHasChosenColorKey, String(handoff.id));
+          if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
+            const restoredColor = String(handoff.color).toLowerCase();
+            localStorage.setItem(currentUserColorKey, restoredColor);
+            localStorage.setItem(lastSelectedColorKey, restoredColor);
+            localStorage.setItem("ovcUserColorV1:" + String(handoff.id), restoredColor);
+          }
+          if (handoff.sessionToken) {
+            localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
+          }
+          sessionStorage.removeItem(loginHandoffKey);
+          window.location.replace("index.html?v=20260508f&recover=1");
+          return;
+        }
+      } catch (error) {
+        sessionStorage.removeItem(loginHandoffKey);
+      }
+    }
+    window.location.replace("ovc-login.html?v=20260508f");
     return;
   }
 
