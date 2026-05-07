@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="viewport">
+    <div class="world">
+      <div class="ground">
+        <img id="plant-spot" src="tilled-soil.png" alt="tilled soil">
+        <img id="sprout" src="sprout.png" alt="sprout">
+        <img id="plant-master" src="plant-master.png" alt="plant master">
+        <div id="npc-bubble"></div>
+        <div id="player-bubble"></div>
+        <div id="player-alert">!</div>
+        <img id="water-needed" src="water-needed.png" alt="water needed">
+        <div id="growth-card">
+          <div id="growth-fill"></div>
+        </div>
+        <div id="spawn-portal" aria-hidden="true"></div>
+        <div id="big-tree" aria-hidden="true">
+          <div class="big-tree-leaves">
+            <div class="big-tree-branch branch-left"></div>
+            <div class="big-tree-branch branch-right"></div>
+            <div class="big-tree-branch branch-left-high"></div>
+            <div class="big-tree-branch branch-right-high"></div>
+            <div class="big-tree-branch branch-left-low"></div>
+            <div class="big-tree-branch branch-right-low"></div>
+            <div class="tree-apple" data-apple-id="apple-1"></div>
+            <div class="tree-apple" data-apple-id="apple-2"></div>
+            <div class="tree-apple" data-apple-id="apple-3"></div>
+            <div class="tree-apple" data-apple-id="apple-4"></div>
+            <div class="tree-apple" data-apple-id="apple-5"></div>
+          </div>
+          <div class="big-tree-trunk"></div>
+          <div class="big-tree-roots"></div>
+        </div>
+        <div id="sign-board">&#50504;&#45236;&#54032;</div>
+        <div id="guide-book">&#52293;</div>
+        <img id="well" src="well.png" alt="well">
+        <img id="bucket" src="bucket-empty.png" alt="bucket">
+        <img id="seed" src="seed.png" alt="seed">
+        <div id="player-status" aria-live="polite"></div>
+        <div id="player-name"></div>
+        <img id="player" src="player-white.png" alt="&#54540;&#47112;&#51060;&#50612;">
+      </div>
+    </div>
+  </div>
+  <div id="character-select-overlay">
+    <div id="character-select-modal">
+      <div class="character-preview-wrap">
+        <div id="character-preview"></div>
+      </div>
+      <div class="character-select-content">
+        <h2>캐릭터 색깔 선택</h2>
+        <p>원하는 색깔을 누르면 왼쪽 캐릭터가 먼저 바뀝니다.</p>
+        <div id="character-color-grid"></div>
+        <button id="character-select-button" type="button">선택</button>
+      </div>
+    </div>
+  </div>
+  <div id="well-card">
+    <img id="well-card-image" src="well.png" alt="well status">
+    <div class="well-card-body">
+      <div id="well-water-text">2/2</div>
+      <div class="well-water-bar">
+        <div id="well-water-fill"></div>
+      </div>
+    </div>
+  </div>
+  <div id="seed-card">
+    <div id="seed-dry-gauge"></div>
+    <div id="seed-dry-text">3&#48516; &#46244; &#47568;&#46972;&#50836;!</div>
+  </div>
+  <div id="plant-card">
+    <div id="plant-water-text">&#49688;&#48516;&#128167;: 1/2</div>
+    <div class="plant-water-bar">
+      <div class="plant-water-segment"></div>
+      <div class="plant-water-segment"></div>
+    </div>
+  </div>
+  <div id="guide-card">
+    <div class="guide-page" data-page="0">
+      <p>&#51060;&#46041;: &#48169;&#54693;&#53412; &#46608;&#45716; WASD</p>
+      <p>&#51216;&#54532;: Space</p>
+      <p>&#54869;&#45824;/&#52629;&#49548;: &#47560;&#50864;&#49828; &#55072;</p>
+      <p>&#51469;&#44592;/&#45236;&#47140;&#45459;&#44592;: E</p>
+      <p>&#49324;&#50857;/&#45824;&#54868;: Q</p>
+      <p>&#44032;&#51060;&#46300;&#48513;: &#50504;&#45236;&#54032; &#50694;&#50640; &#52293; &#51469;&#44592;. &#50812;&#51901; &#50500;&#47000;&#50640;&#49436; &#50616;&#51228;&#46304; &#50676;&#46988; &#44032;&#45733;</p>
+    </div>
+    <div class="guide-page" data-page="1">
+      <p>씨앗 심고 물 한번 주면 생장합니다.</p>
+      <p>씨앗은 3분동안 방치하면 마릅니다.</p>
+      <p>우물은 물 무제한 아닙니다! 강화하세요~</p>
+      <p>새싹도 최종 성장 전까지 관리가 필요합니다.</p>
+      <p>사과는 어딘가에 숨겨져있음. 채집해서 먹으면 신기한 일이 일어나요!!</p>
+    </div>
+    <div id="guide-nav">
+      <button id="guide-prev" type="button">&#8249;</button>
+      <span id="guide-page-text">1/1</span>
+      <button id="guide-next" type="button">&#8250;</button>
+    </div>
+  </div>
+  <button id="guide-book-button" type="button">&#52293;</button>
+  <div id="seed-inventory"></div>
+  <div id="apple-inventory">
+    <div class="inventory-apple"></div>
+    <div id="apple-count">0</div>
+  </div>
+  <div id="multiplayer-status">멀티: 대기</div>
+  <button id="admin-open-button" type="button" aria-label="관리자"></button>
+  <div id="admin-overlay" aria-hidden="true">
+    <div id="admin-modal">
+      <div class="admin-header">
+        <strong>계정 관리</strong>
+        <button id="admin-close-button" type="button">닫기</button>
+      </div>
+      <div id="admin-message"></div>
+      <div id="admin-account-list"></div>
+      <button id="admin-refresh-button" type="button">새로고침</button>
+    </div>
+  </div>
+  <button id="settings-button" type="button" aria-label="설정">⚙</button>
+  <div id="settings-overlay" aria-hidden="true">
+    <div id="settings-modal">
+      <button id="change-color-button" type="button">색깔 바꾸기</button>
+      <button id="logout-button" type="button">로그아웃</button>
+    </div>
+  </div>
+  <div id="logout-confirm-overlay" aria-hidden="true">
+    <div id="logout-confirm-modal">
+      <p>로그아웃할까요?</p>
+      <div class="logout-confirm-actions">
+        <button id="logout-confirm-cancel" type="button">취소</button>
+        <button id="logout-confirm-ok" type="button">로그아웃</button>
+      </div>
+    </div>
+  </div>
+  <div id="online-debug-toast" aria-live="polite"></div>
+  <div id="network-debug-panel" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="online-config.js?v=20260507b"></script>
+  <script src="ovc-online.js?v=20260507b"></script>
+  <script type="module" src="src/main.js?v=20260507b"></script>
+</body>
+</html>

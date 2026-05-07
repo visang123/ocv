@@ -1,0 +1,306 @@
+let storagePrefix = "";
+
+export function setStoragePrefix(prefix) {
+  storagePrefix = prefix || "";
+}
+
+function getScopedKey(key) {
+  return storagePrefix + key;
+}
+
+export function getStoredValue(key) {
+  return localStorage.getItem(getScopedKey(key));
+}
+
+export function setStoredValue(key, value) {
+  localStorage.setItem(getScopedKey(key), value);
+}
+
+export function removeStoredValue(key) {
+  localStorage.removeItem(getScopedKey(key));
+}
+
+export function clearStoredKeys(keys) {
+  keys.forEach(function (key) {
+    localStorage.removeItem(getScopedKey(key));
+  });
+}
+
+export function getStoredFlag(key) {
+  return localStorage.getItem(getScopedKey(key)) === "true";
+}
+
+export function setStoredFlag(key, enabled) {
+  localStorage.setItem(getScopedKey(key), enabled ? "true" : "false");
+}
+
+export function loadWellStateFromStorage(config) {
+  const savedWaterRaw = getStoredValue(config.wellWaterKey);
+  const savedRefillAtRaw = getStoredValue(config.lastWellRefillKey);
+  const savedWater = Number(savedWaterRaw);
+  const savedRefillAt = Number(savedRefillAtRaw);
+
+  let wellWater = config.defaultWellWater;
+  let lastWellRefillAt = config.defaultLastWellRefillAt;
+
+  if (savedWaterRaw !== null && Number.isFinite(savedWater)) {
+    wellWater = Math.max(0, Math.min(config.maxWellWater, savedWater));
+  }
+
+  if (
+    savedRefillAtRaw !== null &&
+    Number.isFinite(savedRefillAt) &&
+    savedRefillAt > 0
+  ) {
+    lastWellRefillAt = savedRefillAt;
+  }
+
+  return {
+    wellWater,
+    lastWellRefillAt
+  };
+}
+
+export function saveWellStateToStorage(config) {
+  setStoredValue(config.wellWaterKey, String(config.wellWater));
+  setStoredValue(config.lastWellRefillKey, String(config.lastWellRefillAt));
+}
+
+export function loadSeedStateFromStorage(config) {
+  const savedCreatedAtRaw = getStoredValue(config.seedCreatedAtKey);
+  const savedPlantedRaw = getStoredValue(config.seedPlantedStateKey);
+  const savedCreatedAt = Number(savedCreatedAtRaw);
+  let parseFailed = false;
+
+  let seedCreatedAt;
+  if (savedCreatedAtRaw !== null && Number.isFinite(savedCreatedAt)) {
+    seedCreatedAt = savedCreatedAt;
+  } else {
+    seedCreatedAt = config.defaultSeedCreatedAt;
+    setStoredValue(config.seedCreatedAtKey, String(seedCreatedAt));
+  }
+
+  const planted = {
+    isSeedPlanted: false,
+    plantSpotX: 0,
+    plantSpotY: 0,
+    plantLastWateredAt: null,
+    plantWateredAtList: [],
+    plantState: "normal",
+    plantWaterLevel: 1,
+    plantWaterLevelUpdatedAt: config.defaultSeedCreatedAt,
+    plantBecameEmptyAt: null,
+    isPlantOverwatered: false,
+    plantNeedsFirstWater: false,
+    plantGrowthStartedAt: null,
+    isSproutGrown: false,
+    plantSproutGrownAt: null,
+    npcX: config.defaultNpcX,
+    npcY: config.defaultNpcY
+  };
+
+  if (savedPlantedRaw !== null) {
+    try {
+      const savedPlantedState = JSON.parse(savedPlantedRaw);
+      planted.isSeedPlanted = Boolean(savedPlantedState.isSeedPlanted);
+      planted.plantSpotX = Number(savedPlantedState.plantSpotX) || 0;
+      planted.plantSpotY = Number(savedPlantedState.plantSpotY) || 0;
+      planted.plantLastWateredAt =
+        Number(savedPlantedState.plantLastWateredAt) || null;
+      planted.plantWateredAtList = Array.isArray(savedPlantedState.plantWateredAtList)
+        ? savedPlantedState.plantWateredAtList.map(Number).filter(Number.isFinite)
+        : [];
+      planted.plantState = savedPlantedState.plantState || "normal";
+      planted.plantWaterLevel = Number.isFinite(Number(savedPlantedState.plantWaterLevel))
+        ? Math.max(0, Math.min(2, Number(savedPlantedState.plantWaterLevel)))
+        : 1;
+      planted.plantWaterLevelUpdatedAt =
+        Number(savedPlantedState.plantWaterLevelUpdatedAt) || config.defaultSeedCreatedAt;
+      planted.plantBecameEmptyAt = Number(savedPlantedState.plantBecameEmptyAt) || null;
+      planted.isPlantOverwatered = Boolean(savedPlantedState.isPlantOverwatered);
+      planted.plantNeedsFirstWater = Boolean(savedPlantedState.plantNeedsFirstWater);
+      planted.plantGrowthStartedAt =
+        Number(savedPlantedState.plantGrowthStartedAt) || null;
+      planted.isSproutGrown = Boolean(savedPlantedState.isSproutGrown);
+      planted.plantSproutGrownAt =
+        Number(savedPlantedState.plantSproutGrownAt) || null;
+      planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
+      planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
+    } catch (error) {
+      removeStoredValue(config.seedPlantedStateKey);
+      parseFailed = true;
+    }
+  }
+
+  return {
+    parseFailed,
+    seedCreatedAt,
+    planted
+  };
+}
+
+export function saveSeedStateToStorage(config) {
+  setStoredValue(config.seedCreatedAtKey, String(config.seedCreatedAt));
+  setStoredValue(config.seedPlantedStateKey, JSON.stringify(config.plantedState));
+}
+
+export function loadAppleStateFromStorage(config) {
+  const savedRaw = getStoredValue(config.appleStateKey);
+
+  if (!savedRaw) {
+    return {
+      hasSavedState: false,
+      parseFailed: false,
+      appleCount: 0,
+      apples: config.createRandomApples(5),
+      pickedAppleIds: [],
+      nextAppleSeedOffset: 0,
+      lastAppleSpawnAt: config.now,
+      extraSeeds: [],
+      extraPlants: []
+    };
+  }
+
+  try {
+    const saved = JSON.parse(savedRaw);
+    const apples = Array.isArray(saved.apples)
+      ? saved.apples.map(function (appleData) {
+          const localX = Number(appleData.localX) || 20;
+          const localY = Number(appleData.localY) || 20;
+          return {
+            id: String(appleData.id),
+            localX,
+            localY,
+            x: config.bigTreeX + localX,
+            y: config.bigTreeY + localY,
+            size: 10
+          };
+        })
+      : config.createRandomApples(5);
+
+    const pickedAppleIds = Array.isArray(saved.pickedAppleIds)
+      ? saved.pickedAppleIds.filter(function (id) {
+          return apples.some(function (apple) {
+            return apple.id === id;
+          });
+        })
+      : [];
+
+    return {
+      hasSavedState: true,
+      parseFailed: false,
+      appleCount: Math.max(0, Number(saved.appleCount) || 0),
+      apples,
+      pickedAppleIds,
+      nextAppleSeedOffset: Math.max(0, Number(saved.nextAppleSeedOffset) || 0),
+      lastAppleSpawnAt: Number(saved.lastAppleSpawnAt) || config.now,
+      extraSeeds: Array.isArray(saved.extraSeeds)
+        ? saved.extraSeeds.map(function (seedData) {
+            return {
+              id: String(seedData.id),
+              x: Number(seedData.x) || 0,
+              y: Number(seedData.y) || 0,
+              createdAt: Number(seedData.createdAt) || config.now,
+              planted: Boolean(seedData.planted),
+              inInventory: Boolean(seedData.inInventory),
+              label: seedData.label || config.defaultSeedLabel,
+              isStarter: Boolean(seedData.isStarter)
+            };
+          })
+        : [],
+      extraPlants: Array.isArray(saved.extraPlants)
+        ? saved.extraPlants.map(function (plantData) {
+            const plantedAt = Number(plantData.plantedAt) || config.now;
+            return {
+              id: String(plantData.id),
+              x: Number(plantData.x) || 0,
+              y: Number(plantData.y) || 0,
+              plantedAt,
+              lastWateredAt: Number(plantData.lastWateredAt) || null,
+              wateredAtList: Array.isArray(plantData.wateredAtList)
+                ? plantData.wateredAtList.map(Number).filter(Number.isFinite)
+                : [],
+              status: plantData.status || "normal",
+              waterLevel: Number.isFinite(Number(plantData.waterLevel))
+                ? Math.max(0, Math.min(2, Number(plantData.waterLevel)))
+                : 1,
+              waterLevelUpdatedAt: Number(plantData.waterLevelUpdatedAt) || plantedAt,
+              becameEmptyAt: Number(plantData.becameEmptyAt) || null,
+              isOverwatered: Boolean(plantData.isOverwatered),
+              needsFirstWater:
+                typeof plantData.needsFirstWater === "boolean"
+                  ? plantData.needsFirstWater
+                  : !plantData.growthStartedAt,
+              growthStartedAt: Number(plantData.growthStartedAt) || null,
+              isSproutGrown: Boolean(plantData.isSproutGrown),
+              sproutGrownAt: Number(plantData.sproutGrownAt) || null
+            };
+          })
+        : []
+    };
+  } catch (error) {
+    removeStoredValue(config.appleStateKey);
+    return {
+      hasSavedState: false,
+      parseFailed: true,
+      appleCount: 0,
+      apples: config.createRandomApples(5),
+      pickedAppleIds: [],
+      nextAppleSeedOffset: 0,
+      lastAppleSpawnAt: config.now,
+      extraSeeds: [],
+      extraPlants: []
+    };
+  }
+}
+
+export function saveAppleStateToStorage(config) {
+  setStoredValue(
+    config.appleStateKey,
+    JSON.stringify({
+      appleCount: config.appleCount,
+      apples: config.apples.map(function (apple) {
+        return {
+          id: apple.id,
+          localX: apple.localX,
+          localY: apple.localY
+        };
+      }),
+      pickedAppleIds: config.pickedAppleIds,
+      nextAppleSeedOffset: config.nextAppleSeedOffset,
+      lastAppleSpawnAt: config.lastAppleSpawnAt,
+      extraSeeds: config.extraSeeds.map(function (extraSeed) {
+        return {
+          id: extraSeed.id,
+          x: extraSeed.x,
+          y: extraSeed.y,
+          createdAt: extraSeed.createdAt,
+          planted: extraSeed.planted,
+          inInventory: extraSeed.inInventory,
+          label: extraSeed.label,
+          isStarter: Boolean(extraSeed.isStarter)
+        };
+      }),
+      extraPlants: config.extraPlants.map(function (plant) {
+        return {
+          id: plant.id,
+          x: plant.x,
+          y: plant.y,
+          plantedAt: plant.plantedAt,
+          lastWateredAt: plant.lastWateredAt,
+          wateredAtList: plant.wateredAtList,
+          status: plant.status,
+          waterLevel: plant.waterLevel,
+          waterLevelUpdatedAt: plant.waterLevelUpdatedAt,
+          becameEmptyAt: plant.becameEmptyAt,
+          isOverwatered: plant.isOverwatered,
+          needsFirstWater: plant.needsFirstWater,
+          growthStartedAt: plant.growthStartedAt,
+          isSproutGrown: plant.isSproutGrown,
+          sproutGrownAt: plant.sproutGrownAt
+        };
+      })
+    })
+  );
+}
+
