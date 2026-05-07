@@ -303,7 +303,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login?v=20260508k");
+  window.location.replace("/ovc-login.html?v=20260508l");
   throw new Error("OVC login required");
 }
 
@@ -2829,7 +2829,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login?v=20260508k");
+    window.location.replace("/ovc-login.html?v=20260508l");
     return;
   }
 
@@ -3405,7 +3405,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login?v=20260508k";
+    window.location.href = "/ovc-login.html?v=20260508l";
   };
 
   if (multiplayerChannel) {
