@@ -201,7 +201,6 @@ const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
-applyUrlLoginHandoff();
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
 let currentSessionId = sessionStorage.getItem(currentSessionKey);
@@ -239,78 +238,6 @@ function normalizeHexColor(value) {
   return value.toLowerCase();
 }
 
-function applyUrlLoginHandoff() {
-  const rawHash = String(window.location.hash || "");
-  const marker = "#ovc-handoff=";
-  const params = new URLSearchParams(window.location.search || "");
-  const rawQueryHandoff = params.get("ovc-handoff");
-  let didApply = false;
-
-  if (rawHash.startsWith(marker)) {
-    didApply = applyLoginHandoffString(rawHash.slice(marker.length));
-  }
-
-  if (!didApply && rawQueryHandoff) {
-    didApply = applyLoginHandoffString(rawQueryHandoff);
-  }
-
-  if (didApply || rawQueryHandoff || rawHash.startsWith(marker)) {
-    const cleanUrl = new URL(window.location.href);
-    cleanUrl.searchParams.delete("ovc-handoff");
-    cleanUrl.hash = "";
-    history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search);
-  }
-}
-
-function applyLoginHandoffString(rawValue) {
-  try {
-    const decoded = decodeURIComponent(String(rawValue || ""));
-    return applyLoginHandoffPayload(JSON.parse(decoded));
-  } catch (error) {
-    try {
-      return applyLoginHandoffPayload(JSON.parse(String(rawValue || "")));
-    } catch (parseError) {
-      return false;
-    }
-  }
-}
-
-function applyStoredLoginHandoff() {
-  const handoffRaw = sessionStorage.getItem(loginHandoffKey);
-  if (!handoffRaw) return false;
-
-  try {
-    const didApply = applyLoginHandoffPayload(JSON.parse(handoffRaw));
-    if (didApply) {
-      sessionStorage.removeItem(loginHandoffKey);
-    }
-    return didApply;
-  } catch (error) {
-    sessionStorage.removeItem(loginHandoffKey);
-    return false;
-  }
-}
-
-function applyLoginHandoffPayload(handoff) {
-  if (!handoff || !handoff.id || !handoff.name) return false;
-
-  const userId = String(handoff.id);
-  const userName = String(handoff.name);
-  localStorage.setItem(currentUserIdKey, userId);
-  localStorage.setItem(currentUserKey, userName);
-  localStorage.setItem(currentUserHasChosenColorKey, userId);
-  if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
-    const restoredColor = String(handoff.color).toLowerCase();
-    localStorage.setItem(currentUserColorKey, restoredColor);
-    localStorage.setItem(lastSelectedColorKey, restoredColor);
-    localStorage.setItem("ovcUserColorV1:" + userId, restoredColor);
-  }
-  if (handoff.sessionToken) {
-    localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
-  }
-
-  return true;
-}
 let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
 let remotePlayers = {};
@@ -376,13 +303,8 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  if (applyStoredLoginHandoff()) {
-    window.location.replace("./index.html?v=20260508j&recover=1");
-    throw new Error("OVC login handoff recovery reload");
-  } else {
-    window.location.href = "./ovc-login.html?v=20260508j";
-    throw new Error("OVC login required");
-  }
+  window.location.replace("/ovc-login?v=20260508k");
+  throw new Error("OVC login required");
 }
 
 window.addEventListener(
@@ -2907,11 +2829,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    if (applyStoredLoginHandoff()) {
-      window.location.replace("./index.html?v=20260508j&recover=1");
-      return;
-    }
-    window.location.replace("./ovc-login.html?v=20260508j");
+    window.location.replace("/ovc-login?v=20260508k");
     return;
   }
 
@@ -3487,7 +3405,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "./ovc-login.html?v=20260508j";
+    window.location.href = "/ovc-login?v=20260508k";
   };
 
   if (multiplayerChannel) {
