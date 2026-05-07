@@ -24,7 +24,8 @@ const signupMessage = document.getElementById("signup-message");
 const passwordToggleButtons = Array.from(document.querySelectorAll(".password-toggle"));
 const REQUEST_TIMEOUT_MS = 12000;
 
-redirectLoggedInUser();
+// Disabled automatic redirect to prevent login/index redirect loops on new hosts.
+// User should explicitly log in from this page.
 
 function normalizeName(value) {
   return value.trim().normalize("NFC");
@@ -55,15 +56,6 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
     button.disabled = false;
     messageElement.textContent = timeoutMessage;
   }, REQUEST_TIMEOUT_MS + 1000);
-}
-
-function redirectLoggedInUser() {
-  const savedName = localStorage.getItem(currentUserKey);
-  const savedId = localStorage.getItem(currentUserIdKey);
-
-  if (savedName && savedId) {
-    window.location.replace("index.html?v=" + APP_VERSION);
-  }
 }
 
 function validateSignup(name, password) {
