@@ -2825,6 +2825,11 @@ function buildCharacterColorGrid() {
 }
 
 function openCharacterSelectIfNeeded() {
+  if (!currentUserId || !currentUserName) {
+    window.location.replace("ovc-login.html?v=20260508b");
+    return;
+  }
+
   playerName.textContent = currentUserName;
 
   if (hasSpawnedCharacter) {
