@@ -201,13 +201,9 @@ const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
-const loginRedirectArmedKey = "ovcLoginRedirectArmedV1";
 applyUrlLoginHandoff();
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
-if (currentUserName && currentUserId) {
-  sessionStorage.removeItem(loginRedirectArmedKey);
-}
 let currentSessionId = sessionStorage.getItem(currentSessionKey);
 const currentUserScopedColorKey = currentUserId
   ? "ovcUserColorV1:" + currentUserId
@@ -381,10 +377,10 @@ if (!currentSessionId) {
 
 if (!currentUserName || !currentUserId) {
   if (applyStoredLoginHandoff()) {
-    window.location.replace("./index.html?v=20260508i&recover=1");
+    window.location.replace("./index.html?v=20260508j&recover=1");
     throw new Error("OVC login handoff recovery reload");
   } else {
-    window.location.href = "./ovc-login.html?v=20260508i";
+    window.location.href = "./ovc-login.html?v=20260508j";
     throw new Error("OVC login required");
   }
 }
@@ -2912,10 +2908,10 @@ function buildCharacterColorGrid() {
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
     if (applyStoredLoginHandoff()) {
-      window.location.replace("./index.html?v=20260508i&recover=1");
+      window.location.replace("./index.html?v=20260508j&recover=1");
       return;
     }
-    window.location.replace("./ovc-login.html?v=20260508i");
+    window.location.replace("./ovc-login.html?v=20260508j");
     return;
   }
 
@@ -3491,7 +3487,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "./ovc-login.html?v=20260508i";
+    window.location.href = "./ovc-login.html?v=20260508j";
   };
 
   if (multiplayerChannel) {
