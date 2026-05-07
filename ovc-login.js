@@ -5,6 +5,7 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
+const APP_VERSION = "20260508b";
 
 const loginForm = document.getElementById("login-form");
 const loginName = document.getElementById("login-name");
@@ -61,7 +62,7 @@ function redirectLoggedInUser() {
   const savedId = localStorage.getItem(currentUserIdKey);
 
   if (savedName && savedId) {
-    window.location.replace("index.html");
+    window.location.replace("index.html?v=" + APP_VERSION);
   }
 }
 
@@ -202,7 +203,7 @@ loginForm.addEventListener("submit", async function (event) {
       localStorage.setItem(currentSessionTokenKey, account.session_token);
     }
 
-    window.location.href = "index.html";
+    window.location.href = "index.html?v=" + APP_VERSION;
   } catch (error) {
     loginMessage.textContent = error.message;
   } finally {
