@@ -21,6 +21,7 @@ const signupPassword = document.getElementById("signup-password");
 const signupButton = document.getElementById("signup-button");
 const signupMessage = document.getElementById("signup-message");
 const passwordToggleButtons = Array.from(document.querySelectorAll(".password-toggle"));
+const REQUEST_TIMEOUT_MS = 12000;
 
 redirectLoggedInUser();
 
@@ -46,6 +47,13 @@ function withTimeout(promise, timeoutMs, timeoutMessage) {
       clearTimeout(timerId);
     }
   });
+}
+
+function startUiWatchdog(button, messageElement, timeoutMessage) {
+  return setTimeout(function () {
+    button.disabled = false;
+    messageElement.textContent = timeoutMessage;
+  }, REQUEST_TIMEOUT_MS + 1000);
 }
 
 function redirectLoggedInUser() {
@@ -123,11 +131,19 @@ signupForm.addEventListener("submit", async function (event) {
 
   signupButton.disabled = true;
   signupMessage.textContent = "가입 중...";
+  const signupWatchdog = startUiWatchdog(
+    signupButton,
+    signupMessage,
+    "가입이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+  );
 
   try {
+    if (!window.OVCOnline || typeof window.OVCOnline.signUp !== "function") {
+      throw new Error("온라인 로그인 모듈을 불러오지 못했습니다. 페이지를 새로고침 해주세요.");
+    }
     await withTimeout(
       window.OVCOnline.signUp(name, password),
-      12000,
+      REQUEST_TIMEOUT_MS,
       "가입 요청이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
     );
     loginName.value = name;
@@ -137,6 +153,7 @@ signupForm.addEventListener("submit", async function (event) {
   } catch (error) {
     signupMessage.textContent = error.message;
   } finally {
+    clearTimeout(signupWatchdog);
     signupButton.disabled = false;
   }
 });
@@ -154,11 +171,19 @@ loginForm.addEventListener("submit", async function (event) {
 
   loginButton.disabled = true;
   loginMessage.textContent = "로그인 중...";
+  const loginWatchdog = startUiWatchdog(
+    loginButton,
+    loginMessage,
+    "로그인이 오래 걸립니다. 새로고침 후 다시 시도해주세요."
+  );
 
   try {
+    if (!window.OVCOnline || typeof window.OVCOnline.login !== "function") {
+      throw new Error("온라인 로그인 모듈을 불러오지 못했습니다. 페이지를 새로고침 해주세요.");
+    }
     const account = await withTimeout(
       window.OVCOnline.login(name, password),
-      12000,
+      REQUEST_TIMEOUT_MS,
       "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
     );
     localStorage.setItem(currentUserKey, account.name);
@@ -181,6 +206,12 @@ loginForm.addEventListener("submit", async function (event) {
   } catch (error) {
     loginMessage.textContent = error.message;
   } finally {
+    clearTimeout(loginWatchdog);
     loginButton.disabled = false;
   }
+});
+
+window.addEventListener("unhandledrejection", function (event) {
+  loginButton.disabled = false;
+  loginMessage.textContent = "로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.";
 });
