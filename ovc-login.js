@@ -170,7 +170,7 @@ async function handleLoginSubmit() {
   }
 
   loginButton.disabled = true;
-  loginMessage.textContent = "로그인 중...";
+  loginMessage.textContent = "로그인 중... (1/3 요청 준비)";
   const loginWatchdog = startUiWatchdog(
     loginButton,
     loginMessage,
@@ -181,11 +181,13 @@ async function handleLoginSubmit() {
     if (!window.OVCOnline || typeof window.OVCOnline.login !== "function") {
       throw new Error("온라인 로그인 모듈을 불러오지 못했습니다. 페이지를 새로고침 해주세요.");
     }
+    loginMessage.textContent = "로그인 중... (2/3 서버 요청)";
     const account = await withTimeout(
       window.OVCOnline.login(name, password),
       REQUEST_TIMEOUT_MS,
       "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
     );
+    loginMessage.textContent = "로그인 중... (3/3 계정 저장)";
     localStorage.setItem(currentUserKey, account.name);
     localStorage.setItem(currentUserIdKey, account.id);
     localStorage.setItem(currentUserHasChosenColorKey, account.id);
@@ -202,9 +204,13 @@ async function handleLoginSubmit() {
       localStorage.setItem(currentSessionTokenKey, account.session_token);
     }
 
-    window.location.href = "index.html?v=" + APP_VERSION;
+    loginMessage.textContent = "게임으로 이동 중...";
+    window.location.replace("index.html?v=" + APP_VERSION);
   } catch (error) {
     loginMessage.textContent = error.message;
+    if (error && error.message) {
+      console.error("[OVC login error]", error.message);
+    }
   } finally {
     clearTimeout(loginWatchdog);
     loginButton.disabled = false;
@@ -223,4 +229,9 @@ loginButton.addEventListener("click", function () {
 window.addEventListener("unhandledrejection", function (event) {
   loginButton.disabled = false;
   loginMessage.textContent = "로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.";
+  console.error("[OVC unhandledrejection]", event.reason);
+});
+
+window.addEventListener("load", function () {
+  loginMessage.textContent = "로그인 준비 완료";
 });
