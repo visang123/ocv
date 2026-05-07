@@ -5,7 +5,7 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
-const APP_VERSION = "20260508f";
+const APP_VERSION = "20260508g";
 const loginHandoffKey = "ovcLoginHandoffV1";
 
 const loginForm = document.getElementById("login-form");
@@ -121,6 +121,7 @@ function goToGame() {
   const targetUrl = new URL("index.html", window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));
+  targetUrl.hash = "ovc-handoff=" + encodeURIComponent(JSON.stringify(handoffPayload));
   window.location.href = targetUrl.toString();
   // Some hosts/cache layers occasionally swallow the first navigation.
   setTimeout(function () {

@@ -201,6 +201,7 @@ const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
+applyUrlLoginHandoff();
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
 let currentSessionId = sessionStorage.getItem(currentSessionKey);
@@ -236,6 +237,34 @@ const characterColors = [
 function normalizeHexColor(value) {
   if (!/^#[0-9a-fA-F]{6}$/.test(value || "")) return "";
   return value.toLowerCase();
+}
+
+function applyUrlLoginHandoff() {
+  const rawHash = String(window.location.hash || "");
+  const marker = "#ovc-handoff=";
+  if (!rawHash.startsWith(marker)) return;
+  try {
+    const decoded = decodeURIComponent(rawHash.slice(marker.length));
+    const handoff = JSON.parse(decoded);
+    if (!handoff || !handoff.id || !handoff.name) return;
+    const userId = String(handoff.id);
+    const userName = String(handoff.name);
+    localStorage.setItem(currentUserIdKey, userId);
+    localStorage.setItem(currentUserKey, userName);
+    localStorage.setItem(currentUserHasChosenColorKey, userId);
+    if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
+      const restoredColor = String(handoff.color).toLowerCase();
+      localStorage.setItem(currentUserColorKey, restoredColor);
+      localStorage.setItem(lastSelectedColorKey, restoredColor);
+      localStorage.setItem("ovcUserColorV1:" + userId, restoredColor);
+    }
+    if (handoff.sessionToken) {
+      localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
+    }
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  } catch (error) {
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  }
 }
 let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
