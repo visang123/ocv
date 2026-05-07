@@ -27,6 +27,7 @@ const REQUEST_TIMEOUT_MS = 12000;
 
 // Disabled automatic redirect to prevent login/index redirect loops on new hosts.
 // User should explicitly log in from this page.
+recoverMisroutedLoginHandoff();
 
 function normalizeName(value) {
   return value.trim().normalize("NFC");
@@ -119,7 +120,7 @@ function goToGame() {
   };
   sessionStorage.setItem(loginHandoffKey, JSON.stringify(handoffPayload));
   const handoffJson = JSON.stringify(handoffPayload);
-  const targetUrl = new URL("./index.html", window.location.href);
+  const targetUrl = new URL("/index.html", window.location.origin);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));
   targetUrl.searchParams.set("ovc-handoff", handoffJson);
@@ -129,6 +130,40 @@ function goToGame() {
   setTimeout(function () {
     window.location.assign(targetUrl.toString());
   }, 1200);
+}
+
+function recoverMisroutedLoginHandoff() {
+  const params = new URLSearchParams(window.location.search || "");
+  const rawQueryHandoff = params.get("ovc-handoff");
+  const rawHash = String(window.location.hash || "");
+  const marker = "#ovc-handoff=";
+  const rawHashHandoff = rawHash.startsWith(marker) ? rawHash.slice(marker.length) : "";
+  const rawHandoff = rawQueryHandoff || rawHashHandoff;
+  if (!rawHandoff) return;
+
+  try {
+    const handoff = JSON.parse(decodeURIComponent(rawHandoff));
+    if (!handoff || !handoff.id || !handoff.name) return;
+    localStorage.setItem(currentUserIdKey, String(handoff.id));
+    localStorage.setItem(currentUserKey, String(handoff.name));
+    localStorage.setItem(currentUserHasChosenColorKey, String(handoff.id));
+    if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
+      const restoredColor = String(handoff.color).toLowerCase();
+      localStorage.setItem(currentUserColorKey, restoredColor);
+      localStorage.setItem(lastSelectedColorKey, restoredColor);
+      localStorage.setItem("ovcUserColorV1:" + String(handoff.id), restoredColor);
+    }
+    if (handoff.sessionToken) {
+      localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
+    }
+    sessionStorage.setItem(loginHandoffKey, JSON.stringify(handoff));
+    const targetUrl = new URL("/index.html", window.location.origin);
+    targetUrl.searchParams.set("v", APP_VERSION);
+    targetUrl.searchParams.set("recover", "login");
+    window.location.replace(targetUrl.toString());
+  } catch (error) {
+    // Let the normal login screen render if the recovery payload is malformed.
+  }
 }
 
 function validateSignup(name, password) {

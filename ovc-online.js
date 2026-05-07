@@ -112,8 +112,8 @@
         const missingSessionTokenColumn =
           message.includes("session_token") &&
           (message.includes("schema cache") || message.includes("column"));
-        if (!missingSessionTokenColumn) {
-          throw new Error(updateError.message);
+        if (!missingSessionTokenColumn && window.console && typeof window.console.warn === "function") {
+          window.console.warn("[OVC login] session token update skipped:", updateError.message);
         }
         return { ...data };
       }
