@@ -107,6 +107,17 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
   }, REQUEST_TIMEOUT_MS + 1000);
 }
 
+function goToGame() {
+  const targetUrl = new URL("index.html", window.location.href);
+  targetUrl.searchParams.set("v", APP_VERSION);
+  targetUrl.searchParams.set("t", String(Date.now()));
+  window.location.href = targetUrl.toString();
+  // Some hosts/cache layers occasionally swallow the first navigation.
+  setTimeout(function () {
+    window.location.assign(targetUrl.toString());
+  }, 1200);
+}
+
 function validateSignup(name, password) {
   if (!koreanNamePattern.test(name)) {
     return "이름은 한글 자음/모음을 포함해서 1~3글자로 입력하세요.";
@@ -257,7 +268,7 @@ async function handleLoginSubmit() {
     }
 
     loginMessage.textContent = "게임으로 이동 중...";
-    window.location.replace("index.html?v=" + APP_VERSION);
+    goToGame();
   } catch (error) {
     const timeoutLikeMessage =
       typeof error.message === "string" &&
@@ -278,7 +289,7 @@ async function handleLoginSubmit() {
         localStorage.setItem(currentUserColorKey, finalColor);
         localStorage.setItem(lastSelectedColorKey, finalColor);
         localStorage.setItem(scopedKey, finalColor);
-        window.location.replace("index.html?v=" + APP_VERSION);
+        goToGame();
         return;
       } catch (fallbackError) {
         loginMessage.textContent =
