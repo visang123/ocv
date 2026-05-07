@@ -270,7 +270,7 @@
     </section>
 
     <section class="form-panel">
-      <form class="login-box" id="login-form" onsubmit="return false;">
+      <form class="login-box" id="login-form">
         <h1>OVC</h1>
         <p>Online Visang Community</p>
 
@@ -287,7 +287,7 @@
           </div>
         </label>
 
-        <button class="login-button" id="login-button" type="submit">로그인</button>
+        <button class="login-button" id="login-button" type="button">로그인</button>
         <button class="signup-open-button" id="signup-open" type="button">회원가입</button>
         <div class="message" id="login-message" role="status"></div>
       </form>
@@ -295,7 +295,7 @@
   </main>
 
   <div class="modal-backdrop" id="signup-backdrop" aria-hidden="true">
-    <form class="signup-modal" id="signup-form" onsubmit="return false;">
+    <form class="signup-modal" id="signup-form">
       <h2>회원가입</h2>
       <p class="hint">이름은 한글 자음/모음 포함 1~3글자, 비밀번호는 4자리 이상 입력하세요.</p>
 
@@ -314,7 +314,7 @@
 
       <div class="modal-actions">
         <button class="cancel-button" id="signup-cancel" type="button">취소</button>
-        <button class="signup-submit-button" id="signup-button" type="submit">회원가입</button>
+        <button class="signup-submit-button" id="signup-button" type="button">회원가입</button>
       </div>
       <div class="signup-message" id="signup-message" role="status"></div>
     </form>
