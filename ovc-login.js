@@ -5,8 +5,9 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
-const APP_VERSION = "20260508h";
+const APP_VERSION = "20260508i";
 const loginHandoffKey = "ovcLoginHandoffV1";
+const loginRedirectArmedKey = "ovcLoginRedirectArmedV1";
 
 const loginForm = document.getElementById("login-form");
 const loginName = document.getElementById("login-name");
@@ -28,6 +29,7 @@ const REQUEST_TIMEOUT_MS = 12000;
 // Disabled automatic redirect to prevent login/index redirect loops on new hosts.
 // User should explicitly log in from this page.
 recoverMisroutedLoginHandoff();
+recoverArmedLoginRedirect();
 
 function normalizeName(value) {
   return value.trim().normalize("NFC");
@@ -119,6 +121,7 @@ function goToGame() {
     at: Date.now()
   };
   sessionStorage.setItem(loginHandoffKey, JSON.stringify(handoffPayload));
+  sessionStorage.setItem(loginRedirectArmedKey, String(Date.now()));
   const handoffJson = JSON.stringify(handoffPayload);
   const targetUrl = new URL("/index.html", window.location.origin);
   targetUrl.searchParams.set("v", APP_VERSION);
@@ -157,6 +160,7 @@ function recoverMisroutedLoginHandoff() {
       localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
     }
     sessionStorage.setItem(loginHandoffKey, JSON.stringify(handoff));
+    sessionStorage.setItem(loginRedirectArmedKey, String(Date.now()));
     const targetUrl = new URL("/index.html", window.location.origin);
     targetUrl.searchParams.set("v", APP_VERSION);
     targetUrl.searchParams.set("recover", "login");
@@ -164,6 +168,23 @@ function recoverMisroutedLoginHandoff() {
   } catch (error) {
     // Let the normal login screen render if the recovery payload is malformed.
   }
+}
+
+function recoverArmedLoginRedirect() {
+  const armedAt = Number(sessionStorage.getItem(loginRedirectArmedKey) || 0);
+  if (!armedAt || Date.now() - armedAt > 30000) {
+    sessionStorage.removeItem(loginRedirectArmedKey);
+    return;
+  }
+
+  const userId = localStorage.getItem(currentUserIdKey) || "";
+  const userName = localStorage.getItem(currentUserKey) || "";
+  if (!userId || !userName) return;
+
+  const targetUrl = new URL("/index.html", window.location.origin);
+  targetUrl.searchParams.set("v", APP_VERSION);
+  targetUrl.searchParams.set("recover", "armed");
+  window.location.replace(targetUrl.toString());
 }
 
 function validateSignup(name, password) {
