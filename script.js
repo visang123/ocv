@@ -242,29 +242,74 @@ function normalizeHexColor(value) {
 function applyUrlLoginHandoff() {
   const rawHash = String(window.location.hash || "");
   const marker = "#ovc-handoff=";
-  if (!rawHash.startsWith(marker)) return;
-  try {
-    const decoded = decodeURIComponent(rawHash.slice(marker.length));
-    const handoff = JSON.parse(decoded);
-    if (!handoff || !handoff.id || !handoff.name) return;
-    const userId = String(handoff.id);
-    const userName = String(handoff.name);
-    localStorage.setItem(currentUserIdKey, userId);
-    localStorage.setItem(currentUserKey, userName);
-    localStorage.setItem(currentUserHasChosenColorKey, userId);
-    if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
-      const restoredColor = String(handoff.color).toLowerCase();
-      localStorage.setItem(currentUserColorKey, restoredColor);
-      localStorage.setItem(lastSelectedColorKey, restoredColor);
-      localStorage.setItem("ovcUserColorV1:" + userId, restoredColor);
-    }
-    if (handoff.sessionToken) {
-      localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
-    }
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-  } catch (error) {
-    history.replaceState(null, "", window.location.pathname + window.location.search);
+  const params = new URLSearchParams(window.location.search || "");
+  const rawQueryHandoff = params.get("ovc-handoff");
+  let didApply = false;
+
+  if (rawHash.startsWith(marker)) {
+    didApply = applyLoginHandoffString(rawHash.slice(marker.length));
   }
+
+  if (!didApply && rawQueryHandoff) {
+    didApply = applyLoginHandoffString(rawQueryHandoff);
+  }
+
+  if (didApply || rawQueryHandoff || rawHash.startsWith(marker)) {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("ovc-handoff");
+    cleanUrl.hash = "";
+    history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search);
+  }
+}
+
+function applyLoginHandoffString(rawValue) {
+  try {
+    const decoded = decodeURIComponent(String(rawValue || ""));
+    return applyLoginHandoffPayload(JSON.parse(decoded));
+  } catch (error) {
+    try {
+      return applyLoginHandoffPayload(JSON.parse(String(rawValue || "")));
+    } catch (parseError) {
+      return false;
+    }
+  }
+}
+
+function applyStoredLoginHandoff() {
+  const handoffRaw = sessionStorage.getItem(loginHandoffKey);
+  if (!handoffRaw) return false;
+
+  try {
+    const didApply = applyLoginHandoffPayload(JSON.parse(handoffRaw));
+    if (didApply) {
+      sessionStorage.removeItem(loginHandoffKey);
+    }
+    return didApply;
+  } catch (error) {
+    sessionStorage.removeItem(loginHandoffKey);
+    return false;
+  }
+}
+
+function applyLoginHandoffPayload(handoff) {
+  if (!handoff || !handoff.id || !handoff.name) return false;
+
+  const userId = String(handoff.id);
+  const userName = String(handoff.name);
+  localStorage.setItem(currentUserIdKey, userId);
+  localStorage.setItem(currentUserKey, userName);
+  localStorage.setItem(currentUserHasChosenColorKey, userId);
+  if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
+    const restoredColor = String(handoff.color).toLowerCase();
+    localStorage.setItem(currentUserColorKey, restoredColor);
+    localStorage.setItem(lastSelectedColorKey, restoredColor);
+    localStorage.setItem("ovcUserColorV1:" + userId, restoredColor);
+  }
+  if (handoff.sessionToken) {
+    localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
+  }
+
+  return true;
 }
 let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
@@ -331,7 +376,11 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.href = "ovc-login.html";
+  if (applyStoredLoginHandoff()) {
+    window.location.replace("./index.html?v=20260508h&recover=1");
+  } else {
+    window.location.href = "./ovc-login.html?v=20260508h";
+  }
 }
 
 window.addEventListener(
@@ -2856,32 +2905,11 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    const handoffRaw = sessionStorage.getItem(loginHandoffKey);
-    if (handoffRaw) {
-      try {
-        const handoff = JSON.parse(handoffRaw);
-        if (handoff && handoff.id && handoff.name) {
-          localStorage.setItem(currentUserIdKey, String(handoff.id));
-          localStorage.setItem(currentUserKey, String(handoff.name));
-          localStorage.setItem(currentUserHasChosenColorKey, String(handoff.id));
-          if (/^#[0-9a-fA-F]{6}$/.test(String(handoff.color || ""))) {
-            const restoredColor = String(handoff.color).toLowerCase();
-            localStorage.setItem(currentUserColorKey, restoredColor);
-            localStorage.setItem(lastSelectedColorKey, restoredColor);
-            localStorage.setItem("ovcUserColorV1:" + String(handoff.id), restoredColor);
-          }
-          if (handoff.sessionToken) {
-            localStorage.setItem(currentSessionTokenKey, String(handoff.sessionToken));
-          }
-          sessionStorage.removeItem(loginHandoffKey);
-          window.location.replace("index.html?v=20260508f&recover=1");
-          return;
-        }
-      } catch (error) {
-        sessionStorage.removeItem(loginHandoffKey);
-      }
+    if (applyStoredLoginHandoff()) {
+      window.location.replace("./index.html?v=20260508h&recover=1");
+      return;
     }
-    window.location.replace("ovc-login.html?v=20260508f");
+    window.location.replace("./ovc-login.html?v=20260508h");
     return;
   }
 
@@ -3457,7 +3485,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "ovc-login.html";
+    window.location.href = "./ovc-login.html?v=20260508h";
   };
 
   if (multiplayerChannel) {
