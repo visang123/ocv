@@ -378,8 +378,10 @@ if (!currentSessionId) {
 if (!currentUserName || !currentUserId) {
   if (applyStoredLoginHandoff()) {
     window.location.replace("./index.html?v=20260508h&recover=1");
+    throw new Error("OVC login handoff recovery reload");
   } else {
     window.location.href = "./ovc-login.html?v=20260508h";
+    throw new Error("OVC login required");
   }
 }
 
