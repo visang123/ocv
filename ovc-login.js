@@ -33,6 +33,21 @@ function normalizeHexColor(value) {
   return value.toLowerCase();
 }
 
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  let timerId = null;
+  const timeoutPromise = new Promise(function (_, reject) {
+    timerId = setTimeout(function () {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(function () {
+    if (timerId) {
+      clearTimeout(timerId);
+    }
+  });
+}
+
 function redirectLoggedInUser() {
   const savedName = localStorage.getItem(currentUserKey);
   const savedId = localStorage.getItem(currentUserIdKey);
@@ -110,7 +125,11 @@ signupForm.addEventListener("submit", async function (event) {
   signupMessage.textContent = "가입 중...";
 
   try {
-    await window.OVCOnline.signUp(name, password);
+    await withTimeout(
+      window.OVCOnline.signUp(name, password),
+      12000,
+      "가입 요청이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
+    );
     loginName.value = name;
     loginPassword.value = "";
     loginMessage.textContent = "회원가입 완료. 비밀번호를 입력하고 로그인하세요.";
@@ -137,7 +156,11 @@ loginForm.addEventListener("submit", async function (event) {
   loginMessage.textContent = "로그인 중...";
 
   try {
-    const account = await window.OVCOnline.login(name, password);
+    const account = await withTimeout(
+      window.OVCOnline.login(name, password),
+      12000,
+      "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
+    );
     localStorage.setItem(currentUserKey, account.name);
     localStorage.setItem(currentUserIdKey, account.id);
     localStorage.setItem(currentUserHasChosenColorKey, account.id);
