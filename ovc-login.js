@@ -110,9 +110,8 @@ signupBackdrop.addEventListener("click", function (event) {
   }
 });
 
-signupForm.addEventListener("submit", async function (event) {
-  event.preventDefault();
-
+async function handleSignupSubmit() {
+  if (signupButton.disabled) return;
   const name = normalizeName(signupName.value);
   const password = signupPassword.value;
   const errorMessage = validateSignup(name, password);
@@ -149,11 +148,19 @@ signupForm.addEventListener("submit", async function (event) {
     clearTimeout(signupWatchdog);
     signupButton.disabled = false;
   }
+}
+
+signupForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+  handleSignupSubmit();
 });
 
-loginForm.addEventListener("submit", async function (event) {
-  event.preventDefault();
+signupButton.addEventListener("click", function () {
+  handleSignupSubmit();
+});
 
+async function handleLoginSubmit() {
+  if (loginButton.disabled) return;
   const name = normalizeName(loginName.value);
   const password = loginPassword.value;
 
@@ -202,6 +209,15 @@ loginForm.addEventListener("submit", async function (event) {
     clearTimeout(loginWatchdog);
     loginButton.disabled = false;
   }
+}
+
+loginForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+  handleLoginSubmit();
+});
+
+loginButton.addEventListener("click", function () {
+  handleLoginSubmit();
 });
 
 window.addEventListener("unhandledrejection", function (event) {
