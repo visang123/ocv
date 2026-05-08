@@ -1511,7 +1511,10 @@ function getSharedWorldSnapshot() {
           size: apple.size
         };
       }),
-      extraSeeds: appleState.extraSeeds.map(function (extraSeed) {
+      // Inventory seeds are local-only and must not be shared.
+      extraSeeds: appleState.extraSeeds.filter(function (extraSeed) {
+        return !extraSeed.inInventory;
+      }).map(function (extraSeed) {
         return {
           id: extraSeed.id,
           x: extraSeed.x,
@@ -1670,6 +1673,20 @@ function applySharedWorldSnapshot(snapshot) {
         snapshotSavedAt >= lastAppleStateChangeAt
       )
     ) {
+      const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
+        return Boolean(extraSeed.inInventory) && !extraSeed.planted;
+      }).map(function (extraSeed) {
+        return {
+          id: extraSeed.id,
+          x: extraSeed.x,
+          y: extraSeed.y,
+          createdAt: extraSeed.createdAt,
+          planted: false,
+          inInventory: true,
+          label: extraSeed.label || "\uC528\uC557",
+          isStarter: Boolean(extraSeed.isStarter)
+        };
+      });
       clearExtraSeedAndPlantElements();
       appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
@@ -1696,7 +1713,7 @@ function applySharedWorldSnapshot(snapshot) {
               y: Number(extraSeed.y) || 0,
               createdAt: Number(extraSeed.createdAt) || Date.now(),
               planted: Boolean(extraSeed.planted),
-              inInventory: Boolean(extraSeed.inInventory),
+              inInventory: false,
               label: extraSeed.label || "\uC528\uC557",
               isStarter: Boolean(extraSeed.isStarter)
             };
@@ -1704,6 +1721,8 @@ function applySharedWorldSnapshot(snapshot) {
         : [];
       if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
         appleState.extraSeeds = [];
+      } else if (localInventorySeeds.length > 0) {
+        appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
       }
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(function (plant) {
