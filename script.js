@@ -2942,13 +2942,17 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= plantDryMs
   ) {
-    removeMainPlant();
+    // Keep the planted ground and transition to dry soil instead of removing immediately.
+    plantRuntime.status = "dry";
+    plantRuntime.isOverwatered = false;
+    plantRuntime.needsFirstWater = false;
+    plantRuntime.growthStartedAt = null;
+    plantRuntime.isSproutGrown = false;
+    plantRuntime.sproutGrownAt = null;
     saveSeedState();
-    updatePlantState();
-    return;
   }
 
-  if (plantRuntime.status === "dry" || plantRuntime.status === "rotten") {
+  if (plantRuntime.status === "rotten") {
     removeMainPlant();
     saveSeedState();
     updatePlantState();
@@ -4272,25 +4276,18 @@ async function validateCurrentAccount() {
   if (isLoggingOut || !currentUserId || !window.OVCOnline) return;
 
   try {
-    if (window.OVCOnline.isConfigured() && typeof window.OVCOnline.validateSession === "function") {
+    if (typeof window.OVCOnline.validateSession === "function") {
       const storedToken = localStorage.getItem(currentSessionTokenKey);
       if (!storedToken) {
-        // Token can be absent on older data/schema. In that case still verify
-        // that the account exists so deleted accounts are forced out.
-        if (typeof window.OVCOnline.getAccount === "function") {
-          const account = await window.OVCOnline.getAccount(currentUserId);
-          if (!account) {
-            showOnlineDebugMessage("삭제된 계정입니다. 로그아웃합니다.");
-            setTimeout(logout, 800);
-          }
-        }
-      } else {
-        const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
-        if (!isValid) {
-          showOnlineDebugMessage("세션이 만료되어 로그아웃합니다.");
-          setTimeout(logout, 1200);
-          return;
-        }
+        showOnlineDebugMessage("세션 정보가 없어 로그아웃합니다.");
+        setTimeout(logout, 800);
+        return;
+      }
+      const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
+      if (!isValid) {
+        showOnlineDebugMessage("다른 기기에서 로그인되어 로그아웃합니다.");
+        setTimeout(logout, 1200);
+        return;
       }
     } else {
       const account = await window.OVCOnline.getAccount(currentUserId);
