@@ -277,7 +277,7 @@ let playerBaseImageReady = false;
 playerBaseImage.addEventListener("load", function () {
   playerBaseImageReady = true;
   playerTintCache.clear();
-  if (selectedPlayerColor) {
+  if (hasChosenPlayerColor && selectedPlayerColor) {
     applyPlayerColor(selectedPlayerColor);
   }
 });
@@ -3364,7 +3364,6 @@ function applyPlayerColor(color) {
   localStorage.setItem(lastSelectedColorKey, normalizedColor);
   if (currentUserId) {
     localStorage.setItem(currentUserColorKey, normalizedColor);
-    localStorage.setItem(currentUserHasChosenColorKey, currentUserId);
     localStorage.setItem("ovcUserColorV1:" + currentUserId, normalizedColor);
   }
   player.style.setProperty("--player-color", normalizedColor);
