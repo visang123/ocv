@@ -1566,20 +1566,18 @@ function applySharedWorldSnapshot(snapshot) {
   try {
     if (snapshot.bucket) {
       const heldBy = String(snapshot.bucket.heldBy || "");
+      const nextBucketX = Number(snapshot.bucket.x);
+      const nextBucketY = Number(snapshot.bucket.y);
       if (heldItem === HELD_ITEM_BUCKET) {
         // While local player is carrying the bucket, keep local ownership/state authoritative.
         window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
       } else {
-      window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
-      if (heldBy && heldBy !== currentSessionId) {
-        isBucketFull = Boolean(snapshot.bucket.isFull);
-        bucketX = Number(snapshot.bucket.x) || bucketX;
-        bucketY = Number(snapshot.bucket.y) || bucketY;
-      } else if (heldBy !== currentSessionId) {
-        isBucketFull = Boolean(snapshot.bucket.isFull);
-        bucketX = Number(snapshot.bucket.x) || bucketX;
-        bucketY = Number(snapshot.bucket.y) || bucketY;
-      }
+        window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
+        if (heldBy !== currentSessionId) {
+          isBucketFull = Boolean(snapshot.bucket.isFull);
+          if (Number.isFinite(nextBucketX)) bucketX = nextBucketX;
+          if (Number.isFinite(nextBucketY)) bucketY = nextBucketY;
+        }
       }
     }
 
@@ -2225,27 +2223,7 @@ function updateBucketPosition() {
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
-    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
-    if (
-      holder &&
-      Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.worldY)
-    ) {
-      // Expected hand anchor from remote rendered player position.
-      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
-      const expectedX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-      const expectedY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
-
-      const snapshotX = Number.isFinite(bucketX) ? bucketX : expectedX;
-      const snapshotY = Number.isFinite(bucketY) ? bucketY : expectedY;
-      const isSnapshotOutlier =
-        Math.abs(snapshotX - expectedX) > 48 ||
-        Math.abs(snapshotY - expectedY) > 48;
-
-      // If shared snapshot drifts too far, trust holder anchor to prevent floating bucket.
-      bucketX = isSnapshotOutlier ? expectedX : snapshotX;
-      bucketY = isSnapshotOutlier ? expectedY : snapshotY;
-    } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
@@ -4279,8 +4257,16 @@ async function validateCurrentAccount() {
     if (typeof window.OVCOnline.validateSession === "function") {
       const storedToken = localStorage.getItem(currentSessionTokenKey);
       if (!storedToken) {
-        showOnlineDebugMessage("세션 정보가 없어 로그아웃합니다.");
-        setTimeout(logout, 800);
+        // Token may be temporarily missing (e.g. migration/fallback path).
+        // Only force logout when the account itself no longer exists.
+        if (typeof window.OVCOnline.getAccount === "function") {
+          const account = await window.OVCOnline.getAccount(currentUserId);
+          if (!account) {
+            showOnlineDebugMessage("삭제된 계정입니다. 로그아웃합니다.");
+            setTimeout(logout, 800);
+            return;
+          }
+        }
         return;
       }
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);

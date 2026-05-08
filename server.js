@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const port = 5173;
 const root = __dirname;
@@ -84,6 +85,10 @@ function normalizeName(value) {
   return String(value || "").trim().normalize("NFC");
 }
 
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
 function handleApi(request, response, requestedPath) {
   if (request.method !== "POST") {
     sendJson(response, 405, { ok: false, message: "POST만 사용할 수 있습니다." });
@@ -116,7 +121,7 @@ function handleApi(request, response, requestedPath) {
       const account = {
         id: "local-" + Date.now() + "-" + Math.random().toString(16).slice(2),
         name,
-        password,
+        password_hash: sha256Hex(password),
         color: null,
         createdAt: Date.now()
       };
@@ -131,8 +136,13 @@ function handleApi(request, response, requestedPath) {
     readJsonBody(request, response, (body) => {
       const name = normalizeName(body.name);
       const password = String(body.password || "");
+      const passwordHash = sha256Hex(password);
       const account = readAccounts().find((savedAccount) => {
-        return normalizeName(savedAccount.name) === name && savedAccount.password === password;
+        const savedHash =
+          typeof savedAccount.password_hash === "string" && savedAccount.password_hash
+            ? savedAccount.password_hash
+            : sha256Hex(savedAccount.password || "");
+        return normalizeName(savedAccount.name) === name && savedHash === passwordHash;
       });
 
       if (!account) {
@@ -147,8 +157,21 @@ function handleApi(request, response, requestedPath) {
 
       const sessionToken = generateSessionToken();
       account.sessionToken = sessionToken;
+      if (!account.password_hash && account.password) {
+        account.password_hash = sha256Hex(account.password);
+      }
+      if ("password" in account) {
+        delete account.password;
+      }
       writeAccounts(readAccounts().map(function (a) {
-        return a.id === account.id ? account : a;
+        const nextAccount = a.id === account.id ? account : a;
+        if (!nextAccount.password_hash && nextAccount.password) {
+          nextAccount.password_hash = sha256Hex(nextAccount.password);
+        }
+        if ("password" in nextAccount) {
+          delete nextAccount.password;
+        }
+        return nextAccount;
       }));
       sendJson(response, 200, { ok: true, id: account.id, name: account.name, color: account.color || null, session_token: sessionToken });
     });
