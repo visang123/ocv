@@ -424,7 +424,7 @@ document.addEventListener("keydown", function (event) {
     }
     if (pickApple()) return;
     if (pickUpGuideBook()) return;
-    toggleSeed();
+    pickUpNearestItem();
   }
 
   if (key === "q" && !event.repeat) {
@@ -1084,13 +1084,7 @@ function setNpcStartPosition() {
 }
 
 function toggleSeed() {
-  if (plantRuntime.isPlanting) return;
-
-  if (heldItem) {
-    dropHeldItem();
-    return;
-  }
-
+  if (plantRuntime.isPlanting || heldItem) return;
   pickUpNearestItem();
 }
 
