@@ -2223,25 +2223,7 @@ function updateBucketPosition() {
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
-    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
-    if (
-      holder &&
-      Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.worldY)
-    ) {
-      // Keep bucket visually attached to remote player hand.
-      const scaleY = ground.clientHeight > 0 ? ground.clientHeight / GROUND_WORLD_HEIGHT : 0;
-      const holderRenderedHeight = holder.element && holder.element.offsetHeight
-        ? holder.element.offsetHeight
-        : 0;
-      const holderWorldHeight =
-        scaleY > 0 && holderRenderedHeight > 0
-          ? holderRenderedHeight / scaleY
-          : PLAYER_HEIGHT;
-      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - holderWorldHeight);
-      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-      bucketY = remoteTopY + holderWorldHeight * 0.68 - bucketSize.height / 2;
-    } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
@@ -3810,6 +3792,9 @@ function sendMultiplayerPresence(forceSend) {
     x: playerX,
     depth: playerDepth,
     jumpY,
+    bucketHeld: heldItem === HELD_ITEM_BUCKET,
+    bucketX: bucketX,
+    bucketY: bucketY,
     updatedAt: now
   };
   const stateKey = [
@@ -3964,6 +3949,18 @@ function handleRemotePlayerBroadcast(state) {
   if (state.action === "leave") {
     removeRemotePlayer(state.id);
     return;
+  }
+
+  if (state.bucketHeld === true) {
+    window.OVC_SHARED_BUCKET_HELD_BY = state.id;
+    if (Number.isFinite(Number(state.bucketX))) {
+      bucketX = Number(state.bucketX);
+    }
+    if (Number.isFinite(Number(state.bucketY))) {
+      bucketY = Number(state.bucketY);
+    }
+  } else if (state.bucketHeld === false && window.OVC_SHARED_BUCKET_HELD_BY === state.id) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
   }
 
   renderRemotePlayerState(state);
