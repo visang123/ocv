@@ -271,6 +271,8 @@ let isWorldPolling = false;
 let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
+let lastBucketFastSyncAt = 0;
+let lastBucketFastPollAt = 0;
 let lastWorldUpdatedAt = "";
 let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
@@ -323,6 +325,8 @@ const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
 const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
 const MULTIPLAYER_WORLD_SYNC_LOOP_MS = 400;
 const MULTIPLAYER_WORLD_POLL_MIN_MS = 400;
+const BUCKET_FAST_SYNC_MS = 120;
+const BUCKET_FAST_POLL_MS = 120;
 
 const keys = createInputState();
 
@@ -2221,6 +2225,11 @@ function updateBucketPosition() {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
     markWorldDirty();
+    const now = Date.now();
+    if (now - lastBucketFastSyncAt >= BUCKET_FAST_SYNC_MS) {
+      syncWorldState(true);
+      lastBucketFastSyncAt = now;
+    }
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
@@ -2231,6 +2240,11 @@ function updateBucketPosition() {
     bucketY = Math.max(-PLAYER_HEIGHT, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
+    const now = Date.now();
+    if (now - lastBucketFastPollAt >= BUCKET_FAST_POLL_MS) {
+      pollWorldState(true);
+      lastBucketFastPollAt = now;
+    }
   } else {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
@@ -2485,7 +2499,7 @@ function startPlanting() {
     plantRuntime.status = "normal";
     plantRuntime.waterLevel = 0;
     plantRuntime.waterLevelUpdatedAt = Date.now();
-    plantRuntime.becameEmptyAt = null;
+    plantRuntime.becameEmptyAt = Date.now();
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
     plantRuntime.growthStartedAt = null;
@@ -2578,7 +2592,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.status = "normal";
       plantRuntime.waterLevel = 0;
       plantRuntime.waterLevelUpdatedAt = Date.now();
-      plantRuntime.becameEmptyAt = null;
+      plantRuntime.becameEmptyAt = Date.now();
       plantRuntime.isOverwatered = false;
       plantRuntime.needsFirstWater = true;
       plantRuntime.growthStartedAt = null;
@@ -2611,7 +2625,7 @@ function createExtraPlant(id, x, y) {
     status: "normal",
     waterLevel: 0,
     waterLevelUpdatedAt: now,
-    becameEmptyAt: null,
+    becameEmptyAt: now,
     isOverwatered: false,
     needsFirstWater: true,
     growthStartedAt: null,
@@ -2890,6 +2904,10 @@ function updatePlantWaterLevel() {
   const previousWaterLevel = plantRuntime.waterLevel;
   plantRuntime.waterLevel = Math.max(0, plantRuntime.waterLevel - elapsedTicks);
   plantRuntime.waterLevelUpdatedAt += elapsedTicks * plantWaterLevelTickMs;
+
+  if (plantRuntime.waterLevel <= 0 && plantRuntime.becameEmptyAt === null) {
+    plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
+  }
 
   if (previousWaterLevel > 0 && plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
     plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
