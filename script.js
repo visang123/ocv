@@ -165,6 +165,8 @@ let seedX = 0;
 let seedY = 20;
 let bucketX = 0;
 let bucketY = 0;
+let bucketRenderX = 0;
+let bucketRenderY = 0;
 let wellX = 0;
 let wellY = 0;
 let signX = SIGN_START_X;
@@ -908,6 +910,8 @@ function applyDefaultState() {
   isBucketFull = false;
   bucketX = wellX - BUCKET_SIZE - 8;
   bucketY = wellY + WELL_SIZE - BUCKET_SIZE;
+  bucketRenderX = bucketX;
+  bucketRenderY = bucketY;
 
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
@@ -1424,16 +1428,14 @@ function getSharedWorldSnapshot() {
           size: apple.size
         };
       }),
-      extraSeeds: appleState.extraSeeds.filter(function (extraSeed) {
-        return !extraSeed.isStarter;
-      }).map(function (extraSeed) {
+      extraSeeds: appleState.extraSeeds.map(function (extraSeed) {
         return {
           id: extraSeed.id,
           x: extraSeed.x,
           y: extraSeed.y,
           createdAt: extraSeed.createdAt,
           planted: Boolean(extraSeed.planted),
-          inInventory: false,
+          inInventory: Boolean(extraSeed.inInventory),
           label: extraSeed.label,
           isStarter: Boolean(extraSeed.isStarter)
         };
@@ -1507,6 +1509,16 @@ function applySharedWorldSnapshot(snapshot) {
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
     }
 
+    if (snapshot.seed) {
+      seedX = Number(snapshot.seed.x) || seedX;
+      seedY = Number(snapshot.seed.y) || seedY;
+      plantRuntime.seedCreatedAt = Number(snapshot.seed.createdAt) || plantRuntime.seedCreatedAt;
+      plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
+      if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
+        heldItem = null;
+      }
+    }
+
     if (snapshot.mainPlant) {
       applyLoadedPlantState({
         isSeedPlanted: Boolean(snapshot.mainPlant.isSeedPlanted),
@@ -1533,9 +1545,6 @@ function applySharedWorldSnapshot(snapshot) {
     }
 
     if (snapshot.apples) {
-      const localStarterSeeds = appleState.extraSeeds.filter(function (extraSeed) {
-        return extraSeed.isStarter;
-      });
       clearExtraSeedAndPlantElements();
       appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
@@ -1554,7 +1563,7 @@ function applySharedWorldSnapshot(snapshot) {
             };
           })
         : appleState.apples;
-      appleState.extraSeeds = localStarterSeeds.concat(Array.isArray(snapshot.apples.extraSeeds)
+      appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
         ? snapshot.apples.extraSeeds.map(function (extraSeed) {
             return {
               id: String(extraSeed.id),
@@ -1562,12 +1571,12 @@ function applySharedWorldSnapshot(snapshot) {
               y: Number(extraSeed.y) || 0,
               createdAt: Number(extraSeed.createdAt) || Date.now(),
               planted: Boolean(extraSeed.planted),
-              inInventory: false,
+              inInventory: Boolean(extraSeed.inInventory),
               label: extraSeed.label || "\uC528\uC557",
               isStarter: Boolean(extraSeed.isStarter)
             };
           })
-        : []);
+        : [];
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(function (plant) {
             return {
@@ -2121,6 +2130,10 @@ function clearExtraSeedAndPlantElements() {
 
 function updateBucketPosition() {
   bucket.src = isBucketFull ? "bucket-full.png" : "bucket-empty.png";
+  const isBucketHeldByRemotePlayer =
+    Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
+    window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
+    heldItem !== HELD_ITEM_BUCKET;
 
   if (heldItem === HELD_ITEM_BUCKET) {
     const bucketSize = getBucketSize();
@@ -2128,10 +2141,21 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
     markWorldDirty();
+  } else if (isBucketHeldByRemotePlayer) {
+    // Smooth remote-held bucket movement to avoid teleporting between snapshots.
+    bucketRenderX += (bucketX - bucketRenderX) * 0.28;
+    bucketRenderY += (bucketY - bucketRenderY) * 0.28;
+    if (Math.abs(bucketX - bucketRenderX) < 0.4) bucketRenderX = bucketX;
+    if (Math.abs(bucketY - bucketRenderY) < 0.4) bucketRenderY = bucketY;
+  } else {
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
   }
 
-  setWorldPosition(bucket, bucketX, bucketY);
+  setWorldPosition(bucket, bucketRenderX, bucketRenderY);
 }
 
 function updatePlayerPosition() {
@@ -4112,14 +4136,23 @@ async function validateCurrentAccount() {
   try {
     if (window.OVCOnline.isConfigured() && typeof window.OVCOnline.validateSession === "function") {
       const storedToken = localStorage.getItem(currentSessionTokenKey);
-      // If session token is not ready (or DB column not migrated yet),
-      // skip forced logout so multiplayer can still run.
-      if (!storedToken) return;
-      const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
-      if (!isValid) {
-        showOnlineDebugMessage("?? ???? ????? ?? ???????.");
-        setTimeout(logout, 1200);
-        return;
+      if (!storedToken) {
+        // Token can be absent on older data/schema. In that case still verify
+        // that the account exists so deleted accounts are forced out.
+        if (typeof window.OVCOnline.getAccount === "function") {
+          const account = await window.OVCOnline.getAccount(currentUserId);
+          if (!account) {
+            showOnlineDebugMessage("삭제된 계정입니다. 로그아웃합니다.");
+            setTimeout(logout, 800);
+          }
+        }
+      } else {
+        const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
+        if (!isValid) {
+          showOnlineDebugMessage("세션이 만료되어 로그아웃합니다.");
+          setTimeout(logout, 1200);
+          return;
+        }
       }
     } else {
       const account = await window.OVCOnline.getAccount(currentUserId);
@@ -4271,6 +4304,8 @@ function setup() {
     wellY = WELL_START_Y;
     bucketX = wellX - bucketSize.width - 8;
     bucketY = wellY + wellSize.height - bucketSize.height;
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
     isSetupComplete = true;
   }
 
