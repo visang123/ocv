@@ -265,6 +265,7 @@ let lastWaterSplashY = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
 let localApplePickedAtById = {};
+let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
@@ -854,6 +855,7 @@ function loadGuideBookState() {
 
 function resetGameForTesting() {
   clearStoredKeys(appStorageKeys);
+  ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
   lastWorldResetAt = Date.now();
@@ -1571,6 +1573,7 @@ function applySharedWorldSnapshot(snapshot) {
   ) {
     lastAppliedWorldResetToken = snapshotResetToken;
     lastWorldResetAt = Date.now();
+    ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
     clearStoredKeys(appStorageKeys);
@@ -1699,6 +1702,9 @@ function applySharedWorldSnapshot(snapshot) {
             };
           })
         : [];
+      if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
+        appleState.extraSeeds = [];
+      }
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(function (plant) {
             return {
