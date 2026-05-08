@@ -497,7 +497,7 @@ guideCard.addEventListener("click", function () {
   updateGuideCard();
 });
 
-document.addEventListener("pointerdown", function (event) {
+document.addEventListener("click", function (event) {
   if (guideCard.style.display !== "block") return;
   if (guideCard.contains(event.target)) return;
   if (event.target === guideBookButton) return;
@@ -505,7 +505,7 @@ document.addEventListener("pointerdown", function (event) {
   isGuideBookOpen = false;
   isGuideDismissedAtSign = true;
   updateGuideCard();
-});
+}, true);
 
 seed.addEventListener("mouseenter", function () {
   isHoveringMainSeed = true;
