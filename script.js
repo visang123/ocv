@@ -407,6 +407,10 @@ document.addEventListener("keydown", function (event) {
   if (key === "e" && !event.repeat) {
     event.preventDefault();
     if (plantRuntime.isPlanting) return;
+    if (heldItem) {
+      dropHeldItem();
+      return;
+    }
     if (pickApple()) return;
     if (pickUpGuideBook()) return;
     toggleSeed();
