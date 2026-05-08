@@ -1471,11 +1471,20 @@ function readWaterLevel(value, fallback) {
 function applySharedWorldSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
+  const snapshotResetToken = String(snapshot.resetToken || "");
+  // After any world reset, ignore snapshots that do not carry the same reset token.
+  // This prevents stale pre-reset state from restoring dried/duplicate seeds.
   if (
-    snapshot.resetToken &&
-    snapshot.resetToken !== lastAppliedWorldResetToken
+    lastAppliedWorldResetToken &&
+    snapshotResetToken !== lastAppliedWorldResetToken
   ) {
-    lastAppliedWorldResetToken = snapshot.resetToken;
+    return;
+  }
+  if (
+    snapshotResetToken &&
+    snapshotResetToken !== lastAppliedWorldResetToken
+  ) {
+    lastAppliedWorldResetToken = snapshotResetToken;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
     clearStoredKeys(appStorageKeys);
@@ -1506,15 +1515,6 @@ function applySharedWorldSnapshot(snapshot) {
     if (snapshot.well) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
-    }
-
-    if (snapshot.seed) {
-      plantRuntime.seedCreatedAt = Number(snapshot.seed.createdAt) || plantRuntime.seedCreatedAt;
-      // Never trust remote isDry directly; always derive from seedCreatedAt.
-      updateSeedDryState();
-      if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
-        heldItem = null;
-      }
     }
 
     if (snapshot.mainPlant) {
@@ -2148,6 +2148,17 @@ function updateBucketPosition() {
     bucketRenderY = bucketY;
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
+    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
+    if (
+      holder &&
+      Number.isFinite(holder.worldX) &&
+      Number.isFinite(holder.worldY)
+    ) {
+      const bucketSize = getBucketSize();
+      // Match local hand anchor so the bucket sticks to the remote character body.
+      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+      bucketY = holder.worldY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+    }
     // Smooth remote-held bucket movement to avoid teleporting between snapshots.
     bucketRenderX += (bucketX - bucketRenderX) * 0.28;
     bucketRenderY += (bucketY - bucketRenderY) * 0.28;
@@ -3880,6 +3891,8 @@ function renderRemotePlayerState(state) {
     setWorldPosition(remotePlayer.element, nextX, nextY);
     remotePlayer.positionKey = nextPositionKey;
   }
+  remotePlayer.worldX = nextX;
+  remotePlayer.worldY = nextY;
   remotePlayer.lastSeenAt = Date.now();
 }
 
@@ -3903,7 +3916,16 @@ function createRemotePlayer(remoteId) {
   ground.appendChild(element);
   setWorldSize(element, PLAYER_WIDTH);
 
-  remotePlayers[remoteId] = { element, bodyElement, nameElement, statusElement, positionKey: "", lastSeenAt: Date.now() };
+  remotePlayers[remoteId] = {
+    element,
+    bodyElement,
+    nameElement,
+    statusElement,
+    positionKey: "",
+    worldX: 0,
+    worldY: 0,
+    lastSeenAt: Date.now()
+  };
   return remotePlayers[remoteId];
 }
 
