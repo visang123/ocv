@@ -2223,12 +2223,16 @@ function updateBucketPosition() {
     if (
       holder &&
       Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.worldY)
+      Number.isFinite(holder.depth) &&
+      Number.isFinite(holder.jumpY)
     ) {
       const bucketSize = getBucketSize();
-      // Match local hand anchor so the bucket sticks to the remote character body.
+      // Remote player element uses bottom-origin movement. Bucket uses top-origin,
+      // so derive hand Y from remote depth/jump with the same formula as local playerBox.
+      const remoteTopY =
+        GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-      bucketY = holder.worldY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+      bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
     } else {
       // Fallback: keep last synced world position, but never let invalid values hide bucket.
       if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
@@ -3985,6 +3989,8 @@ function renderRemotePlayerState(state) {
   }
   remotePlayer.worldX = nextX;
   remotePlayer.worldY = nextY;
+  remotePlayer.depth = Number(state.depth) || 0;
+  remotePlayer.jumpY = Number(state.jumpY) || 0;
   remotePlayer.lastSeenAt = Date.now();
 }
 
@@ -4016,6 +4022,8 @@ function createRemotePlayer(remoteId) {
     positionKey: "",
     worldX: 0,
     worldY: 0,
+    depth: 0,
+    jumpY: 0,
     lastSeenAt: Date.now()
   };
   return remotePlayers[remoteId];
