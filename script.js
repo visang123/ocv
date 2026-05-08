@@ -242,7 +242,7 @@ let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
 let remotePlayers = {};
 let remotePlayerCount = 0;
-let multiplayerStatusText = "대기";
+let multiplayerStatusText = "?��?;
 let isMultiplayerSubscribed = false;
 let multiplayerReconnectTimeout = null;
 let multiplayerConnectAttempt = 0;
@@ -318,7 +318,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508v");
+  window.location.replace("/ovc-login.html?v=20260508ac");
   throw new Error("OVC login required");
 }
 
@@ -447,6 +447,8 @@ window.addEventListener("pageshow", function () {
 });
 document.addEventListener("visibilitychange", function () {
   if (document.hidden) {
+    settlePlayerBeforeBackground();
+    sendMultiplayerPresence(true);
     saveGameSnapshot();
     resetInputKeys(keys);
   }
@@ -529,28 +531,33 @@ const spawnPortal = document.getElementById("spawn-portal");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 player.insertAdjacentElement("afterend", playerColorBody);
+const networkDebugButton = document.createElement("button");
+networkDebugButton.id = "network-debug-button";
+networkDebugButton.type = "button";
+networkDebugButton.setAttribute("aria-label", "로그");
+document.body.appendChild(networkDebugButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
-controlsButton.textContent = "조작법";
+controlsButton.textContent = "조작�?;
 settingsModal.insertBefore(controlsButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong><button id="controls-close-button" type="button" aria-label="닫기">×</button></div>' +
+  '<div class="controls-header"><strong>조작�?/strong><button id="controls-close-button" type="button" aria-label="?�기">×</button></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / ↑</span><p>위로 이동</p></div>' +
-  '<div><span>A / ←</span><p>왼쪽으로 이동</p></div>' +
-  '<div><span>S / ↓</span><p>아래로 이동</p></div>' +
-  '<div><span>D / →</span><p>오른쪽으로 이동</p></div>' +
-  '<div><span>Space</span><p>점프</p></div>' +
-  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
-  '<div><span>Q</span><p>사용 / 대화</p></div>' +
-  '<div><span>🖱 휠</span><p>확대 / 축소</p></div>' +
-  '<div><span>⚙</span><p>설정 열기</p></div>' +
+  '<div><span>W / ??/span><p>?�로 ?�동</p></div>' +
+  '<div><span>A / ??/span><p>?�쪽?�로 ?�동</p></div>' +
+  '<div><span>S / ??/span><p>?�래�??�동</p></div>' +
+  '<div><span>D / ??/span><p>?�른쪽으�??�동</p></div>' +
+  '<div><span>Space</span><p>?�프</p></div>' +
+  '<div><span>E</span><p>줍기 / ?�려?�기</p></div>' +
+  '<div><span>Q</span><p>?�용 / ?�??/p></div>' +
+  '<div><span>마우????/span><p>?��? / 축소</p></div>' +
+  '<div><span>??/span><p>?�정 ?�기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 const controlsCloseButton = document.getElementById("controls-close-button");
@@ -611,6 +618,10 @@ changeColorButton.addEventListener("click", function () {
 
 adminOpenButton.addEventListener("dblclick", function () {
   openAdminPanel();
+});
+
+networkDebugButton.addEventListener("dblclick", function () {
+  networkDebugPanel.classList.toggle("is-visible");
 });
 
 adminCloseButton.addEventListener("click", function () {
@@ -812,6 +823,20 @@ function restartPlayerPositionOnly() {
   wasPlayerInTree = false;
   plantingInventorySeedId = null;
   savePlayerPosition(true);
+}
+
+function settlePlayerBeforeBackground() {
+  const groundMaxDepth = getMaxGroundedPlayerDepth();
+  if (playerDepth > groundMaxDepth && !isPlayerSupportedByTree()) {
+    playerDepth = groundMaxDepth;
+    jumpY = 0;
+    velocityY = 0;
+    isOnGround = true;
+    isTreeFalling = false;
+    wasPlayerInTree = false;
+    setWorldPosition(player, playerX, getPlayerWorldY());
+    updatePlayerColorBodyPosition();
+  }
 }
 
 function applyDefaultState() {
@@ -1359,7 +1384,6 @@ function getSharedWorldSnapshot() {
     },
     mainPlant: getPlantStateForStorage(),
     apples: {
-      count: appleState.count,
       pickedIds: appleState.pickedIds.slice(),
       nextSeedOffset: appleState.nextSeedOffset,
       lastSpawnAt: appleState.lastSpawnAt,
@@ -1373,14 +1397,16 @@ function getSharedWorldSnapshot() {
           size: apple.size
         };
       }),
-      extraSeeds: appleState.extraSeeds.map(function (extraSeed) {
+      extraSeeds: appleState.extraSeeds.filter(function (extraSeed) {
+        return !extraSeed.isStarter;
+      }).map(function (extraSeed) {
         return {
           id: extraSeed.id,
           x: extraSeed.x,
           y: extraSeed.y,
           createdAt: extraSeed.createdAt,
           planted: Boolean(extraSeed.planted),
-          inInventory: Boolean(extraSeed.inInventory),
+          inInventory: false,
           label: extraSeed.label,
           isStarter: Boolean(extraSeed.isStarter)
         };
@@ -1408,8 +1434,15 @@ function getSharedWorldSnapshot() {
   };
 }
 
+function readWaterLevel(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(0, Math.min(2, number));
+}
+
 function applySharedWorldSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
+  if (snapshot.savedBy === currentSessionId) return;
   if (
     snapshot.resetToken &&
     snapshot.resetToken !== lastAppliedWorldResetToken
@@ -1453,7 +1486,7 @@ function applySharedWorldSnapshot(snapshot) {
         plantLastWateredAt: Number(snapshot.mainPlant.plantLastWateredAt) || null,
         plantWateredAtList: Array.isArray(snapshot.mainPlant.plantWateredAtList) ? snapshot.mainPlant.plantWateredAtList : [],
         plantState: snapshot.mainPlant.plantState || "normal",
-        plantWaterLevel: Number(snapshot.mainPlant.plantWaterLevel) || 1,
+        plantWaterLevel: readWaterLevel(snapshot.mainPlant.plantWaterLevel, 1),
         plantWaterLevelUpdatedAt: Number(snapshot.mainPlant.plantWaterLevelUpdatedAt) || Date.now(),
         plantBecameEmptyAt: Number(snapshot.mainPlant.plantBecameEmptyAt) || null,
         isPlantOverwatered: Boolean(snapshot.mainPlant.isPlantOverwatered),
@@ -1464,11 +1497,17 @@ function applySharedWorldSnapshot(snapshot) {
       });
       npcX = Number(snapshot.mainPlant.npcX) || npcX;
       npcY = Number(snapshot.mainPlant.npcY) || npcY;
+      plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
+      if (plantRuntime.isSeedPlanted) {
+        setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+      }
     }
 
     if (snapshot.apples) {
+      const localStarterSeeds = appleState.extraSeeds.filter(function (extraSeed) {
+        return extraSeed.isStarter;
+      });
       clearExtraSeedAndPlantElements();
-      appleState.count = Math.max(0, Number(snapshot.apples.count) || 0);
       appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
       appleState.lastSpawnAt = Number(snapshot.apples.lastSpawnAt) || Date.now();
@@ -1486,7 +1525,7 @@ function applySharedWorldSnapshot(snapshot) {
             };
           })
         : appleState.apples;
-      appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
+      appleState.extraSeeds = localStarterSeeds.concat(Array.isArray(snapshot.apples.extraSeeds)
         ? snapshot.apples.extraSeeds.map(function (extraSeed) {
             return {
               id: String(extraSeed.id),
@@ -1494,12 +1533,12 @@ function applySharedWorldSnapshot(snapshot) {
               y: Number(extraSeed.y) || 0,
               createdAt: Number(extraSeed.createdAt) || Date.now(),
               planted: Boolean(extraSeed.planted),
-              inInventory: Boolean(extraSeed.inInventory),
-              label: extraSeed.label || "씨앗",
+              inInventory: false,
+              label: extraSeed.label || "?�앗",
               isStarter: Boolean(extraSeed.isStarter)
             };
           })
-        : [];
+        : []);
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(function (plant) {
             return {
@@ -1510,7 +1549,7 @@ function applySharedWorldSnapshot(snapshot) {
               lastWateredAt: Number(plant.lastWateredAt) || null,
               wateredAtList: Array.isArray(plant.wateredAtList) ? plant.wateredAtList.slice() : [],
               status: plant.status || "normal",
-              waterLevel: Number(plant.waterLevel) || 1,
+              waterLevel: readWaterLevel(plant.waterLevel, 1),
               waterLevelUpdatedAt: Number(plant.waterLevelUpdatedAt) || Date.now(),
               becameEmptyAt: Number(plant.becameEmptyAt) || null,
               isOverwatered: Boolean(plant.isOverwatered),
@@ -1530,10 +1569,55 @@ function applySharedWorldSnapshot(snapshot) {
     updateApples();
     updateExtraSeedsAndPlants();
     updatePlantState();
+    ensureSharedPlantVisuals();
+    refreshSharedWaterIndicators();
     updateSeedInventory();
   } finally {
     isApplyingWorldState = false;
   }
+}
+
+function ensureSharedPlantVisuals() {
+  if (plantRuntime.isSeedPlanted) {
+    plantSpot.style.display = "block";
+    plantSpot.src = getPlantSoilSrc(plantRuntime);
+    setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+  }
+
+  appleState.extraPlants.forEach(function (plant) {
+    ensureExtraPlantElements(plant);
+    plant.spotElement.style.display = "block";
+    plant.spotElement.src = getPlantSoilSrc(plant);
+    setWorldPosition(plant.spotElement, plant.x, plant.y);
+  });
+}
+
+function refreshSharedWaterIndicators() {
+  if (
+    plantRuntime.isSeedPlanted &&
+    plantRuntime.needsFirstWater &&
+    plantRuntime.status !== "dry" &&
+    plantRuntime.status !== "rotten"
+  ) {
+    waterNeeded.style.display = "block";
+    setWorldPosition(
+      waterNeeded,
+      plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
+      plantRuntime.spotY - WATER_NEEDED_SIZE - 2
+    );
+  }
+
+  appleState.extraPlants.forEach(function (plant) {
+    if (!plant.waterNeededElement) return;
+    if (plant.needsFirstWater && plant.status !== "dry" && plant.status !== "rotten") {
+      plant.waterNeededElement.style.display = "block";
+      setWorldPosition(
+        plant.waterNeededElement,
+        plant.x + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
+        plant.y - WATER_NEEDED_SIZE - 2
+      );
+    }
+  });
 }
 
 function syncWorldState(forceSave) {
@@ -1595,13 +1679,13 @@ function saveSharedWorldAndReload() {
   });
 }
 
-function pollWorldState() {
+function pollWorldState(forcePoll) {
   const now = Date.now();
   if (
     isWorldPolling ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
-    now - lastWorldPollAt < 1000
+    (!forcePoll && now - lastWorldPollAt < 1500)
   ) {
     return;
   }
@@ -1782,7 +1866,7 @@ function normalizeExtraPlantState(plant) {
   const now = Date.now();
   if (!plant.status) plant.status = "normal";
   if (!Array.isArray(plant.wateredAtList)) plant.wateredAtList = [];
-  if (!Number.isFinite(Number(plant.waterLevel))) plant.waterLevel = 1;
+  plant.waterLevel = readWaterLevel(plant.waterLevel, 1);
   if (!plant.waterLevelUpdatedAt) plant.waterLevelUpdatedAt = plant.plantedAt || now;
   if (typeof plant.needsFirstWater !== "boolean") {
     plant.needsFirstWater = !plant.growthStartedAt;
@@ -2132,10 +2216,10 @@ function isPlayerInWellWaterArea() {
   const footX = getPlayerCenterX();
   const footY = getPlayerFootY();
   return (
-    footX >= wellX + 9 &&
-    footX <= wellX + WELL_SIZE - 9 &&
-    footY >= wellY + 10 &&
-    footY <= wellY + WELL_SIZE - 8
+    footX >= wellX + 12 &&
+    footX <= wellX + WELL_SIZE - 12 &&
+    footY >= wellY + WELL_SIZE * 0.55 &&
+    footY <= wellY + WELL_SIZE - 6
   );
 }
 
@@ -2253,7 +2337,7 @@ function startPlanting() {
     plantRuntime.lastWateredAt = Date.now();
     plantRuntime.wateredAtList = [];
     plantRuntime.status = "normal";
-    plantRuntime.waterLevel = 1;
+    plantRuntime.waterLevel = 0;
     plantRuntime.waterLevelUpdatedAt = Date.now();
     plantRuntime.becameEmptyAt = null;
     plantRuntime.isOverwatered = false;
@@ -2346,7 +2430,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.lastWateredAt = Date.now();
       plantRuntime.wateredAtList = [];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 1;
+      plantRuntime.waterLevel = 0;
       plantRuntime.waterLevelUpdatedAt = Date.now();
       plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
@@ -2379,7 +2463,7 @@ function createExtraPlant(id, x, y) {
     lastWateredAt: now,
     wateredAtList: [],
     status: "normal",
-    waterLevel: 1,
+    waterLevel: 0,
     waterLevelUpdatedAt: now,
     becameEmptyAt: null,
     isOverwatered: false,
@@ -2391,6 +2475,7 @@ function createExtraPlant(id, x, y) {
 }
 
 function canPlantAt(x, y) {
+  pollWorldState(true);
   const plantCenters = [];
 
   if (plantRuntime.isSeedPlanted) {
@@ -2552,6 +2637,7 @@ function waterPlant(target) {
   const now = Date.now();
 
   updatePlantWaterLevel();
+  const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
 
   plantRuntime.lastWateredAt = now;
   plantRuntime.needsFirstWater = false;
@@ -2572,7 +2658,11 @@ function waterPlant(target) {
     return;
   }
 
-  if (plantRuntime.waterLevel >= 2) {
+  if (isFirstWater || plantRuntime.waterLevel <= 0) {
+    plantRuntime.waterLevel = 1;
+    plantRuntime.isOverwatered = false;
+    plantRuntime.status = "normal";
+  } else if (plantRuntime.waterLevel >= 2) {
     plantRuntime.isOverwatered = true;
     plantRuntime.status = "rotten";
     plantRuntime.growthStartedAt = null;
@@ -2595,6 +2685,7 @@ function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
+  const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
 
   plant.lastWateredAt = now;
   plant.needsFirstWater = false;
@@ -2615,7 +2706,11 @@ function waterExtraPlant(plant) {
     return;
   }
 
-  if (plant.waterLevel >= 2) {
+  if (isFirstWater || plant.waterLevel <= 0) {
+    plant.waterLevel = 1;
+    plant.isOverwatered = false;
+    plant.status = "normal";
+  } else if (plant.waterLevel >= 2) {
     plant.isOverwatered = true;
     plant.status = "rotten";
     plant.growthStartedAt = null;
@@ -3210,7 +3305,7 @@ function postJson(url, payload) {
   }).then(function (response) {
     return response.json().then(function (data) {
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "요청에 실패했습니다.");
+        throw new Error(data.message || "?�청???�패?�습?�다.");
       }
 
       return data;
@@ -3298,7 +3393,7 @@ function buildCharacterColorGrid() {
     button.type = "button";
     button.className = "character-color-option";
     button.style.background = color;
-    button.setAttribute("aria-label", color + " 색깔");
+    button.setAttribute("aria-label", color + " ?�깔");
 
     if (color === selectedPlayerColor) {
       button.classList.add("is-selected");
@@ -3324,7 +3419,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508v");
+    window.location.replace("/ovc-login.html?v=20260508ac");
     return;
   }
 
@@ -3395,18 +3490,18 @@ function updatePlayerName() {
 
 function setupMultiplayer() {
   if (!hasSpawnedCharacter) {
-    updateMultiplayerStatus("색 선택 전");
+    updateMultiplayerStatus("캐릭???�택 ??);
     addNetworkDebugLog("multiplayer skipped: character not spawned");
     return;
   }
 
   if (multiplayerChannel) {
     if (isMultiplayerSubscribed) {
-      updateMultiplayerStatus("연결됨");
+      updateMultiplayerStatus("?�결??);
       sendMultiplayerPresence(true);
       addNetworkDebugLog("multiplayer reuse: subscribed channel");
     } else {
-      updateMultiplayerStatus("연결중");
+      updateMultiplayerStatus("?�결�?);
       addNetworkDebugLog("multiplayer reuse: waiting subscribe");
     }
     return;
@@ -3418,7 +3513,7 @@ function setupMultiplayer() {
     !window.OVCOnline ||
     !window.OVCOnline.isConfigured()
   ) {
-    updateMultiplayerStatus("연결 안됨");
+    updateMultiplayerStatus("?�결 ?�됨");
     addNetworkDebugLog(
       "multiplayer unavailable: userId=" +
       Boolean(currentUserId) +
@@ -3440,7 +3535,7 @@ function setupMultiplayer() {
     addNetworkDebugLog("warning: sb_publishable key can close Realtime immediately; use anon public key");
   }
 
-  updateMultiplayerStatus("연결중");
+  updateMultiplayerStatus("?�결�?);
   const channel = window.OVCOnline.createPresenceChannel(
     window.OVC_ONLINE_CONFIG.multiplayerRoom,
     currentSessionId
@@ -3449,7 +3544,7 @@ function setupMultiplayer() {
   const attempt = ++multiplayerConnectAttempt;
 
   if (!channel) {
-    updateMultiplayerStatus("연결 안됨");
+    updateMultiplayerStatus("?�결 ?�됨");
     addNetworkDebugLog("multiplayer failed: createPresenceChannel returned null");
     return;
   }
@@ -3480,7 +3575,7 @@ function setupMultiplayer() {
       if (status === "SUBSCRIBED") {
         isMultiplayerSubscribed = true;
         clearMultiplayerReconnectTimeout();
-        updateMultiplayerStatus("연결됨");
+        updateMultiplayerStatus("?�결??);
         setTimeout(function () {
           if (channel !== multiplayerChannel) return;
           sendMultiplayerPresence(true);
@@ -3506,7 +3601,7 @@ function setupMultiplayer() {
           addNetworkDebugLog("reset supabase realtime client");
         }
         multiplayerChannel = null;
-        updateMultiplayerStatus("연결 안됨");
+        updateMultiplayerStatus("?�결 ?�됨");
         scheduleMultiplayerReconnect(1500);
       }
     });
@@ -3691,22 +3786,24 @@ function renderRemotePlayerState(state) {
   const remoteId = state.id;
   const remotePlayer = remotePlayers[remoteId] || createRemotePlayer(remoteId);
   const remoteColor = state.color || "#7dd3fc";
+  const nextX = Number(state.x) || 0;
+  const nextY = -(Number(state.depth) || 0) + (Number(state.jumpY) || 0);
+  const nextPositionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
 
   remotePlayer.nameElement.textContent = state.name || "OVC";
   remotePlayer.statusElement.textContent =
     state.action === "planting"
-      ? "씨앗 심는중..."
+      ? "?�앗 ?�는�?.."
       : state.action === "eating"
-        ? "먹는중..."
+        ? "먹는�?.."
         : "";
   remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
-  setWorldPosition(
-    remotePlayer.element,
-    Number(state.x) || 0,
-    -(Number(state.depth) || 0) + (Number(state.jumpY) || 0)
-  );
+  if (remotePlayer.positionKey !== nextPositionKey) {
+    setWorldPosition(remotePlayer.element, nextX, nextY);
+    remotePlayer.positionKey = nextPositionKey;
+  }
   remotePlayer.lastSeenAt = Date.now();
 }
 
@@ -3730,7 +3827,7 @@ function createRemotePlayer(remoteId) {
   ground.appendChild(element);
   setWorldSize(element, PLAYER_WIDTH);
 
-  remotePlayers[remoteId] = { element, bodyElement, nameElement, statusElement, lastSeenAt: Date.now() };
+  remotePlayers[remoteId] = { element, bodyElement, nameElement, statusElement, positionKey: "", lastSeenAt: Date.now() };
   return remotePlayers[remoteId];
 }
 
@@ -3754,13 +3851,13 @@ function updateMultiplayerStatus(statusText) {
   if (!multiplayerStatus) return;
 
   const statusLabel =
-    multiplayerStatusText === "연결됨" ||
-    multiplayerStatusText === "연결중" ||
-    multiplayerStatusText === "색 선택 전"
+    multiplayerStatusText === "?�결?? ||
+    multiplayerStatusText === "?�결�? ||
+    multiplayerStatusText === "캐릭???�택 ??
       ? multiplayerStatusText
-      : "연결 안됨";
+      : "?�결 ?�됨";
   multiplayerStatus.textContent =
-    "멀티: " + statusLabel + " / 로그인 " + getOnlinePlayerCount();
+    "멀??" + statusLabel + " / 로그??" + getOnlinePlayerCount();
 }
 
 function clearMultiplayerReconnectTimeout() {
@@ -3793,8 +3890,8 @@ function syncPlayerColorToServer(forceSync) {
       addNetworkDebugLog("color synced online: " + colorToSync);
     }).catch(function (error) {
       showOnlineDebugMessage(
-        "색 저장 실패: " +
-        (error && error.message ? error.message : "온라인 서버 확인 필요")
+        "?�라???�???�패: " +
+        (error && error.message ? error.message : "?�라???�버 ?�인 ?�요")
       );
     });
     return;
@@ -3809,8 +3906,8 @@ function syncPlayerColorToServer(forceSync) {
     addNetworkDebugLog("color synced local: " + colorToSync);
   }).catch(function (error) {
     showOnlineDebugMessage(
-      "색 저장 실패: " +
-      (error && error.message ? error.message : "로컬 서버 확인 필요")
+      "로컬 ?�???�패: " +
+      (error && error.message ? error.message : "로컬 ?�버 ?�인 ?�요")
     );
   });
 }
@@ -3831,14 +3928,14 @@ function closeAdminPanel() {
 }
 
 async function loadAdminAccounts() {
-  adminMessage.textContent = "계정 불러오는 중...";
+  adminMessage.textContent = "계정 불러?�는 �?..";
   adminAccountList.innerHTML = "";
 
   try {
     const accounts = await window.OVCOnline.listAccounts();
     adminAccountList.dataset.accounts = JSON.stringify(accounts);
     renderAdminAccounts(accounts);
-    adminMessage.textContent = accounts.length + "개 계정";
+    adminMessage.textContent = accounts.length + "�?계정";
   } catch (error) {
     adminMessage.textContent = error.message;
   }
@@ -3850,7 +3947,7 @@ function renderAdminAccounts(accounts) {
   if (!accounts.length) {
     const empty = document.createElement("div");
     empty.className = "admin-empty";
-    empty.textContent = "가입된 계정이 없습니다.";
+    empty.textContent = "가?�된 계정???�습?�다.";
     adminAccountList.appendChild(empty);
     return;
   }
@@ -3867,16 +3964,16 @@ function renderAdminAccounts(accounts) {
     meta.className = "admin-account-meta";
     deleteButton.className = "admin-delete-button";
 
-    name.textContent = account.name || "이름 없음";
+    name.textContent = account.name || "?�름 ?�음";
     meta.textContent =
-      (account.color || "색 없음") +
+      (account.color || "???�음") +
       " / " +
       formatAdminDate(account.created_at);
-    deleteButton.textContent = "삭제";
+    deleteButton.textContent = "??��";
     deleteButton.type = "button";
 
     deleteButton.addEventListener("click", async function () {
-      if (!confirm((account.name || "이 계정") + "을 삭제할까요?")) return;
+      if (!confirm((account.name || "??계정") + "????��?�까??")) return;
 
       try {
         deleteButton.disabled = true;
@@ -3891,7 +3988,7 @@ function renderAdminAccounts(accounts) {
           logout();
           return;
         }
-        adminMessage.textContent = "삭제 완료";
+        adminMessage.textContent = "??�� ?�료";
         loadAdminAccounts();
       } catch (error) {
         deleteButton.disabled = false;
@@ -3917,10 +4014,10 @@ function getRenderedAdminAccounts() {
 }
 
 function formatAdminDate(value) {
-  if (!value) return "날짜 없음";
+  if (!value) return "?�짜 ?�음";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "날짜 없음";
+  if (Number.isNaN(date.getTime())) return "?�짜 ?�음";
 
   return date.toLocaleString("ko-KR");
 }
@@ -3958,7 +4055,6 @@ function addNetworkDebugLog(message) {
     networkDebugLines.shift();
   }
   networkDebugPanel.textContent = networkDebugLines.join("\n");
-  networkDebugPanel.classList.add("is-visible");
 }
 
 async function validateCurrentAccount() {
@@ -3972,7 +4068,7 @@ async function validateCurrentAccount() {
       if (!storedToken) return;
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
-        showOnlineDebugMessage("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+        showOnlineDebugMessage("?�른 기기?�서 로그?�되???�동 로그?�웃?�니??");
         setTimeout(logout, 1200);
         return;
       }
@@ -4008,7 +4104,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508v";
+    window.location.href = "/ovc-login.html?v=20260508ac";
   };
 
   if (multiplayerChannel) {

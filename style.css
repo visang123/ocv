@@ -1106,6 +1106,21 @@ body::-webkit-scrollbar {
   opacity: 0.78;
 }
 
+#network-debug-button {
+  position: fixed;
+  left: 14px;
+  top: 3px;
+  z-index: 260;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: #050505;
+  cursor: pointer;
+  opacity: 0.78;
+}
+
 #admin-overlay {
   position: fixed;
   inset: 0;
