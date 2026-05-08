@@ -38,6 +38,7 @@ const wellWaterFill = document.getElementById("well-water-fill");
 const seedCard = document.getElementById("seed-card");
 const seedDryGauge = document.getElementById("seed-dry-gauge");
 const seedDryText = document.getElementById("seed-dry-text");
+const seedWorldText = document.getElementById("seed-world-text");
 const seedInventory = document.getElementById("seed-inventory");
 const appleInventory = document.getElementById("apple-inventory");
 const appleCountText = document.getElementById("apple-count");
@@ -85,6 +86,7 @@ export {
   seedCard,
   seedDryGauge,
   seedDryText,
+  seedWorldText,
   seedInventory,
   appleInventory,
   appleCountText,

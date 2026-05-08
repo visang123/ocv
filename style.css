@@ -56,6 +56,24 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   user-select: none;
+  pointer-events: auto;
+}
+
+#seed-world-text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  min-width: 46px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  color: #111;
+  font: 900 4.8px/1.2 Arial, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
   pointer-events: none;
 }
 
@@ -1288,6 +1306,7 @@ body::-webkit-scrollbar {
 }
 
 #seed-card {
+  display: none !important;
   position: fixed;
   right: 270px;
   top: 0;

@@ -118,6 +118,7 @@ import {
   seedCard,
   seedDryGauge,
   seedDryText,
+  seedWorldText,
   seedInventory,
   appleInventory,
   appleCountText,
@@ -188,6 +189,7 @@ let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
 let hasShownFirstSeedFocus = false;
 let firstSeedFocusTimeout = null;
+let isHoveringMainSeed = false;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -493,6 +495,14 @@ guideCard.addEventListener("click", function () {
     isGuideDismissedAtSign = true;
   }
   updateGuideCard();
+});
+
+seed.addEventListener("mouseenter", function () {
+  isHoveringMainSeed = true;
+});
+
+seed.addEventListener("mouseleave", function () {
+  isHoveringMainSeed = false;
 });
 
 guidePrev.addEventListener("click", function (event) {
@@ -920,6 +930,7 @@ function applyDefaultState() {
   sprout.style.display = "none";
   plantCard.style.display = "none";
   seedCard.style.display = "none";
+  seedWorldText.style.display = "none";
   seedInventory.style.display = "none";
   guideCard.style.display = "none";
   guideBook.style.display = "block";
@@ -1810,6 +1821,9 @@ function updateSeedPosition() {
   }
   seed.style.display =
     shouldShowMainSeed ? "block" : "none";
+  if (!shouldShowMainSeed) {
+    isHoveringMainSeed = false;
+  }
   seed.src = plantRuntime.isSeedDry ? "seed-dry.png" : "seed.png";
 
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
@@ -3209,30 +3223,34 @@ function updateWellCard() {
 
 function updateSeedCard() {
   updateSeedDryState();
+  seedCard.style.display = "none";
 
-  if (plantRuntime.isSeedPlanted || (!isNearSeed() && heldItem !== HELD_ITEM_SEED)) {
-    seedCard.style.display = "none";
+  if (plantRuntime.isSeedPlanted) {
+    seedWorldText.style.display = "none";
     return;
   }
 
   const remaining = getSeedDryRemainingMs();
-  const remainingRatio = remaining / seedDryMs;
-  const gaugeDegrees = remainingRatio * 360;
   const remainingMinutes = Math.ceil(remaining / 60000);
-
-  seedCard.style.display = "flex";
-  seedDryGauge.style.background =
-    "conic-gradient(#e3362d " +
-    gaugeDegrees +
-    "deg, #ead2d0 0deg)";
+  const shouldShowWorldText =
+    seed.style.display === "block" &&
+    heldItem !== HELD_ITEM_SEED &&
+    (isNearSeed() || isHoveringMainSeed);
 
   if (plantRuntime.isSeedDry) {
-    seedDryText.textContent = "\uB9C8\uB978 \uC528\uC557";
+    seedWorldText.textContent = "\uB9C8\uB978 \uC528\uC557";
+    seedWorldText.style.display = shouldShowWorldText ? "block" : "none";
+    if (shouldShowWorldText) {
+      setWorldPosition(seedWorldText, seedX + SEED_SIZE / 2 - 23, seedY - 12);
+    }
     return;
   }
 
-  seedDryText.textContent =
-    remainingMinutes + "\uBD84 \uB4A4 \uB9D0\uB77C\uC694!";
+  seedWorldText.textContent = remainingMinutes + "\uBD84\uD6C4\uC5D0 \uB9C8\uB984!";
+  seedWorldText.style.display = shouldShowWorldText ? "block" : "none";
+  if (shouldShowWorldText) {
+    setWorldPosition(seedWorldText, seedX + SEED_SIZE / 2 - 23, seedY - 12);
+  }
 }
 
 function getSeedDryRemainingMs() {
