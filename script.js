@@ -2245,6 +2245,12 @@ function updateBucketPosition() {
     bucketRenderY = bucketY;
   }
 
+  // Keep bucket visible when attached to a player hand.
+  bucket.style.zIndex =
+    heldItem === HELD_ITEM_BUCKET || isBucketHeldByRemotePlayer
+      ? "23"
+      : "18";
+
   if (!Number.isFinite(bucketRenderX) || !Number.isFinite(bucketRenderY)) {
     const bucketSize = getBucketSize();
     bucketRenderX = wellX - bucketSize.width - 8;
