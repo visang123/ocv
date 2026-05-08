@@ -251,7 +251,6 @@ async function handleLoginSubmit() {
     loginMessage.textContent = "로그인 중... (3/3 계정 저장)";
     localStorage.setItem(currentUserKey, account.name);
     localStorage.setItem(currentUserIdKey, account.id);
-    localStorage.setItem(currentUserHasChosenColorKey, account.id);
     const accountColor = normalizeHexColor(account.color);
     const scopedKey = "ovcUserColorV1:" + account.id;
     const scopedColor = normalizeHexColor(localStorage.getItem(scopedKey));
@@ -277,7 +276,6 @@ async function handleLoginSubmit() {
         const account = await loginWithSupabaseRestFallback(name, password);
         localStorage.setItem(currentUserKey, account.name);
         localStorage.setItem(currentUserIdKey, account.id);
-        localStorage.setItem(currentUserHasChosenColorKey, account.id);
         const accountColor = normalizeHexColor(account.color);
         const scopedKey = "ovcUserColorV1:" + account.id;
         const scopedColor = normalizeHexColor(localStorage.getItem(scopedKey));
