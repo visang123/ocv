@@ -252,6 +252,10 @@ let presenceRateLimitedUntil = 0;
 let lastPresenceTrackAt = 0;
 let lastBroadcastAt = 0;
 let lastHeartbeatBroadcastAt = 0;
+let lastPresenceDbSyncAt = 0;
+let lastPresenceDbPollAt = 0;
+let isPresenceDbSyncing = false;
+let isPresenceDbPolling = false;
 let isLoggingOut = false;
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
@@ -304,7 +308,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508n");
+  window.location.replace("/ovc-login.html?v=20260508o");
   throw new Error("OVC login required");
 }
 
@@ -496,6 +500,7 @@ characterSelectButton.addEventListener("click", function () {
 
 const settingsButton = document.getElementById("settings-button");
 const settingsOverlay = document.getElementById("settings-overlay");
+const settingsModal = document.getElementById("settings-modal");
 const changeColorButton = document.getElementById("change-color-button");
 const logoutButton = document.getElementById("logout-button");
 const logoutConfirmOverlay = document.getElementById("logout-confirm-overlay");
@@ -514,6 +519,30 @@ const spawnPortal = document.getElementById("spawn-portal");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 player.insertAdjacentElement("afterend", playerColorBody);
+const controlsButton = document.createElement("button");
+controlsButton.id = "controls-button";
+controlsButton.type = "button";
+controlsButton.textContent = "조작법";
+settingsModal.insertBefore(controlsButton, logoutButton);
+const controlsOverlay = document.createElement("div");
+controlsOverlay.id = "controls-overlay";
+controlsOverlay.setAttribute("aria-hidden", "true");
+controlsOverlay.innerHTML =
+  '<div id="controls-modal">' +
+  '<div class="controls-header"><strong>조작법</strong><button id="controls-close-button" type="button" aria-label="닫기">×</button></div>' +
+  '<div class="controls-list">' +
+  '<div><span>W / ↑</span><p>위로 이동</p></div>' +
+  '<div><span>A / ←</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / ↓</span><p>아래로 이동</p></div>' +
+  '<div><span>D / →</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>Space</span><p>점프</p></div>' +
+  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
+  '<div><span>Q</span><p>사용 / 대화</p></div>' +
+  '<div><span>🖱 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>⚙</span><p>설정 열기</p></div>' +
+  '</div></div>';
+document.body.appendChild(controlsOverlay);
+const controlsCloseButton = document.getElementById("controls-close-button");
 
 settingsButton.addEventListener("click", function () {
   settingsOverlay.classList.add("is-open");
@@ -524,6 +553,25 @@ settingsOverlay.addEventListener("click", function (event) {
   if (event.target === settingsOverlay) {
     settingsOverlay.classList.remove("is-open");
     settingsOverlay.setAttribute("aria-hidden", "true");
+  }
+});
+
+controlsButton.addEventListener("click", function () {
+  settingsOverlay.classList.remove("is-open");
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  controlsOverlay.classList.add("is-open");
+  controlsOverlay.setAttribute("aria-hidden", "false");
+});
+
+controlsCloseButton.addEventListener("click", function () {
+  controlsOverlay.classList.remove("is-open");
+  controlsOverlay.setAttribute("aria-hidden", "true");
+});
+
+controlsOverlay.addEventListener("click", function (event) {
+  if (event.target === controlsOverlay) {
+    controlsOverlay.classList.remove("is-open");
+    controlsOverlay.setAttribute("aria-hidden", "true");
   }
 });
 
@@ -2446,18 +2494,10 @@ function updatePlayerAlert() {
 }
 
 function updateGuideCard() {
-  const isNearSign = isNearSignBoard();
-
-  if (!isNearSign) {
-    isGuideDismissedAtSign = false;
-  }
-
-  guideCard.style.display =
-    (isNearSign && !isGuideDismissedAtSign) || isGuideBookOpen
-      ? "block"
-      : "none";
-  guideBook.classList.toggle("is-near", isNearGuideBook());
-  updateGuidePages();
+  isGuideBookOpen = false;
+  isGuideDismissedAtSign = true;
+  guideCard.style.display = "none";
+  guideBook.classList.remove("is-near");
 }
 
 function getGuideMaxPage() {
@@ -2832,7 +2872,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508n");
+    window.location.replace("/ovc-login.html?v=20260508o");
     return;
   }
 
@@ -2968,6 +3008,10 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemotePlayerBroadcast(payload.payload);
     })
+    .on("presence", { event: "sync" }, function () {
+      if (channel !== multiplayerChannel || typeof channel.presenceState !== "function") return;
+      renderRemotePlayersFromPresence(channel.presenceState());
+    })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
       addNetworkDebugLog("system: " + JSON.stringify(payload || {}));
@@ -3021,7 +3065,7 @@ function setupMultiplayer() {
 }
 
 function sendMultiplayerPresence(forceSend) {
-  if (!multiplayerChannel || !hasSpawnedCharacter) return;
+  if (!hasSpawnedCharacter) return;
 
   const now = Date.now();
   const state = {
@@ -3029,6 +3073,7 @@ function sendMultiplayerPresence(forceSend) {
     userId: currentUserId,
     name: currentUserName,
     action: "state",
+    room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
     depth: playerDepth,
@@ -3045,7 +3090,7 @@ function sendMultiplayerPresence(forceSend) {
 
   // Broadcast is the primary multiplayer sync path. Keep a heartbeat so idle
   // players stay visible even when they are not moving.
-  if (forceSend || (hasChanged && now - lastBroadcastAt >= 120) || now - lastHeartbeatBroadcastAt >= 1000) {
+  if (multiplayerChannel && (forceSend || (hasChanged && now - lastBroadcastAt >= 120) || now - lastHeartbeatBroadcastAt >= 1000)) {
     Promise.resolve(multiplayerChannel.send({
       type: "broadcast",
       event: "player_state",
@@ -3060,29 +3105,99 @@ function sendMultiplayerPresence(forceSend) {
       lastHeartbeatBroadcastAt = now;
     }
   }
+  if (multiplayerChannel && (forceSend || now - lastPresenceTrackAt >= 5000)) {
+    Promise.resolve(multiplayerChannel.track(state)).catch(function (error) {
+      addNetworkDebugLog(
+        "presence track error: " + (error && error.message ? error.message : "unknown")
+      );
+    });
+    lastPresenceTrackAt = now;
+  }
 
   if (hasChanged || forceSend) {
     lastPresenceStateKey = stateKey;
   }
+  if (forceSend || hasChanged || now - lastPresenceDbSyncAt >= 2000) {
+    syncPresenceToDatabase(state);
+  }
+  if (now - lastPresenceDbPollAt >= 2000) {
+    pollPresenceDatabase();
+  }
   lastPresenceSentAt = now;
 }
 
-function sendMultiplayerLeave() {
-  if (!multiplayerChannel || !currentSessionId) return;
+function syncPresenceToDatabase(state) {
+  if (
+    isPresenceDbSyncing ||
+    !window.OVCOnline ||
+    typeof window.OVCOnline.savePresence !== "function"
+  ) {
+    return;
+  }
 
-  Promise.resolve(multiplayerChannel.send({
-    type: "broadcast",
-    event: "player_state",
-    payload: {
-      id: currentSessionId,
-      userId: currentUserId,
-      name: currentUserName,
-      action: "leave",
-      updatedAt: Date.now()
-    }
-  })).catch(function () {
-    // The page may be closing; best effort is enough here.
+  isPresenceDbSyncing = true;
+  lastPresenceDbSyncAt = Date.now();
+  window.OVCOnline.savePresence(state).catch(function (error) {
+    addNetworkDebugLog(
+      "presence db save error: " + (error && error.message ? error.message : "unknown")
+    );
+  }).finally(function () {
+    isPresenceDbSyncing = false;
   });
+}
+
+function pollPresenceDatabase() {
+  if (
+    isPresenceDbPolling ||
+    !window.OVCOnline ||
+    typeof window.OVCOnline.listPresence !== "function"
+  ) {
+    return;
+  }
+
+  isPresenceDbPolling = true;
+  lastPresenceDbPollAt = Date.now();
+  window.OVCOnline.listPresence(
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
+  ).then(function (players) {
+    players.forEach(function (state) {
+      if (!state || state.id === currentSessionId) return;
+      renderRemotePlayerState(state);
+    });
+    updateRemotePlayerCount();
+  }).catch(function (error) {
+    addNetworkDebugLog(
+      "presence db poll error: " + (error && error.message ? error.message : "unknown")
+    );
+  }).finally(function () {
+    isPresenceDbPolling = false;
+  });
+}
+
+function sendMultiplayerLeave() {
+  if (!currentSessionId) return;
+
+  if (multiplayerChannel) {
+    Promise.resolve(multiplayerChannel.send({
+      type: "broadcast",
+      event: "player_state",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId,
+        name: currentUserName,
+        action: "leave",
+        updatedAt: Date.now()
+      }
+    })).catch(function () {
+      // The page may be closing; best effort is enough here.
+    });
+  }
+
+  if (window.OVCOnline && typeof window.OVCOnline.removePresence === "function") {
+    Promise.resolve(window.OVCOnline.removePresence(currentSessionId)).catch(function () {
+      // The page may be closing; best effort is enough here.
+    });
+  }
 }
 
 function renderRemotePlayersFromPresence(presenceState) {
@@ -3173,7 +3288,7 @@ function pruneStaleRemotePlayers() {
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.lastSeenAt) return;
-    if (now - remotePlayer.lastSeenAt < 15000) return;
+    if (now - remotePlayer.lastSeenAt < 75000) return;
     removeRemotePlayer(remoteId);
   });
 }
@@ -3442,7 +3557,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508n";
+    window.location.href = "/ovc-login.html?v=20260508o";
   };
 
   if (multiplayerChannel) {

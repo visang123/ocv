@@ -248,6 +248,67 @@
     });
   }
 
+  async function savePresence(state) {
+    const supabaseClient = getClient();
+    if (!supabaseClient || !state || !state.id) return;
+
+    const payload = {
+      id: String(state.id),
+      room: String(state.room || config.multiplayerRoom || "ovc-main-room"),
+      account_id: state.userId || null,
+      name: String(state.name || "OVC"),
+      color: state.color || "#ffffff",
+      x: Number(state.x) || 0,
+      depth: Number(state.depth) || 0,
+      jump_y: Number(state.jumpY) || 0,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabaseClient
+      .from(config.presenceTable || "ovc_presence")
+      .upsert(payload, { onConflict: "id" });
+
+    if (error) throw normalizeOnlineError(error);
+  }
+
+  async function listPresence(roomName) {
+    const supabaseClient = getClient();
+    if (!supabaseClient) return [];
+
+    const staleCutoff = new Date(Date.now() - 70000).toISOString();
+    const { data, error } = await supabaseClient
+      .from(config.presenceTable || "ovc_presence")
+      .select("id, account_id, name, color, x, depth, jump_y, updated_at")
+      .eq("room", roomName || config.multiplayerRoom || "ovc-main-room")
+      .gte("updated_at", staleCutoff);
+
+    if (error) throw normalizeOnlineError(error);
+    return (data || []).map(function (row) {
+      return {
+        id: row.id,
+        userId: row.account_id,
+        name: row.name,
+        color: row.color,
+        x: row.x,
+        depth: row.depth,
+        jumpY: row.jump_y,
+        updatedAt: row.updated_at
+      };
+    });
+  }
+
+  async function removePresence(sessionId) {
+    const supabaseClient = getClient();
+    if (!supabaseClient || !sessionId) return;
+
+    const { error } = await supabaseClient
+      .from(config.presenceTable || "ovc_presence")
+      .delete()
+      .eq("id", String(sessionId));
+
+    if (error) throw normalizeOnlineError(error);
+  }
+
   async function postLocalApi(url, payload) {
     let response;
 
@@ -336,6 +397,9 @@
     deleteAccount,
     getAccount,
     createPresenceChannel,
-    validateSession
+    validateSession,
+    savePresence,
+    listPresence,
+    removePresence
   };
 })();

@@ -469,6 +469,7 @@ body::-webkit-scrollbar {
 }
 
 #sign-board {
+  display: none !important;
   position: absolute;
   left: 0;
   top: 0;
@@ -496,6 +497,7 @@ body::-webkit-scrollbar {
 }
 
 #guide-book {
+  display: none !important;
   position: absolute;
   left: 0;
   top: 0;
@@ -925,7 +927,8 @@ body::-webkit-scrollbar {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 
-#change-color-button {
+#change-color-button,
+#controls-button {
   width: 180px;
   height: 48px;
   border: 0;
@@ -937,8 +940,83 @@ body::-webkit-scrollbar {
   font-weight: 800;
 }
 
-#change-color-button:hover {
+#change-color-button:hover,
+#controls-button:hover {
   background: #dbeafe;
+}
+
+#controls-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.68);
+}
+
+#controls-overlay.is-open {
+  display: flex;
+}
+
+#controls-modal {
+  width: min(380px, 90vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #061016;
+  color: #fff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+#controls-close-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.controls-list {
+  display: grid;
+  gap: 8px;
+}
+
+.controls-list div {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.controls-list span {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.controls-list p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 #logout-button {
@@ -1248,6 +1326,7 @@ body::-webkit-scrollbar {
 }
 
 #guide-book-button {
+  display: none !important;
   position: fixed;
   left: 18px;
   bottom: 18px;
