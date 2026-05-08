@@ -497,7 +497,7 @@ body::-webkit-scrollbar {
 }
 
 #guide-book {
-  display: none !important;
+  display: none;
   position: absolute;
   left: 0;
   top: 0;
@@ -1381,7 +1381,6 @@ body::-webkit-scrollbar {
 }
 
 #guide-book-button {
-  display: none !important;
   position: fixed;
   left: 18px;
   bottom: 18px;
