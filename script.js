@@ -276,11 +276,13 @@ let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV
 let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
+let lastBucketTraceAtByKey = {};
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
 ground.appendChild(playerBucketOverlay);
+const BUCKET_DEBUG_TRACE = true;
 const playerTintCache = new Map();
 const playerBaseImage = new Image();
 let playerBaseImageReady = false;
@@ -2216,18 +2218,16 @@ function updateBucketPosition() {
   if (isBucketHeldByRemotePlayer) {
     const holderId = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
     const lastUpdateAt = Number(remoteBucketUpdateAtById[holderId] || 0);
-    if (lastUpdateAt && Date.now() - lastUpdateAt > 1200) {
+    if (lastUpdateAt && Date.now() - lastUpdateAt > 5000) {
       window.OVC_SHARED_BUCKET_HELD_BY = "";
+      addBucketTrace("stale", "clear holder=" + holderId + " age=" + (Date.now() - lastUpdateAt), 0);
     }
   }
 
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.element) return;
-    remotePlayer.element.classList.toggle(
-      "is-carrying-bucket",
-      isBucketHeldByRemotePlayer && remoteId === window.OVC_SHARED_BUCKET_HELD_BY
-    );
+    remotePlayer.element.classList.remove("is-carrying-bucket");
   });
 
   if (heldItem === HELD_ITEM_BUCKET) {
@@ -2247,7 +2247,7 @@ function updateBucketPosition() {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
-    bucket.style.display = "none";
+    bucket.style.display = "block";
     playerBucketOverlay.style.display = "none";
   } else {
     bucket.style.display = "block";
@@ -2262,6 +2262,20 @@ function updateBucketPosition() {
 
   if (bucket.style.display === "block") {
     setWorldPosition(bucket, bucketX, bucketY);
+    addBucketTrace(
+      "render",
+      "mode=" +
+      (heldItem === HELD_ITEM_BUCKET
+        ? "local-held"
+        : isBucketHeldByRemotePlayer
+          ? "remote-held"
+          : "world") +
+      " x=" +
+      Math.round(bucketX || 0) +
+      " y=" +
+      Math.round(bucketY || 0),
+      500
+    );
   }
 }
 
@@ -3877,6 +3891,11 @@ function broadcastBucketState(forceSend) {
     // Best effort; world sync remains the fallback.
   });
   lastBucketBroadcastAt = now;
+  addBucketTrace(
+    "send",
+    "held=" + payload.held + " x=" + Math.round(payload.x || 0) + " y=" + Math.round(payload.y || 0) + " t=" + payload.updatedAt,
+    350
+  );
 }
 
 function handleRemoteBucketBroadcast(payload) {
@@ -3894,6 +3913,11 @@ function handleRemoteBucketBroadcast(payload) {
     if (Number.isFinite(nextX)) bucketX = nextX;
     if (Number.isFinite(nextY)) bucketY = nextY;
     isBucketFull = Boolean(payload.isFull);
+    addBucketTrace(
+      "recv",
+      "from=" + remoteId + " held=true x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
+      350
+    );
     return;
   }
 
@@ -3904,6 +3928,11 @@ function handleRemoteBucketBroadcast(payload) {
     if (Number.isFinite(nextX)) bucketX = nextX;
     if (Number.isFinite(nextY)) bucketY = nextY;
     isBucketFull = Boolean(payload.isFull);
+    addBucketTrace(
+      "recv",
+      "from=" + remoteId + " held=false x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
+      350
+    );
   }
 }
 
@@ -4322,6 +4351,15 @@ function addNetworkDebugLog(message) {
     networkDebugLines.shift();
   }
   networkDebugPanel.textContent = networkDebugLines.join("\n");
+}
+
+function addBucketTrace(key, message, minIntervalMs) {
+  if (!BUCKET_DEBUG_TRACE) return;
+  const now = Date.now();
+  const last = Number(lastBucketTraceAtByKey[key] || 0);
+  if (now - last < (minIntervalMs || 500)) return;
+  lastBucketTraceAtByKey[key] = now;
+  addNetworkDebugLog("[bucket:" + key + "] " + message);
 }
 
 async function validateCurrentAccount() {
