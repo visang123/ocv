@@ -1561,7 +1561,9 @@ function applySharedWorldSnapshot(snapshot) {
   isApplyingWorldState = true;
 
   try {
-    if (snapshot.bucket) {
+    // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
+    // Apply snapshot bucket fallback only when realtime channel is not subscribed.
+    if (snapshot.bucket && !isMultiplayerSubscribed) {
       const heldBy = String(snapshot.bucket.heldBy || "");
       const nextBucketX = Number(snapshot.bucket.x);
       const nextBucketY = Number(snapshot.bucket.y);
