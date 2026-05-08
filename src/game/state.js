@@ -36,7 +36,10 @@ export function createPlantState() {
     needsFirstWater: false,
     growthStartedAt: null,
     isSproutGrown: false,
-    sproutGrownAt: null
+    sproutGrownAt: null,
+    sproutEvolutionMs: 0,
+    sproutEvolutionLastTickAt: null,
+    isSproutSelfSustaining: false
   };
 }
 

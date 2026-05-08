@@ -54,6 +54,13 @@ import {
   appleRespawnMs,
   minPlantSpacing,
   biggerSproutMs,
+  sproutStage1Ms,
+  sproutStage2GrowMs,
+  sproutStage1Image,
+  sproutStage2Image,
+  sproutStage3Image,
+  SPROUT_STAGE_WIDTHS,
+  SPROUT_STAGE_HEIGHTS,
   pickupDistance,
   guideInteractDistance,
   npcInteractDistance,
@@ -394,6 +401,16 @@ if (!currentSessionId) {
   currentSessionId =
     "session-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   sessionStorage.setItem(currentSessionKey, currentSessionId);
+}
+
+/** Other browser tabs use a different session id but the same account — do not draw them as remotes. */
+function isRemotePresenceSameLoggedInAccount(state) {
+  if (!state || !currentUserId) return false;
+  const remoteUserId = state.userId != null ? String(state.userId).trim() : "";
+  if (!remoteUserId || remoteUserId !== String(currentUserId).trim()) return false;
+  const remoteSession = state.id != null ? String(state.id) : "";
+  if (!remoteSession || remoteSession === String(currentSessionId)) return false;
+  return true;
 }
 
 if (!currentUserName || !currentUserId) {
@@ -1007,6 +1024,9 @@ function applyDefaultState() {
   plantRuntime.growthStartedAt = null;
   plantRuntime.isSproutGrown = false;
   plantRuntime.sproutGrownAt = null;
+  plantRuntime.sproutEvolutionMs = 0;
+  plantRuntime.sproutEvolutionLastTickAt = null;
+  plantRuntime.isSproutSelfSustaining = false;
 
   hasGuideBook = false;
   isGuideBookOpen = false;
@@ -1620,7 +1640,10 @@ function getSharedWorldSnapshot() {
           needsFirstWater: Boolean(plant.needsFirstWater),
           growthStartedAt: plant.growthStartedAt,
           isSproutGrown: Boolean(plant.isSproutGrown),
-          sproutGrownAt: plant.sproutGrownAt
+          sproutGrownAt: plant.sproutGrownAt,
+          sproutEvolutionMs: plant.sproutEvolutionMs,
+          sproutEvolutionLastTickAt: plant.sproutEvolutionLastTickAt,
+          isSproutSelfSustaining: plant.isSproutSelfSustaining
         };
       })
     }
@@ -1779,22 +1802,33 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         snapshotSavedAt >= lastMainPlantStateChangeAt
       )
     ) {
-      applyLoadedPlantState({
-        isSeedPlanted: Boolean(snapshot.mainPlant.isSeedPlanted),
-        plantSpotX: Number(snapshot.mainPlant.plantSpotX) || 0,
-        plantSpotY: Number(snapshot.mainPlant.plantSpotY) || 0,
-        plantLastWateredAt: Number(snapshot.mainPlant.plantLastWateredAt) || null,
-        plantWateredAtList: Array.isArray(snapshot.mainPlant.plantWateredAtList) ? snapshot.mainPlant.plantWateredAtList : [],
-        plantState: snapshot.mainPlant.plantState || "normal",
-        plantWaterLevel: readWaterLevel(snapshot.mainPlant.plantWaterLevel, 1),
-        plantWaterLevelUpdatedAt: Number(snapshot.mainPlant.plantWaterLevelUpdatedAt) || Date.now(),
-        plantBecameEmptyAt: Number(snapshot.mainPlant.plantBecameEmptyAt) || null,
-        isPlantOverwatered: Boolean(snapshot.mainPlant.isPlantOverwatered),
-        plantNeedsFirstWater: Boolean(snapshot.mainPlant.plantNeedsFirstWater),
-        plantGrowthStartedAt: Number(snapshot.mainPlant.plantGrowthStartedAt) || null,
-        isSproutGrown: Boolean(snapshot.mainPlant.isSproutGrown),
-        plantSproutGrownAt: Number(snapshot.mainPlant.plantSproutGrownAt) || null
-      });
+      const mp = snapshot.mainPlant;
+      const plantedFromSnapshot = {
+        isSeedPlanted: Boolean(mp.isSeedPlanted),
+        plantSpotX: Number(mp.plantSpotX) || 0,
+        plantSpotY: Number(mp.plantSpotY) || 0,
+        plantLastWateredAt: Number(mp.plantLastWateredAt) || null,
+        plantWateredAtList: Array.isArray(mp.plantWateredAtList) ? mp.plantWateredAtList : [],
+        plantState: mp.plantState || "normal",
+        plantWaterLevel: readWaterLevel(mp.plantWaterLevel, 1),
+        plantWaterLevelUpdatedAt: Number(mp.plantWaterLevelUpdatedAt) || Date.now(),
+        plantBecameEmptyAt: Number(mp.plantBecameEmptyAt) || null,
+        isPlantOverwatered: Boolean(mp.isPlantOverwatered),
+        plantNeedsFirstWater: Boolean(mp.plantNeedsFirstWater),
+        plantGrowthStartedAt: Number(mp.plantGrowthStartedAt) || null,
+        isSproutGrown: Boolean(mp.isSproutGrown),
+        plantSproutGrownAt: Number(mp.plantSproutGrownAt) || null
+      };
+      if (Object.prototype.hasOwnProperty.call(mp, "sproutEvolutionMs")) {
+        plantedFromSnapshot.sproutEvolutionMs = Number(mp.sproutEvolutionMs) || 0;
+      }
+      if (Object.prototype.hasOwnProperty.call(mp, "sproutEvolutionLastTickAt")) {
+        plantedFromSnapshot.sproutEvolutionLastTickAt = Number(mp.sproutEvolutionLastTickAt) || null;
+      }
+      if (Object.prototype.hasOwnProperty.call(mp, "isSproutSelfSustaining")) {
+        plantedFromSnapshot.isSproutSelfSustaining = Boolean(mp.isSproutSelfSustaining);
+      }
+      applyLoadedPlantState(plantedFromSnapshot);
       npcX = Number(snapshot.mainPlant.npcX) || npcX;
       npcY = Number(snapshot.mainPlant.npcY) || npcY;
       plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
@@ -1894,7 +1928,22 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
               needsFirstWater: Boolean(plant.needsFirstWater),
               growthStartedAt: Number(plant.growthStartedAt) || null,
               isSproutGrown: Boolean(plant.isSproutGrown),
-              sproutGrownAt: Number(plant.sproutGrownAt) || null
+              sproutGrownAt: Number(plant.sproutGrownAt) || null,
+              sproutEvolutionMs: Object.prototype.hasOwnProperty.call(plant, "sproutEvolutionMs")
+                ? Math.max(0, Number(plant.sproutEvolutionMs) || 0)
+                : 0,
+              sproutEvolutionLastTickAt: Object.prototype.hasOwnProperty.call(
+                plant,
+                "sproutEvolutionLastTickAt"
+              )
+                ? Number(plant.sproutEvolutionLastTickAt) || null
+                : null,
+              isSproutSelfSustaining: Object.prototype.hasOwnProperty.call(
+                plant,
+                "isSproutSelfSustaining"
+              )
+                ? Boolean(plant.isSproutSelfSustaining)
+                : false
             };
           })
         : [];
@@ -2233,6 +2282,9 @@ function updateExtraSeedsAndPlants() {
     ensureExtraPlantElements(plant);
     normalizeExtraPlantState(plant);
     updateExtraPlantState(plant, now);
+    if (plant.isSproutGrown && !plant.isSproutSelfSustaining) {
+      tickSproutEvolution(plant, now);
+    }
     plant.spotElement.style.display = "block";
     plant.spotElement.src = getPlantSoilSrc(plant);
     setWorldPosition(plant.spotElement, plant.x, plant.y);
@@ -2247,15 +2299,11 @@ function updateExtraSeedsAndPlants() {
 
     const isSproutGrown =
       plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry";
-    const grownAt =
-      plant.sproutGrownAt ||
-      (plant.growthStartedAt ? plant.growthStartedAt + plantGrowthMs : now);
-    const isBigSprout = isSproutGrown && now - grownAt >= biggerSproutMs;
-    const sproutWidth = isBigSprout ? 30 : SPROUT_WIDTH;
-    const sproutHeight = isBigSprout ? 38 : SPROUT_HEIGHT;
+    const stage = getSproutStageFromPlant(plant);
+    const sproutSize = getSproutSizeForStage(stage);
     plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
-    plant.sproutElement.src = isBigSprout ? "sprout-grown.svg" : "sprout.png";
-    plant.sproutElement.classList.toggle("is-big", isBigSprout);
+    plant.sproutElement.src = getSproutImageForStage(stage);
+    plant.sproutElement.classList.toggle("is-big", stage >= 2);
     plant.waterNeededElement.style.display =
       plant.needsFirstWater && plant.status !== "dry" && plant.status !== "rotten"
         ? "block"
@@ -2268,11 +2316,11 @@ function updateExtraSeedsAndPlants() {
       );
     }
     if (!isSproutGrown) return;
-    setWorldSize(plant.sproutElement, sproutWidth, sproutHeight);
+    setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     setWorldPosition(
       plant.sproutElement,
-      plant.x + PLANT_SPOT_WIDTH / 2 - sproutWidth / 2,
-      plant.y - sproutHeight + 7
+      plant.x + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
+      plant.y - sproutSize.height + 7
     );
   });
   appleState.extraPlants = appleState.extraPlants.filter(function (plant) {
@@ -2297,6 +2345,34 @@ function normalizeExtraPlantState(plant) {
   }
   if (typeof plant.isOverwatered !== "boolean") plant.isOverwatered = false;
   if (typeof plant.isSproutGrown !== "boolean") plant.isSproutGrown = false;
+  if (typeof plant.isSproutSelfSustaining !== "boolean") plant.isSproutSelfSustaining = false;
+  if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
+    plant.sproutEvolutionLastTickAt = null;
+  }
+
+  const hadEvolutionKey = Object.prototype.hasOwnProperty.call(plant, "sproutEvolutionMs");
+  if (
+    !hadEvolutionKey &&
+    plant.isSproutGrown &&
+    plant.sproutGrownAt &&
+    !plant.isSproutSelfSustaining
+  ) {
+    const elapsed = now - plant.sproutGrownAt;
+    if (elapsed >= biggerSproutMs) {
+      plant.isSproutSelfSustaining = true;
+      plant.sproutEvolutionMs = sproutStage1Ms + sproutStage2GrowMs;
+    } else if (elapsed > 0) {
+      plant.sproutEvolutionMs = Math.floor(
+        (elapsed / biggerSproutMs) * (sproutStage1Ms + sproutStage2GrowMs - 1)
+      );
+    } else {
+      plant.sproutEvolutionMs = 0;
+    }
+  } else if (typeof plant.sproutEvolutionMs !== "number") {
+    plant.sproutEvolutionMs = 0;
+  } else {
+    plant.sproutEvolutionMs = Math.max(0, plant.sproutEvolutionMs);
+  }
 }
 
 function updateExtraPlantState(plant, now) {
@@ -2312,6 +2388,7 @@ function updateExtraPlantState(plant, now) {
   }
 
   if (
+    !plant.isSproutSelfSustaining &&
     plant.status !== "rotten" &&
     plant.status !== "dry" &&
     plant.becameEmptyAt !== null &&
@@ -2332,7 +2409,55 @@ function updateExtraPlantState(plant, now) {
   ) {
     plant.isSproutGrown = true;
     plant.sproutGrownAt = now;
+    plant.sproutEvolutionMs = 0;
+    plant.sproutEvolutionLastTickAt = now;
+    plant.isSproutSelfSustaining = false;
   }
+}
+
+function getSproutStageFromPlant(plant) {
+  if (!plant.isSproutGrown) return 0;
+  if (plant.isSproutSelfSustaining) return 3;
+  const ev = plant.sproutEvolutionMs || 0;
+  if (ev < sproutStage1Ms) return 1;
+  return 2;
+}
+
+function tickSproutEvolution(plant, now) {
+  if (!plant.isSproutGrown || plant.isSproutSelfSustaining) return;
+  if (plant.status !== "normal" || plant.isOverwatered) {
+    plant.sproutEvolutionLastTickAt = now;
+    return;
+  }
+  if (plant.sproutEvolutionLastTickAt == null) {
+    plant.sproutEvolutionLastTickAt = plant.sproutGrownAt || now;
+  }
+  const last = plant.sproutEvolutionLastTickAt;
+  const delta = Math.min(4000, Math.max(0, now - last));
+  plant.sproutEvolutionMs = (plant.sproutEvolutionMs || 0) + delta;
+  plant.sproutEvolutionLastTickAt = now;
+  const cap = sproutStage1Ms + sproutStage2GrowMs;
+  if (plant.sproutEvolutionMs >= cap) {
+    plant.sproutEvolutionMs = cap;
+    plant.isSproutSelfSustaining = true;
+    plant.waterLevel = Math.max(Number(plant.waterLevel) || 0, 2);
+    plant.becameEmptyAt = null;
+    plant.status = "normal";
+  }
+}
+
+function getSproutImageForStage(stage) {
+  if (stage >= 3) return sproutStage3Image;
+  if (stage === 2) return sproutStage2Image;
+  return sproutStage1Image;
+}
+
+function getSproutSizeForStage(stage) {
+  const idx = Math.min(2, Math.max(0, stage - 1));
+  return {
+    width: SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH,
+    height: SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT
+  };
 }
 
 function getPlantGrowthRatio(plant, now) {
@@ -2343,8 +2468,10 @@ function getPlantGrowthRatio(plant, now) {
 
 function getPlantSecondGrowthRatio(plant, now) {
   if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten") return null;
-  const grownAt = plant.sproutGrownAt || (plant.growthStartedAt ? plant.growthStartedAt + plantGrowthMs : now);
-  return Math.min(1, Math.max(0, (now - grownAt) / biggerSproutMs));
+  if (plant.isSproutSelfSustaining) return null;
+  const ev = plant.sproutEvolutionMs || 0;
+  if (ev < sproutStage1Ms) return null;
+  return Math.min(1, Math.max(0, (ev - sproutStage1Ms) / sproutStage2GrowMs));
 }
 
 function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
@@ -2361,7 +2488,7 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 }
 
 function updateExtraPlantWaterLevel(plant, now) {
-  if (plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") return;
+  if (plant.isSproutSelfSustaining || plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") return;
 
   const elapsedTicks = Math.floor((now - plant.waterLevelUpdatedAt) / plantWaterLevelTickMs);
   if (elapsedTicks <= 0) return;
@@ -2840,6 +2967,9 @@ function startPlanting() {
     plantRuntime.growthStartedAt = null;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
     setNpcStartPosition();
     playerStatus.textContent = "";
     seedCard.style.display = "none";
@@ -2933,6 +3063,9 @@ function plantInventorySeed(seedId) {
       plantRuntime.growthStartedAt = null;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
+      plantRuntime.sproutEvolutionMs = 0;
+      plantRuntime.sproutEvolutionLastTickAt = null;
+      plantRuntime.isSproutSelfSustaining = false;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -2965,7 +3098,10 @@ function createExtraPlant(id, x, y) {
     needsFirstWater: true,
     growthStartedAt: null,
     isSproutGrown: false,
-    sproutGrownAt: null
+    sproutGrownAt: null,
+    sproutEvolutionMs: 0,
+    sproutEvolutionLastTickAt: null,
+    isSproutSelfSustaining: false
   };
 }
 
@@ -3159,6 +3295,10 @@ function waterPlant(target) {
     return;
   }
 
+  if (plantRuntime.isSproutSelfSustaining) {
+    return;
+  }
+
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
 
   plantRuntime.lastWateredAt = now;
@@ -3190,6 +3330,9 @@ function waterPlant(target) {
     plantRuntime.growthStartedAt = null;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
   } else {
     plantRuntime.waterLevel += 1;
     plantRuntime.isOverwatered = false;
@@ -3207,6 +3350,9 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
+  if (plant.isSproutSelfSustaining) {
+    return;
+  }
   updateExtraPlantWaterLevel(plant, now);
 
   if (plant.status === "dry") {
@@ -3258,6 +3404,9 @@ function waterExtraPlant(plant) {
     plant.growthStartedAt = null;
     plant.isSproutGrown = false;
     plant.sproutGrownAt = null;
+    plant.sproutEvolutionMs = 0;
+    plant.sproutEvolutionLastTickAt = null;
+    plant.isSproutSelfSustaining = false;
   } else {
     plant.waterLevel += 1;
     plant.isOverwatered = false;
@@ -3272,7 +3421,13 @@ function waterExtraPlant(plant) {
 }
 
 function updatePlantWaterLevel() {
-  if (!plantRuntime.isSeedPlanted || plantRuntime.isOverwatered || plantRuntime.status === "dry" || plantRuntime.status === "rotten") {
+  if (
+    !plantRuntime.isSeedPlanted ||
+    plantRuntime.isOverwatered ||
+    plantRuntime.status === "dry" ||
+    plantRuntime.status === "rotten" ||
+    plantRuntime.isSproutSelfSustaining
+  ) {
     return;
   }
 
@@ -3314,7 +3469,12 @@ function updatePlantState() {
   const now = Date.now();
   updatePlantWaterLevel();
 
+  if (plantRuntime.isSproutGrown && !plantRuntime.isSproutSelfSustaining) {
+    tickSproutEvolution(plantRuntime, now);
+  }
+
   if (
+    !plantRuntime.isSproutSelfSustaining &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= plantDryMs
@@ -3374,6 +3534,9 @@ function removeMainPlant() {
   plantRuntime.growthStartedAt = null;
   plantRuntime.isSproutGrown = false;
   plantRuntime.sproutGrownAt = null;
+  plantRuntime.sproutEvolutionMs = 0;
+  plantRuntime.sproutEvolutionLastTickAt = null;
+  plantRuntime.isSproutSelfSustaining = false;
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
   sprout.style.display = "none";
@@ -3408,6 +3571,7 @@ function updatePlantCard() {
     !plantRuntime.isSeedPlanted ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
+    plantRuntime.isSproutSelfSustaining ||
     !wateringTarget
   ) {
     plantCard.style.display = "none";
@@ -3437,9 +3601,10 @@ function updatePlantGrowth() {
     return;
   }
 
-  const elapsed = Date.now() - plantRuntime.growthStartedAt;
+  const now = Date.now();
+  const elapsed = now - plantRuntime.growthStartedAt;
   const growthRatio = Math.min(1, elapsed / plantGrowthMs);
-  const secondGrowthRatio = getPlantSecondGrowthRatio(plantRuntime, Date.now());
+  const secondGrowthRatio = getPlantSecondGrowthRatio(plantRuntime, now);
   updatePlantGrowthMeter(
     mainPlantGrowthMeter.element,
     mainPlantGrowthMeter.fill,
@@ -3457,7 +3622,10 @@ function updatePlantGrowth() {
   if (growthRatio >= 1) {
     if (!plantRuntime.isSproutGrown) {
       plantRuntime.isSproutGrown = true;
-      plantRuntime.sproutGrownAt = Date.now();
+      plantRuntime.sproutGrownAt = now;
+      plantRuntime.sproutEvolutionMs = 0;
+      plantRuntime.sproutEvolutionLastTickAt = now;
+      plantRuntime.isSproutSelfSustaining = false;
     }
     growthCard.style.display = "none";
     updateSproutPosition();
@@ -3477,22 +3645,16 @@ function updateSproutPosition() {
     return;
   }
 
-  const grownAt =
-    plantRuntime.sproutGrownAt ||
-    (plantRuntime.growthStartedAt ? plantRuntime.growthStartedAt + plantGrowthMs : Date.now());
-  const sproutElapsed = Date.now() - grownAt;
-  const isBigSprout = sproutElapsed >= biggerSproutMs;
-  const sproutWidth = isBigSprout ? 30 : SPROUT_WIDTH;
-  const sproutHeight = isBigSprout ? 38 : SPROUT_HEIGHT;
-
+  const stage = getSproutStageFromPlant(plantRuntime);
+  const sproutSize = getSproutSizeForStage(stage);
   sprout.style.display = "block";
-  sprout.classList.toggle("is-big", isBigSprout);
-  sprout.src = isBigSprout ? "sprout-grown.svg" : "sprout.png";
-  setWorldSize(sprout, sproutWidth, sproutHeight);
+  sprout.classList.toggle("is-big", stage >= 2);
+  sprout.src = getSproutImageForStage(stage);
+  setWorldSize(sprout, sproutSize.width, sproutSize.height);
   setWorldPosition(
     sprout,
-    plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - sproutWidth / 2,
-    plantRuntime.spotY - sproutHeight + 7
+    plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
+    plantRuntime.spotY - sproutSize.height + 7
   );
   updateNpcPosition();
 }
@@ -3729,6 +3891,33 @@ function applyLoadedPlantState(loadedPlant) {
     (plantRuntime.isSproutGrown && plantRuntime.growthStartedAt
       ? plantRuntime.growthStartedAt
       : null);
+
+  const hadEvolutionKey = Object.prototype.hasOwnProperty.call(loadedPlant, "sproutEvolutionMs");
+  const hadSelfKey = Object.prototype.hasOwnProperty.call(loadedPlant, "isSproutSelfSustaining");
+  plantRuntime.isSproutSelfSustaining = hadSelfKey ? Boolean(loadedPlant.isSproutSelfSustaining) : false;
+
+  if (!hadEvolutionKey) {
+    plantRuntime.sproutEvolutionMs = 0;
+    if (
+      plantRuntime.isSproutGrown &&
+      plantRuntime.sproutGrownAt &&
+      !plantRuntime.isSproutSelfSustaining
+    ) {
+      const elapsed = Date.now() - plantRuntime.sproutGrownAt;
+      if (elapsed >= biggerSproutMs) {
+        plantRuntime.isSproutSelfSustaining = true;
+        plantRuntime.sproutEvolutionMs = sproutStage1Ms + sproutStage2GrowMs;
+      } else if (elapsed > 0) {
+        plantRuntime.sproutEvolutionMs = Math.floor(
+          (elapsed / biggerSproutMs) * (sproutStage1Ms + sproutStage2GrowMs - 1)
+        );
+      }
+    }
+  } else {
+    plantRuntime.sproutEvolutionMs = Math.max(0, Number(loadedPlant.sproutEvolutionMs) || 0);
+  }
+
+  plantRuntime.sproutEvolutionLastTickAt = Date.now();
 }
 
 function getPlantStateForStorage() {
@@ -3747,6 +3936,9 @@ function getPlantStateForStorage() {
     plantGrowthStartedAt: plantRuntime.growthStartedAt,
     isSproutGrown: plantRuntime.isSproutGrown,
     plantSproutGrownAt: plantRuntime.sproutGrownAt,
+    sproutEvolutionMs: plantRuntime.sproutEvolutionMs,
+    sproutEvolutionLastTickAt: plantRuntime.sproutEvolutionLastTickAt,
+    isSproutSelfSustaining: plantRuntime.isSproutSelfSustaining,
     npcX,
     npcY
   };
@@ -4350,6 +4542,7 @@ function pollPresenceDatabase() {
     const idsInDb = Object.create(null);
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
+      if (isRemotePresenceSameLoggedInAccount(state)) return;
       idsInDb[String(state.id)] = true;
       renderRemotePlayerState(state);
     });
@@ -4411,6 +4604,7 @@ function renderRemotePlayersFromPresence(presenceState) {
 
     const latestPresence = presences[presences.length - 1];
     if (!latestPresence || !latestPresence.id || latestPresence.id === currentSessionId) return;
+    if (isRemotePresenceSameLoggedInAccount(latestPresence)) return;
 
     nextRemotePlayers[latestPresence.id] = latestPresence;
   });
@@ -4429,7 +4623,7 @@ function handleRemotePlayerBroadcast(state) {
     removeRemotePlayer(state.id);
     return;
   }
-
+  if (isRemotePresenceSameLoggedInAccount(state)) return;
   renderRemotePlayerState(state);
   updateRemotePlayerCount();
 }

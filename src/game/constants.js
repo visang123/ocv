@@ -46,9 +46,21 @@ export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 
+/** Stage 1 sprout art duration after first sprout appears (ms). */
+export const sproutStage1Ms = 3 * SECOND_MS;
+/** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
+export const sproutStage2GrowMs = 1 * MINUTE_MS;
+export const sproutStage1Image = "sprout-stage1.svg";
+export const sproutStage2Image = "sprout-stage2.svg";
+export const sproutStage3Image = "sprout-stage3.svg";
+/** Draw sizes per stage (world pixels). */
+export const SPROUT_STAGE_WIDTHS = [14, 22, 34];
+export const SPROUT_STAGE_HEIGHTS = [18, 32, 58];
+
 export const appleEatMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
+/** Legacy: used only to migrate old saves into stage-3 self-sustaining sprouts. */
 export const biggerSproutMs = 30 * SECOND_MS;
 export const pickupDistance = 28;
 export const guideInteractDistance = 60;

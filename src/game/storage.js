@@ -95,6 +95,9 @@ export function loadSeedStateFromStorage(config) {
     plantGrowthStartedAt: null,
     isSproutGrown: false,
     plantSproutGrownAt: null,
+    sproutEvolutionMs: 0,
+    sproutEvolutionLastTickAt: null,
+    isSproutSelfSustaining: false,
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -124,6 +127,13 @@ export function loadSeedStateFromStorage(config) {
       planted.isSproutGrown = Boolean(savedPlantedState.isSproutGrown);
       planted.plantSproutGrownAt =
         Number(savedPlantedState.plantSproutGrownAt) || null;
+      planted.sproutEvolutionMs = Math.max(
+        0,
+        Number(savedPlantedState.sproutEvolutionMs) || 0
+      );
+      planted.sproutEvolutionLastTickAt =
+        Number(savedPlantedState.sproutEvolutionLastTickAt) || null;
+      planted.isSproutSelfSustaining = Boolean(savedPlantedState.isSproutSelfSustaining);
       planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
       planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
     } catch (error) {
@@ -233,7 +243,11 @@ export function loadAppleStateFromStorage(config) {
                   : !plantData.growthStartedAt,
               growthStartedAt: Number(plantData.growthStartedAt) || null,
               isSproutGrown: Boolean(plantData.isSproutGrown),
-              sproutGrownAt: Number(plantData.sproutGrownAt) || null
+              sproutGrownAt: Number(plantData.sproutGrownAt) || null,
+              sproutEvolutionMs: Math.max(0, Number(plantData.sproutEvolutionMs) || 0),
+              sproutEvolutionLastTickAt:
+                Number(plantData.sproutEvolutionLastTickAt) || null,
+              isSproutSelfSustaining: Boolean(plantData.isSproutSelfSustaining)
             };
           })
         : []
@@ -297,7 +311,10 @@ export function saveAppleStateToStorage(config) {
           needsFirstWater: plant.needsFirstWater,
           growthStartedAt: plant.growthStartedAt,
           isSproutGrown: plant.isSproutGrown,
-          sproutGrownAt: plant.sproutGrownAt
+          sproutGrownAt: plant.sproutGrownAt,
+          sproutEvolutionMs: plant.sproutEvolutionMs,
+          sproutEvolutionLastTickAt: plant.sproutEvolutionLastTickAt,
+          isSproutSelfSustaining: plant.isSproutSelfSustaining
         };
       })
     })
