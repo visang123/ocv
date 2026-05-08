@@ -308,7 +308,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508o");
+  window.location.replace("/ovc-login.html?v=20260508p");
   throw new Error("OVC login required");
 }
 
@@ -2872,7 +2872,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508o");
+    window.location.replace("/ovc-login.html?v=20260508p");
     return;
   }
 
@@ -3008,10 +3008,6 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemotePlayerBroadcast(payload.payload);
     })
-    .on("presence", { event: "sync" }, function () {
-      if (channel !== multiplayerChannel || typeof channel.presenceState !== "function") return;
-      renderRemotePlayersFromPresence(channel.presenceState());
-    })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
       addNetworkDebugLog("system: " + JSON.stringify(payload || {}));
@@ -3105,19 +3101,10 @@ function sendMultiplayerPresence(forceSend) {
       lastHeartbeatBroadcastAt = now;
     }
   }
-  if (multiplayerChannel && (forceSend || now - lastPresenceTrackAt >= 5000)) {
-    Promise.resolve(multiplayerChannel.track(state)).catch(function (error) {
-      addNetworkDebugLog(
-        "presence track error: " + (error && error.message ? error.message : "unknown")
-      );
-    });
-    lastPresenceTrackAt = now;
-  }
-
   if (hasChanged || forceSend) {
     lastPresenceStateKey = stateKey;
   }
-  if (forceSend || hasChanged || now - lastPresenceDbSyncAt >= 2000) {
+  if (hasChanged || now - lastPresenceDbSyncAt >= 2000) {
     syncPresenceToDatabase(state);
   }
   if (now - lastPresenceDbPollAt >= 2000) {
@@ -3213,13 +3200,6 @@ function renderRemotePlayersFromPresence(presenceState) {
     nextRemotePlayers[latestPresence.id] = latestPresence;
   });
 
-  Object.keys(remotePlayers).forEach(function (remoteId) {
-    if (!nextRemotePlayers[remoteId]) {
-      remotePlayers[remoteId].element.remove();
-      delete remotePlayers[remoteId];
-    }
-  });
-
   Object.keys(nextRemotePlayers).forEach(function (remoteId) {
     renderRemotePlayerState(nextRemotePlayers[remoteId]);
   });
@@ -3288,7 +3268,7 @@ function pruneStaleRemotePlayers() {
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.lastSeenAt) return;
-    if (now - remotePlayer.lastSeenAt < 75000) return;
+    if (now - remotePlayer.lastSeenAt < 90000) return;
     removeRemotePlayer(remoteId);
   });
 }
@@ -3557,7 +3537,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508o";
+    window.location.href = "/ovc-login.html?v=20260508p";
   };
 
   if (multiplayerChannel) {
