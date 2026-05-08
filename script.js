@@ -2225,11 +2225,21 @@ function updateBucketPosition() {
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
-    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
+    if (
+      holder &&
+      Number.isFinite(holder.worldX) &&
+      Number.isFinite(holder.worldY)
+    ) {
+      // holder.worldY is bottom-origin (-depth + jumpY). Convert to top-origin.
+      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
+      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+      bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+    } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
-    // For remote holder, trust shared bucket coordinates directly.
+    bucketX = Math.max(0, Math.min(WORLD_WIDTH - bucketSize.width, bucketX));
     bucketY = Math.max(0, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
