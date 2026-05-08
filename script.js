@@ -702,11 +702,17 @@ seedInventory.addEventListener("click", function (event) {
   const seedItem = event.target.closest(".inventory-seed");
   if (!seedItem) return;
   event.preventDefault();
-  if (seedItem.dataset.action === "discard") {
-    discardInventorySeed(seedItem.dataset.seedId);
+  const seedId = seedItem.dataset.seedId;
+  const targetSeed = appleState.extraSeeds.find(function (extraSeed) {
+    return extraSeed.id === seedId;
+  });
+  if (!targetSeed) return;
+  // Decide by real-time seed state, not stale UI dataset.
+  if (isExtraSeedDry(targetSeed)) {
+    discardInventorySeed(seedId);
     return;
   }
-  plantInventorySeed(seedItem.dataset.seedId);
+  plantInventorySeed(seedId);
 });
 
 function applyGuideTexts() {
@@ -2043,6 +2049,23 @@ function updateSeedPosition() {
 
 function updateExtraSeedsAndPlants() {
   const now = Date.now();
+  let didAutoRemoveDryExtraSeed = false;
+
+  appleState.extraSeeds = appleState.extraSeeds.filter(function (extraSeed) {
+    const shouldAutoRemoveDrySeed =
+      !extraSeed.inInventory &&
+      !extraSeed.planted &&
+      isExtraSeedDry(extraSeed, now) &&
+      now - Number(extraSeed.createdAt || 0) >= seedDryMs + 20000;
+    if (!shouldAutoRemoveDrySeed) return true;
+    if (extraSeed.element) extraSeed.element.remove();
+    if (extraSeed.inventoryElement) extraSeed.inventoryElement.remove();
+    if (heldItem === createHeldExtraSeed(extraSeed.id)) {
+      heldItem = null;
+    }
+    didAutoRemoveDryExtraSeed = true;
+    return false;
+  });
 
   appleState.extraSeeds.forEach(function (extraSeed) {
     ensureExtraSeedElement(extraSeed);
@@ -2064,6 +2087,12 @@ function updateExtraSeedsAndPlants() {
 
     setWorldPosition(extraSeed.element, extraSeed.x, extraSeed.y);
   });
+
+  if (didAutoRemoveDryExtraSeed) {
+    saveAppleState();
+    markWorldDirty();
+    syncWorldState(true);
+  }
 
   updateSeedInventory();
 
