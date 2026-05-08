@@ -218,9 +218,7 @@ const savedGlobalPlayerColor = normalizeHexColor(localStorage.getItem(currentUse
 const savedLastPlayerColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
 const hasChosenPlayerColor =
   localStorage.getItem(currentUserHasChosenColorKey) === currentUserId ||
-  Boolean(savedUserScopedColor) ||
-  Boolean(savedGlobalPlayerColor) ||
-  Boolean(savedLastPlayerColor);
+  Boolean(savedUserScopedColor);
 let selectedPlayerColor =
   savedUserScopedColor || savedGlobalPlayerColor || savedLastPlayerColor || "#ffffff";
 if (currentUserId) {
@@ -312,6 +310,12 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
+const MULTIPLAYER_BROADCAST_MIN_MS = 80;
+const MULTIPLAYER_HEARTBEAT_MS = 500;
+const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
+const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
+const MULTIPLAYER_WORLD_SYNC_LOOP_MS = 400;
+const MULTIPLAYER_WORLD_POLL_MIN_MS = 400;
 
 const keys = createInputState();
 
@@ -759,6 +763,9 @@ function isNearWellForPouring() {
 }
 
 function isNearSignBoard() {
+  if (!signBoard || signBoard.style.display === "none") {
+    return false;
+  }
   return getCenterDistance(signX, signY, SIGN_WIDTH, SIGN_HEIGHT) < guideInteractDistance;
 }
 
@@ -1469,6 +1476,8 @@ function applySharedWorldSnapshot(snapshot) {
   ) {
     lastAppliedWorldResetToken = snapshot.resetToken;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
+    // Keep multiplayer reset consistent across devices by clearing local world caches too.
+    clearStoredKeys(appStorageKeys);
     restartPlayerPositionOnly();
     setTimeout(function () {
       window.location.reload();
@@ -1705,7 +1714,7 @@ function pollWorldState(forcePoll) {
     isWorldPolling ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
-    (!forcePoll && now - lastWorldPollAt < 1500)
+    (!forcePoll && now - lastWorldPollAt < MULTIPLAYER_WORLD_POLL_MIN_MS)
   ) {
     return;
   }
@@ -2956,9 +2965,6 @@ function updatePlantGrowth() {
 function updateSproutPosition() {
   if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten") {
     sprout.style.display = "none";
-    plantMaster.style.display = "none";
-    npcBubble.style.display = "none";
-    playerBubble.style.display = "none";
     return;
   }
 
@@ -3670,7 +3676,14 @@ function sendMultiplayerPresence(forceSend) {
 
   // Broadcast is the primary multiplayer sync path. Keep a heartbeat so idle
   // players stay visible even when they are not moving.
-  if (multiplayerChannel && (forceSend || (hasChanged && now - lastBroadcastAt >= 120) || now - lastHeartbeatBroadcastAt >= 1000)) {
+  if (
+    multiplayerChannel &&
+    (
+      forceSend ||
+      (hasChanged && now - lastBroadcastAt >= MULTIPLAYER_BROADCAST_MIN_MS) ||
+      now - lastHeartbeatBroadcastAt >= MULTIPLAYER_HEARTBEAT_MS
+    )
+  ) {
     Promise.resolve(multiplayerChannel.send({
       type: "broadcast",
       event: "player_state",
@@ -3688,10 +3701,10 @@ function sendMultiplayerPresence(forceSend) {
   if (hasChanged || forceSend) {
     lastPresenceStateKey = stateKey;
   }
-  if (hasChanged || now - lastPresenceDbSyncAt >= 2000) {
+  if (hasChanged || now - lastPresenceDbSyncAt >= MULTIPLAYER_PRESENCE_DB_SYNC_MS) {
     syncPresenceToDatabase(state);
   }
-  if (now - lastPresenceDbPollAt >= 2000) {
+  if (now - lastPresenceDbPollAt >= MULTIPLAYER_PRESENCE_DB_POLL_MS) {
     pollPresenceDatabase();
   }
   lastPresenceSentAt = now;
@@ -4299,7 +4312,7 @@ setInterval(function () {
 setInterval(function () {
   syncWorldState(false);
   pollWorldState();
-}, 1000);
+}, MULTIPLAYER_WORLD_SYNC_LOOP_MS);
 setInterval(validateCurrentAccount, 5000);
 window.addEventListener("resize", function () {
   setup();

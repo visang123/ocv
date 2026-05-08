@@ -106,7 +106,9 @@ function handleApi(request, response, requestedPath) {
       }
 
       const accounts = readAccounts();
-      if (accounts.some((account) => account.name === name)) {
+      if (
+        accounts.some((account) => normalizeName(account.name) === name)
+      ) {
         sendJson(response, 409, { ok: false, message: "이미 가입된 이름입니다." });
         return;
       }
@@ -130,7 +132,7 @@ function handleApi(request, response, requestedPath) {
       const name = normalizeName(body.name);
       const password = String(body.password || "");
       const account = readAccounts().find((savedAccount) => {
-        return savedAccount.name === name && savedAccount.password === password;
+        return normalizeName(savedAccount.name) === name && savedAccount.password === password;
       });
 
       if (!account) {
