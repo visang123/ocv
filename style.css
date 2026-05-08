@@ -64,13 +64,13 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   display: none;
-  min-width: 46px;
-  padding: 2px 4px;
+  min-width: 34px;
+  padding: 1px 3px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.22);
   color: #111;
-  font: 900 4.8px/1.2 Arial, sans-serif;
+  font: 900 4px/1.2 Arial, sans-serif;
   text-align: center;
   white-space: nowrap;
   user-select: none;
@@ -333,8 +333,8 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   display: none;
-  min-width: 26px;
-  padding: 3px 5px;
+  min-width: 20px;
+  padding: 2px 4px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 8px;
@@ -351,8 +351,8 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   display: none;
-  min-width: 22px;
-  padding: 3px 5px;
+  min-width: 18px;
+  padding: 2px 4px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 8px;

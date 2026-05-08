@@ -497,6 +497,16 @@ guideCard.addEventListener("click", function () {
   updateGuideCard();
 });
 
+document.addEventListener("pointerdown", function (event) {
+  if (guideCard.style.display !== "block") return;
+  if (guideCard.contains(event.target)) return;
+  if (event.target === guideBookButton) return;
+
+  isGuideBookOpen = false;
+  isGuideDismissedAtSign = true;
+  updateGuideCard();
+});
+
 seed.addEventListener("mouseenter", function () {
   isHoveringMainSeed = true;
 });
@@ -775,7 +785,11 @@ function isNearWellForPouring() {
 }
 
 function isNearSignBoard() {
-  if (!signBoard || signBoard.style.display === "none") {
+  if (!signBoard) {
+    return false;
+  }
+  const signBoardStyle = window.getComputedStyle(signBoard);
+  if (signBoardStyle.display === "none" || signBoardStyle.visibility === "hidden") {
     return false;
   }
   return getCenterDistance(signX, signY, SIGN_WIDTH, SIGN_HEIGHT) < guideInteractDistance;
@@ -1491,7 +1505,6 @@ function applySharedWorldSnapshot(snapshot) {
   if (
     isResetGuardWindow &&
     lastAppliedWorldResetToken &&
-    snapshotResetToken &&
     snapshotResetToken !== lastAppliedWorldResetToken
   ) {
     return;
@@ -2178,6 +2191,13 @@ function updateBucketPosition() {
       // Match local hand anchor so the bucket sticks to the remote character body.
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
       bucketY = holder.worldY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+    } else {
+      // Fallback: keep last synced world position, but never let invalid values hide bucket.
+      if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+        const bucketSize = getBucketSize();
+        bucketX = wellX - bucketSize.width - 8;
+        bucketY = wellY + WELL_SIZE - bucketSize.height;
+      }
     }
     // No interpolation while remotely held: attach instantly to holder hand.
     bucketRenderX = bucketX;
@@ -2185,6 +2205,12 @@ function updateBucketPosition() {
   } else {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
+  }
+
+  if (!Number.isFinite(bucketRenderX) || !Number.isFinite(bucketRenderY)) {
+    const bucketSize = getBucketSize();
+    bucketRenderX = wellX - bucketSize.width - 8;
+    bucketRenderY = wellY + WELL_SIZE - bucketSize.height;
   }
 
   setWorldPosition(bucket, bucketRenderX, bucketRenderY);
