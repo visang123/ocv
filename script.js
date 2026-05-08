@@ -2219,13 +2219,24 @@ function updateBucketPosition() {
     bucketRenderY = bucketY;
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
-    // Use shared world snapshot position directly for remote-held bucket.
-    // This avoids coordinate-space drift between remote player transform and bucket transform.
+    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
+    const bucketSize = getBucketSize();
+    if (
+      holder &&
+      Number.isFinite(holder.worldX) &&
+      Number.isFinite(holder.depth) &&
+      Number.isFinite(holder.jumpY)
+    ) {
+      const remoteTopY =
+        GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
+      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+      bucketY = remoteTopY + PLAYER_HEIGHT * 0.74 - bucketSize.height / 2;
+    }
     if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
-      const bucketSize = getBucketSize();
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
+    bucketY = Math.max(-BUCKET_SIZE, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
   } else {
