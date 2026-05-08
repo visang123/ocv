@@ -1128,6 +1128,7 @@ function pickUpNearestItem() {
     lastBucketPickupAt = Date.now();
     window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
     markWorldDirty();
+    syncWorldState(true);
   }
 }
 
@@ -1857,6 +1858,7 @@ function dropBucket() {
   heldItem = null;
   window.OVC_SHARED_BUCKET_HELD_BY = "";
   saveBucketState();
+  syncWorldState(true);
 }
 
 function updateSeedPosition() {
@@ -3785,7 +3787,6 @@ function sendMultiplayerPresence(forceSend) {
     x: playerX,
     depth: playerDepth,
     jumpY,
-    bucketHeld: heldItem === HELD_ITEM_BUCKET,
     updatedAt: now
   };
   const stateKey = [
@@ -3938,18 +3939,8 @@ function renderRemotePlayersFromPresence(presenceState) {
 function handleRemotePlayerBroadcast(state) {
   if (!state || !state.id || state.id === currentSessionId) return;
   if (state.action === "leave") {
-    if (window.OVC_SHARED_BUCKET_HELD_BY === state.id) {
-      window.OVC_SHARED_BUCKET_HELD_BY = "";
-      markWorldDirty();
-    }
     removeRemotePlayer(state.id);
     return;
-  }
-
-  if (state.bucketHeld === true) {
-    window.OVC_SHARED_BUCKET_HELD_BY = state.id;
-  } else if (state.bucketHeld === false && window.OVC_SHARED_BUCKET_HELD_BY === state.id) {
-    window.OVC_SHARED_BUCKET_HELD_BY = "";
   }
 
   renderRemotePlayerState(state);
