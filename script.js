@@ -257,6 +257,7 @@ let lastPresenceStateKey = "";
 let presenceRateLimitedUntil = 0;
 let lastPresenceTrackAt = 0;
 let lastBroadcastAt = 0;
+let lastBucketBroadcastAt = 0;
 let lastHeartbeatBroadcastAt = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
@@ -274,6 +275,7 @@ let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
 let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
+let remoteBucketUpdateAtById = {};
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 const playerTintCache = new Map();
@@ -1852,6 +1854,7 @@ function dropBucket() {
   bucketY = playerBox.bottom - bucketSize.height;
   heldItem = null;
   window.OVC_SHARED_BUCKET_HELD_BY = "";
+  broadcastBucketState(true);
   saveBucketState();
   syncWorldState(true);
 }
@@ -2211,6 +2214,7 @@ function updateBucketPosition() {
     bucketX = handPosition.x;
     bucketY = handPosition.y;
     markWorldDirty();
+    broadcastBucketState(false);
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
@@ -3703,6 +3707,10 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemotePlayerBroadcast(payload.payload);
     })
+    .on("broadcast", { event: "bucket_state" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteBucketBroadcast(payload.payload);
+    })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
       addNetworkDebugLog("system: " + JSON.stringify(payload || {}));
@@ -3813,6 +3821,57 @@ function sendMultiplayerPresence(forceSend) {
     pollPresenceDatabase();
   }
   lastPresenceSentAt = now;
+}
+
+function broadcastBucketState(forceSend) {
+  if (!multiplayerChannel || !currentSessionId) return;
+  const now = Date.now();
+  if (!forceSend && now - lastBucketBroadcastAt < 60) return;
+
+  const payload = {
+    id: currentSessionId,
+    held: heldItem === HELD_ITEM_BUCKET,
+    x: bucketX,
+    y: bucketY,
+    isFull: isBucketFull,
+    updatedAt: now
+  };
+  Promise.resolve(multiplayerChannel.send({
+    type: "broadcast",
+    event: "bucket_state",
+    payload
+  })).catch(function () {
+    // Best effort; world sync remains the fallback.
+  });
+  lastBucketBroadcastAt = now;
+}
+
+function handleRemoteBucketBroadcast(payload) {
+  if (!payload || !payload.id || payload.id === currentSessionId) return;
+  const remoteId = String(payload.id);
+  const nextUpdatedAt = Number(payload.updatedAt || 0);
+  const prevUpdatedAt = Number(remoteBucketUpdateAtById[remoteId] || 0);
+  if (nextUpdatedAt < prevUpdatedAt) return;
+  remoteBucketUpdateAtById[remoteId] = nextUpdatedAt;
+
+  if (payload.held === true) {
+    window.OVC_SHARED_BUCKET_HELD_BY = remoteId;
+    const nextX = Number(payload.x);
+    const nextY = Number(payload.y);
+    if (Number.isFinite(nextX)) bucketX = nextX;
+    if (Number.isFinite(nextY)) bucketY = nextY;
+    isBucketFull = Boolean(payload.isFull);
+    return;
+  }
+
+  if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    const nextX = Number(payload.x);
+    const nextY = Number(payload.y);
+    if (Number.isFinite(nextX)) bucketX = nextX;
+    if (Number.isFinite(nextY)) bucketY = nextY;
+    isBucketFull = Boolean(payload.isFull);
+  }
 }
 
 function syncPresenceToDatabase(state) {
