@@ -259,6 +259,10 @@ let lastPresenceTrackAt = 0;
 let lastBroadcastAt = 0;
 let lastBucketBroadcastAt = 0;
 let lastHeartbeatBroadcastAt = 0;
+let lastWaterSplashAt = 0;
+let lastWaterSplashX = 0;
+let lastWaterSplashY = 0;
+let lastMainPlantStateChangeAt = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
@@ -1537,6 +1541,7 @@ function readWaterLevel(value, fallback) {
 function applySharedWorldSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
+  const snapshotSavedAt = Number(snapshot.savedAt || 0);
   const snapshotResetToken = String(snapshot.resetToken || "");
   const isResetGuardWindow = Date.now() - lastWorldResetAt < 20000;
   // Guard only during the short reset window. After that, allow sync to recover
@@ -1585,12 +1590,35 @@ function applySharedWorldSnapshot(snapshot) {
       }
     }
 
+    if (snapshot.seed) {
+      const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
+      const nextSeedX = Number(snapshot.seed.x);
+      const nextSeedY = Number(snapshot.seed.y);
+      if (heldItem !== HELD_ITEM_SEED) {
+        if (Number.isFinite(nextSeedX)) seedX = nextSeedX;
+        if (Number.isFinite(nextSeedY)) seedY = nextSeedY;
+      }
+      if (Number.isFinite(nextSeedCreatedAt) && nextSeedCreatedAt > 0) {
+        plantRuntime.seedCreatedAt = nextSeedCreatedAt;
+        setStoredValue(seedCreatedAtKey, String(nextSeedCreatedAt));
+      }
+      if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.seed.isDry === "boolean") {
+        plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
+      }
+    }
+
     if (snapshot.well) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
     }
 
-    if (snapshot.mainPlant) {
+    if (
+      snapshot.mainPlant &&
+      (
+        !snapshotSavedAt ||
+        snapshotSavedAt >= lastMainPlantStateChangeAt
+      )
+    ) {
       applyLoadedPlantState({
         isSeedPlanted: Boolean(snapshot.mainPlant.isSeedPlanted),
         plantSpotX: Number(snapshot.mainPlant.plantSpotX) || 0,
@@ -1612,6 +1640,9 @@ function applySharedWorldSnapshot(snapshot) {
       plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
       if (plantRuntime.isSeedPlanted) {
         setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+      }
+      if (snapshotSavedAt) {
+        lastMainPlantStateChangeAt = Math.max(lastMainPlantStateChangeAt, snapshotSavedAt);
       }
     }
 
@@ -2005,7 +2036,6 @@ function updateExtraPlantState(plant, now) {
 
   if (
     plant.status !== "rotten" &&
-    plant.status !== "wet" &&
     plant.becameEmptyAt !== null &&
     now - plant.becameEmptyAt >= plantDryMs
   ) {
@@ -2721,7 +2751,7 @@ function useBucket() {
         saveWellState();
         updateWellImage();
         updateWellCard();
-        createWaterSplash();
+        triggerWaterSplash();
         isBucketFull = false;
       }
       return;
@@ -2730,9 +2760,9 @@ function useBucket() {
     const wateringTarget = getNearestWateringTarget();
     if (wateringTarget) {
       waterPlant(wateringTarget);
-      createWaterSplash();
+      triggerWaterSplash();
     } else {
-      createWaterSplash();
+      triggerWaterSplash();
     }
 
     isBucketFull = false;
@@ -2749,6 +2779,17 @@ function useBucket() {
     return;
   }
 
+}
+
+function triggerWaterSplash() {
+  const bucketSize = getBucketSize();
+  const splashX = bucketX + bucketSize.width / 2;
+  const splashY = bucketY + bucketSize.height * 0.75;
+  lastWaterSplashAt = Date.now();
+  lastWaterSplashX = splashX;
+  lastWaterSplashY = splashY;
+  createWaterSplashAt(splashX, splashY);
+  sendMultiplayerPresence(true);
 }
 
 function getNearestWateringTarget() {
@@ -2784,11 +2825,7 @@ function getNearestWateringTarget() {
   return nearest;
 }
 
-function createWaterSplash() {
-  const bucketSize = getBucketSize();
-  const startX = bucketX + bucketSize.width / 2;
-  const startY = bucketY + bucketSize.height * 0.75;
-
+function createWaterSplashAt(startX, startY) {
   for (let index = 0; index < 8; index += 1) {
     const drop = document.createElement("div");
     const offsetX = (index - 3.5) * 3;
@@ -2858,6 +2895,7 @@ function waterPlant(target) {
   plantRuntime.becameEmptyAt = null;
 
   saveSeedState();
+  syncWorldState(true);
   updatePlantState();
 }
 
@@ -2954,7 +2992,6 @@ function updatePlantState() {
 
   if (
     plantRuntime.status !== "rotten" &&
-    plantRuntime.status !== "wet" &&
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= plantDryMs
   ) {
@@ -3427,6 +3464,7 @@ function loadSeedState() {
 }
 
 function saveSeedState() {
+  lastMainPlantStateChangeAt = Date.now();
   saveSeedStateToStorage({
     seedCreatedAtKey,
     seedPlantedStateKey,
@@ -3820,16 +3858,26 @@ function sendMultiplayerPresence(forceSend) {
   if (!hasSpawnedCharacter) return;
 
   const now = Date.now();
+  const isWateringNow = now - lastWaterSplashAt < 600;
   const state = {
     id: currentSessionId,
     userId: currentUserId,
     name: currentUserName,
-    action: plantRuntime.isPlanting ? "planting" : (appleState.isEating ? "eating" : "state"),
+    action: plantRuntime.isPlanting
+      ? "planting"
+      : appleState.isEating
+        ? "eating"
+        : isWateringNow
+          ? "watering"
+          : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
     depth: playerDepth,
     jumpY,
+    waterSplashAt: lastWaterSplashAt,
+    waterSplashX: lastWaterSplashX,
+    waterSplashY: lastWaterSplashY,
     updatedAt: now
   };
   const stateKey = [
@@ -4089,6 +4137,8 @@ function renderRemotePlayerState(state) {
       ? "\uC528\uC557 \uC2EC\uB294\uC911..."
       : state.action === "eating"
         ? "\uBA39\uB294\uC911..."
+        : state.action === "watering"
+          ? "\uBB3C \uC8FC\uB294\uC911..."
         : "";
   remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
@@ -4101,6 +4151,19 @@ function renderRemotePlayerState(state) {
   remotePlayer.worldY = nextY;
   remotePlayer.depth = Number(state.depth) || 0;
   remotePlayer.jumpY = Number(state.jumpY) || 0;
+  const nextWaterSplashAt = Number(state.waterSplashAt || 0);
+  if (
+    nextWaterSplashAt > 0 &&
+    nextWaterSplashAt > Number(remotePlayer.lastWaterSplashAt || 0) &&
+    Date.now() - nextWaterSplashAt < 5000
+  ) {
+    const nextSplashX = Number(state.waterSplashX);
+    const nextSplashY = Number(state.waterSplashY);
+    if (Number.isFinite(nextSplashX) && Number.isFinite(nextSplashY)) {
+      createWaterSplashAt(nextSplashX, nextSplashY);
+      remotePlayer.lastWaterSplashAt = nextWaterSplashAt;
+    }
+  }
   remotePlayer.lastSeenAt = Date.now();
 }
 
@@ -4134,6 +4197,7 @@ function createRemotePlayer(remoteId) {
     worldY: 0,
     depth: 0,
     jumpY: 0,
+    lastWaterSplashAt: 0,
     lastSeenAt: Date.now()
   };
   return remotePlayers[remoteId];
