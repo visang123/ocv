@@ -191,6 +191,7 @@ let hasShownFirstSeedFocus = false;
 let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
 let lastPickupToggleAt = 0;
+let lastBucketPickupAt = 0;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -412,6 +413,9 @@ document.addEventListener("keydown", function (event) {
     if (now - lastPickupToggleAt < 180) return;
     lastPickupToggleAt = now;
     if (heldItem) {
+      if (heldItem === HELD_ITEM_BUCKET && now - lastBucketPickupAt < 260) {
+        return;
+      }
       dropHeldItem();
       return;
     }
@@ -1121,6 +1125,7 @@ function pickUpNearestItem() {
 
   if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
     heldItem = HELD_ITEM_BUCKET;
+    lastBucketPickupAt = Date.now();
     window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
     markWorldDirty();
   }
