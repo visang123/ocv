@@ -1742,6 +1742,10 @@ function applySharedWorldSnapshot(snapshot) {
           isStarter: Boolean(extraSeed.isStarter)
         };
       });
+      const localInventorySeedIds = {};
+      localInventorySeeds.forEach(function (invSeed) {
+        localInventorySeedIds[String(invSeed.id)] = true;
+      });
       clearExtraSeedAndPlantElements();
       appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
@@ -1761,18 +1765,25 @@ function applySharedWorldSnapshot(snapshot) {
           })
         : appleState.apples;
       appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
-        ? snapshot.apples.extraSeeds.map(function (extraSeed) {
-            return {
-              id: String(extraSeed.id),
-              x: Number(extraSeed.x) || 0,
-              y: Number(extraSeed.y) || 0,
-              createdAt: Number(extraSeed.createdAt) || Date.now(),
-              planted: Boolean(extraSeed.planted),
-              inInventory: false,
-              label: extraSeed.label || "\uC528\uC557",
-              isStarter: Boolean(extraSeed.isStarter)
-            };
-          })
+        ? snapshot.apples.extraSeeds
+            .filter(function (extraSeed) {
+              // Stale snapshots can still list a seed on the ground after this client
+              // already picked it into inventory (inventory is not in shared extraSeeds).
+              // Merging both would duplicate ids: one hidden (inventory) and one visible ghost.
+              return !localInventorySeedIds[String(extraSeed.id)];
+            })
+            .map(function (extraSeed) {
+              return {
+                id: String(extraSeed.id),
+                x: Number(extraSeed.x) || 0,
+                y: Number(extraSeed.y) || 0,
+                createdAt: Number(extraSeed.createdAt) || Date.now(),
+                planted: Boolean(extraSeed.planted),
+                inInventory: false,
+                label: extraSeed.label || "\uC528\uC557",
+                isStarter: Boolean(extraSeed.isStarter)
+              };
+            })
         : [];
       if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
         appleState.extraSeeds = [];
