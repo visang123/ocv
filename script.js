@@ -193,6 +193,7 @@ let isHoveringMainSeed = false;
 let lastPickupToggleAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
+let lastRemoteBucketDebugAt = 0;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -2231,12 +2232,32 @@ function updateBucketPosition() {
         GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
       bucketY = remoteTopY + PLAYER_HEIGHT * 0.74 - bucketSize.height / 2;
+      const now = Date.now();
+      if (now - lastRemoteBucketDebugAt >= 1500) {
+        addNetworkDebugLog(
+          "bucket remote holder=" +
+          window.OVC_SHARED_BUCKET_HELD_BY +
+          " x=" +
+          Math.round(bucketX) +
+          " y=" +
+          Math.round(bucketY) +
+          " depth=" +
+          Math.round(holder.depth) +
+          " jump=" +
+          Math.round(holder.jumpY)
+        );
+        lastRemoteBucketDebugAt = now;
+      }
+    } else {
+      // Holder is unknown/stale: avoid using old bucket coordinates.
+      bucketX = wellX - bucketSize.width - 8;
+      bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
     if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
-    bucketY = Math.max(-BUCKET_SIZE, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
+    bucketY = Math.max(0, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
   } else {
