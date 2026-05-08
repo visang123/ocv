@@ -271,8 +271,6 @@ let isWorldPolling = false;
 let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
-let lastBucketFastSyncAt = 0;
-let lastBucketFastPollAt = 0;
 let lastWorldUpdatedAt = "";
 let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
@@ -323,10 +321,8 @@ const MULTIPLAYER_BROADCAST_MIN_MS = 80;
 const MULTIPLAYER_HEARTBEAT_MS = 500;
 const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
 const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
-const MULTIPLAYER_WORLD_SYNC_LOOP_MS = 400;
-const MULTIPLAYER_WORLD_POLL_MIN_MS = 400;
-const BUCKET_FAST_SYNC_MS = 120;
-const BUCKET_FAST_POLL_MS = 120;
+const MULTIPLAYER_WORLD_SYNC_LOOP_MS = 150;
+const MULTIPLAYER_WORLD_POLL_MIN_MS = 150;
 
 const keys = createInputState();
 
@@ -2225,14 +2221,19 @@ function updateBucketPosition() {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
     markWorldDirty();
-    const now = Date.now();
-    if (now - lastBucketFastSyncAt >= BUCKET_FAST_SYNC_MS) {
-      syncWorldState(true);
-      lastBucketFastSyncAt = now;
-    }
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
-    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
+    if (
+      holder &&
+      Number.isFinite(holder.worldX) &&
+      Number.isFinite(holder.worldY)
+    ) {
+      // Keep bucket visually attached to remote player hand.
+      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
+      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+      bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+    } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
@@ -2240,11 +2241,6 @@ function updateBucketPosition() {
     bucketY = Math.max(-PLAYER_HEIGHT, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
-    const now = Date.now();
-    if (now - lastBucketFastPollAt >= BUCKET_FAST_POLL_MS) {
-      pollWorldState(true);
-      lastBucketFastPollAt = now;
-    }
   } else {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
