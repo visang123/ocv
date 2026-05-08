@@ -78,6 +78,7 @@ import {
   appleStateKey,
   bucketStateKey,
   mainDrySeedHandledKey,
+  mainSeedCollectedKey,
   appStorageKeys
 } from "./src/game/constants.js";
 import {
@@ -188,6 +189,7 @@ let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
 let hasShownFirstSeedFocus = false;
 let hasHandledDryMainSeed = false;
+let isMainSeedAvailable = true;
 let dryMainSeedVisibleSince = 0;
 let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
@@ -231,6 +233,7 @@ let selectedPlayerColor =
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
+  isMainSeedAvailable = !getStoredFlag(mainSeedCollectedKey);
 }
 let isCharacterSelecting = false;
 let hasSpawnedCharacter = Boolean(currentUserId && hasChosenPlayerColor);
@@ -766,7 +769,7 @@ function isNearSeed() {
 
 function canPickUpSeed() {
   updateSeedDryState();
-  return !hasStarterSeedInSeedList() && !plantRuntime.isSeedPlanted && !plantRuntime.isSeedDry;
+  return isMainSeedAvailable && !plantRuntime.isSeedPlanted && !plantRuntime.isSeedDry;
 }
 
 function hasStarterSeedInSeedList() {
@@ -776,7 +779,7 @@ function hasStarterSeedInSeedList() {
 }
 
 function createStarterSeedInventoryItem() {
-  if (hasStarterSeedInSeedList()) return null;
+  if (!isMainSeedAvailable) return null;
 
   const starterSeed = {
     id: "starter-seed",
@@ -789,12 +792,16 @@ function createStarterSeedInventoryItem() {
     isStarter: true
   };
   appleState.extraSeeds.unshift(starterSeed);
+  isMainSeedAvailable = false;
+  setStoredFlag(mainSeedCollectedKey, true);
   if (plantRuntime.isSeedDry) {
     hasHandledDryMainSeed = true;
     setStoredFlag(mainDrySeedHandledKey, true);
     markWorldDirty();
     syncWorldState(true);
   }
+  markWorldDirty();
+  syncWorldState(true);
   saveAppleState();
   return starterSeed;
 }
@@ -926,6 +933,8 @@ function applyDefaultState() {
   plantRuntime.seedCreatedAt = Date.now();
   setStoredValue(seedCreatedAtKey, String(plantRuntime.seedCreatedAt));
   plantRuntime.isSeedDry = false;
+  isMainSeedAvailable = true;
+  setStoredFlag(mainSeedCollectedKey, false);
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
   heldItem = null;
@@ -1508,7 +1517,8 @@ function getSharedWorldSnapshot() {
       y: seedY,
       createdAt: plantRuntime.seedCreatedAt,
       isDry: plantRuntime.isSeedDry,
-      isDryHandled: hasHandledDryMainSeed
+      isDryHandled: hasHandledDryMainSeed,
+      isMainSeedAvailable
     },
     mainPlant: getPlantStateForStorage(),
     apples: {
@@ -1628,6 +1638,10 @@ function applySharedWorldSnapshot(snapshot) {
       const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
       const nextSeedX = Number(snapshot.seed.x);
       const nextSeedY = Number(snapshot.seed.y);
+      if (typeof snapshot.seed.isMainSeedAvailable === "boolean") {
+        isMainSeedAvailable = Boolean(snapshot.seed.isMainSeedAvailable);
+        setStoredFlag(mainSeedCollectedKey, !isMainSeedAvailable);
+      }
       if (typeof snapshot.seed.isDryHandled === "boolean") {
         hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
         setStoredFlag(mainDrySeedHandledKey, hasHandledDryMainSeed);
@@ -1981,16 +1995,18 @@ function updateSeedPosition() {
   updateSeedDryState();
   const now = Date.now();
   const shouldShowMainSeed =
+    isMainSeedAvailable &&
     !plantRuntime.isPlanting &&
     !plantRuntime.isSeedPlanted &&
-    !hasStarterSeedInSeedList() &&
     !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
   if (plantRuntime.isSeedDry && shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
     if (!dryMainSeedVisibleSince) {
       dryMainSeedVisibleSince = now;
     } else if (now - dryMainSeedVisibleSince >= 20000) {
       hasHandledDryMainSeed = true;
+      isMainSeedAvailable = false;
       setStoredFlag(mainDrySeedHandledKey, true);
+      setStoredFlag(mainSeedCollectedKey, true);
       dryMainSeedVisibleSince = 0;
       markWorldDirty();
       syncWorldState(true);
