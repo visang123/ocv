@@ -2205,10 +2205,19 @@ function clearExtraSeedAndPlantElements() {
 
 function updateBucketPosition() {
   bucket.src = isBucketFull ? "bucket-full.png" : "bucket-empty.png";
+  playerBucketOverlay.style.backgroundImage =
+    'url("' + (isBucketFull ? "bucket-full.png" : "bucket-empty.png") + '")';
   const isBucketHeldByRemotePlayer =
     Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
     window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
     heldItem !== HELD_ITEM_BUCKET;
+  if (isBucketHeldByRemotePlayer) {
+    const holderId = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+    const lastUpdateAt = Number(remoteBucketUpdateAtById[holderId] || 0);
+    if (lastUpdateAt && Date.now() - lastUpdateAt > 1200) {
+      window.OVC_SHARED_BUCKET_HELD_BY = "";
+    }
+  }
 
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
@@ -4002,6 +4011,7 @@ function renderRemotePlayersFromPresence(presenceState) {
 function handleRemotePlayerBroadcast(state) {
   if (!state || !state.id || state.id === currentSessionId) return;
   if (state.action === "leave") {
+    delete remoteBucketUpdateAtById[state.id];
     removeRemotePlayer(state.id);
     return;
   }
