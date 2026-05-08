@@ -166,8 +166,6 @@ let seedX = 0;
 let seedY = 20;
 let bucketX = 0;
 let bucketY = 0;
-let bucketRenderX = 0;
-let bucketRenderY = 0;
 let wellX = 0;
 let wellY = 0;
 let signX = SIGN_START_X;
@@ -946,8 +944,6 @@ function applyDefaultState() {
   isBucketFull = false;
   bucketX = wellX - BUCKET_SIZE - 8;
   bucketY = wellY + WELL_SIZE - BUCKET_SIZE;
-  bucketRenderX = bucketX;
-  bucketRenderY = bucketY;
 
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
@@ -1127,8 +1123,6 @@ function pickUpNearestItem() {
     const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
     bucketX = handPosition.x;
     bucketY = handPosition.y;
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
     heldItem = HELD_ITEM_BUCKET;
     lastBucketPickupAt = Date.now();
     window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
@@ -1428,8 +1422,6 @@ function loadBucketState() {
     }
     heldItem = null;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
   } catch (error) {
     removeStoredValue(bucketStateKey);
   }
@@ -2218,8 +2210,6 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
@@ -2227,28 +2217,15 @@ function updateBucketPosition() {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
-    bucketX = Math.max(0, Math.min(WORLD_WIDTH - bucketSize.width, bucketX));
-    bucketY = Math.max(-PLAYER_HEIGHT, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
-  } else {
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
   }
 
-  // Keep bucket visible when attached to a player hand.
-  bucket.style.zIndex =
-    heldItem === HELD_ITEM_BUCKET || isBucketHeldByRemotePlayer
-      ? "23"
-      : "18";
-
-  if (!Number.isFinite(bucketRenderX) || !Number.isFinite(bucketRenderY)) {
+  if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
     const bucketSize = getBucketSize();
-    bucketRenderX = wellX - bucketSize.width - 8;
-    bucketRenderY = wellY + WELL_SIZE - bucketSize.height;
+    bucketX = wellX - bucketSize.width - 8;
+    bucketY = wellY + WELL_SIZE - bucketSize.height;
   }
 
-  setWorldPosition(bucket, bucketRenderX, bucketRenderY);
+  setWorldPosition(bucket, bucketX, bucketY);
 }
 
 function updatePlayerPosition() {
@@ -4429,8 +4406,6 @@ function setup() {
     wellY = WELL_START_Y;
     bucketX = wellX - bucketSize.width - 8;
     bucketY = wellY + wellSize.height - bucketSize.height;
-    bucketRenderX = bucketX;
-    bucketRenderY = bucketY;
     isSetupComplete = true;
   }
 
