@@ -577,7 +577,7 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong><button id="controls-close-button" type="button" aria-label="닫기">?</button></div>' +
+  '<div class="controls-header"><strong>조작법</strong></div>' +
   '<div class="controls-list">' +
   '<div><span>W / ?</span><p>위로 이동</p></div>' +
   '<div><span>A / ?</span><p>왼쪽으로 이동</p></div>' +
@@ -587,10 +587,8 @@ controlsOverlay.innerHTML =
   '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
   '<div><span>Q</span><p>사용 / 대화</p></div>' +
   '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
-  '<div><span>?</span><p>설정 열기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
-const controlsCloseButton = document.getElementById("controls-close-button");
 
 settingsButton.addEventListener("click", function () {
   settingsOverlay.classList.add("is-open");
@@ -609,11 +607,6 @@ controlsButton.addEventListener("click", function () {
   settingsOverlay.setAttribute("aria-hidden", "true");
   controlsOverlay.classList.add("is-open");
   controlsOverlay.setAttribute("aria-hidden", "false");
-});
-
-controlsCloseButton.addEventListener("click", function () {
-  controlsOverlay.classList.remove("is-open");
-  controlsOverlay.setAttribute("aria-hidden", "true");
 });
 
 controlsOverlay.addEventListener("click", function (event) {
@@ -1136,7 +1129,23 @@ function triggerFirstSeedFocus() {
 }
 
 function canPickUpSharedBucket() {
-  return !window.OVC_SHARED_BUCKET_HELD_BY || window.OVC_SHARED_BUCKET_HELD_BY === currentSessionId;
+  const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+  if (!heldBy || heldBy === currentSessionId) return true;
+
+  const holder = remotePlayers[heldBy];
+  const holderIsActive =
+    holder &&
+    Number.isFinite(holder.lastSeenAt) &&
+    Date.now() - holder.lastSeenAt < 5000;
+
+  if (!holderIsActive) {
+    // Recover from stale holder ownership that blocks pickup forever.
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    return true;
+  }
+
+  return false;
 }
 
 function getNearestPickableExtraSeed() {
@@ -3983,6 +3992,10 @@ function pruneStaleRemotePlayers() {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.lastSeenAt) return;
     if (now - remotePlayer.lastSeenAt < 90000) return;
+    if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
+      window.OVC_SHARED_BUCKET_HELD_BY = "";
+      markWorldDirty();
+    }
     removeRemotePlayer(remoteId);
   });
 }
