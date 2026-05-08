@@ -1561,7 +1561,7 @@ function applySharedWorldSnapshot(snapshot) {
   if (
     isResetGuardWindow &&
     lastAppliedWorldResetToken &&
-    snapshotResetToken !== lastAppliedWorldResetToken
+    !snapshotResetToken
   ) {
     return;
   }
@@ -1574,6 +1574,8 @@ function applySharedWorldSnapshot(snapshot) {
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
     clearStoredKeys(appStorageKeys);
+    applyDefaultState();
+    savePlayerPosition(true);
     restartPlayerPositionOnly();
     setTimeout(function () {
       window.location.reload();
