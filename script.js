@@ -263,6 +263,7 @@ let lastWaterSplashAt = 0;
 let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
 let lastMainPlantStateChangeAt = 0;
+let lastAppleStateChangeAt = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
@@ -1208,6 +1209,7 @@ function pickApple() {
   if (!apple) return false;
 
   appleState.pickedIds.push(apple.id);
+  appleState.lastSpawnAt = Date.now();
   appleState.count += 1;
   saveAppleState();
   updateApples();
@@ -1404,6 +1406,7 @@ function loadAppleState() {
 }
 
 function saveAppleState() {
+  lastAppleStateChangeAt = Date.now();
   saveAppleStateToStorage({
     appleStateKey,
     appleCount: appleState.count,
@@ -1646,7 +1649,13 @@ function applySharedWorldSnapshot(snapshot) {
       }
     }
 
-    if (snapshot.apples) {
+    if (
+      snapshot.apples &&
+      (
+        !snapshotSavedAt ||
+        snapshotSavedAt >= lastAppleStateChangeAt
+      )
+    ) {
       clearExtraSeedAndPlantElements();
       appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
@@ -1700,6 +1709,9 @@ function applySharedWorldSnapshot(snapshot) {
             };
           })
         : [];
+      if (snapshotSavedAt) {
+        lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
+      }
     }
 
     updateWellImage();
@@ -3080,7 +3092,7 @@ function updatePlantCard() {
   const wateringTarget = getNearestWateringTarget();
   if (wateringTarget && wateringTarget.type === "extra") {
     const plant = wateringTarget.plant;
-    if (plant.status === "rotten") {
+    if (plant.status === "dry" || plant.status === "rotten") {
       plantCard.style.display = "none";
       return;
     }
@@ -3097,6 +3109,7 @@ function updatePlantCard() {
 
   if (
     !plantRuntime.isSeedPlanted ||
+    plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
     !wateringTarget
   ) {
