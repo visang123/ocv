@@ -890,7 +890,7 @@ body::-webkit-scrollbar {
 #online-debug-toast {
   position: fixed;
   left: 14px;
-  bottom: 52px;
+  bottom: 72px;
   z-index: 240;
   display: none;
   max-width: min(360px, calc(100vw - 28px));
@@ -911,8 +911,8 @@ body::-webkit-scrollbar {
 
 #network-debug-panel {
   position: fixed;
-  right: 12px;
-  bottom: 12px;
+  left: 12px;
+  top: 12px;
   z-index: 250;
   width: min(360px, calc(100vw - 24px));
   max-height: 180px;
@@ -925,6 +925,28 @@ body::-webkit-scrollbar {
   color: #dbeafe;
   font: 700 10px/1.35 Consolas, "Courier New", monospace;
   white-space: pre-wrap;
+}
+
+.plant-growth-meter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  width: 42px;
+  height: 6px;
+  padding: 1px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(50, 120, 50, 0.35);
+  border-radius: 999px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.plant-growth-meter-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: #48d85f;
 }
 
 #network-debug-panel.is-visible {

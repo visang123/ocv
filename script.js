@@ -315,7 +315,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508q");
+  window.location.replace("/ovc-login.html?v=20260508s");
   throw new Error("OVC login required");
 }
 
@@ -526,6 +526,7 @@ const spawnPortal = document.getElementById("spawn-portal");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 player.insertAdjacentElement("afterend", playerColorBody);
+const mainPlantGrowthMeter = createPlantGrowthMeter();
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
@@ -1678,6 +1679,14 @@ function updateExtraSeedsAndPlants() {
     plant.spotElement.style.display = "block";
     plant.spotElement.src = getPlantSoilSrc(plant);
     setWorldPosition(plant.spotElement, plant.x, plant.y);
+    updatePlantGrowthMeter(
+      plant.growthMeterElement,
+      plant.growthMeterFill,
+      plant.x,
+      plant.y,
+      getPlantGrowthRatio(plant, now),
+      getPlantSecondGrowthRatio(plant, now)
+    );
 
     const isSproutGrown = plant.isSproutGrown && plant.status !== "rotten";
     const grownAt =
@@ -1708,6 +1717,15 @@ function updateExtraSeedsAndPlants() {
       plant.y - sproutHeight + 7
     );
   });
+  appleState.extraPlants = appleState.extraPlants.filter(function (plant) {
+    if (!plant.removed) return true;
+    if (plant.spotElement) plant.spotElement.remove();
+    if (plant.sproutElement) plant.sproutElement.remove();
+    if (plant.waterNeededElement) plant.waterNeededElement.remove();
+    if (plant.growthMeterElement) plant.growthMeterElement.remove();
+    markWorldDirty();
+    return false;
+  });
 }
 
 function normalizeExtraPlantState(plant) {
@@ -1726,14 +1744,19 @@ function normalizeExtraPlantState(plant) {
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
 
+  if (plant.status === "dry" || plant.status === "rotten") {
+    plant.removed = true;
+    return;
+  }
+
   if (
     plant.status !== "rotten" &&
     plant.status !== "wet" &&
     plant.becameEmptyAt !== null &&
     now - plant.becameEmptyAt >= plantDryMs
   ) {
-    plant.status = "dry";
-    plant.waterLevel = 0;
+    plant.removed = true;
+    return;
   }
 
   if (
@@ -1747,6 +1770,31 @@ function updateExtraPlantState(plant, now) {
     plant.isSproutGrown = true;
     plant.sproutGrownAt = now;
   }
+}
+
+function getPlantGrowthRatio(plant, now) {
+  if (!plant.growthStartedAt || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return null;
+  if (plant.isSproutGrown) return 1;
+  return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / plantGrowthMs));
+}
+
+function getPlantSecondGrowthRatio(plant, now) {
+  if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten") return null;
+  const grownAt = plant.sproutGrownAt || (plant.growthStartedAt ? plant.growthStartedAt + plantGrowthMs : now);
+  return Math.min(1, Math.max(0, (now - grownAt) / biggerSproutMs));
+}
+
+function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
+  if (!element || !fill) return;
+  const ratio = secondRatio !== null ? secondRatio : firstRatio;
+  if (ratio === null || ratio >= 1) {
+    element.style.display = "none";
+    return;
+  }
+
+  element.style.display = "block";
+  fill.style.width = Math.round(ratio * 100) + "%";
+  setWorldPosition(element, x + PLANT_SPOT_WIDTH / 2 - 21, y - 24);
 }
 
 function updateExtraPlantWaterLevel(plant, now) {
@@ -1858,7 +1906,7 @@ function ensureExtraSeedElement(extraSeed) {
 }
 
 function ensureExtraPlantElements(plant) {
-  if (plant.spotElement && plant.sproutElement) return;
+  if (plant.spotElement && plant.sproutElement && plant.growthMeterElement) return;
 
   const spotElement = document.createElement("img");
   spotElement.className = "extra-plant-spot";
@@ -1884,11 +1932,25 @@ function ensureExtraPlantElements(plant) {
   plant.spotElement = spotElement;
   plant.sproutElement = sproutElement;
   plant.waterNeededElement = waterNeededElement;
+  const growthMeter = createPlantGrowthMeter();
+  plant.growthMeterElement = growthMeter.element;
+  plant.growthMeterFill = growthMeter.fill;
+}
+
+function createPlantGrowthMeter() {
+  const element = document.createElement("div");
+  const fill = document.createElement("div");
+  element.className = "plant-growth-meter";
+  fill.className = "plant-growth-meter-fill";
+  element.appendChild(fill);
+  ground.appendChild(element);
+  return { element, fill };
 }
 
 function clearExtraSeedAndPlantElements() {
-  document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .inventory-seed").forEach(
+  document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .inventory-seed, .plant-growth-meter").forEach(
     function (element) {
+      if (element === mainPlantGrowthMeter.element) return;
       element.remove();
     }
   );
@@ -2567,9 +2629,24 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= plantDryMs
   ) {
-    plantRuntime.status = "dry";
-    plantRuntime.waterLevel = 0;
+    removeMainPlant();
     saveSeedState();
+    updatePlantState();
+    return;
+  }
+
+  if (plantRuntime.status === "dry" || plantRuntime.status === "rotten") {
+    removeMainPlant();
+    saveSeedState();
+    updatePlantState();
+    return;
+  }
+
+  if (plantRuntime.isOverwatered) {
+    removeMainPlant();
+    saveSeedState();
+    updatePlantState();
+    return;
   }
 
   if (plantRuntime.status === "rotten") {
@@ -2600,6 +2677,33 @@ function updatePlantState() {
 
   updatePlantCard();
   updatePlantGrowth();
+}
+
+function removeMainPlant() {
+  plantRuntime.isSeedPlanted = false;
+  plantRuntime.isPlanting = false;
+  plantRuntime.spotX = 0;
+  plantRuntime.spotY = 0;
+  plantRuntime.lastWateredAt = null;
+  plantRuntime.wateredAtList = [];
+  plantRuntime.status = "normal";
+  plantRuntime.waterLevel = 1;
+  plantRuntime.waterLevelUpdatedAt = Date.now();
+  plantRuntime.becameEmptyAt = null;
+  plantRuntime.isOverwatered = false;
+  plantRuntime.needsFirstWater = false;
+  plantRuntime.growthStartedAt = null;
+  plantRuntime.isSproutGrown = false;
+  plantRuntime.sproutGrownAt = null;
+  plantSpot.style.display = "none";
+  waterNeeded.style.display = "none";
+  sprout.style.display = "none";
+  plantMaster.style.display = "none";
+  npcBubble.style.display = "none";
+  playerBubble.style.display = "none";
+  growthCard.style.display = "none";
+  mainPlantGrowthMeter.element.style.display = "none";
+  markWorldDirty();
 }
 
 function updatePlantCard() {
@@ -2644,6 +2748,7 @@ function updatePlantCard() {
 function updatePlantGrowth() {
   if (!plantRuntime.isSeedPlanted || plantRuntime.growthStartedAt === null || plantRuntime.status === "dry" || plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     growthCard.style.display = "none";
+    mainPlantGrowthMeter.element.style.display = "none";
     sprout.style.display = plantRuntime.isSproutGrown && plantRuntime.status !== "rotten" ? "block" : "none";
     updateSproutPosition();
     return;
@@ -2651,6 +2756,15 @@ function updatePlantGrowth() {
 
   const elapsed = Date.now() - plantRuntime.growthStartedAt;
   const growthRatio = Math.min(1, elapsed / plantGrowthMs);
+  const secondGrowthRatio = getPlantSecondGrowthRatio(plantRuntime, Date.now());
+  updatePlantGrowthMeter(
+    mainPlantGrowthMeter.element,
+    mainPlantGrowthMeter.fill,
+    plantRuntime.spotX,
+    plantRuntime.spotY,
+    growthRatio,
+    secondGrowthRatio
+  );
   const cardWidth = 42;
   const cardX = Math.max(
     0,
@@ -2668,7 +2782,7 @@ function updatePlantGrowth() {
     return;
   }
 
-  growthCard.style.display = "block";
+  growthCard.style.display = "none";
   growthFill.style.width = growthRatio * 100 + "%";
   setWorldPosition(growthCard, cardX, plantRuntime.spotY - 26);
   sprout.style.display = "none";
@@ -2715,7 +2829,7 @@ function updateNpcPosition() {
   setWorldPosition(plantMaster, npcX, npcY);
 
   if (npcBubble.style.display === "block") {
-    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 13, npcY - 12);
+    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 13, npcY - 22);
   }
 
   if (playerBubble.style.display === "block") {
@@ -2734,7 +2848,7 @@ function updatePlayerBubblePosition() {
   setWorldPosition(
     playerBubble,
     playerWorldLeft + PLAYER_WIDTH / 2 - 13,
-    playerWorldTop - 12
+    playerWorldTop - 22
   );
 }
 
@@ -3160,7 +3274,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508q");
+    window.location.replace("/ovc-login.html?v=20260508s");
     return;
   }
 
@@ -3844,7 +3958,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508q";
+    window.location.href = "/ovc-login.html?v=20260508s";
   };
 
   if (multiplayerChannel) {
@@ -4000,7 +4114,7 @@ setInterval(function () {
   sendMultiplayerPresence(true);
 }, 1000);
 setInterval(function () {
-  syncWorldState(true);
+  syncWorldState(false);
   pollWorldState();
 }, 1000);
 setInterval(validateCurrentAccount, 5000);
