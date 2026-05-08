@@ -242,7 +242,7 @@ let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
 let remotePlayers = {};
 let remotePlayerCount = 0;
-let multiplayerStatusText = "?��?;
+let multiplayerStatusText = "\uB300\uAE30";
 let isMultiplayerSubscribed = false;
 let multiplayerReconnectTimeout = null;
 let multiplayerConnectAttempt = 0;
@@ -540,24 +540,24 @@ const mainPlantGrowthMeter = createPlantGrowthMeter();
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
-controlsButton.textContent = "조작�?;
+controlsButton.textContent = "조작법";
 settingsModal.insertBefore(controlsButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작�?/strong><button id="controls-close-button" type="button" aria-label="?�기">×</button></div>' +
+  '<div class="controls-header"><strong>조작법</strong><button id="controls-close-button" type="button" aria-label="닫기">?</button></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / ??/span><p>?�로 ?�동</p></div>' +
-  '<div><span>A / ??/span><p>?�쪽?�로 ?�동</p></div>' +
-  '<div><span>S / ??/span><p>?�래�??�동</p></div>' +
-  '<div><span>D / ??/span><p>?�른쪽으�??�동</p></div>' +
-  '<div><span>Space</span><p>?�프</p></div>' +
-  '<div><span>E</span><p>줍기 / ?�려?�기</p></div>' +
-  '<div><span>Q</span><p>?�용 / ?�??/p></div>' +
-  '<div><span>마우????/span><p>?��? / 축소</p></div>' +
-  '<div><span>??/span><p>?�정 ?�기</p></div>' +
+  '<div><span>W / ?</span><p>위로 이동</p></div>' +
+  '<div><span>A / ?</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / ?</span><p>아래로 이동</p></div>' +
+  '<div><span>D / ?</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>Space</span><p>점프</p></div>' +
+  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
+  '<div><span>Q</span><p>사용 / 대화</p></div>' +
+  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>?</span><p>설정 열기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 const controlsCloseButton = document.getElementById("controls-close-button");
@@ -1534,7 +1534,7 @@ function applySharedWorldSnapshot(snapshot) {
               createdAt: Number(extraSeed.createdAt) || Date.now(),
               planted: Boolean(extraSeed.planted),
               inInventory: false,
-              label: extraSeed.label || "?�앗",
+              label: extraSeed.label || "\uC528\uC557",
               isStarter: Boolean(extraSeed.isStarter)
             };
           })
@@ -1641,7 +1641,7 @@ function syncWorldState(forceSave) {
     if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world save error: " + (error && error.message ? error.message : "unknown")
+      "world save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
     isWorldDirty = true;
   }).finally(function () {
@@ -1670,7 +1670,7 @@ function saveSharedWorldAndReload() {
     if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world reset save error: " + (error && error.message ? error.message : "unknown")
+      "world reset save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isWorldSyncing = false;
@@ -1700,7 +1700,7 @@ function pollWorldState(forcePoll) {
     applySharedWorldSnapshot(row.state);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world poll error: " + (error && error.message ? error.message : "unknown")
+      "world poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isWorldPolling = false;
@@ -3305,7 +3305,7 @@ function postJson(url, payload) {
   }).then(function (response) {
     return response.json().then(function (data) {
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "?�청???�패?�습?�다.");
+        throw new Error(data.message || "요청에 실패했습니다.");
       }
 
       return data;
@@ -3393,7 +3393,7 @@ function buildCharacterColorGrid() {
     button.type = "button";
     button.className = "character-color-option";
     button.style.background = color;
-    button.setAttribute("aria-label", color + " ?�깔");
+    button.setAttribute("aria-label", color + " 색깔");
 
     if (color === selectedPlayerColor) {
       button.classList.add("is-selected");
@@ -3490,18 +3490,18 @@ function updatePlayerName() {
 
 function setupMultiplayer() {
   if (!hasSpawnedCharacter) {
-    updateMultiplayerStatus("캐릭???�택 ??);
+    updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
     addNetworkDebugLog("multiplayer skipped: character not spawned");
     return;
   }
 
   if (multiplayerChannel) {
     if (isMultiplayerSubscribed) {
-      updateMultiplayerStatus("?�결??);
+      updateMultiplayerStatus("\uC5F0\uACB0\uB428");
       sendMultiplayerPresence(true);
       addNetworkDebugLog("multiplayer reuse: subscribed channel");
     } else {
-      updateMultiplayerStatus("?�결�?);
+      updateMultiplayerStatus("\uC5F0\uACB0\uC911");
       addNetworkDebugLog("multiplayer reuse: waiting subscribe");
     }
     return;
@@ -3513,7 +3513,7 @@ function setupMultiplayer() {
     !window.OVCOnline ||
     !window.OVCOnline.isConfigured()
   ) {
-    updateMultiplayerStatus("?�결 ?�됨");
+    updateMultiplayerStatus("\uC5F0\uACB0 \uC548\uB428");
     addNetworkDebugLog(
       "multiplayer unavailable: userId=" +
       Boolean(currentUserId) +
@@ -3535,7 +3535,7 @@ function setupMultiplayer() {
     addNetworkDebugLog("warning: sb_publishable key can close Realtime immediately; use anon public key");
   }
 
-  updateMultiplayerStatus("?�결�?);
+  updateMultiplayerStatus("\uC5F0\uACB0\uC911");
   const channel = window.OVCOnline.createPresenceChannel(
     window.OVC_ONLINE_CONFIG.multiplayerRoom,
     currentSessionId
@@ -3544,7 +3544,7 @@ function setupMultiplayer() {
   const attempt = ++multiplayerConnectAttempt;
 
   if (!channel) {
-    updateMultiplayerStatus("?�결 ?�됨");
+    updateMultiplayerStatus("\uC5F0\uACB0 \uC548\uB428");
     addNetworkDebugLog("multiplayer failed: createPresenceChannel returned null");
     return;
   }
@@ -3575,7 +3575,7 @@ function setupMultiplayer() {
       if (status === "SUBSCRIBED") {
         isMultiplayerSubscribed = true;
         clearMultiplayerReconnectTimeout();
-        updateMultiplayerStatus("?�결??);
+        updateMultiplayerStatus("\uC5F0\uACB0\uB428");
         setTimeout(function () {
           if (channel !== multiplayerChannel) return;
           sendMultiplayerPresence(true);
@@ -3601,7 +3601,7 @@ function setupMultiplayer() {
           addNetworkDebugLog("reset supabase realtime client");
         }
         multiplayerChannel = null;
-        updateMultiplayerStatus("?�결 ?�됨");
+        updateMultiplayerStatus("\uC5F0\uACB0 \uC548\uB428");
         scheduleMultiplayerReconnect(1500);
       }
     });
@@ -3640,7 +3640,7 @@ function sendMultiplayerPresence(forceSend) {
       payload: state
     })).catch(function (error) {
       addNetworkDebugLog(
-        "broadcast error: " + (error && error.message ? error.message : "unknown")
+        "broadcast error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
       );
     });
     lastBroadcastAt = now;
@@ -3673,7 +3673,7 @@ function syncPresenceToDatabase(state) {
   lastPresenceDbSyncAt = Date.now();
   window.OVCOnline.savePresence(state).catch(function (error) {
     addNetworkDebugLog(
-      "presence db save error: " + (error && error.message ? error.message : "unknown")
+      "presence db save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isPresenceDbSyncing = false;
@@ -3701,7 +3701,7 @@ function pollPresenceDatabase() {
     updateRemotePlayerCount();
   }).catch(function (error) {
     addNetworkDebugLog(
-      "presence db poll error: " + (error && error.message ? error.message : "unknown")
+      "presence db poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isPresenceDbPolling = false;
@@ -3793,9 +3793,9 @@ function renderRemotePlayerState(state) {
   remotePlayer.nameElement.textContent = state.name || "OVC";
   remotePlayer.statusElement.textContent =
     state.action === "planting"
-      ? "?�앗 ?�는�?.."
+      ? "\uC528\uC557 \uC2EC\uB294\uC911..."
       : state.action === "eating"
-        ? "먹는�?.."
+        ? "\uBA39\uB294\uC911..."
         : "";
   remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
@@ -3851,13 +3851,13 @@ function updateMultiplayerStatus(statusText) {
   if (!multiplayerStatus) return;
 
   const statusLabel =
-    multiplayerStatusText === "?�결?? ||
-    multiplayerStatusText === "?�결�? ||
-    multiplayerStatusText === "캐릭???�택 ??
+    multiplayerStatusText === "연결됨" ||
+    multiplayerStatusText === "연결중" ||
+    multiplayerStatusText === "캐릭터 선택 전"
       ? multiplayerStatusText
-      : "?�결 ?�됨";
+      : "연결 안됨";
   multiplayerStatus.textContent =
-    "멀??" + statusLabel + " / 로그??" + getOnlinePlayerCount();
+    "멀티 " + statusLabel + " / 로그인 " + getOnlinePlayerCount();
 }
 
 function clearMultiplayerReconnectTimeout() {
@@ -3890,8 +3890,8 @@ function syncPlayerColorToServer(forceSync) {
       addNetworkDebugLog("color synced online: " + colorToSync);
     }).catch(function (error) {
       showOnlineDebugMessage(
-        "?�라???�???�패: " +
-        (error && error.message ? error.message : "?�라???�버 ?�인 ?�요")
+      "로컬 저장 실패: " +
+        (error && error.message ? error.message : "온라인 서버 확인 필요")
       );
     });
     return;
@@ -3906,8 +3906,8 @@ function syncPlayerColorToServer(forceSync) {
     addNetworkDebugLog("color synced local: " + colorToSync);
   }).catch(function (error) {
     showOnlineDebugMessage(
-      "로컬 ?�???�패: " +
-      (error && error.message ? error.message : "로컬 ?�버 ?�인 ?�요")
+      "로컬 저장 실패: " +
+      (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   });
 }
@@ -3928,14 +3928,14 @@ function closeAdminPanel() {
 }
 
 async function loadAdminAccounts() {
-  adminMessage.textContent = "계정 불러?�는 �?..";
+  adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
   adminAccountList.innerHTML = "";
 
   try {
     const accounts = await window.OVCOnline.listAccounts();
     adminAccountList.dataset.accounts = JSON.stringify(accounts);
     renderAdminAccounts(accounts);
-    adminMessage.textContent = accounts.length + "�?계정";
+    adminMessage.textContent = accounts.length + "\uAC1C \uACC4\uC815";
   } catch (error) {
     adminMessage.textContent = error.message;
   }
@@ -3947,7 +3947,7 @@ function renderAdminAccounts(accounts) {
   if (!accounts.length) {
     const empty = document.createElement("div");
     empty.className = "admin-empty";
-    empty.textContent = "가?�된 계정???�습?�다.";
+    empty.textContent = "\uAC00\uC785\uB41C \uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.";
     adminAccountList.appendChild(empty);
     return;
   }
@@ -3964,16 +3964,16 @@ function renderAdminAccounts(accounts) {
     meta.className = "admin-account-meta";
     deleteButton.className = "admin-delete-button";
 
-    name.textContent = account.name || "?�름 ?�음";
+    name.textContent = account.name || "\uC774\uB984 \uC5C6\uC74C";
     meta.textContent =
-      (account.color || "???�음") +
+      (account.color || "\uC0C9 \uC5C6\uC74C") +
       " / " +
       formatAdminDate(account.created_at);
-    deleteButton.textContent = "??��";
+    deleteButton.textContent = "\uC0AD\uC81C";
     deleteButton.type = "button";
 
     deleteButton.addEventListener("click", async function () {
-      if (!confirm((account.name || "??계정") + "????��?�까??")) return;
+      if (!confirm((account.name || "\uC774 \uACC4\uC815") + "\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?")) return;
 
       try {
         deleteButton.disabled = true;
@@ -3988,7 +3988,7 @@ function renderAdminAccounts(accounts) {
           logout();
           return;
         }
-        adminMessage.textContent = "??�� ?�료";
+  adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
         loadAdminAccounts();
       } catch (error) {
         deleteButton.disabled = false;
@@ -4014,10 +4014,10 @@ function getRenderedAdminAccounts() {
 }
 
 function formatAdminDate(value) {
-  if (!value) return "?�짜 ?�음";
+  if (!value) return "\uB0A0\uC9DC \uC5C6\uC74C";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "?�짜 ?�음";
+  if (Number.isNaN(date.getTime())) return "\uB0A0\uC9DC \uC5C6\uC74C";
 
   return date.toLocaleString("ko-KR");
 }
@@ -4068,7 +4068,7 @@ async function validateCurrentAccount() {
       if (!storedToken) return;
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
-        showOnlineDebugMessage("?�른 기기?�서 로그?�되???�동 로그?�웃?�니??");
+        showOnlineDebugMessage("?? ???? ????? ?? ???????.");
         setTimeout(logout, 1200);
         return;
       }
