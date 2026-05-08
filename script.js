@@ -304,7 +304,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508m");
+  window.location.replace("/ovc-login.html?v=20260508n");
   throw new Error("OVC login required");
 }
 
@@ -419,10 +419,12 @@ window.addEventListener("blur", function () {
   resetInputKeys(keys);
 });
 window.addEventListener("pagehide", function () {
+  sendMultiplayerLeave();
   saveGameSnapshot();
   resetInputKeys(keys);
 });
 window.addEventListener("beforeunload", function () {
+  sendMultiplayerLeave();
   saveGameSnapshot();
   resetInputKeys(keys);
 });
@@ -2830,7 +2832,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508m");
+    window.location.replace("/ovc-login.html?v=20260508n");
     return;
   }
 
@@ -2892,7 +2894,7 @@ function updatePlayerName() {
   const playerBox = getPlayerBox();
   const nameWidth = playerName.offsetWidth || 36;
   const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
-  const y = toScreenY(playerBox.top) + 10.5;
+  const y = toScreenY(playerBox.top) + 13;
 
   playerName.textContent = currentUserName;
   playerName.style.display = "block";
@@ -2964,7 +2966,7 @@ function setupMultiplayer() {
   channel
     .on("broadcast", { event: "player_state" }, function (payload) {
       if (channel !== multiplayerChannel) return;
-      renderRemotePlayerFromBroadcast(payload.payload);
+      handleRemotePlayerBroadcast(payload.payload);
     })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
@@ -3026,6 +3028,7 @@ function sendMultiplayerPresence(forceSend) {
     id: currentSessionId,
     userId: currentUserId,
     name: currentUserName,
+    action: "state",
     color: selectedPlayerColor,
     x: playerX,
     depth: playerDepth,
@@ -3064,6 +3067,24 @@ function sendMultiplayerPresence(forceSend) {
   lastPresenceSentAt = now;
 }
 
+function sendMultiplayerLeave() {
+  if (!multiplayerChannel || !currentSessionId) return;
+
+  Promise.resolve(multiplayerChannel.send({
+    type: "broadcast",
+    event: "player_state",
+    payload: {
+      id: currentSessionId,
+      userId: currentUserId,
+      name: currentUserName,
+      action: "leave",
+      updatedAt: Date.now()
+    }
+  })).catch(function () {
+    // The page may be closing; best effort is enough here.
+  });
+}
+
 function renderRemotePlayersFromPresence(presenceState) {
   const nextRemotePlayers = {};
 
@@ -3091,10 +3112,22 @@ function renderRemotePlayersFromPresence(presenceState) {
   updateRemotePlayerCount();
 }
 
-function renderRemotePlayerFromBroadcast(state) {
+function handleRemotePlayerBroadcast(state) {
   if (!state || !state.id || state.id === currentSessionId) return;
+  if (state.action === "leave") {
+    removeRemotePlayer(state.id);
+    return;
+  }
 
   renderRemotePlayerState(state);
+  updateRemotePlayerCount();
+}
+
+function removeRemotePlayer(remoteId) {
+  const remotePlayer = remotePlayers[remoteId];
+  if (!remotePlayer) return;
+  remotePlayer.element.remove();
+  delete remotePlayers[remoteId];
   updateRemotePlayerCount();
 }
 
@@ -3141,10 +3174,8 @@ function pruneStaleRemotePlayers() {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.lastSeenAt) return;
     if (now - remotePlayer.lastSeenAt < 15000) return;
-    remotePlayer.element.remove();
-    delete remotePlayers[remoteId];
+    removeRemotePlayer(remoteId);
   });
-  updateRemotePlayerCount();
 }
 
 function updateRemotePlayerCount() {
@@ -3393,6 +3424,7 @@ async function validateCurrentAccount() {
 function logout() {
   if (isLoggingOut) return;
   isLoggingOut = true;
+  sendMultiplayerLeave();
   isCharacterSelecting = true;
   resetInputKeys(keys);
   document.body.style.pointerEvents = "none";
@@ -3410,7 +3442,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508m";
+    window.location.href = "/ovc-login.html?v=20260508n";
   };
 
   if (multiplayerChannel) {
@@ -3562,6 +3594,9 @@ addNetworkDebugLog(
   selectedPlayerColor
 );
 openCharacterSelectIfNeeded();
+setInterval(function () {
+  sendMultiplayerPresence(true);
+}, 1000);
 setInterval(validateCurrentAccount, 5000);
 window.addEventListener("resize", function () {
   setup();
