@@ -3039,10 +3039,17 @@ function updatePlayerAlert() {
 }
 
 function updateGuideCard() {
-  isGuideBookOpen = false;
-  isGuideDismissedAtSign = true;
-  guideCard.style.display = "none";
-  guideBook.classList.remove("is-near");
+  const nearSign = isNearSignBoard();
+  const shouldShow = isGuideBookOpen || (nearSign && !isGuideDismissedAtSign);
+
+  if (shouldShow) {
+    guideCard.style.display = "block";
+    updateGuidePages();
+  } else {
+    guideCard.style.display = "none";
+  }
+
+  guideBook.classList.toggle("is-near", !hasGuideBook && isNearGuideBook());
 }
 
 function getGuideMaxPage() {
