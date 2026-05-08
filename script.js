@@ -264,6 +264,8 @@ let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
+let pendingWorldResetToken = "";
+let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 const playerTintCache = new Map();
@@ -315,7 +317,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508s");
+  window.location.replace("/ovc-login.html?v=20260508u");
   throw new Error("OVC login required");
 }
 
@@ -781,8 +783,15 @@ function loadGuideBookState() {
 
 function resetGameForTesting() {
   clearStoredKeys(appStorageKeys);
-
+  pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  lastAppliedWorldResetToken = pendingWorldResetToken;
+  sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
   applyDefaultState();
+  isWorldDirty = true;
+  syncWorldState(true);
+  setTimeout(function () {
+    window.location.reload();
+  }, 250);
 }
 
 function saveGameSnapshot() {
@@ -1333,6 +1342,7 @@ function getSharedWorldSnapshot() {
   return {
     savedAt: Date.now(),
     savedBy: currentSessionId,
+    resetToken: pendingWorldResetToken || lastAppliedWorldResetToken || "",
     bucket: {
       x: bucketX,
       y: bucketY,
@@ -1402,6 +1412,18 @@ function getSharedWorldSnapshot() {
 
 function applySharedWorldSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
+  if (
+    snapshot.resetToken &&
+    snapshot.resetToken !== lastAppliedWorldResetToken
+  ) {
+    lastAppliedWorldResetToken = snapshot.resetToken;
+    sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
+    restartPlayerPositionOnly();
+    setTimeout(function () {
+      window.location.reload();
+    }, 120);
+    return;
+  }
   isApplyingWorldState = true;
 
   try {
@@ -3274,7 +3296,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508s");
+    window.location.replace("/ovc-login.html?v=20260508u");
     return;
   }
 
@@ -3958,7 +3980,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508s";
+    window.location.href = "/ovc-login.html?v=20260508u";
   };
 
   if (multiplayerChannel) {
