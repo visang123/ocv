@@ -2226,12 +2226,24 @@ function updateBucketPosition() {
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
-    if (
+    if (holder && holder.element) {
+      // Use rendered remote element position and convert back to world coordinates.
+      // This keeps bucket attached even when remote world/depth values drift.
+      const groundRect = ground.getBoundingClientRect();
+      const holderRect = holder.element.getBoundingClientRect();
+      const scaleX = ground.clientWidth / WORLD_WIDTH;
+      const scaleY = ground.clientHeight / GROUND_WORLD_HEIGHT;
+      if (scaleX > 0 && scaleY > 0) {
+        const holderWorldX = (holderRect.left - groundRect.left) / scaleX;
+        const holderWorldTopY = (holderRect.top - groundRect.top) / scaleY;
+        bucketX = holderWorldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+        bucketY = holderWorldTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+      }
+    } else if (
       holder &&
       Number.isFinite(holder.worldX) &&
       Number.isFinite(holder.worldY)
     ) {
-      // holder.worldY is bottom-origin (-depth + jumpY). Convert to top-origin.
       const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
       bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
