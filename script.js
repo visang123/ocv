@@ -1124,6 +1124,11 @@ function pickUpNearestItem() {
   }
 
   if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
+    const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
+    bucketX = handPosition.x;
+    bucketY = handPosition.y;
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
     heldItem = HELD_ITEM_BUCKET;
     lastBucketPickupAt = Date.now();
     window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
