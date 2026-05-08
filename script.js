@@ -77,6 +77,7 @@ import {
   guidePlantPageUnlockedKey,
   appleStateKey,
   bucketStateKey,
+  mainDrySeedHandledKey,
   appStorageKeys
 } from "./src/game/constants.js";
 import {
@@ -186,6 +187,8 @@ let isGuidePlantPageUnlocked = false;
 let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
 let hasShownFirstSeedFocus = false;
+let hasHandledDryMainSeed = false;
+let dryMainSeedVisibleSince = 0;
 let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
 let lastPickupToggleAt = 0;
@@ -227,6 +230,7 @@ let selectedPlayerColor =
   savedUserScopedColor || savedGlobalPlayerColor || savedLastPlayerColor || "#ffffff";
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
+  hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
 }
 let isCharacterSelecting = false;
 let hasSpawnedCharacter = Boolean(currentUserId && hasChosenPlayerColor);
@@ -785,6 +789,10 @@ function createStarterSeedInventoryItem() {
     isStarter: true
   };
   appleState.extraSeeds.unshift(starterSeed);
+  if (plantRuntime.isSeedDry) {
+    hasHandledDryMainSeed = true;
+    setStoredFlag(mainDrySeedHandledKey, true);
+  }
   saveAppleState();
   return starterSeed;
 }
@@ -938,6 +946,9 @@ function applyDefaultState() {
   hasGuideBook = false;
   isGuideBookOpen = false;
   isGuideDismissedAtSign = false;
+  hasHandledDryMainSeed = false;
+  dryMainSeedVisibleSince = 0;
+  setStoredFlag(mainDrySeedHandledKey, false);
   isNpcDialogueRunning = false;
   isNpcDialogueComplete = false;
   isGuidePlantPageUnlocked = false;
@@ -1961,8 +1972,23 @@ function dropBucket() {
 
 function updateSeedPosition() {
   updateSeedDryState();
+  const now = Date.now();
   const shouldShowMainSeed =
-    !plantRuntime.isPlanting && !plantRuntime.isSeedPlanted && !hasStarterSeedInSeedList();
+    !plantRuntime.isPlanting &&
+    !plantRuntime.isSeedPlanted &&
+    !hasStarterSeedInSeedList() &&
+    !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
+  if (plantRuntime.isSeedDry && shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
+    if (!dryMainSeedVisibleSince) {
+      dryMainSeedVisibleSince = now;
+    } else if (now - dryMainSeedVisibleSince >= 20000) {
+      hasHandledDryMainSeed = true;
+      setStoredFlag(mainDrySeedHandledKey, true);
+      dryMainSeedVisibleSince = 0;
+    }
+  } else {
+    dryMainSeedVisibleSince = 0;
+  }
   // Main seed is a fixed world object (next to the book), not a roaming synced item.
   if (shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
     seedX = SEED_START_X;
@@ -2211,6 +2237,10 @@ function discardInventorySeed(seedId) {
   }
   if (seedToRemove.element) {
     seedToRemove.element.remove();
+  }
+  if (seedToRemove.isStarter && isExtraSeedDry(seedToRemove)) {
+    hasHandledDryMainSeed = true;
+    setStoredFlag(mainDrySeedHandledKey, true);
   }
 
   appleState.extraSeeds.splice(seedIndex, 1);

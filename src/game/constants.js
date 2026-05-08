@@ -74,6 +74,7 @@ export const guidePlantPageUnlockedKey = "guidePlantPageUnlockedV1";
 export const appleStateKey = "appleStateV1";
 export const playerPositionKey = "playerPositionV1";
 export const bucketStateKey = "bucketStateV1";
+export const mainDrySeedHandledKey = "mainDrySeedHandledV1";
 
 export const appStorageKeys = [
   "wellWaterV1",
@@ -89,5 +90,6 @@ export const appStorageKeys = [
   guidePlantPageUnlockedKey,
   appleStateKey,
   playerPositionKey,
-  bucketStateKey
+  bucketStateKey,
+  mainDrySeedHandledKey
 ];
