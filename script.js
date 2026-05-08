@@ -184,6 +184,8 @@ let isNpcDialogueComplete = false;
 let isGuidePlantPageUnlocked = false;
 let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
+let hasShownFirstSeedFocus = false;
+let firstSeedFocusTimeout = null;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -911,6 +913,9 @@ function applyDefaultState() {
   guideBook.style.display = "block";
   guideBook.classList.remove("is-near");
   guideBookButton.style.display = "none";
+  hasShownFirstSeedFocus = false;
+  window.clearTimeout(firstSeedFocusTimeout);
+  seedInventory.classList.remove("is-first-seed-focus");
   npcBubble.style.display = "none";
   playerAlert.style.display = "none";
 
@@ -1059,6 +1064,7 @@ function pickUpNearestItem() {
     createStarterSeedInventoryItem();
     updateSeedPosition();
     updateSeedInventory();
+    triggerFirstSeedFocus();
     return;
   }
 
@@ -1071,6 +1077,7 @@ function pickUpNearestItem() {
     saveAppleState();
     updateExtraSeedsAndPlants();
     updateSeedInventory();
+    triggerFirstSeedFocus();
     return;
   }
 
@@ -1078,6 +1085,17 @@ function pickUpNearestItem() {
     heldItem = HELD_ITEM_BUCKET;
     markWorldDirty();
   }
+}
+
+function triggerFirstSeedFocus() {
+  if (hasShownFirstSeedFocus) return;
+
+  hasShownFirstSeedFocus = true;
+  seedInventory.classList.add("is-first-seed-focus");
+  window.clearTimeout(firstSeedFocusTimeout);
+  firstSeedFocusTimeout = window.setTimeout(function () {
+    seedInventory.classList.remove("is-first-seed-focus");
+  }, 6500);
 }
 
 function canPickUpSharedBucket() {
