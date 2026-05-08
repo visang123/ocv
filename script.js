@@ -184,6 +184,8 @@ let isNpcDialogueComplete = false;
 let isGuidePlantPageUnlocked = false;
 let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
+const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
+const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
 let cameraX = 0;
 let cameraY = 0;
@@ -996,7 +998,7 @@ function startPlantMasterDialogue() {
     setStoredFlag(guidePlantPageUnlockedKey, true);
     updateNpcPosition();
     showPlayerAlert();
-    guidePageIndex = 1;
+    guidePageIndex = 0;
     isGuideBookOpen = true;
     updateGuideCard();
   }, lines.length * 650 + 250);
@@ -3040,7 +3042,8 @@ function updatePlayerAlert() {
 
 function updateGuideCard() {
   const nearSign = isNearSignBoard();
-  const shouldShow = isGuideBookOpen || (nearSign && !isGuideDismissedAtSign);
+  const shouldShow =
+    hasGuideBook && (isGuideBookOpen || (nearSign && !isGuideDismissedAtSign));
 
   if (shouldShow) {
     guideCard.style.display = "block";
@@ -3053,10 +3056,19 @@ function updateGuideCard() {
 }
 
 function getGuideMaxPage() {
-  return isGuidePlantPageUnlocked ? 1 : 0;
+  return 0;
 }
 
 function updateGuidePages() {
+  if (isGuidePlantPageUnlocked && guidePlantPageHtml) {
+    guidePages[0].innerHTML = guidePlantPageHtml;
+  } else {
+    guidePages[0].innerHTML = guidePlaceholderHtml;
+  }
+  if (guidePages[1]) {
+    guidePages[1].classList.remove("is-active");
+  }
+
   const maxPage = getGuideMaxPage();
 
   if (guidePageIndex > maxPage) {
