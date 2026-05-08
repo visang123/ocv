@@ -1410,12 +1410,20 @@ function loadBucketState() {
   try {
     const saved = JSON.parse(savedRaw);
     isBucketFull = Boolean(saved.isBucketFull);
-    bucketX = Number.isFinite(Number(saved.bucketX)) ? Number(saved.bucketX) : bucketX;
-    bucketY = Number.isFinite(Number(saved.bucketY)) ? Number(saved.bucketY) : bucketY;
-
     if (saved.heldItem === HELD_ITEM_BUCKET) {
-      heldItem = HELD_ITEM_BUCKET;
+      // Carrying is transient input state, not persisted world state.
+      // Old saves may contain hand-position coordinates; reset those to the well.
+      const bucketSize = getBucketSize();
+      bucketX = wellX - bucketSize.width - 8;
+      bucketY = wellY + WELL_SIZE - bucketSize.height;
+    } else {
+      bucketX = Number.isFinite(Number(saved.bucketX)) ? Number(saved.bucketX) : bucketX;
+      bucketY = Number.isFinite(Number(saved.bucketY)) ? Number(saved.bucketY) : bucketY;
     }
+    heldItem = null;
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
   } catch (error) {
     removeStoredValue(bucketStateKey);
   }
@@ -1428,7 +1436,7 @@ function saveBucketState() {
       isBucketFull,
       bucketX,
       bucketY,
-      heldItem: heldItem === HELD_ITEM_BUCKET ? HELD_ITEM_BUCKET : null,
+      heldItem: null,
       savedAt: Date.now()
     })
   );
