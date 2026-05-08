@@ -269,6 +269,7 @@ let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
 let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
+let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
@@ -809,6 +810,7 @@ function resetGameForTesting() {
   clearStoredKeys(appStorageKeys);
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
+  lastWorldResetAt = Date.now();
   sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
   applyDefaultState();
   saveSharedWorldAndReload();
@@ -1472,10 +1474,13 @@ function applySharedWorldSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
   const snapshotResetToken = String(snapshot.resetToken || "");
-  // After any world reset, ignore snapshots that do not carry the same reset token.
-  // This prevents stale pre-reset state from restoring dried/duplicate seeds.
+  const isResetGuardWindow = Date.now() - lastWorldResetAt < 20000;
+  // Guard only during the short reset window. After that, allow sync to recover
+  // even if some clients still publish snapshots without a reset token.
   if (
+    isResetGuardWindow &&
     lastAppliedWorldResetToken &&
+    snapshotResetToken &&
     snapshotResetToken !== lastAppliedWorldResetToken
   ) {
     return;
@@ -1485,6 +1490,7 @@ function applySharedWorldSnapshot(snapshot) {
     snapshotResetToken !== lastAppliedWorldResetToken
   ) {
     lastAppliedWorldResetToken = snapshotResetToken;
+    lastWorldResetAt = Date.now();
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
     clearStoredKeys(appStorageKeys);
