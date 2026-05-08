@@ -192,6 +192,7 @@ let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
 let lastPickupToggleAt = 0;
 let lastBucketPickupAt = 0;
+let isInteractKeyLatched = false;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -408,6 +409,8 @@ document.addEventListener("keydown", function (event) {
 
   if (key === "e" && !event.repeat) {
     event.preventDefault();
+    if (isInteractKeyLatched) return;
+    isInteractKeyLatched = true;
     if (plantRuntime.isPlanting) return;
     const now = Date.now();
     if (now - lastPickupToggleAt < 180) return;
@@ -450,6 +453,9 @@ document.addEventListener("keyup", function (event) {
   if (key in keys) {
     event.preventDefault();
     keys[key] = false;
+  }
+  if (key === "e") {
+    isInteractKeyLatched = false;
   }
 });
 
