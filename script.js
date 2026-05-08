@@ -2159,11 +2159,9 @@ function updateBucketPosition() {
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
       bucketY = holder.worldY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
     }
-    // Smooth remote-held bucket movement to avoid teleporting between snapshots.
-    bucketRenderX += (bucketX - bucketRenderX) * 0.28;
-    bucketRenderY += (bucketY - bucketRenderY) * 0.28;
-    if (Math.abs(bucketX - bucketRenderX) < 0.4) bucketRenderX = bucketX;
-    if (Math.abs(bucketY - bucketRenderY) < 0.4) bucketRenderY = bucketY;
+    // No interpolation while remotely held: attach instantly to holder hand.
+    bucketRenderX = bucketX;
+    bucketRenderY = bucketY;
   } else {
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
