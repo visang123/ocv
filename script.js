@@ -1510,7 +1510,8 @@ function applySharedWorldSnapshot(snapshot) {
 
     if (snapshot.seed) {
       plantRuntime.seedCreatedAt = Number(snapshot.seed.createdAt) || plantRuntime.seedCreatedAt;
-      plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
+      // Never trust remote isDry directly; always derive from seedCreatedAt.
+      updateSeedDryState();
       if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
         heldItem = null;
       }
