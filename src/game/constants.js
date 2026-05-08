@@ -46,7 +46,7 @@ export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 
-export const appleEatMs = 5 * SECOND_MS;
+export const appleEatMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
 export const biggerSproutMs = 30 * SECOND_MS;
@@ -61,7 +61,7 @@ export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
 export const plantDryMs = 2 * MINUTE_MS;
 export const plantWaterLevelTickMs = 1 * MINUTE_MS;
-export const plantGrowthMs = 15 * SECOND_MS;
+export const plantGrowthMs = 3 * SECOND_MS;
 export const overwaterWindowMs = 60 * MINUTE_MS;
 
 export const wellWaterKey = "wellWaterV3";

@@ -257,6 +257,13 @@ let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
 let isPresenceDbPolling = false;
 let isLoggingOut = false;
+let isApplyingWorldState = false;
+let isWorldSyncing = false;
+let isWorldPolling = false;
+let isWorldDirty = false;
+let lastWorldSaveAt = 0;
+let lastWorldPollAt = 0;
+let lastWorldUpdatedAt = "";
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 const playerTintCache = new Map();
@@ -308,7 +315,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508p");
+  window.location.replace("/ovc-login.html?v=20260508q");
   throw new Error("OVC login required");
 }
 
@@ -783,6 +790,7 @@ function saveGameSnapshot() {
   saveSeedState();
   saveAppleState();
   saveBucketState();
+  syncWorldState(true);
 }
 
 function restartPlayerPositionOnly() {
@@ -1031,9 +1039,14 @@ function pickUpNearestItem() {
     return;
   }
 
-  if (bucketDistance <= pickupDistance) {
+  if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
     heldItem = HELD_ITEM_BUCKET;
+    markWorldDirty();
   }
+}
+
+function canPickUpSharedBucket() {
+  return !window.OVC_SHARED_BUCKET_HELD_BY || window.OVC_SHARED_BUCKET_HELD_BY === currentSessionId;
 }
 
 function getNearestPickableExtraSeed() {
@@ -1274,6 +1287,7 @@ function saveAppleState() {
     extraSeeds: appleState.extraSeeds,
     extraPlants: appleState.extraPlants
   });
+  markWorldDirty();
 }
 
 function loadBucketState() {
@@ -1305,6 +1319,257 @@ function saveBucketState() {
       savedAt: Date.now()
     })
   );
+  markWorldDirty();
+}
+
+function markWorldDirty() {
+  if (isApplyingWorldState) return;
+  isWorldDirty = true;
+}
+
+function getSharedWorldSnapshot() {
+  const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
+  return {
+    savedAt: Date.now(),
+    savedBy: currentSessionId,
+    bucket: {
+      x: bucketX,
+      y: bucketY,
+      isFull: isBucketFull,
+      heldBy: bucketHeldBy
+    },
+    well: {
+      water: wellState.water,
+      lastRefillAt: wellState.lastRefillAt
+    },
+    seed: {
+      x: seedX,
+      y: seedY,
+      createdAt: plantRuntime.seedCreatedAt,
+      isDry: plantRuntime.isSeedDry
+    },
+    mainPlant: getPlantStateForStorage(),
+    apples: {
+      count: appleState.count,
+      pickedIds: appleState.pickedIds.slice(),
+      nextSeedOffset: appleState.nextSeedOffset,
+      lastSpawnAt: appleState.lastSpawnAt,
+      apples: appleState.apples.map(function (apple) {
+        return {
+          id: apple.id,
+          localX: apple.localX,
+          localY: apple.localY,
+          x: apple.x,
+          y: apple.y,
+          size: apple.size
+        };
+      }),
+      extraSeeds: appleState.extraSeeds.map(function (extraSeed) {
+        return {
+          id: extraSeed.id,
+          x: extraSeed.x,
+          y: extraSeed.y,
+          createdAt: extraSeed.createdAt,
+          planted: Boolean(extraSeed.planted),
+          inInventory: Boolean(extraSeed.inInventory),
+          label: extraSeed.label,
+          isStarter: Boolean(extraSeed.isStarter)
+        };
+      }),
+      extraPlants: appleState.extraPlants.map(function (plant) {
+        return {
+          id: plant.id,
+          x: plant.x,
+          y: plant.y,
+          plantedAt: plant.plantedAt,
+          lastWateredAt: plant.lastWateredAt,
+          wateredAtList: Array.isArray(plant.wateredAtList) ? plant.wateredAtList.slice() : [],
+          status: plant.status,
+          waterLevel: plant.waterLevel,
+          waterLevelUpdatedAt: plant.waterLevelUpdatedAt,
+          becameEmptyAt: plant.becameEmptyAt,
+          isOverwatered: Boolean(plant.isOverwatered),
+          needsFirstWater: Boolean(plant.needsFirstWater),
+          growthStartedAt: plant.growthStartedAt,
+          isSproutGrown: Boolean(plant.isSproutGrown),
+          sproutGrownAt: plant.sproutGrownAt
+        };
+      })
+    }
+  };
+}
+
+function applySharedWorldSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  isApplyingWorldState = true;
+
+  try {
+    if (snapshot.bucket) {
+      const heldBy = String(snapshot.bucket.heldBy || "");
+      window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
+      if (heldBy && heldBy !== currentSessionId) {
+        if (heldItem === HELD_ITEM_BUCKET) heldItem = null;
+        isBucketFull = Boolean(snapshot.bucket.isFull);
+        bucketX = Number(snapshot.bucket.x) || bucketX;
+        bucketY = Number(snapshot.bucket.y) || bucketY;
+      } else if (heldBy !== currentSessionId) {
+        isBucketFull = Boolean(snapshot.bucket.isFull);
+        bucketX = Number(snapshot.bucket.x) || bucketX;
+        bucketY = Number(snapshot.bucket.y) || bucketY;
+      }
+    }
+
+    if (snapshot.well) {
+      wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
+      wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
+    }
+
+    if (snapshot.mainPlant) {
+      applyLoadedPlantState({
+        isSeedPlanted: Boolean(snapshot.mainPlant.isSeedPlanted),
+        plantSpotX: Number(snapshot.mainPlant.plantSpotX) || 0,
+        plantSpotY: Number(snapshot.mainPlant.plantSpotY) || 0,
+        plantLastWateredAt: Number(snapshot.mainPlant.plantLastWateredAt) || null,
+        plantWateredAtList: Array.isArray(snapshot.mainPlant.plantWateredAtList) ? snapshot.mainPlant.plantWateredAtList : [],
+        plantState: snapshot.mainPlant.plantState || "normal",
+        plantWaterLevel: Number(snapshot.mainPlant.plantWaterLevel) || 1,
+        plantWaterLevelUpdatedAt: Number(snapshot.mainPlant.plantWaterLevelUpdatedAt) || Date.now(),
+        plantBecameEmptyAt: Number(snapshot.mainPlant.plantBecameEmptyAt) || null,
+        isPlantOverwatered: Boolean(snapshot.mainPlant.isPlantOverwatered),
+        plantNeedsFirstWater: Boolean(snapshot.mainPlant.plantNeedsFirstWater),
+        plantGrowthStartedAt: Number(snapshot.mainPlant.plantGrowthStartedAt) || null,
+        isSproutGrown: Boolean(snapshot.mainPlant.isSproutGrown),
+        plantSproutGrownAt: Number(snapshot.mainPlant.plantSproutGrownAt) || null
+      });
+      npcX = Number(snapshot.mainPlant.npcX) || npcX;
+      npcY = Number(snapshot.mainPlant.npcY) || npcY;
+    }
+
+    if (snapshot.apples) {
+      clearExtraSeedAndPlantElements();
+      appleState.count = Math.max(0, Number(snapshot.apples.count) || 0);
+      appleState.pickedIds = Array.isArray(snapshot.apples.pickedIds) ? snapshot.apples.pickedIds.slice() : [];
+      appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
+      appleState.lastSpawnAt = Number(snapshot.apples.lastSpawnAt) || Date.now();
+      appleState.apples = Array.isArray(snapshot.apples.apples)
+        ? snapshot.apples.apples.map(function (apple) {
+            const localX = Number(apple.localX) || 20;
+            const localY = Number(apple.localY) || 20;
+            return {
+              id: String(apple.id),
+              localX,
+              localY,
+              x: BIG_TREE_X + localX,
+              y: BIG_TREE_Y + localY,
+              size: Number(apple.size) || 10
+            };
+          })
+        : appleState.apples;
+      appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
+        ? snapshot.apples.extraSeeds.map(function (extraSeed) {
+            return {
+              id: String(extraSeed.id),
+              x: Number(extraSeed.x) || 0,
+              y: Number(extraSeed.y) || 0,
+              createdAt: Number(extraSeed.createdAt) || Date.now(),
+              planted: Boolean(extraSeed.planted),
+              inInventory: Boolean(extraSeed.inInventory),
+              label: extraSeed.label || "씨앗",
+              isStarter: Boolean(extraSeed.isStarter)
+            };
+          })
+        : [];
+      appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
+        ? snapshot.apples.extraPlants.map(function (plant) {
+            return {
+              id: String(plant.id),
+              x: Number(plant.x) || 0,
+              y: Number(plant.y) || 0,
+              plantedAt: Number(plant.plantedAt) || Date.now(),
+              lastWateredAt: Number(plant.lastWateredAt) || null,
+              wateredAtList: Array.isArray(plant.wateredAtList) ? plant.wateredAtList.slice() : [],
+              status: plant.status || "normal",
+              waterLevel: Number(plant.waterLevel) || 1,
+              waterLevelUpdatedAt: Number(plant.waterLevelUpdatedAt) || Date.now(),
+              becameEmptyAt: Number(plant.becameEmptyAt) || null,
+              isOverwatered: Boolean(plant.isOverwatered),
+              needsFirstWater: Boolean(plant.needsFirstWater),
+              growthStartedAt: Number(plant.growthStartedAt) || null,
+              isSproutGrown: Boolean(plant.isSproutGrown),
+              sproutGrownAt: Number(plant.sproutGrownAt) || null
+            };
+          })
+        : [];
+    }
+
+    updateWellImage();
+    updateWellCard();
+    updateSeedPosition();
+    updateBucketPosition();
+    updateApples();
+    updateExtraSeedsAndPlants();
+    updatePlantState();
+    updateSeedInventory();
+  } finally {
+    isApplyingWorldState = false;
+  }
+}
+
+function syncWorldState(forceSave) {
+  const now = Date.now();
+  if (
+    isWorldSyncing ||
+    !window.OVCOnline ||
+    typeof window.OVCOnline.saveWorldState !== "function"
+  ) {
+    return;
+  }
+  if (!forceSave && !isWorldDirty && now - lastWorldSaveAt < 2500) return;
+
+  isWorldSyncing = true;
+  isWorldDirty = false;
+  lastWorldSaveAt = now;
+  window.OVCOnline.saveWorldState(
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
+    getSharedWorldSnapshot()
+  ).then(function (row) {
+    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+  }).catch(function (error) {
+    addNetworkDebugLog(
+      "world save error: " + (error && error.message ? error.message : "unknown")
+    );
+    isWorldDirty = true;
+  }).finally(function () {
+    isWorldSyncing = false;
+  });
+}
+
+function pollWorldState() {
+  const now = Date.now();
+  if (
+    isWorldPolling ||
+    !window.OVCOnline ||
+    typeof window.OVCOnline.loadWorldState !== "function" ||
+    now - lastWorldPollAt < 1000
+  ) {
+    return;
+  }
+
+  isWorldPolling = true;
+  lastWorldPollAt = now;
+  window.OVCOnline.loadWorldState(
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
+  ).then(function (row) {
+    if (!row || !row.state || !row.updated_at || row.updated_at === lastWorldUpdatedAt) return;
+    lastWorldUpdatedAt = row.updated_at;
+    applySharedWorldSnapshot(row.state);
+  }).catch(function (error) {
+    addNetworkDebugLog(
+      "world poll error: " + (error && error.message ? error.message : "unknown")
+    );
+  }).finally(function () {
+    isWorldPolling = false;
+  });
 }
 
 function dropHeldItem() {
@@ -1638,6 +1903,7 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
+    markWorldDirty();
   }
 
   setWorldPosition(bucket, bucketX, bucketY);
@@ -1656,6 +1922,9 @@ function updatePlayerPosition() {
     return;
   }
 
+  const previousPlayerX = playerX;
+  const previousPlayerDepth = playerDepth;
+  const previousJumpY = jumpY;
   const groundMaxDepth = getMaxGroundedPlayerDepth();
   const isInCanopy = isPlayerInTreeCanopy();
   const isNearTrunk = isPlayerNearTreeTrunk();
@@ -1736,9 +2005,26 @@ function updatePlayerPosition() {
     isTreeFalling = false;
   }
 
+  if (isPlayerInWellWaterArea()) {
+    playerX = previousPlayerX;
+    playerDepth = previousPlayerDepth;
+    jumpY = previousJumpY;
+  }
+
   setWorldPosition(player, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   wasPlayerInTree = isInTree || (isTreeFalling && playerDepth > groundMaxDepth);
+}
+
+function isPlayerInWellWaterArea() {
+  const footX = getPlayerCenterX();
+  const footY = getPlayerFootY();
+  return (
+    footX >= wellX + 9 &&
+    footX <= wellX + WELL_SIZE - 9 &&
+    footY >= wellY + 10 &&
+    footY <= wellY + WELL_SIZE - 8
+  );
 }
 
 function updatePlayerColorBodyPosition() {
@@ -2542,6 +2828,7 @@ function saveWellState() {
     wellWater: wellState.water,
     lastWellRefillAt: wellState.lastRefillAt
   });
+  markWorldDirty();
 }
 
 function refillWellIfNeeded() {
@@ -2681,6 +2968,7 @@ function saveSeedState() {
     seedCreatedAt: plantRuntime.seedCreatedAt,
     plantedState: getPlantStateForStorage()
   });
+  markWorldDirty();
 }
 
 function updateSeedDryState() {
@@ -2872,7 +3160,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508p");
+    window.location.replace("/ovc-login.html?v=20260508q");
     return;
   }
 
@@ -3068,7 +3356,7 @@ function sendMultiplayerPresence(forceSend) {
     id: currentSessionId,
     userId: currentUserId,
     name: currentUserName,
-    action: "state",
+    action: plantRuntime.isPlanting ? "planting" : (appleState.isEating ? "eating" : "state"),
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
@@ -3164,6 +3452,15 @@ function pollPresenceDatabase() {
 function sendMultiplayerLeave() {
   if (!currentSessionId) return;
 
+  if (heldItem === HELD_ITEM_BUCKET || window.OVC_SHARED_BUCKET_HELD_BY === currentSessionId) {
+    if (heldItem === HELD_ITEM_BUCKET) {
+      dropBucket();
+    }
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    syncWorldState(true);
+  }
+
   if (multiplayerChannel) {
     Promise.resolve(multiplayerChannel.send({
       type: "broadcast",
@@ -3232,6 +3529,13 @@ function renderRemotePlayerState(state) {
   const remoteColor = state.color || "#7dd3fc";
 
   remotePlayer.nameElement.textContent = state.name || "OVC";
+  remotePlayer.statusElement.textContent =
+    state.action === "planting"
+      ? "씨앗 심는중..."
+      : state.action === "eating"
+        ? "먹는중..."
+        : "";
+  remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
   setWorldPosition(
@@ -3246,6 +3550,7 @@ function createRemotePlayer(remoteId) {
   const element = document.createElement("div");
   const bodyElement = document.createElement("img");
   const nameElement = document.createElement("div");
+  const statusElement = document.createElement("div");
 
   element.className = "remote-player";
   bodyElement.className = "remote-player-body";
@@ -3254,12 +3559,14 @@ function createRemotePlayer(remoteId) {
   bodyElement.draggable = false;
   element.dataset.remoteId = remoteId;
   nameElement.className = "remote-player-name";
+  statusElement.className = "remote-player-status";
   element.appendChild(bodyElement);
   element.appendChild(nameElement);
+  element.appendChild(statusElement);
   ground.appendChild(element);
   setWorldSize(element, PLAYER_WIDTH);
 
-  remotePlayers[remoteId] = { element, bodyElement, nameElement, lastSeenAt: Date.now() };
+  remotePlayers[remoteId] = { element, bodyElement, nameElement, statusElement, lastSeenAt: Date.now() };
   return remotePlayers[remoteId];
 }
 
@@ -3537,7 +3844,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508p";
+    window.location.href = "/ovc-login.html?v=20260508q";
   };
 
   if (multiplayerChannel) {
@@ -3691,6 +3998,10 @@ addNetworkDebugLog(
 openCharacterSelectIfNeeded();
 setInterval(function () {
   sendMultiplayerPresence(true);
+}, 1000);
+setInterval(function () {
+  syncWorldState(true);
+  pollWorldState();
 }, 1000);
 setInterval(validateCurrentAccount, 5000);
 window.addEventListener("resize", function () {

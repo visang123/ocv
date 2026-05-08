@@ -309,6 +309,40 @@
     if (error) throw normalizeOnlineError(error);
   }
 
+  async function saveWorldState(roomName, state) {
+    const supabaseClient = getClient();
+    if (!supabaseClient || !state) return null;
+
+    const room = roomName || config.multiplayerRoom || "ovc-main-room";
+    const { data, error } = await supabaseClient
+      .from(config.worldTable || "ovc_world")
+      .upsert({
+        room,
+        state,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "room" })
+      .select("state, updated_at")
+      .single();
+
+    if (error) throw normalizeOnlineError(error);
+    return data || null;
+  }
+
+  async function loadWorldState(roomName) {
+    const supabaseClient = getClient();
+    if (!supabaseClient) return null;
+
+    const room = roomName || config.multiplayerRoom || "ovc-main-room";
+    const { data, error } = await supabaseClient
+      .from(config.worldTable || "ovc_world")
+      .select("state, updated_at")
+      .eq("room", room)
+      .maybeSingle();
+
+    if (error) throw normalizeOnlineError(error);
+    return data || null;
+  }
+
   async function postLocalApi(url, payload) {
     let response;
 
@@ -400,6 +434,8 @@
     validateSession,
     savePresence,
     listPresence,
-    removePresence
+    removePresence,
+    saveWorldState,
+    loadWorldState
   };
 })();

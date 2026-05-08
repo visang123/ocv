@@ -77,3 +77,27 @@ on public.ovc_presence
 for delete
 to anon
 using (true);
+
+create table if not exists public.ovc_world (
+  room text primary key,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.ovc_world enable row level security;
+
+drop policy if exists "ovc world readable" on public.ovc_world;
+drop policy if exists "ovc world writable" on public.ovc_world;
+
+create policy "ovc world readable"
+on public.ovc_world
+for select
+to anon
+using (true);
+
+create policy "ovc world writable"
+on public.ovc_world
+for all
+to anon
+using (true)
+with check (true);
