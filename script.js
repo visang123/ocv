@@ -225,7 +225,7 @@ const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
-let currentSessionId = sessionStorage.getItem(currentSessionKey);
+let currentSessionId = "";
 const currentUserScopedColorKey = currentUserId
   ? "ovcUserColorV1:" + currentUserId
   : "";
@@ -328,6 +328,7 @@ let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
 let isPresenceDbPolling = false;
 let isLoggingOut = false;
+let isTabSessionSuperseded = false;
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
 let isWorldPolling = false;
@@ -397,12 +398,6 @@ const MULTIPLAYER_WORLD_POLL_MIN_MS = 150;
 
 const keys = createInputState();
 
-if (!currentSessionId) {
-  currentSessionId =
-    "session-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-  sessionStorage.setItem(currentSessionKey, currentSessionId);
-}
-
 /** Other browser tabs use a different session id but the same account — do not draw them as remotes. */
 function isRemotePresenceSameLoggedInAccount(state) {
   if (!state || !currentUserId) return false;
@@ -418,9 +413,95 @@ if (!currentUserName || !currentUserId) {
   throw new Error("OVC login required");
 }
 
+const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
+
+function getAccountSessionLeaderStorageKey() {
+  return "ovcAccountSessionLeaderV1:" + currentUserId;
+}
+
+function claimAccountSessionTabOwnership() {
+  const leaderToken = Date.now() + "-" + Math.random().toString(16).slice(2);
+  const newSessionId = "session-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  sessionStorage.setItem(accountLeaderTokenSessionKey, leaderToken);
+  localStorage.setItem(
+    getAccountSessionLeaderStorageKey(),
+    JSON.stringify({
+      token: leaderToken,
+      sessionId: newSessionId,
+      at: Date.now()
+    })
+  );
+  currentSessionId = newSessionId;
+  sessionStorage.setItem(currentSessionKey, currentSessionId);
+}
+
+function onAccountSessionLeaderStorageEvent(event) {
+  if (!event.key || event.storageArea !== localStorage) return;
+  if (event.key !== getAccountSessionLeaderStorageKey() || !event.newValue) return;
+  if (isTabSessionSuperseded) return;
+  let parsed;
+  try {
+    parsed = JSON.parse(event.newValue);
+  } catch (err) {
+    return;
+  }
+  const myToken = sessionStorage.getItem(accountLeaderTokenSessionKey);
+  if (!myToken || !parsed || !parsed.token) return;
+  if (parsed.token === myToken) return;
+  applySupersededTabShutdown();
+}
+
+function applySupersededTabShutdown() {
+  if (isTabSessionSuperseded) return;
+  isTabSessionSuperseded = true;
+  resetInputKeys(keys);
+  clearMultiplayerReconnectTimeout();
+  sendMultiplayerLeave();
+  const channel = multiplayerChannel;
+  multiplayerChannel = null;
+  isMultiplayerSubscribed = false;
+  if (channel) {
+    Promise.resolve(typeof channel.untrack === "function" ? channel.untrack() : undefined)
+      .catch(function () {})
+      .finally(function () {
+        try {
+          channel.unsubscribe();
+        } catch (errUnsub) {
+          // ignore
+        }
+        const client =
+          window.OVCOnline && typeof window.OVCOnline.getClient === "function"
+            ? window.OVCOnline.getClient()
+            : null;
+        if (client && typeof client.removeChannel === "function") {
+          Promise.resolve(client.removeChannel(channel)).catch(function () {});
+        }
+      });
+  }
+  document.body.style.pointerEvents = "none";
+  let veil = document.getElementById("ovc-tab-superseded-veil");
+  if (!veil) {
+    veil = document.createElement("div");
+    veil.id = "ovc-tab-superseded-veil";
+    veil.setAttribute("role", "dialog");
+    veil.setAttribute("aria-live", "polite");
+    veil.style.cssText =
+      "position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.92);color:#f8fafc;" +
+      "display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.5 system-ui,sans-serif;text-align:center;";
+    veil.innerHTML =
+      "<div><p style=\"font-size:18px;margin:0 0 12px;font-weight:600\">\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uAC8C\uC784\uC774 \uC5F4\uB838\uC2B5\uB2C8\uB2E4.</p>" +
+      "<p style=\"margin:0;opacity:.9\">\uC774 \uD0ED\uC740 \uC5F0\uACB0\uC774 \uB04A\uC5B4\uC84C\uC2B5\uB2C8\uB2E4. \uC774 \uD0ED\uC740 \uB2EB\uC544 \uC8FC\uC138\uC694.</p></div>";
+    document.body.appendChild(veil);
+  }
+}
+
+claimAccountSessionTabOwnership();
+window.addEventListener("storage", onAccountSessionLeaderStorageEvent);
+
 window.addEventListener(
   "keydown",
   function (event) {
+    if (isTabSessionSuperseded) return;
     if (
       event.code === "KeyR" &&
       event.shiftKey &&
@@ -466,6 +547,10 @@ function setWorldPosition(element, x, y) {
 }
 
 document.addEventListener("keydown", function (event) {
+  if (isTabSessionSuperseded) {
+    event.preventDefault();
+    return;
+  }
   const key = getControlKey(event);
 
   if (isCharacterSelecting) {
@@ -2034,6 +2119,7 @@ function isWorldServerSyncAvailable() {
 
 function syncWorldState(forceSave) {
   const now = Date.now();
+  if (isTabSessionSuperseded) return;
   if (
     isWorldSyncing ||
     !window.OVCOnline ||
@@ -2098,6 +2184,7 @@ function pollWorldState(forcePoll) {
   const now = Date.now();
   if (
     isWorldPolling ||
+    isTabSessionSuperseded ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
     (!forcePoll && now - lastWorldPollAt < MULTIPLAYER_WORLD_POLL_MIN_MS)
@@ -4237,6 +4324,7 @@ function updatePlayerName() {
 }
 
 function setupMultiplayer() {
+  if (isTabSessionSuperseded) return;
   if (!hasSpawnedCharacter) {
     updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
     addNetworkDebugLog("multiplayer skipped: character not spawned");
@@ -4360,7 +4448,7 @@ function setupMultiplayer() {
 }
 
 function sendMultiplayerPresence(forceSend) {
-  if (!hasSpawnedCharacter) return;
+  if (!hasSpawnedCharacter || isTabSessionSuperseded) return;
 
   const now = Date.now();
   const isWateringNow = now - lastWaterSplashAt < 600;
@@ -4508,6 +4596,7 @@ function handleRemoteBucketBroadcast(payload) {
 function syncPresenceToDatabase(state) {
   if (
     isPresenceDbSyncing ||
+    isTabSessionSuperseded ||
     !window.OVCOnline ||
     typeof window.OVCOnline.savePresence !== "function"
   ) {
@@ -4528,6 +4617,7 @@ function syncPresenceToDatabase(state) {
 function pollPresenceDatabase() {
   if (
     isPresenceDbPolling ||
+    isTabSessionSuperseded ||
     !window.OVCOnline ||
     typeof window.OVCOnline.listPresence !== "function"
   ) {
@@ -4757,7 +4847,7 @@ function clearMultiplayerReconnectTimeout() {
 }
 
 function scheduleMultiplayerReconnect(delayMs) {
-  if (multiplayerReconnectTimeout || !hasSpawnedCharacter || isLoggingOut) return;
+  if (multiplayerReconnectTimeout || !hasSpawnedCharacter || isLoggingOut || isTabSessionSuperseded) return;
   const waitMs = Math.max(500, Number(delayMs) || 1500);
   addNetworkDebugLog("schedule reconnect in " + waitMs + "ms");
   multiplayerReconnectTimeout = setTimeout(function () {
@@ -4956,7 +5046,7 @@ function addBucketTrace(key, message, minIntervalMs) {
 }
 
 async function validateCurrentAccount() {
-  if (isLoggingOut || !currentUserId || !window.OVCOnline) return;
+  if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
 
   try {
     if (typeof window.OVCOnline.validateSession === "function") {
@@ -5044,6 +5134,7 @@ function getFitZoom() {
 }
 
 function gameLoop() {
+  if (isTabSessionSuperseded) return;
   respawnApplesIfNeeded();
   refillWellIfNeeded();
   updatePlayerPosition();
@@ -5168,23 +5259,30 @@ if (!isWorldServerSyncAvailable()) {
   hasHydratedSharedWorldFromServer = true;
 }
 setTimeout(function () {
+  if (isTabSessionSuperseded) return;
   if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
     pollWorldState(true);
   }
 }, 40);
 setTimeout(function () {
+  if (isTabSessionSuperseded) return;
   if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
     hasHydratedSharedWorldFromServer = true;
   }
 }, 8000);
 setInterval(function () {
+  if (isTabSessionSuperseded) return;
   sendMultiplayerPresence(true);
 }, 1000);
 setInterval(function () {
+  if (isTabSessionSuperseded) return;
   pollWorldState(false);
   syncWorldState(false);
 }, MULTIPLAYER_WORLD_SYNC_LOOP_MS);
-setInterval(validateCurrentAccount, 5000);
+setInterval(function () {
+  if (isTabSessionSuperseded) return;
+  validateCurrentAccount();
+}, 5000);
 window.addEventListener("resize", function () {
   setup();
   zoomLevel = clampZoom(zoomLevel);
