@@ -2219,29 +2219,13 @@ function updateBucketPosition() {
     bucketRenderY = bucketY;
     markWorldDirty();
   } else if (isBucketHeldByRemotePlayer) {
-    const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
-    if (
-      holder &&
-      Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.depth) &&
-      Number.isFinite(holder.jumpY)
-    ) {
+    // Use shared world snapshot position directly for remote-held bucket.
+    // This avoids coordinate-space drift between remote player transform and bucket transform.
+    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       const bucketSize = getBucketSize();
-      // Remote player element uses bottom-origin movement. Bucket uses top-origin,
-      // so derive hand Y from remote depth/jump with the same formula as local playerBox.
-      const remoteTopY =
-        GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
-      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-      bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
-    } else {
-      // Fallback: keep last synced world position, but never let invalid values hide bucket.
-      if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
-        const bucketSize = getBucketSize();
-        bucketX = wellX - bucketSize.width - 8;
-        bucketY = wellY + WELL_SIZE - bucketSize.height;
-      }
+      bucketX = wellX - bucketSize.width - 8;
+      bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
-    // No interpolation while remotely held: attach instantly to holder hand.
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
   } else {
