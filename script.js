@@ -234,7 +234,7 @@ let selectedPlayerColor =
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
-  isMainSeedAvailable = !getStoredFlag(mainSeedCollectedKey);
+  isMainSeedAvailable = !hasPickedMainSeedInCurrentRoom();
   lastMainSeedStateChangeAt = Date.now();
 }
 let isCharacterSelecting = false;
@@ -251,6 +251,47 @@ const characterColors = [
 function normalizeHexColor(value) {
   if (!/^#[0-9a-fA-F]{6}$/.test(value || "")) return "";
   return value.toLowerCase();
+}
+
+function getMultiplayerRoomSlug() {
+  const room = window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom;
+  return room ? String(room).replace(/[^\w\-]+/g, "_") : "offline";
+}
+
+function storageKeyMainSeedPickedForRoom() {
+  return "mainSeedPickedRoomV1:" + getMultiplayerRoomSlug();
+}
+
+function storageKeyGuideBookPickedForRoom() {
+  return "guideBookPickedRoomV1:" + getMultiplayerRoomSlug();
+}
+
+function hasPickedMainSeedInCurrentRoom() {
+  if (getStoredFlag(storageKeyMainSeedPickedForRoom())) return true;
+  if (getStoredFlag(mainSeedCollectedKey)) {
+    setStoredFlag(storageKeyMainSeedPickedForRoom(), true);
+    return true;
+  }
+  return false;
+}
+
+function setMainSeedPickedForCurrentRoom() {
+  setStoredFlag(storageKeyMainSeedPickedForRoom(), true);
+  setStoredFlag(mainSeedCollectedKey, true);
+}
+
+function hasPickedGuideBookInCurrentRoom() {
+  if (getStoredFlag(storageKeyGuideBookPickedForRoom())) return true;
+  if (getStoredFlag(hasGuideBookKey)) {
+    setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
+    return true;
+  }
+  return false;
+}
+
+function setGuideBookPickedForCurrentRoom() {
+  setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
+  setStoredFlag(hasGuideBookKey, true);
 }
 
 let multiplayerChannel = null;
@@ -287,6 +328,8 @@ let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
+/** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
+let hasHydratedSharedWorldFromServer = false;
 let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
 let lastWorldResetAt = 0;
@@ -777,17 +820,15 @@ function isNearSeed() {
 
 function canPickUpSeed() {
   updateSeedDryState();
-  return isMainSeedAvailable && !plantRuntime.isSeedPlanted && !plantRuntime.isSeedDry;
-}
-
-function hasStarterSeedInSeedList() {
-  return appleState.extraSeeds.some(function (extraSeed) {
-    return extraSeed.isStarter;
-  });
+  return (
+    !hasPickedMainSeedInCurrentRoom() &&
+    !plantRuntime.isSeedPlanted &&
+    !plantRuntime.isSeedDry
+  );
 }
 
 function createStarterSeedInventoryItem() {
-  if (!isMainSeedAvailable) return null;
+  if (hasPickedMainSeedInCurrentRoom()) return null;
 
   const starterSeed = {
     id: "starter-seed",
@@ -802,7 +843,7 @@ function createStarterSeedInventoryItem() {
   appleState.extraSeeds.unshift(starterSeed);
   isMainSeedAvailable = false;
   lastMainSeedStateChangeAt = Date.now();
-  setStoredFlag(mainSeedCollectedKey, true);
+  setMainSeedPickedForCurrentRoom();
   if (plantRuntime.isSeedDry) {
     hasHandledDryMainSeed = true;
     setStoredFlag(mainDrySeedHandledKey, true);
@@ -845,7 +886,7 @@ function isNearSignBoard() {
 }
 
 function isNearGuideBook() {
-  if (hasGuideBook) return false;
+  if (hasPickedGuideBookInCurrentRoom()) return false;
 
   return (
     getCenterDistance(
@@ -862,7 +903,7 @@ function pickUpGuideBook() {
 
   hasGuideBook = true;
   isGuideBookOpen = false;
-  setStoredFlag(hasGuideBookKey, true);
+  setGuideBookPickedForCurrentRoom();
   guideBook.style.display = "none";
   guideBookButton.style.display = "block";
   updateGuideCard();
@@ -870,7 +911,7 @@ function pickUpGuideBook() {
 }
 
 function loadGuideBookState() {
-  hasGuideBook = getStoredFlag(hasGuideBookKey);
+  hasGuideBook = hasPickedGuideBookInCurrentRoom();
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   guideBook.style.display = hasGuideBook ? "none" : "block";
@@ -944,7 +985,10 @@ function applyDefaultState() {
   plantRuntime.isSeedDry = false;
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
+  removeStoredValue(storageKeyMainSeedPickedForRoom());
+  removeStoredValue(storageKeyGuideBookPickedForRoom());
   setStoredFlag(mainSeedCollectedKey, false);
+  setStoredFlag(hasGuideBookKey, false);
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
   heldItem = null;
@@ -1528,7 +1572,7 @@ function getSharedWorldSnapshot() {
       createdAt: plantRuntime.seedCreatedAt,
       isDry: plantRuntime.isSeedDry,
       isDryHandled: hasHandledDryMainSeed,
-      isMainSeedAvailable
+      isMainSeedAvailable: !hasPickedMainSeedInCurrentRoom()
     },
     mainPlant: getPlantStateForStorage(),
     apples: {
@@ -1702,18 +1746,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       const nextSeedY = Number(snapshot.seed.y);
       const canApplyMainSeedState =
         !snapshotSavedAt || snapshotSavedAt >= lastMainSeedStateChangeAt;
-      if (canApplyMainSeedState && typeof snapshot.seed.isMainSeedAvailable === "boolean") {
-        const nextMainSeedAvailable = Boolean(snapshot.seed.isMainSeedAvailable);
-        const isResetRecoveryWindow = Date.now() - lastWorldResetAt < 20000;
-        // Main seed availability is monotonic during normal play:
-        // once collected/removed, do not resurrect it from stale or lagging peers.
-        if (!isMainSeedAvailable && nextMainSeedAvailable && !isResetRecoveryWindow) {
-          // ignore resurrection
-        } else {
-          isMainSeedAvailable = nextMainSeedAvailable;
-          setStoredFlag(mainSeedCollectedKey, !isMainSeedAvailable);
-        }
-      }
+      // Per-account tutorial seed uses room-scoped storage; do not mirror shared snapshot here.
       if (canApplyMainSeedState && typeof snapshot.seed.isDryHandled === "boolean") {
         hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
         setStoredFlag(mainDrySeedHandledKey, hasHandledDryMainSeed);
@@ -1916,7 +1949,8 @@ function refreshSharedWaterIndicators() {
     plantRuntime.isSeedPlanted &&
     plantRuntime.needsFirstWater &&
     plantRuntime.status !== "dry" &&
-    plantRuntime.status !== "rotten"
+    plantRuntime.status !== "rotten" &&
+    !plantRuntime.isOverwatered
   ) {
     waterNeeded.style.display = "block";
     setWorldPosition(
@@ -1939,6 +1973,16 @@ function refreshSharedWaterIndicators() {
   });
 }
 
+function isWorldServerSyncAvailable() {
+  return Boolean(
+    window.OVCOnline &&
+    typeof window.OVCOnline.saveWorldState === "function" &&
+    typeof window.OVCOnline.loadWorldState === "function" &&
+    window.OVCOnline.isConfigured &&
+    window.OVCOnline.isConfigured()
+  );
+}
+
 function syncWorldState(forceSave) {
   const now = Date.now();
   if (
@@ -1949,6 +1993,9 @@ function syncWorldState(forceSave) {
     return;
   }
   if (!forceSave && !isWorldDirty) return;
+  if (!forceSave && !hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+    return;
+  }
 
   isWorldSyncing = true;
   isWorldDirty = false;
@@ -2023,6 +2070,9 @@ function pollWorldState(forcePoll) {
     );
   }).finally(function () {
     isWorldPolling = false;
+    if (isWorldServerSyncAvailable()) {
+      hasHydratedSharedWorldFromServer = true;
+    }
   });
 }
 
@@ -2083,7 +2133,7 @@ function updateSeedPosition() {
   updateSeedDryState();
   const now = Date.now();
   const shouldShowMainSeed =
-    isMainSeedAvailable &&
+    !hasPickedMainSeedInCurrentRoom() &&
     !plantRuntime.isPlanting &&
     !plantRuntime.isSeedPlanted &&
     !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
@@ -2095,7 +2145,7 @@ function updateSeedPosition() {
       isMainSeedAvailable = false;
       lastMainSeedStateChangeAt = now;
       setStoredFlag(mainDrySeedHandledKey, true);
-      setStoredFlag(mainSeedCollectedKey, true);
+      setMainSeedPickedForCurrentRoom();
       dryMainSeedVisibleSince = 0;
       markWorldDirty();
       syncWorldState(true);
@@ -2195,7 +2245,8 @@ function updateExtraSeedsAndPlants() {
       getPlantSecondGrowthRatio(plant, now)
     );
 
-    const isSproutGrown = plant.isSproutGrown && plant.status !== "rotten";
+    const isSproutGrown =
+      plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry";
     const grownAt =
       plant.sproutGrownAt ||
       (plant.growthStartedAt ? plant.growthStartedAt + plantGrowthMs : now);
@@ -2251,17 +2302,23 @@ function normalizeExtraPlantState(plant) {
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
 
-  if (plant.status === "dry" || plant.status === "rotten") {
+  if (plant.status === "rotten") {
     plant.removed = true;
+    return;
+  }
+
+  if (plant.status === "dry") {
     return;
   }
 
   if (
     plant.status !== "rotten" &&
+    plant.status !== "dry" &&
     plant.becameEmptyAt !== null &&
     now - plant.becameEmptyAt >= plantDryMs
   ) {
-    plant.removed = true;
+    plant.status = "dry";
+    plant.needsFirstWater = true;
     return;
   }
 
@@ -2319,7 +2376,7 @@ function updateExtraPlantWaterLevel(plant, now) {
 }
 
 function getPlantSoilSrc(plant) {
-  if (plant.status === "rotten") return "soil-rotten.png";
+  if (plant.status === "rotten" || plant.isOverwatered) return "soil-rotten.png";
   if (plant.status === "wet") return "soil-wet.png";
   if (plant.status === "dry") return "soil-dry.png";
   return "tilled-soil.png";
@@ -3082,6 +3139,26 @@ function waterPlant(target) {
   const now = Date.now();
 
   updatePlantWaterLevel();
+
+  if (plantRuntime.status === "dry") {
+    plantRuntime.status = "normal";
+    plantRuntime.waterLevel = 1;
+    plantRuntime.waterLevelUpdatedAt = now;
+    plantRuntime.becameEmptyAt = null;
+    plantRuntime.isOverwatered = false;
+    plantRuntime.needsFirstWater = false;
+    plantRuntime.lastWateredAt = now;
+    plantRuntime.wateredAtList = plantRuntime.wateredAtList
+      .filter(function (wateredAt) {
+        return now - wateredAt <= overwaterWindowMs;
+      })
+      .concat(now);
+    saveSeedState();
+    syncWorldState(true);
+    updatePlantState();
+    return;
+  }
+
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
 
   plantRuntime.lastWateredAt = now;
@@ -3097,7 +3174,7 @@ function waterPlant(target) {
     })
     .concat(now);
 
-  if (plantRuntime.status === "dry" || plantRuntime.isOverwatered || plantRuntime.status === "rotten") {
+  if (plantRuntime.isOverwatered || plantRuntime.status === "rotten") {
     saveSeedState();
     updatePlantState();
     return;
@@ -3131,6 +3208,25 @@ function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
+
+  if (plant.status === "dry") {
+    plant.status = "normal";
+    plant.waterLevel = 1;
+    plant.waterLevelUpdatedAt = now;
+    plant.becameEmptyAt = null;
+    plant.isOverwatered = false;
+    plant.needsFirstWater = false;
+    plant.lastWateredAt = now;
+    plant.wateredAtList = plant.wateredAtList
+      .filter(function (wateredAt) {
+        return now - wateredAt <= overwaterWindowMs;
+      })
+      .concat(now);
+    saveAppleState();
+    updateExtraSeedsAndPlants();
+    return;
+  }
+
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
 
   plant.lastWateredAt = now;
@@ -3146,7 +3242,7 @@ function waterExtraPlant(plant) {
     })
     .concat(now);
 
-  if (plant.status === "dry" || plant.isOverwatered || plant.status === "rotten") {
+  if (plant.isOverwatered || plant.status === "rotten") {
     saveAppleState();
     updateExtraSeedsAndPlants();
     return;
@@ -3223,31 +3319,16 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= plantDryMs
   ) {
-    // Keep the planted ground and transition to dry soil instead of removing immediately.
+    // Keep planted ground + dry soil; preserve sprout growth so stage 2 returns after watering.
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
-    plantRuntime.needsFirstWater = false;
-    plantRuntime.growthStartedAt = null;
-    plantRuntime.isSproutGrown = false;
-    plantRuntime.sproutGrownAt = null;
+    plantRuntime.needsFirstWater = true;
     saveSeedState();
   }
 
-  if (plantRuntime.status === "rotten") {
-    removeMainPlant();
-    saveSeedState();
-    updatePlantState();
-    return;
-  }
+  const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
 
-  if (plantRuntime.isOverwatered) {
-    removeMainPlant();
-    saveSeedState();
-    updatePlantState();
-    return;
-  }
-
-  if (plantRuntime.status === "rotten") {
+  if (mainSoilRotten) {
     plantSpot.src = "soil-rotten.png";
   } else if (plantRuntime.status === "wet") {
     plantSpot.src = "soil-wet.png";
@@ -3257,7 +3338,7 @@ function updatePlantState() {
     plantSpot.src = "tilled-soil.png";
   }
 
-  if (plantRuntime.status === "rotten") {
+  if (mainSoilRotten) {
     waterNeeded.style.display = "none";
     plantCard.style.display = "none";
     growthCard.style.display = "none";
@@ -3348,7 +3429,10 @@ function updatePlantGrowth() {
   if (!plantRuntime.isSeedPlanted || plantRuntime.growthStartedAt === null || plantRuntime.status === "dry" || plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     growthCard.style.display = "none";
     mainPlantGrowthMeter.element.style.display = "none";
-    sprout.style.display = plantRuntime.isSproutGrown && plantRuntime.status !== "rotten" ? "block" : "none";
+    sprout.style.display =
+      plantRuntime.isSproutGrown && plantRuntime.status !== "rotten" && plantRuntime.status !== "dry"
+        ? "block"
+        : "none";
     updateSproutPosition();
     return;
   }
@@ -3388,7 +3472,7 @@ function updatePlantGrowth() {
 }
 
 function updateSproutPosition() {
-  if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten") {
+  if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten" || plantRuntime.status === "dry") {
     sprout.style.display = "none";
     return;
   }
@@ -4263,9 +4347,15 @@ function pollPresenceDatabase() {
   window.OVCOnline.listPresence(
     window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
   ).then(function (players) {
-    players.forEach(function (state) {
-      if (!state || state.id === currentSessionId) return;
+    const idsInDb = Object.create(null);
+    (players || []).forEach(function (state) {
+      if (!state || !state.id || state.id === currentSessionId) return;
+      idsInDb[String(state.id)] = true;
       renderRemotePlayerState(state);
+    });
+    Object.keys(remotePlayers).forEach(function (remoteId) {
+      if (idsInDb[remoteId]) return;
+      removeRemotePlayer(remoteId);
     });
     updateRemotePlayerCount();
   }).catch(function (error) {
@@ -4880,12 +4970,25 @@ addNetworkDebugLog(
   selectedPlayerColor
 );
 openCharacterSelectIfNeeded();
+if (!isWorldServerSyncAvailable()) {
+  hasHydratedSharedWorldFromServer = true;
+}
+setTimeout(function () {
+  if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+    pollWorldState(true);
+  }
+}, 40);
+setTimeout(function () {
+  if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+    hasHydratedSharedWorldFromServer = true;
+  }
+}, 8000);
 setInterval(function () {
   sendMultiplayerPresence(true);
 }, 1000);
 setInterval(function () {
+  pollWorldState(false);
   syncWorldState(false);
-  pollWorldState();
 }, MULTIPLAYER_WORLD_SYNC_LOOP_MS);
 setInterval(validateCurrentAccount, 5000);
 window.addEventListener("resize", function () {
