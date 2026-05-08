@@ -792,6 +792,8 @@ function createStarterSeedInventoryItem() {
   if (plantRuntime.isSeedDry) {
     hasHandledDryMainSeed = true;
     setStoredFlag(mainDrySeedHandledKey, true);
+    markWorldDirty();
+    syncWorldState(true);
   }
   saveAppleState();
   return starterSeed;
@@ -1505,7 +1507,8 @@ function getSharedWorldSnapshot() {
       x: seedX,
       y: seedY,
       createdAt: plantRuntime.seedCreatedAt,
-      isDry: plantRuntime.isSeedDry
+      isDry: plantRuntime.isSeedDry,
+      isDryHandled: hasHandledDryMainSeed
     },
     mainPlant: getPlantStateForStorage(),
     apples: {
@@ -1625,6 +1628,10 @@ function applySharedWorldSnapshot(snapshot) {
       const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
       const nextSeedX = Number(snapshot.seed.x);
       const nextSeedY = Number(snapshot.seed.y);
+      if (typeof snapshot.seed.isDryHandled === "boolean") {
+        hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
+        setStoredFlag(mainDrySeedHandledKey, hasHandledDryMainSeed);
+      }
       if (heldItem !== HELD_ITEM_SEED) {
         if (Number.isFinite(nextSeedX)) seedX = nextSeedX;
         if (Number.isFinite(nextSeedY)) seedY = nextSeedY;
@@ -1985,6 +1992,8 @@ function updateSeedPosition() {
       hasHandledDryMainSeed = true;
       setStoredFlag(mainDrySeedHandledKey, true);
       dryMainSeedVisibleSince = 0;
+      markWorldDirty();
+      syncWorldState(true);
     }
   } else {
     dryMainSeedVisibleSince = 0;
@@ -2241,6 +2250,8 @@ function discardInventorySeed(seedId) {
   if (seedToRemove.isStarter && isExtraSeedDry(seedToRemove)) {
     hasHandledDryMainSeed = true;
     setStoredFlag(mainDrySeedHandledKey, true);
+    markWorldDirty();
+    syncWorldState(true);
   }
 
   appleState.extraSeeds.splice(seedIndex, 1);
