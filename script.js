@@ -251,6 +251,7 @@ let lastPresenceStateKey = "";
 let presenceRateLimitedUntil = 0;
 let lastPresenceTrackAt = 0;
 let lastBroadcastAt = 0;
+let lastHeartbeatBroadcastAt = 0;
 let isLoggingOut = false;
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
@@ -303,7 +304,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508l");
+  window.location.replace("/ovc-login.html?v=20260508m");
   throw new Error("OVC login required");
 }
 
@@ -2829,7 +2830,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508l");
+    window.location.replace("/ovc-login.html?v=20260508m");
     return;
   }
 
@@ -3039,8 +3040,9 @@ function sendMultiplayerPresence(forceSend) {
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
 
-  // Broadcast is the primary multiplayer sync path.
-  if (forceSend || (hasChanged && now - lastBroadcastAt >= 120)) {
+  // Broadcast is the primary multiplayer sync path. Keep a heartbeat so idle
+  // players stay visible even when they are not moving.
+  if (forceSend || (hasChanged && now - lastBroadcastAt >= 120) || now - lastHeartbeatBroadcastAt >= 1000) {
     Promise.resolve(multiplayerChannel.send({
       type: "broadcast",
       event: "player_state",
@@ -3051,6 +3053,9 @@ function sendMultiplayerPresence(forceSend) {
       );
     });
     lastBroadcastAt = now;
+    if (forceSend || !hasChanged) {
+      lastHeartbeatBroadcastAt = now;
+    }
   }
 
   if (hasChanged || forceSend) {
@@ -3099,32 +3104,32 @@ function renderRemotePlayerState(state) {
   const remoteColor = state.color || "#7dd3fc";
 
   remotePlayer.nameElement.textContent = state.name || "OVC";
-  remotePlayer.element.style.setProperty(
-    "--remote-player-color",
-    remoteColor
-  );
+  remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
   setWorldPosition(
     remotePlayer.element,
     Number(state.x) || 0,
-    GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - (Number(state.depth) || 0) + (Number(state.jumpY) || 0)
+    -(Number(state.depth) || 0) + (Number(state.jumpY) || 0)
   );
   remotePlayer.lastSeenAt = Date.now();
 }
 
 function createRemotePlayer(remoteId) {
   const element = document.createElement("div");
-  const bodyElement = document.createElement("div");
+  const bodyElement = document.createElement("img");
   const nameElement = document.createElement("div");
 
   element.className = "remote-player";
   bodyElement.className = "remote-player-body";
+  bodyElement.alt = "";
+  bodyElement.decoding = "async";
+  bodyElement.draggable = false;
   element.dataset.remoteId = remoteId;
   nameElement.className = "remote-player-name";
   element.appendChild(bodyElement);
   element.appendChild(nameElement);
   ground.appendChild(element);
-  setWorldSize(element, PLAYER_WIDTH, PLAYER_HEIGHT);
+  setWorldSize(element, PLAYER_WIDTH);
 
   remotePlayers[remoteId] = { element, bodyElement, nameElement, lastSeenAt: Date.now() };
   return remotePlayers[remoteId];
@@ -3135,7 +3140,7 @@ function pruneStaleRemotePlayers() {
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.lastSeenAt) return;
-    if (now - remotePlayer.lastSeenAt < 6000) return;
+    if (now - remotePlayer.lastSeenAt < 15000) return;
     remotePlayer.element.remove();
     delete remotePlayers[remoteId];
   });
@@ -3405,7 +3410,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508l";
+    window.location.href = "/ovc-login.html?v=20260508m";
   };
 
   if (multiplayerChannel) {
@@ -3492,6 +3497,9 @@ function setup() {
 
   setWorldSize(player, PLAYER_WIDTH);
   setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
+  });
   setWorldSize(spawnPortal, spawnPortalWidth, spawnPortalHeight);
   setWorldSize(seed, SEED_SIZE);
   appleState.extraSeeds.forEach(function (extraSeed) {
