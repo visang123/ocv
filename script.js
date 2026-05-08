@@ -278,6 +278,9 @@ let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
+const playerBucketOverlay = document.createElement("div");
+playerBucketOverlay.id = "player-bucket-overlay";
+ground.appendChild(playerBucketOverlay);
 const playerTintCache = new Map();
 const playerBaseImage = new Image();
 let playerBaseImageReady = false;
@@ -2207,6 +2210,15 @@ function updateBucketPosition() {
     window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
     heldItem !== HELD_ITEM_BUCKET;
 
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const remotePlayer = remotePlayers[remoteId];
+    if (!remotePlayer || !remotePlayer.element) return;
+    remotePlayer.element.classList.toggle(
+      "is-carrying-bucket",
+      isBucketHeldByRemotePlayer && remoteId === window.OVC_SHARED_BUCKET_HELD_BY
+    );
+  });
+
   if (heldItem === HELD_ITEM_BUCKET) {
     const bucketSize = getBucketSize();
     const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
@@ -2215,21 +2227,31 @@ function updateBucketPosition() {
     bucketY = handPosition.y;
     markWorldDirty();
     broadcastBucketState(false);
+    bucket.style.display = "none";
+    playerBucketOverlay.style.display = "block";
+    setWorldPosition(playerBucketOverlay, bucketX, bucketY);
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
+    bucket.style.display = "none";
+    playerBucketOverlay.style.display = "none";
+  } else {
+    bucket.style.display = "block";
+    playerBucketOverlay.style.display = "none";
   }
 
-  if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+  if (bucket.style.display === "block" && (!Number.isFinite(bucketX) || !Number.isFinite(bucketY))) {
     const bucketSize = getBucketSize();
     bucketX = wellX - bucketSize.width - 8;
     bucketY = wellY + WELL_SIZE - bucketSize.height;
   }
 
-  setWorldPosition(bucket, bucketX, bucketY);
+  if (bucket.style.display === "block") {
+    setWorldPosition(bucket, bucketX, bucketY);
+  }
 }
 
 function updatePlayerPosition() {
