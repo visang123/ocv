@@ -190,6 +190,7 @@ let npcPromptHideTimeout = null;
 let hasShownFirstSeedFocus = false;
 let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
+let lastPickupToggleAt = 0;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
@@ -407,6 +408,9 @@ document.addEventListener("keydown", function (event) {
   if (key === "e" && !event.repeat) {
     event.preventDefault();
     if (plantRuntime.isPlanting) return;
+    const now = Date.now();
+    if (now - lastPickupToggleAt < 180) return;
+    lastPickupToggleAt = now;
     if (heldItem) {
       dropHeldItem();
       return;
