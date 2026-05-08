@@ -219,8 +219,7 @@ const savedUserScopedColor = normalizeHexColor(
 const savedGlobalPlayerColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
 const savedLastPlayerColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
 const hasChosenPlayerColor =
-  localStorage.getItem(currentUserHasChosenColorKey) === currentUserId ||
-  Boolean(savedUserScopedColor);
+  localStorage.getItem(currentUserHasChosenColorKey) === currentUserId;
 let selectedPlayerColor =
   savedUserScopedColor || savedGlobalPlayerColor || savedLastPlayerColor || "#ffffff";
 if (currentUserId) {
@@ -1510,8 +1509,6 @@ function applySharedWorldSnapshot(snapshot) {
     }
 
     if (snapshot.seed) {
-      seedX = Number(snapshot.seed.x) || seedX;
-      seedY = Number(snapshot.seed.y) || seedY;
       plantRuntime.seedCreatedAt = Number(snapshot.seed.createdAt) || plantRuntime.seedCreatedAt;
       plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
       if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
@@ -1797,10 +1794,15 @@ function dropBucket() {
 
 function updateSeedPosition() {
   updateSeedDryState();
+  const shouldShowMainSeed =
+    !plantRuntime.isPlanting && !plantRuntime.isSeedPlanted && !hasStarterSeedInSeedList();
+  // Main seed is a fixed world object (next to the book), not a roaming synced item.
+  if (shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
+    seedX = SEED_START_X;
+    seedY = SEED_START_Y;
+  }
   seed.style.display =
-    plantRuntime.isPlanting || plantRuntime.isSeedPlanted || hasStarterSeedInSeedList()
-      ? "none"
-      : "block";
+    shouldShowMainSeed ? "block" : "none";
   seed.src = plantRuntime.isSeedDry ? "seed-dry.png" : "seed.png";
 
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
