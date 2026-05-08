@@ -2226,25 +2226,15 @@ function updateBucketPosition() {
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     const holder = remotePlayers[window.OVC_SHARED_BUCKET_HELD_BY];
-    if (holder && holder.element) {
-      // Use rendered remote element position and convert back to world coordinates.
-      // This keeps bucket attached even when remote world/depth values drift.
-      const groundRect = ground.getBoundingClientRect();
-      const holderRect = holder.element.getBoundingClientRect();
-      const scaleX = ground.clientWidth / WORLD_WIDTH;
-      const scaleY = ground.clientHeight / GROUND_WORLD_HEIGHT;
-      if (scaleX > 0 && scaleY > 0) {
-        const holderWorldX = (holderRect.left - groundRect.left) / scaleX;
-        const holderWorldTopY = (holderRect.top - groundRect.top) / scaleY;
-        bucketX = holderWorldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-        bucketY = holderWorldTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
-      }
-    } else if (
+    if (
       holder &&
       Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.worldY)
+      Number.isFinite(holder.depth) &&
+      Number.isFinite(holder.jumpY)
     ) {
-      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
+      // Match local getHandPosition formula exactly, but using remote depth/jump.
+      const remoteTopY =
+        GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
       bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
       bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
     } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
@@ -2252,7 +2242,7 @@ function updateBucketPosition() {
       bucketY = wellY + WELL_SIZE - bucketSize.height;
     }
     bucketX = Math.max(0, Math.min(WORLD_WIDTH - bucketSize.width, bucketX));
-    bucketY = Math.max(0, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
+    bucketY = Math.max(-PLAYER_HEIGHT, Math.min(GROUND_WORLD_HEIGHT - BUCKET_SIZE, bucketY));
     bucketRenderX = bucketX;
     bucketRenderY = bucketY;
   } else {
