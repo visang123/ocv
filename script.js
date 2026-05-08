@@ -1589,10 +1589,62 @@ function readWaterLevel(value, fallback) {
   return Math.max(0, Math.min(2, number));
 }
 
-function applySharedWorldSnapshot(snapshot) {
+function resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt) {
+  let savedAt = Number(snapshot.savedAt || 0);
+  if (!savedAt && serverRowUpdatedAt) {
+    const parsed =
+      typeof serverRowUpdatedAt === "string"
+        ? Date.parse(serverRowUpdatedAt)
+        : Number(serverRowUpdatedAt);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      savedAt = parsed;
+    }
+  }
+  return savedAt;
+}
+
+function dedupeExtraSeedsPreferInventory(extraSeeds) {
+  const byId = Object.create(null);
+  extraSeeds.forEach(function (seed) {
+    const id = String(seed.id);
+    const prev = byId[id];
+    if (!prev) {
+      byId[id] = seed;
+      return;
+    }
+    const pickInv = Boolean(seed.inInventory);
+    const prevInv = Boolean(prev.inInventory);
+    let winner = prev;
+    let loser = seed;
+    if (pickInv && !prevInv) {
+      winner = seed;
+      loser = prev;
+    } else if (prevInv && !pickInv) {
+      winner = prev;
+      loser = seed;
+    }
+    if (loser !== winner) {
+      if (loser.element && typeof loser.element.remove === "function") {
+        loser.element.remove();
+      }
+      if (loser.inventoryElement && typeof loser.inventoryElement.remove === "function") {
+        loser.inventoryElement.remove();
+      }
+      loser.element = undefined;
+      loser.inventoryElement = undefined;
+      loser.inventoryImage = undefined;
+    }
+    byId[id] = winner;
+  });
+  return Object.keys(byId).map(function (key) {
+    return byId[key];
+  });
+}
+
+function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
-  const snapshotSavedAt = Number(snapshot.savedAt || 0);
+  const snapshotSavedAt = resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt);
   const snapshotResetToken = String(snapshot.resetToken || "");
   const isResetGuardWindow = Date.now() - lastWorldResetAt < 20000;
   // Guard only during the short reset window. After that, allow sync to recover
@@ -1786,10 +1838,12 @@ function applySharedWorldSnapshot(snapshot) {
             })
         : [];
       if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
-        appleState.extraSeeds = [];
+        // Ignore stale world seeds from snapshot, but never drop inventory-only seeds.
+        appleState.extraSeeds = localInventorySeeds.slice();
       } else if (localInventorySeeds.length > 0) {
         appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
       }
+      appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(function (plant) {
             return {
@@ -1962,7 +2016,7 @@ function pollWorldState(forcePoll) {
   ).then(function (row) {
     if (!row || !row.state || !row.updated_at || row.updated_at === lastWorldUpdatedAt) return;
     lastWorldUpdatedAt = row.updated_at;
-    applySharedWorldSnapshot(row.state);
+    applySharedWorldSnapshot(row.state, row.updated_at);
   }).catch(function (error) {
     addNetworkDebugLog(
       "world poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
