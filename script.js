@@ -1134,6 +1134,7 @@ function pickUpNearestItem() {
     lastBucketPickupAt = Date.now();
     window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
     markWorldDirty();
+    broadcastBucketState(true);
     syncWorldState(true);
   }
 }
@@ -1163,9 +1164,11 @@ function canPickUpSharedBucket() {
     // Recover from stale holder ownership that blocks pickup forever.
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     markWorldDirty();
+    addBucketTrace("pickup", "recovered stale holder=" + heldBy, 0);
     return true;
   }
 
+  addBucketTrace("pickup", "blocked by active holder=" + heldBy, 500);
   return false;
 }
 
@@ -2252,6 +2255,9 @@ function updateBucketPosition() {
   } else {
     bucket.style.display = "block";
     playerBucketOverlay.style.display = "none";
+    // While idle on ground, periodically publish authoritative world bucket state.
+    // This helps recover peers that missed a pickup/drop edge event.
+    broadcastBucketState(false);
   }
 
   if (bucket.style.display === "block" && (!Number.isFinite(bucketX) || !Number.isFinite(bucketY))) {
@@ -3871,9 +3877,19 @@ function sendMultiplayerPresence(forceSend) {
 }
 
 function broadcastBucketState(forceSend) {
-  if (!multiplayerChannel || !currentSessionId) return;
+  if (!multiplayerChannel || !currentSessionId) {
+    addBucketTrace(
+      "send-skip",
+      "no-channel=" + !multiplayerChannel + " no-session=" + !currentSessionId,
+      1000
+    );
+    return;
+  }
   const now = Date.now();
-  if (!forceSend && now - lastBucketBroadcastAt < 60) return;
+  if (!forceSend && now - lastBucketBroadcastAt < 60) {
+    addBucketTrace("send-skip", "throttled " + (now - lastBucketBroadcastAt) + "ms", 1000);
+    return;
+  }
 
   const payload = {
     id: currentSessionId,
