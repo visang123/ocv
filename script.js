@@ -1117,6 +1117,7 @@ function pickUpNearestItem() {
 
   if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
     heldItem = HELD_ITEM_BUCKET;
+    window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
     markWorldDirty();
   }
 }
@@ -1542,9 +1543,12 @@ function applySharedWorldSnapshot(snapshot) {
   try {
     if (snapshot.bucket) {
       const heldBy = String(snapshot.bucket.heldBy || "");
+      if (heldItem === HELD_ITEM_BUCKET) {
+        // While local player is carrying the bucket, keep local ownership/state authoritative.
+        window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
+      } else {
       window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
       if (heldBy && heldBy !== currentSessionId) {
-        if (heldItem === HELD_ITEM_BUCKET) heldItem = null;
         isBucketFull = Boolean(snapshot.bucket.isFull);
         bucketX = Number(snapshot.bucket.x) || bucketX;
         bucketY = Number(snapshot.bucket.y) || bucketY;
@@ -1552,6 +1556,7 @@ function applySharedWorldSnapshot(snapshot) {
         isBucketFull = Boolean(snapshot.bucket.isFull);
         bucketX = Number(snapshot.bucket.x) || bucketX;
         bucketY = Number(snapshot.bucket.y) || bucketY;
+      }
       }
     }
 
@@ -1833,6 +1838,7 @@ function dropBucket() {
   bucketX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
   bucketY = playerBox.bottom - bucketSize.height;
   heldItem = null;
+  window.OVC_SHARED_BUCKET_HELD_BY = "";
   saveBucketState();
 }
 
