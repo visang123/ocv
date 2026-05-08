@@ -266,6 +266,7 @@ let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
 let pendingWorldResetToken = "";
 let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
+let isReloadingForWorldReset = false;
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 const playerTintCache = new Map();
@@ -317,7 +318,7 @@ if (!currentSessionId) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("/ovc-login.html?v=20260508u");
+  window.location.replace("/ovc-login.html?v=20260508v");
   throw new Error("OVC login required");
 }
 
@@ -787,14 +788,11 @@ function resetGameForTesting() {
   lastAppliedWorldResetToken = pendingWorldResetToken;
   sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
   applyDefaultState();
-  isWorldDirty = true;
-  syncWorldState(true);
-  setTimeout(function () {
-    window.location.reload();
-  }, 250);
+  saveSharedWorldAndReload();
 }
 
 function saveGameSnapshot() {
+  if (isReloadingForWorldReset) return;
   savePlayerPosition(true);
   saveWellState();
   saveSeedState();
@@ -1547,7 +1545,7 @@ function syncWorldState(forceSave) {
   ) {
     return;
   }
-  if (!forceSave && !isWorldDirty && now - lastWorldSaveAt < 2500) return;
+  if (!forceSave && !isWorldDirty) return;
 
   isWorldSyncing = true;
   isWorldDirty = false;
@@ -1564,6 +1562,36 @@ function syncWorldState(forceSave) {
     isWorldDirty = true;
   }).finally(function () {
     isWorldSyncing = false;
+  });
+}
+
+function saveSharedWorldAndReload() {
+  if (!window.OVCOnline || typeof window.OVCOnline.saveWorldState !== "function") {
+    isWorldDirty = true;
+    syncWorldState(true);
+    setTimeout(function () {
+      isReloadingForWorldReset = true;
+      window.location.reload();
+    }, 400);
+    return;
+  }
+
+  isWorldSyncing = true;
+  isWorldDirty = false;
+  lastWorldSaveAt = Date.now();
+  window.OVCOnline.saveWorldState(
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
+    getSharedWorldSnapshot()
+  ).then(function (row) {
+    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+  }).catch(function (error) {
+    addNetworkDebugLog(
+      "world reset save error: " + (error && error.message ? error.message : "unknown")
+    );
+  }).finally(function () {
+    isWorldSyncing = false;
+    isReloadingForWorldReset = true;
+    window.location.reload();
   });
 }
 
@@ -3296,7 +3324,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("/ovc-login.html?v=20260508u");
+    window.location.replace("/ovc-login.html?v=20260508v");
     return;
   }
 
@@ -3980,7 +4008,7 @@ function logout() {
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
     sessionStorage.removeItem(currentSessionKey);
-    window.location.href = "/ovc-login.html?v=20260508u";
+    window.location.href = "/ovc-login.html?v=20260508v";
   };
 
   if (multiplayerChannel) {
