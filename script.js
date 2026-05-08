@@ -2229,14 +2229,22 @@ function updateBucketPosition() {
     if (
       holder &&
       Number.isFinite(holder.worldX) &&
-      Number.isFinite(holder.depth) &&
-      Number.isFinite(holder.jumpY)
+      Number.isFinite(holder.worldY)
     ) {
-      // Match local getHandPosition formula exactly, but using remote depth/jump.
-      const remoteTopY =
-        GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - holder.depth + holder.jumpY;
-      bucketX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
-      bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+      // Expected hand anchor from remote rendered player position.
+      const remoteTopY = holder.worldY + (GROUND_WORLD_HEIGHT - PLAYER_HEIGHT);
+      const expectedX = holder.worldX + PLAYER_WIDTH * 0.82 - bucketSize.width / 2;
+      const expectedY = remoteTopY + PLAYER_HEIGHT * 0.68 - bucketSize.height / 2;
+
+      const snapshotX = Number.isFinite(bucketX) ? bucketX : expectedX;
+      const snapshotY = Number.isFinite(bucketY) ? bucketY : expectedY;
+      const isSnapshotOutlier =
+        Math.abs(snapshotX - expectedX) > 48 ||
+        Math.abs(snapshotY - expectedY) > 48;
+
+      // If shared snapshot drifts too far, trust holder anchor to prevent floating bucket.
+      bucketX = isSnapshotOutlier ? expectedX : snapshotX;
+      bucketY = isSnapshotOutlier ? expectedY : snapshotY;
     } else if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
       bucketX = wellX - bucketSize.width - 8;
       bucketY = wellY + WELL_SIZE - bucketSize.height;
