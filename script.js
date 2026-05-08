@@ -256,6 +256,7 @@ let multiplayerReconnectTimeout = null;
 let multiplayerConnectAttempt = 0;
 let lastSyncedPlayerColor = "";
 let lastPresenceStateKey = "";
+let remoteBucketUpdatedAtById = {};
 let presenceRateLimitedUntil = 0;
 let lastPresenceTrackAt = 0;
 let lastBroadcastAt = 0;
@@ -3795,13 +3796,17 @@ function sendMultiplayerPresence(forceSend) {
     bucketHeld: heldItem === HELD_ITEM_BUCKET,
     bucketX: bucketX,
     bucketY: bucketY,
+    bucketUpdatedAt: heldItem === HELD_ITEM_BUCKET ? now : 0,
     updatedAt: now
   };
   const stateKey = [
     state.color,
     Math.round(state.x),
     Math.round(state.depth),
-    Math.round(state.jumpY)
+    Math.round(state.jumpY),
+    state.bucketHeld ? 1 : 0,
+    Math.round(state.bucketX || 0),
+    Math.round(state.bucketY || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
 
@@ -3947,19 +3952,42 @@ function renderRemotePlayersFromPresence(presenceState) {
 function handleRemotePlayerBroadcast(state) {
   if (!state || !state.id || state.id === currentSessionId) return;
   if (state.action === "leave") {
+    delete remoteBucketUpdatedAtById[state.id];
     removeRemotePlayer(state.id);
     return;
   }
 
   if (state.bucketHeld === true) {
-    window.OVC_SHARED_BUCKET_HELD_BY = state.id;
-    if (Number.isFinite(Number(state.bucketX))) {
-      bucketX = Number(state.bucketX);
-    }
-    if (Number.isFinite(Number(state.bucketY))) {
-      bucketY = Number(state.bucketY);
+    const nextUpdatedAt = Number(state.bucketUpdatedAt || state.updatedAt || 0);
+    const lastUpdatedAt = Number(remoteBucketUpdatedAtById[state.id] || 0);
+    if (nextUpdatedAt >= lastUpdatedAt) {
+      remoteBucketUpdatedAtById[state.id] = nextUpdatedAt;
+      window.OVC_SHARED_BUCKET_HELD_BY = state.id;
+
+      const parsedBucketX = Number(state.bucketX);
+      const parsedBucketY = Number(state.bucketY);
+      const isBucketXFinite = Number.isFinite(parsedBucketX);
+      const isBucketYFinite = Number.isFinite(parsedBucketY);
+      const isBucketYInReasonableRange =
+        isBucketYFinite &&
+        parsedBucketY >= -PLAYER_HEIGHT &&
+        parsedBucketY <= GROUND_WORLD_HEIGHT - BUCKET_SIZE;
+
+      if (isBucketXFinite && isBucketYInReasonableRange) {
+        bucketX = parsedBucketX;
+        bucketY = parsedBucketY;
+      } else {
+        const remoteDepth = Number(state.depth) || 0;
+        const remoteJumpY = Number(state.jumpY) || 0;
+        const remoteTopY =
+          GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - remoteDepth + remoteJumpY;
+        const remoteX = Number(state.x) || 0;
+        bucketX = remoteX + PLAYER_WIDTH * 0.82 - BUCKET_SIZE / 2;
+        bucketY = remoteTopY + PLAYER_HEIGHT * 0.68 - BUCKET_SIZE / 2;
+      }
     }
   } else if (state.bucketHeld === false && window.OVC_SHARED_BUCKET_HELD_BY === state.id) {
+    delete remoteBucketUpdatedAtById[state.id];
     window.OVC_SHARED_BUCKET_HELD_BY = "";
   }
 
