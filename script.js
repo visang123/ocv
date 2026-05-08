@@ -264,6 +264,7 @@ let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
+let localApplePickedAtById = {};
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
 let isPresenceDbSyncing = false;
@@ -950,6 +951,7 @@ function applyDefaultState() {
   clearExtraSeedAndPlantElements();
   appleState.extraSeeds = [];
   appleState.extraPlants = [];
+  localApplePickedAtById = {};
 
   wellState.water = maxWellWater;
   wellState.lastRefillAt = Date.now();
@@ -1210,6 +1212,7 @@ function pickApple() {
 
   appleState.pickedIds.push(apple.id);
   appleState.lastSpawnAt = Date.now();
+  localApplePickedAtById[apple.id] = appleState.lastSpawnAt;
   appleState.count += 1;
   saveAppleState();
   updateApples();
@@ -1347,6 +1350,12 @@ function isAppleInTrunkArea(localX, localY, size) {
 
 function respawnApplesIfNeeded() {
   const now = Date.now();
+  Object.keys(localApplePickedAtById).forEach(function (appleId) {
+    const pickedAt = Number(localApplePickedAtById[appleId] || 0);
+    if (!pickedAt || now - pickedAt > appleRespawnMs * 2) {
+      delete localApplePickedAtById[appleId];
+    }
+  });
   const availableIds = appleState.apples
     .filter(function (apple) {
       return appleState.pickedIds.includes(apple.id);
@@ -1709,6 +1718,17 @@ function applySharedWorldSnapshot(snapshot) {
             };
           })
         : [];
+      const now = Date.now();
+      Object.keys(localApplePickedAtById).forEach(function (appleId) {
+        const pickedAt = Number(localApplePickedAtById[appleId] || 0);
+        if (!pickedAt || now - pickedAt >= appleRespawnMs) return;
+        if (!appleState.pickedIds.includes(appleId)) {
+          appleState.pickedIds.push(appleId);
+        }
+        if (!appleState.lastSpawnAt || appleState.lastSpawnAt < pickedAt) {
+          appleState.lastSpawnAt = pickedAt;
+        }
+      });
       if (snapshotSavedAt) {
         lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
       }
