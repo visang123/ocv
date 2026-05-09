@@ -2131,11 +2131,11 @@ body #guide-book-button {
 
 #magic-powder-inventory {
   position: fixed;
-  left: 322px;
-  bottom: 20px;
+  left: 300px;
+  bottom: 18px;
   display: none;
-  width: 76px;
-  height: 62px;
+  width: 96px;
+  height: 80px;
   z-index: 11;
   pointer-events: none;
   margin: 0;
@@ -2161,8 +2161,8 @@ body #guide-book-button {
 #magic-powder-inventory.is-near:hover::before {
   content: "사용 click";
   position: absolute;
-  left: 38px;
-  bottom: 68px;
+  left: 48px;
+  bottom: 86px;
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
@@ -2177,27 +2177,29 @@ body #guide-book-button {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 58px;
-  height: 58px;
+  width: 76px;
+  height: 76px;
   background-color: transparent;
   background-image: url("이미지/magic-powder-gray.png");
   background-position: center;
   background-size: contain;
   background-repeat: no-repeat;
+  /* PNG에 검은 배경이 깔려 있을 때: screen 블렌드로 어두운 배경을 뒤 콘텐츠와 합성 */
+  mix-blend-mode: screen;
 }
 
 #magic-powder-count {
   position: absolute;
   right: 0;
   top: 0;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 5px;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   border: 2px solid #111;
   color: #111;
-  font: 900 16px/20px Arial, sans-serif;
+  font: 900 17px/22px Arial, sans-serif;
   text-align: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }

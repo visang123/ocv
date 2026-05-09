@@ -362,7 +362,7 @@ let multiplayerChannel = null;
 let lastPresenceSentAt = 0;
 let remotePlayers = {};
 let remotePlayerCount = 0;
-let multiplayerStatusText = "\uB300\uAE30";
+let multiplayerStatusText = "\uCD08\uAE30\uD654 \uC911";
 let isMultiplayerSubscribed = false;
 let multiplayerReconnectTimeout = null;
 let multiplayerConnectAttempt = 0;
@@ -918,6 +918,7 @@ const logoutConfirmOk = document.getElementById("logout-confirm-ok");
 const onlineDebugToast = document.getElementById("online-debug-toast");
 const networkDebugPanel = document.getElementById("network-debug-panel");
 const multiplayerStatus = document.getElementById("multiplayer-status");
+updateMultiplayerStatus("\uCD08\uAE30\uD654 \uC911");
 const adminOpenButton = document.getElementById("admin-open-button");
 const adminOverlay = document.getElementById("admin-overlay");
 const adminCloseButton = document.getElementById("admin-close-button");
@@ -5039,6 +5040,7 @@ function openCharacterSelectIfNeeded() {
   }
 
   isCharacterSelecting = true;
+  updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
   player.classList.add("is-hidden-before-spawn");
   buildCharacterColorGrid();
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
@@ -5622,7 +5624,8 @@ function updateMultiplayerStatus(statusText) {
   const statusLabel =
     multiplayerStatusText === "연결됨" ||
     multiplayerStatusText === "연결중" ||
-    multiplayerStatusText === "캐릭터 선택 전"
+    multiplayerStatusText === "캐릭터 선택 전" ||
+    multiplayerStatusText === "초기화 중"
       ? multiplayerStatusText
       : "연결 안됨";
   multiplayerStatus.textContent =
@@ -5682,7 +5685,8 @@ function syncPlayerColorToServer(forceSync) {
 }
 
 function getOnlinePlayerCount() {
-  return hasSpawnedCharacter ? remotePlayerCount + 1 : remotePlayerCount;
+  if (!currentUserId) return remotePlayerCount;
+  return remotePlayerCount + 1;
 }
 
 function openAdminPanel() {
