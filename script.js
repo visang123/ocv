@@ -544,14 +544,14 @@ const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 느낌 완화) */
-const TREE_DEPTH_CLAMP_MAX_STEP = 9;
+const TREE_DEPTH_CLAMP_MAX_STEP = 4;
 /**
- * 보이는 기둥·뿌리 = style.css #big-tree 안의 .big-tree-trunk / .big-tree-roots 픽셀과 동일.
- * (#big-tree 월드 크기 BIG_TREE_WIDTH×BIG_TREE_HEIGHT 와 1:1)
+ * 보이는 뿌리만 = style.css .big-tree-roots (left 39, w 68, h 16, bottom -2).
+ * 전체 기둥 박스로 겹치면 옆 지나갈 때 몸통만 겹쳐도 나무 모드로 들어가 순간이동처럼 보임 → 발·뿌리만 검사.
  */
-const TREE_CSS_TRUNK_HEIGHT = 118;
 const TREE_CSS_ROOTS_LEFT = 39;
 const TREE_CSS_ROOTS_WIDTH = 68;
+const TREE_CSS_ROOTS_HEIGHT = 16;
 const TREE_CSS_ROOTS_BOTTOM_EXTEND = 2;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
@@ -1663,7 +1663,10 @@ function repairOnboardingCompletionFromStoredStep() {
     return;
   }
   var stepNum = parseInt(stepStr, 10);
-  if (stepNum === ONBOARDING_MAX_STEP) {
+  if (
+    Number.isFinite(stepNum) &&
+    stepNum >= ONBOARDING_MAX_STEP - 1
+  ) {
     setStoredFlag(onboardingFlowDoneKey, true);
     setStoredValue(onboardingFlowStepKey, "0");
   }
@@ -1675,16 +1678,21 @@ function repairOnboardingCompletionFromStoredStep() {
  */
 function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!currentUserId) return;
-  if (!getStoredFlag(everBeenToWorldKey)) return;
+  if (getStoredFlag(onboardingFlowDoneKey)) {
+    try {
+      sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+    } catch (eClrReplay) {}
+    setStoredFlag(everBeenToWorldKey, true);
+    return;
+  }
   var replay = "";
   try {
     replay = sessionStorage.getItem(ovcTutorialReplaySessionKey) || "";
   } catch (e) {}
   if (replay === "1") return;
-  if (!getStoredFlag(onboardingFlowDoneKey)) {
-    setStoredFlag(onboardingFlowDoneKey, true);
-    setStoredValue(onboardingFlowStepKey, "0");
-  }
+  if (!getStoredFlag(everBeenToWorldKey)) return;
+  setStoredFlag(onboardingFlowDoneKey, true);
+  setStoredValue(onboardingFlowStepKey, "0");
 }
 
 function resetTutorialProgressInStorage() {
@@ -4438,17 +4446,28 @@ function getPlayerFootY() {
 }
 
 function isPlayerNearTreeTrunk() {
-  const box = getPlayerBox();
-  const left = BIG_TREE_X + TREE_CSS_ROOTS_LEFT;
-  const right = BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH;
-  const top = BIG_TREE_Y + (BIG_TREE_HEIGHT - TREE_CSS_TRUNK_HEIGHT);
-  const bottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
-  return (
-    box.left < right &&
-    box.right > left &&
-    box.top < bottom &&
-    box.bottom > top
-  );
+  if (isTreeFalling) return false;
+  const footY = getPlayerFootY();
+  const rootsTop =
+    BIG_TREE_Y +
+    BIG_TREE_HEIGHT +
+    TREE_CSS_ROOTS_BOTTOM_EXTEND -
+    TREE_CSS_ROOTS_HEIGHT;
+  const rootsBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  const feetInset = 5;
+  const feetRect = {
+    left: playerX + feetInset,
+    right: playerX + PLAYER_WIDTH - feetInset,
+    top: footY - 8,
+    bottom: footY + 2
+  };
+  const rootsRect = {
+    left: BIG_TREE_X + TREE_CSS_ROOTS_LEFT,
+    right: BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH,
+    top: rootsTop,
+    bottom: rootsBottom
+  };
+  return isOverlappingRect(feetRect, rootsRect);
 }
 
 function isPlayerInTreeSpace() {
@@ -6074,6 +6093,9 @@ function finishCharacterSelect() {
     (!getStoredFlag(everBeenToWorldKey) || replayActiveForSpawn)
   ) {
     isReloadingForWorldReset = true;
+    try {
+      sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+    } catch (eTutSpawn) {}
     window.location.replace(ovcTutorialPageUrl());
     return;
   }
@@ -7820,6 +7842,9 @@ try {
     (!getStoredFlag(everBeenToWorldKey) || ovcTutorialReplayActive)
   ) {
     ovcAbortedPageInit = true;
+    try {
+      sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+    } catch (eTutRedirect) {}
     window.location.replace(ovcTutorialPageUrl());
   }
   if (!ovcAbortedPageInit) {
@@ -7828,11 +7853,18 @@ try {
       !getStoredFlag(onboardingFlowDoneKey) &&
       isTutorialDocumentEntry()
     ) {
-      resetTutorialProgressInStorage();
-      clearStoredKeys(appStorageKeysSharedWorldReset);
+      var tutorialWorldResetPending = false;
       try {
-        sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
-      } catch (eTutorialPage) {}
+        tutorialWorldResetPending =
+          sessionStorage.getItem("ovcTutorialWorldResetPending") === "1";
+      } catch (ePendingTutorial) {}
+      if (tutorialWorldResetPending) {
+        resetTutorialProgressInStorage();
+        clearStoredKeys(appStorageKeysSharedWorldReset);
+        try {
+          sessionStorage.removeItem("ovcTutorialWorldResetPending");
+        } catch (eRmPending) {}
+      }
     }
     applyTutorialWorldResetIfPending();
     loadWellState();
