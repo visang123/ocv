@@ -114,6 +114,7 @@ import {
   movementTutorialCompleteKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
+  onboardingTutorialBindSessionKey,
   appStorageKeys
 } from "./src/game/constants.js";
 import {
@@ -244,7 +245,9 @@ let onboardingFinalHideTimerId = null;
 let onboardingButterflyCountBaseline = null;
 let onboardingTutorialEnteredTree = false;
 let onboardingSeedTutorialSecondLine = false;
-const ONBOARDING_MAX_STEP = 28;
+const ONBOARDING_MAX_STEP = 27;
+let onboardingStep26OpenedSettingsWithEsc = false;
+let tutorialWorldNeedsFullReset = false;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
@@ -501,6 +504,8 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
+const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 28;
+const PLAYER_SPEECH_BUBBLE_EXTRA_LIFT = 26;
 
 function showAppLoadingScreen(message) {
   if (!appLoadingScreen) return;
@@ -770,6 +775,25 @@ document.addEventListener("keydown", function (event) {
     if (isGuideBookOpen || guideCard.style.display === "block") {
       event.preventDefault();
       closeGuideCardFromClick();
+      return;
+    }
+    if (controlsOverlay.classList.contains("is-open")) {
+      event.preventDefault();
+      controlsOverlay.classList.remove("is-open");
+      controlsOverlay.setAttribute("aria-hidden", "true");
+      return;
+    }
+    if (settingsOverlay.classList.contains("is-open")) {
+      event.preventDefault();
+      closeSettingsOverlayFromEscape();
+      return;
+    }
+    if (hasSpawnedCharacter && !isCharacterSelecting) {
+      event.preventDefault();
+      if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 26) {
+        onboardingStep26OpenedSettingsWithEsc = true;
+      }
+      openSettingsOverlay();
     }
     return;
   }
@@ -943,6 +967,8 @@ const settingsOverlay = document.getElementById("settings-overlay");
 const settingsModal = document.getElementById("settings-modal");
 const changeColorButton = document.getElementById("change-color-button");
 const logoutButton = document.getElementById("logout-button");
+const tutorialExitButton = document.getElementById("tutorial-exit-button");
+const tutorialReplayButton = document.getElementById("tutorial-replay-button");
 const logoutConfirmOverlay = document.getElementById("logout-confirm-overlay");
 const logoutConfirmCancel = document.getElementById("logout-confirm-cancel");
 const logoutConfirmOk = document.getElementById("logout-confirm-ok");
@@ -1005,22 +1031,131 @@ controlsOverlay.innerHTML =
   '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
   '<div><span>Q</span><p>사용 / 대화</p></div>' +
   '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 
-settingsButton.addEventListener("click", function () {
+function updateSettingsTutorialButtons() {
+  if (!tutorialExitButton || !tutorialReplayButton) return;
+  const done = getStoredFlag(onboardingFlowDoneKey);
+  const inTutorial = Boolean(currentUserId && hasSpawnedCharacter && !done && onboardingFlowStep > 0);
+  tutorialExitButton.style.display = inTutorial ? "block" : "none";
+  tutorialReplayButton.style.display =
+    currentUserId && hasSpawnedCharacter && done ? "block" : "none";
+}
+
+function openSettingsOverlay() {
+  if (!settingsOverlay) return;
   settingsOverlay.classList.add("is-open");
   settingsOverlay.setAttribute("aria-hidden", "false");
+  updateSettingsTutorialButtons();
+}
+
+function closeSettingsOverlayFromBackdrop() {
+  onboardingStep26OpenedSettingsWithEsc = false;
+  if (!settingsOverlay) return;
+  settingsOverlay.classList.remove("is-open");
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  updateSettingsTutorialButtons();
+}
+
+function closeSettingsOverlayFromEscape() {
+  const hadEscOpenCycle = onboardingStep26OpenedSettingsWithEsc;
+  if (!settingsOverlay) return;
+  settingsOverlay.classList.remove("is-open");
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  updateSettingsTutorialButtons();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 26 && hadEscOpenCycle) {
+    onboardingFlowStep = 27;
+    onboardingStep26OpenedSettingsWithEsc = false;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+    onboardingScheduleTutorialCompleteHide();
+  } else {
+    onboardingStep26OpenedSettingsWithEsc = false;
+  }
+}
+
+function skipTutorialFromSettings() {
+  if (!window.confirm("\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uAC74\uB108\uB6B0\uACE0 \uC790\uC720\uB86D\uAC8C \uD50C\uB808\uC774\uD560\uAE4C\uC694?")) {
+    return;
+  }
+  onboardingClearAllOnboardingTimers();
+  onboardingStep26OpenedSettingsWithEsc = false;
+  setStoredFlag(onboardingFlowDoneKey, true);
+  onboardingFlowStep = 0;
+  setStoredValue(onboardingFlowStepKey, "0");
+  persistOnboardingStep();
+  completeMovementTutorial();
+  setStoredFlag(hasGuideBookKey, true);
+  setGuideBookPickedForCurrentRoom();
+  setStoredFlag(npcDialogueCompleteKey, true);
+  setStoredFlag(guidePlantPageUnlockedKey, true);
+  setStoredFlag(guideBookClickPromptDismissedKey, true);
+  hasGuideBook = true;
+  isNpcDialogueComplete = true;
+  isGuidePlantPageUnlocked = true;
+  isGuideBookOpen = false;
+  isGuideBookClickPromptActive = false;
+  if (guideBook) guideBook.style.display = "none";
+  if (guideBookButton) guideBookButton.style.display = "block";
+  if (guideCard) guideCard.style.display = "none";
+  updateGuidePages();
+  updateGuideCard();
+  updateNpcPosition();
+  closeSettingsOverlayFromBackdrop();
+  setOnboardingCalloutVisible(false, "");
+  clearOnboardingHighlights();
+  updateOnboardingFlowUI();
+  try {
+    sessionStorage.removeItem("ovcTutorialWorldResetPending");
+  } catch (e) {}
+  isReloadingForWorldReset = true;
+  window.location.reload();
+}
+
+function replayTutorialFromSettings() {
+  if (
+    !window.confirm(
+      "\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uCC98\uC74C\uBD80\uD130 \uB2E4\uC2DC \uC9C4\uD589\uD560\uAE4C\uC694? \uD398\uC774\uC9C0\uAC00 \uC0C8\uB85C\uACE0\uCE68\uB429\uB2C8\uB2E4."
+    )
+  ) {
+    return;
+  }
+  let sid = "";
+  try {
+    sid = sessionStorage.getItem("ovcGameSessionId") || "";
+  } catch (e) {}
+  if (!sid) {
+    sid =
+      "tab-" +
+      Date.now().toString(36) +
+      "-" +
+      Math.random().toString(16).slice(2);
+    try {
+      sessionStorage.setItem("ovcGameSessionId", sid);
+    } catch (e2) {}
+  }
+  resetTutorialProgressInStorage();
+  setStoredValue(onboardingTutorialBindSessionKey, sid);
+  try {
+    sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+  } catch (e3) {}
+  window.location.reload();
+}
+
+settingsButton.addEventListener("click", function () {
+  openSettingsOverlay();
 });
 
 settingsOverlay.addEventListener("click", function (event) {
   if (event.target === settingsOverlay) {
-    settingsOverlay.classList.remove("is-open");
-    settingsOverlay.setAttribute("aria-hidden", "true");
+    closeSettingsOverlayFromBackdrop();
   }
 });
 
 controlsButton.addEventListener("click", function () {
+  onboardingStep26OpenedSettingsWithEsc = false;
   settingsOverlay.classList.remove("is-open");
   settingsOverlay.setAttribute("aria-hidden", "true");
   controlsOverlay.classList.add("is-open");
@@ -1046,6 +1181,17 @@ logoutConfirmOk.addEventListener("click", function () {
   closeLogoutConfirm();
   logout();
 });
+
+if (tutorialExitButton) {
+  tutorialExitButton.addEventListener("click", function () {
+    skipTutorialFromSettings();
+  });
+}
+if (tutorialReplayButton) {
+  tutorialReplayButton.addEventListener("click", function () {
+    replayTutorialFromSettings();
+  });
+}
 
 logoutConfirmOverlay.addEventListener("click", function (event) {
   if (event.target === logoutConfirmOverlay) {
@@ -1369,6 +1515,104 @@ function persistOnboardingStep() {
   setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
 }
 
+function resetTutorialProgressInStorage() {
+  setStoredFlag(onboardingFlowDoneKey, false);
+  setStoredValue(onboardingFlowStepKey, "1");
+  removeStoredValue(movementTutorialCompleteKey);
+  setStoredFlag(hasGuideBookKey, false);
+  removeStoredValue(storageKeyGuideBookPickedForRoom());
+  setStoredFlag(npcDialogueCompleteKey, false);
+  setStoredFlag(guidePlantPageUnlockedKey, false);
+  setStoredFlag(guideBookClickPromptDismissedKey, false);
+  try {
+    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  } catch (e) {}
+  tutorialWorldNeedsFullReset = true;
+}
+
+function isSharedWorldSyncPausedForTutorial() {
+  return !getStoredFlag(onboardingFlowDoneKey);
+}
+
+function teardownMultiplayerForTutorial() {
+  clearMultiplayerReconnectTimeout();
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    removeRemotePlayer(remoteId);
+  });
+  updateRemotePlayerCount();
+  if (!multiplayerChannel) {
+    return;
+  }
+  isMultiplayerSubscribed = false;
+  const channel = multiplayerChannel;
+  multiplayerChannel = null;
+  channel.untrack().finally(function () {
+    channel.unsubscribe();
+    const client =
+      window.OVCOnline && typeof window.OVCOnline.getClient === "function"
+        ? window.OVCOnline.getClient()
+        : null;
+    if (client && typeof client.removeChannel === "function") {
+      Promise.resolve(client.removeChannel(channel)).catch(function () {});
+    }
+  });
+}
+
+function applyTutorialWorldResetIfPending() {
+  let pendingWorld = tutorialWorldNeedsFullReset;
+  try {
+    if (sessionStorage.getItem("ovcTutorialWorldResetPending") === "1") {
+      pendingWorld = true;
+    }
+  } catch (e) {}
+  if (getStoredFlag(onboardingFlowDoneKey) || !pendingWorld) {
+    return false;
+  }
+  tutorialWorldNeedsFullReset = false;
+  try {
+    sessionStorage.removeItem("ovcTutorialWorldResetPending");
+  } catch (e2) {}
+  applyDefaultState();
+  loadGuideBookState();
+  loadOnboardingFlowState();
+  setWorldPosition(player, playerX, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
+  updateCamera();
+  savePlayerPosition(true);
+  saveWellState();
+  saveSeedState();
+  saveAppleState();
+  saveBucketState();
+  hasHydratedSharedWorldFromServer = true;
+  return true;
+}
+
+function maybeResetTutorialForNewLoginSession() {
+  if (!currentUserId) return;
+  let sid = "";
+  try {
+    sid = sessionStorage.getItem("ovcGameSessionId") || "";
+  } catch (e) {}
+  if (!sid) {
+    sid =
+      "tab-" +
+      Date.now().toString(36) +
+      "-" +
+      Math.random().toString(16).slice(2);
+    try {
+      sessionStorage.setItem("ovcGameSessionId", sid);
+    } catch (e2) {}
+  }
+  if (getStoredFlag(onboardingFlowDoneKey)) {
+    setStoredValue(onboardingTutorialBindSessionKey, sid);
+    return;
+  }
+  const bound = getStoredValue(onboardingTutorialBindSessionKey) || "";
+  if (bound === sid) return;
+  resetTutorialProgressInStorage();
+  setStoredValue(onboardingTutorialBindSessionKey, sid);
+}
+
 function onboardingClearEscHintTimer() {
   if (onboardingEscHintTimerId) {
     window.clearTimeout(onboardingEscHintTimerId);
@@ -1413,6 +1657,12 @@ function onboardingScheduleTutorialCompleteHide() {
     setStoredFlag(onboardingFlowDoneKey, true);
     onboardingFlowStep = 0;
     setStoredValue(onboardingFlowStepKey, "0");
+    tutorialWorldNeedsFullReset = false;
+    try {
+      sessionStorage.removeItem("ovcTutorialWorldResetPending");
+    } catch (e) {}
+    isReloadingForWorldReset = true;
+    window.location.reload();
   }, 7000);
 }
 
@@ -1455,15 +1705,31 @@ function syncOnboardingFlowProgressFromWorld() {
     onboardingFlowStep = 2;
     changed = true;
   }
-  if (hasPickedMainSeedInCurrentRoom() && onboardingFlowStep < 7) {
+  // Only catch up seed/plant/NPC steps if the player is already in that branch of the
+  // tutorial. Otherwise a shared-world snapshot (another player's planted main spot)
+  // would jump fresh onboarding straight to "find the plant master" or later.
+  if (
+    hasPickedMainSeedInCurrentRoom() &&
+    onboardingFlowStep < 7 &&
+    onboardingFlowStep >= 5
+  ) {
     onboardingFlowStep = 7;
     changed = true;
   }
-  if (plantRuntime.isSeedPlanted && onboardingFlowStep < 8) {
+  if (
+    plantRuntime.isSeedPlanted &&
+    onboardingFlowStep < 8 &&
+    onboardingFlowStep >= 7
+  ) {
     onboardingFlowStep = 8;
     changed = true;
   }
-  if (isNpcDialogueComplete && plantRuntime.isSeedPlanted && onboardingFlowStep < 10) {
+  if (
+    isNpcDialogueComplete &&
+    plantRuntime.isSeedPlanted &&
+    onboardingFlowStep < 10 &&
+    onboardingFlowStep >= 8
+  ) {
     onboardingFlowStep = 10;
     changed = true;
   }
@@ -1558,21 +1824,26 @@ function onboardingAutoAdvanceSteps() {
     !isPlayerInTreeSpace()
   ) {
     onboardingFlowStep = 26;
+    onboardingStep26OpenedSettingsWithEsc = false;
     persistOnboardingStep();
-    onboardingScheduleTutorialCompleteHide();
   }
 }
 
 function updateOnboardingFlowUI() {
-  if (!onboardingCallout || !onboardingCalloutText) return;
+  if (!onboardingCallout || !onboardingCalloutText) {
+    updateSettingsTutorialButtons();
+    return;
+  }
   if (!hasSpawnedCharacter || isCharacterSelecting || isTabSessionSuperseded) {
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
+    updateSettingsTutorialButtons();
     return;
   }
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep <= 0) {
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
+    updateSettingsTutorialButtons();
     return;
   }
 
@@ -1765,12 +2036,20 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 26: {
+      setOnboardingCalloutVisible(
+        true,
+        "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
+      );
+      break;
+    }
+    case 27: {
       setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
     default:
       setOnboardingCalloutVisible(false, "");
   }
+  updateSettingsTutorialButtons();
 }
 
 function onboardingCheckJumpFinish() {
@@ -1836,6 +2115,9 @@ function pickUpGuideBook() {
 }
 
 function loadGuideBookState() {
+  if (currentUserId) {
+    maybeResetTutorialForNewLoginSession();
+  }
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
   if (hasGuideBook) {
     setStoredFlag(movementTutorialCompleteKey, true);
@@ -1927,6 +2209,8 @@ function applyDefaultState() {
   velocityY = 0;
   isOnGround = true;
   wasPlayerInTree = false;
+  npcX = NPC_START_X;
+  npcY = NPC_START_Y;
 
   seedX = SEED_START_X;
   seedY = SEED_START_Y;
@@ -2688,6 +2972,7 @@ function refreshUiAfterSharedWorldApply() {
 }
 
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
   const snapshotSavedAt = resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt);
@@ -2943,6 +3228,7 @@ function isSharedWorldMergeActive() {
 function syncWorldState(forceSave) {
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (
     isWorldSyncing ||
     !window.OVCOnline ||
@@ -3016,6 +3302,7 @@ function pollWorldState(forcePoll) {
     isWorldPolling ||
     isReloadingForWorldReset ||
     isTabSessionSuperseded ||
+    isSharedWorldSyncPausedForTutorial() ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
     (!forcePoll && now - lastWorldPollAt < MULTIPLAYER_WORLD_POLL_MIN_MS)
@@ -4151,8 +4438,44 @@ function createExtraPlant(id, x, y) {
   };
 }
 
+function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
+  const pw = PLANT_SPOT_WIDTH;
+  const ph = PLANT_SPOT_HEIGHT;
+  const left = plantX;
+  const right = plantX + pw;
+  const top = plantY;
+  const bottom = plantY + ph;
+
+  function overlap(ax1, ay1, ax2, ay2) {
+    return left < ax2 && right > ax1 && top < ay2 && bottom > ay1;
+  }
+
+  if (
+    overlap(
+      TREE_CANOPY_LEFT,
+      TREE_CANOPY_TOP,
+      TREE_CANOPY_RIGHT,
+      TREE_CANOPY_BOTTOM
+    )
+  ) {
+    return true;
+  }
+
+  const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE;
+  const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE;
+  const trunkTop = TREE_TRUNK_TOP - 24;
+  const trunkBottom = GROUND_WORLD_HEIGHT;
+  if (overlap(trunkLeft, trunkTop, trunkRight, trunkBottom)) {
+    return true;
+  }
+  return false;
+}
+
 function canPlantAt(x, y) {
   pollWorldState(true);
+  if (isPlantSpotOverlappingTreeNoPlantZone(x, y)) {
+    return false;
+  }
   const plantCenters = [];
 
   if (plantRuntime.isSeedPlanted) {
@@ -4826,7 +5149,7 @@ function updateNpcPosition() {
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3
+      npcY - bubbleHeight - 3 - NPC_SPEECH_BUBBLE_EXTRA_LIFT
     );
   }
 
@@ -4846,7 +5169,7 @@ function updatePlayerBubblePosition() {
   setWorldPosition(
     playerBubble,
     playerWorldLeft + PLAYER_WIDTH / 2 - 13,
-    playerWorldTop - 22
+    playerWorldTop - 22 - PLAYER_SPEECH_BUBBLE_EXTRA_LIFT
   );
 }
 
@@ -4866,7 +5189,7 @@ function updateNpcPrompt() {
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3
+      npcY - bubbleHeight - 3 - NPC_SPEECH_BUBBLE_EXTRA_LIFT
     );
 
     window.clearTimeout(npcPromptHideTimeout);
@@ -5417,12 +5740,14 @@ function openCharacterSelectIfNeeded() {
   if (hasSpawnedCharacter) {
     player.classList.remove("is-hidden-before-spawn");
     if (playerBaseImageReady) {
+      applyTutorialWorldResetIfPending();
       applyPlayerColor(selectedPlayerColor);
       syncPlayerColorToServer(true);
       setupMultiplayer();
     } else {
       playerBaseImage.addEventListener("load", function onceLoaded() {
         playerBaseImage.removeEventListener("load", onceLoaded);
+        applyTutorialWorldResetIfPending();
         applyPlayerColor(selectedPlayerColor);
         syncPlayerColorToServer(true);
         setupMultiplayer();
@@ -5440,6 +5765,7 @@ function openCharacterSelectIfNeeded() {
 }
 
 function openCharacterColorChange() {
+  onboardingStep26OpenedSettingsWithEsc = false;
   settingsOverlay.classList.remove("is-open");
   settingsOverlay.setAttribute("aria-hidden", "true");
   isCharacterSelecting = true;
@@ -5462,7 +5788,23 @@ function finishCharacterSelect() {
 
   syncPlayerColorToServer(true);
 
-  loadOnboardingFlowState();
+  if (!applyTutorialWorldResetIfPending()) {
+    loadOnboardingFlowState();
+    setWorldPosition(player, playerX, getPlayerWorldY());
+    updatePlayerColorBodyPosition();
+    updateCamera();
+    savePlayerPosition(true);
+    saveWellState();
+    saveSeedState();
+    saveAppleState();
+    saveBucketState();
+  }
+
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    hasHydratedSharedWorldFromServer = true;
+  }
+
+  updateOnboardingFlowUI();
   setupMultiplayer();
 }
 
@@ -5487,6 +5829,15 @@ function setupMultiplayer() {
   if (!hasSpawnedCharacter) {
     updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
     addNetworkDebugLog("multiplayer skipped: character not spawned");
+    return;
+  }
+
+  if (isSharedWorldSyncPausedForTutorial()) {
+    teardownMultiplayerForTutorial();
+    updateMultiplayerStatus(
+      "\uD29C\uD1A0\uB9AC\uC5BC \uC911 \u2014 \uB2E8\uB3C5 \uC138\uC0C1, \uBA40\uD2F0 \uC5F0\uACB0 \uC548 \uB428"
+    );
+    addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
   }
 
@@ -5612,6 +5963,7 @@ function setupMultiplayer() {
 
 function sendMultiplayerPresence(forceSend) {
   if (!hasSpawnedCharacter || isTabSessionSuperseded) return;
+  if (isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();
   const isWateringNow = now - lastWaterSplashAt < 600;
@@ -5719,6 +6071,7 @@ function broadcastBucketState(forceSend) {
 }
 
 function handleRemoteBucketBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.id || payload.id === currentSessionId) return;
   const remoteId = String(payload.id);
   const nextUpdatedAt = Number(payload.updatedAt || 0);
@@ -5760,6 +6113,7 @@ function syncPresenceToDatabase(state) {
   if (
     isPresenceDbSyncing ||
     isTabSessionSuperseded ||
+    isSharedWorldSyncPausedForTutorial() ||
     !window.OVCOnline ||
     typeof window.OVCOnline.savePresence !== "function"
   ) {
@@ -5781,6 +6135,7 @@ function pollPresenceDatabase() {
   if (
     isPresenceDbPolling ||
     isTabSessionSuperseded ||
+    isSharedWorldSyncPausedForTutorial() ||
     !window.OVCOnline ||
     typeof window.OVCOnline.listPresence !== "function"
   ) {
@@ -5870,6 +6225,7 @@ function renderRemotePlayersFromPresence(presenceState) {
 }
 
 function handleRemotePlayerBroadcast(state) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (!state || !state.id || state.id === currentSessionId) return;
   if (state.action === "leave") {
     delete remoteBucketUpdateAtById[state.id];
@@ -6017,7 +6373,9 @@ function updateMultiplayerStatus(statusText) {
     multiplayerStatusText === "연결됨" ||
     multiplayerStatusText === "연결중" ||
     multiplayerStatusText === "캐릭터 선택 전" ||
-    multiplayerStatusText === "초기화 중"
+    multiplayerStatusText === "초기화 중" ||
+    (typeof multiplayerStatusText === "string" &&
+      multiplayerStatusText.indexOf("튜토리얼") !== -1)
       ? multiplayerStatusText
       : "연결 안됨";
   multiplayerStatus.textContent =
@@ -6032,6 +6390,7 @@ function clearMultiplayerReconnectTimeout() {
 }
 
 function scheduleMultiplayerReconnect(delayMs) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (multiplayerReconnectTimeout || !hasSpawnedCharacter || isLoggingOut || isTabSessionSuperseded) return;
   const waitMs = Math.max(500, Number(delayMs) || 1500);
   addNetworkDebugLog("schedule reconnect in " + waitMs + "ms");
@@ -6285,6 +6644,9 @@ function logout() {
   });
 
   const finishLogout = function () {
+    try {
+      sessionStorage.removeItem("ovcGameSessionId");
+    } catch (e) {}
     localStorage.removeItem(currentUserKey);
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
@@ -6720,6 +7082,7 @@ function broadcastButterflyCatch(butterflyId) {
 }
 
 function handleRemoteButterflyCatchBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.butterflyId) return;
   if (payload.from === currentSessionId) return;
   if (!stripButterflyFromSharedList(payload.butterflyId)) return;
@@ -7118,7 +7481,7 @@ try {
     selectedPlayerColor
   );
   openCharacterSelectIfNeeded();
-  if (!isWorldServerSyncAvailable()) {
+  if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
     hasHydratedSharedWorldFromServer = true;
     setTimeout(hideAppLoadingScreen, 300);
   }

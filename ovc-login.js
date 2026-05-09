@@ -110,6 +110,12 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
 }
 
 function goToGame() {
+  try {
+    sessionStorage.setItem(
+      "ovcGameSessionId",
+      Date.now().toString(36) + "-" + Math.random().toString(16).slice(2)
+    );
+  } catch (e) {}
   sessionStorage.removeItem(loginHandoffKey);
   const targetUrl = new URL("./index.html", window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);

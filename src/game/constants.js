@@ -17,7 +17,9 @@ export const BIG_TREE_HEIGHT = 190;
 export const NPC_WIDTH = 13;
 export const NPC_HEIGHT = 26;
 
-export const BIG_TREE_X = WORLD_WIDTH - BIG_TREE_WIDTH - 8;
+/** Right-anchored tree, shifted left by 1.5× tree width from the original spot. */
+export const BIG_TREE_X =
+  WORLD_WIDTH - BIG_TREE_WIDTH - 8 - Math.round(BIG_TREE_WIDTH * 1.5);
 export const BIG_TREE_Y = -BIG_TREE_HEIGHT + 10;
 export const TREE_TRUNK_X = BIG_TREE_X + 58;
 export const TREE_TRUNK_WIDTH = 30;
@@ -138,6 +140,7 @@ export const mainSeedCollectedKey = "mainSeedCollectedV1";
 export const movementTutorialCompleteKey = "movementTutorialCompleteV1";
 export const onboardingFlowStepKey = "onboardingFlowStepV2";
 export const onboardingFlowDoneKey = "onboardingFlowDoneV2";
+export const onboardingTutorialBindSessionKey = "onboardingTutorialBindSessionV1";
 
 export const appStorageKeys = [
   "wellWaterV1",
@@ -159,6 +162,7 @@ export const appStorageKeys = [
   movementTutorialCompleteKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
+  onboardingTutorialBindSessionKey,
   "butterflyCaughtCountsV1",
   "magicPowderCountV1"
 ];
