@@ -1468,6 +1468,10 @@ function startPlantMasterDialogue() {
     isNpcDialogueRunning = false;
     isNpcDialogueComplete = true;
     isGuidePlantPageUnlocked = true;
+    hasGuideBook = true;
+    setGuideBookPickedForCurrentRoom();
+    guideBook.style.display = "none";
+    guideBookButton.style.display = "block";
     setStoredFlag(npcDialogueCompleteKey, true);
     setStoredFlag(guidePlantPageUnlockedKey, true);
     isGuideBookClickPromptActive = true;
@@ -3068,7 +3072,6 @@ function updatePlayerPosition() {
 
   const shouldTreeFall =
     playerDepth > groundMaxDepth &&
-    wasPlayerInTree &&
     (isTreeFalling || !isPlayerSupportedByTree());
   const isFallingFromTree = shouldTreeFall;
 
@@ -3117,9 +3120,8 @@ function updatePlayerPosition() {
   if (playerDepth < getMinGroundedPlayerDepth()) {
     playerDepth = getMinGroundedPlayerDepth();
   }
-  if (!isInTree && !isFallingFromTree && playerDepth > groundMaxDepth) {
-    playerDepth = groundMaxDepth;
-  }
+  // Do not hard-snap to ground depth here; if the player is above ground and
+  // outside tree support we want a smooth fall, not an instant teleport.
 
   if (isInTree) {
     clampPlayerToTreeOutline();
