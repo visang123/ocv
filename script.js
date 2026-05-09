@@ -1584,6 +1584,9 @@ function recoverWorldMainSeedIfOnboardingStuck() {
   if (plantRuntime.isSeedPlanted || plantRuntime.isPlanting) return;
   if (!hasPickedMainSeedInCurrentRoom()) return;
   if (hasTutorialStarterSeedInPlay()) return;
+  // 마른 메인 씨앗 자동 제거(updateSeedPosition)가 picked만 켜고 스타터를 안 남김.
+  // 여기서 플래그를 지우면 씨앗이 되살아나 타이머가 영원히 끝나지 않음.
+  if (hasHandledDryMainSeed) return;
   try {
     sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
   } catch (eRm) {}
@@ -3482,6 +3485,18 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       if (canApplyMainSeedState && typeof snapshot.seed.isDryHandled === "boolean") {
         hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
         setStoredFlag(mainDrySeedHandledKey, hasHandledDryMainSeed);
+      }
+      if (canApplyMainSeedState && typeof snapshot.seed.isMainSeedAvailable === "boolean") {
+        if (snapshot.seed.isMainSeedAvailable) {
+          hasPickedMainSeedThisWindow = false;
+          isMainSeedAvailable = true;
+          try {
+            sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+          } catch (eRmPick) {}
+        } else {
+          setMainSeedPickedForCurrentRoom();
+          isMainSeedAvailable = false;
+        }
       }
       if (canApplyMainSeedState && snapshotSavedAt) {
         lastMainSeedStateChangeAt = Math.max(lastMainSeedStateChangeAt, snapshotSavedAt);
