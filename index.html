@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function () {
+      try {
+        if (!/[?&]ovc_world=1(?:&|$)/.test(location.search || "")) return;
+        sessionStorage.setItem("ovcForceWorldHubV1", "1");
+      } catch (e) {}
+    })();
+  </script>
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
   <link rel="stylesheet" href="style.css?v=20260517c">
 </head>

@@ -245,6 +245,28 @@ function ovcTutorialPageUrl() {
 
 /** 설정 「튜토리얼 하기」로 연 일회성 재생 세션(탭 단위). 없으면 월드 경험 계정은 튜토리얼에 갇히지 않게 복구한다. */
 const ovcTutorialReplaySessionKey = "ovcTutorialReplaySessionV1";
+/** 튜토리얼 갇힘 탈출: `?ovc_world=1` 또는 sessionStorage 플래그 → index(월드)로 두고 온보딩 완료 저장 */
+const ovcForceWorldHubSessionKey = "ovcForceWorldHubV1";
+const ovcForceWorldHubUrlParam = "ovc_world";
+
+function ovcUrlIndicatesForceWorldHub() {
+  try {
+    if (typeof window === "undefined" || !window.location) return false;
+    return (
+      new URLSearchParams(window.location.search || "").get(
+        ovcForceWorldHubUrlParam
+      ) === "1"
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+try {
+  if (ovcUrlIndicatesForceWorldHub()) {
+    sessionStorage.setItem(ovcForceWorldHubSessionKey, "1");
+  }
+} catch (eForceUrlHook) {}
 
 let playerX = 100;
 let playerDepth = 0;
@@ -325,6 +347,28 @@ const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
+function ovcApplyForceWorldHubBypassLoggedIn() {
+  if (!currentUserId) return false;
+  var force = false;
+  try {
+    force =
+      sessionStorage.getItem(ovcForceWorldHubSessionKey) === "1" ||
+      ovcUrlIndicatesForceWorldHub();
+  } catch (eRead) {
+    return false;
+  }
+  if (!force) return false;
+  try {
+    sessionStorage.removeItem(ovcForceWorldHubSessionKey);
+    sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+    sessionStorage.removeItem("ovcTutorialWorldResetPending");
+  } catch (eClr) {}
+  setStoredFlag(onboardingFlowDoneKey, true);
+  setStoredFlag(everBeenToWorldKey, true);
+  setStoredValue(onboardingFlowStepKey, "0");
+  setStoredFlag(movementTutorialCompleteKey, true);
+  return true;
+}
 function nameForIngameUiDisplay(realName) {
   return (realName || "").trim() || "OVC";
 }
@@ -354,6 +398,9 @@ if (currentUserId) {
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
   isMainSeedAvailable = !hasPickedMainSeedInCurrentRoom();
   lastMainSeedStateChangeAt = Date.now();
+  if (ovcApplyForceWorldHubBypassLoggedIn() && isTutorialDocumentEntry()) {
+    window.location.replace(ovcWorldIndexUrl());
+  }
 }
 let isCharacterSelecting = false;
 let hasSpawnedCharacter = Boolean(currentUserId && hasChosenPlayerColor);
