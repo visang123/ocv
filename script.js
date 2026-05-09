@@ -1559,16 +1559,38 @@ function clearTutorialMainSeedRespawnTimer() {
 }
 
 function scheduleTutorialMainSeedRespawnFromGround() {
-  if (!isTutorialDocumentEntry()) return;
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   clearTutorialMainSeedRespawnTimer();
   tutorialMainSeedRespawnTimerId = window.setTimeout(function () {
     tutorialMainSeedRespawnTimerId = null;
-    if (!isTutorialDocumentEntry()) return;
     if (getStoredFlag(onboardingFlowDoneKey)) return;
     if (plantRuntime.isSeedPlanted) return;
     tutorialRespawnMainSeedOnGround();
   }, TUTORIAL_MAIN_SEED_RESPAWN_MS);
+}
+
+function hasTutorialStarterSeedInPlay() {
+  if (heldItem === HELD_ITEM_SEED) return true;
+  return appleState.extraSeeds.some(function (s) {
+    if (s.planted) return false;
+    return s.id === "starter-seed" || s.isStarter;
+  });
+}
+
+/**
+ * 온보딩 중인데 '줍힘'만 남고 씨앗 추적이 없으면 땅 씨앗이 영원히 안 나옴 → 플래그 정리
+ */
+function recoverWorldMainSeedIfOnboardingStuck() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (plantRuntime.isSeedPlanted || plantRuntime.isPlanting) return;
+  if (!hasPickedMainSeedInCurrentRoom()) return;
+  if (hasTutorialStarterSeedInPlay()) return;
+  try {
+    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  } catch (eRm) {}
+  hasPickedMainSeedThisWindow = false;
+  isMainSeedAvailable = true;
+  lastMainSeedStateChangeAt = Date.now();
 }
 
 function tutorialRespawnMainSeedOnGround() {
@@ -2774,12 +2796,15 @@ function isPlantMasterVisible() {
   if (!isNpcDialogueComplete) {
     return true;
   }
-  /** 온보딩(튜토리얼) 끝 전에는 대화 반복을 위해 항상 표시 */
+  /** 온보딩 중에는 대화 반복을 위해 항상 표시 */
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     return true;
   }
+  /** 본편: 첫 대화 후에도 메인 작물 심기 전에는 찾을 수 있게 */
+  if (!plantRuntime.isSeedPlanted) {
+    return true;
+  }
   return (
-    plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.status !== "dry"
   );
@@ -3818,6 +3843,7 @@ function onboardingShouldKeepWorldMainSeedVisible() {
 
 function updateSeedPosition() {
   updateSeedDryState();
+  recoverWorldMainSeedIfOnboardingStuck();
   const now = Date.now();
   const shouldShowMainSeed =
     onboardingShouldKeepWorldMainSeedVisible() ||
