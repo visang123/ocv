@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
-  <link rel="stylesheet" href="style.css?v=20260514a">
+  <link rel="stylesheet" href="style.css?v=20260515a">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -215,7 +215,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="online-config.js?v=20260508ac"></script>
   <script src="ovc-online.js?v=20260508ac"></script>
-  <script type="module" src="src/main.js?v=20260514b"></script>
+  <script type="module" src="src/main.js?v=20260515a"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {
@@ -225,9 +225,17 @@
           if (el) el.hidden = true;
         } catch (e) {}
       }
-      window.setTimeout(ovcDismissLoadingFailsafe, 10000);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+          window.setTimeout(ovcDismissLoadingFailsafe, 2000);
+        });
+      } else {
+        window.setTimeout(ovcDismissLoadingFailsafe, 2000);
+      }
+      window.setTimeout(ovcDismissLoadingFailsafe, 5000);
+      window.setTimeout(ovcDismissLoadingFailsafe, 12000);
       window.addEventListener("load", function () {
-        window.setTimeout(ovcDismissLoadingFailsafe, 8000);
+        window.setTimeout(ovcDismissLoadingFailsafe, 2500);
       });
     })();
   </script>

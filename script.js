@@ -526,6 +526,8 @@ if (!currentUserName || !currentUserId) {
   throw new Error("OVC login required");
 }
 
+hideAppLoadingScreen();
+
 const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
 
 function getAccountSessionLeaderStorageKey() {
@@ -573,6 +575,14 @@ function onAccountSessionLeaderStorageEvent(event) {
   const myToken = sessionStorage.getItem(accountLeaderTokenSessionKey);
   if (!myToken || !parsed || !parsed.token) return;
   if (parsed.token === myToken) return;
+  const incomingSession = parsed.sessionId != null ? String(parsed.sessionId) : "";
+  if (
+    incomingSession &&
+    currentSessionId &&
+    incomingSession === String(currentSessionId)
+  ) {
+    return;
+  }
   applySupersededTabShutdown();
 }
 

@@ -40,10 +40,12 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-.is-game-ready .app-loading-screen {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+.is-game-ready .app-loading-screen,
+.is-game-ready #app-loading-screen {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .app-loading-inner {
