@@ -319,6 +319,7 @@ let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
+let lastWellStateChangeAt = 0;
 let localApplePickedAtById = {};
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
@@ -1934,9 +1935,18 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (snapshot.well) {
+    if (
+      snapshot.well &&
+      (
+        !snapshotSavedAt ||
+        snapshotSavedAt >= lastWellStateChangeAt
+      )
+    ) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
+      if (snapshotSavedAt) {
+        lastWellStateChangeAt = Math.max(lastWellStateChangeAt, snapshotSavedAt);
+      }
     }
 
     if (
@@ -3335,6 +3345,7 @@ function useBucket() {
         wellState.water += 1;
         wellState.lastRefillAt = Date.now();
         saveWellState();
+        syncWorldState(true);
         updateWellImage();
         updateWellCard();
         triggerWaterSplash();
@@ -3360,6 +3371,7 @@ function useBucket() {
     wellState.water -= 1;
     wellState.lastRefillAt = Date.now();
     saveWellState();
+    syncWorldState(true);
     updateWellImage();
     updateWellCard();
     return;
@@ -3970,6 +3982,7 @@ function loadWellState() {
 }
 
 function saveWellState() {
+  lastWellStateChangeAt = Date.now();
   saveWellStateToStorage({
     wellWaterKey,
     lastWellRefillKey,
