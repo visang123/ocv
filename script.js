@@ -72,6 +72,7 @@ import {
   wellRefillMs,
   seedDryMs,
   plantDryMs,
+  mainPlantDryAfterEmptyMs,
   plantWaterLevelTickMs,
   plantGrowthMs,
   overwaterWindowMs,
@@ -3096,17 +3097,28 @@ function dropBucket() {
   onboardingHookDroppedBucketForTutorial();
 }
 
+function onboardingShouldKeepWorldMainSeedVisible() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return false;
+  if (onboardingFlowStep < 1 || onboardingFlowStep > 6) return false;
+  if (hasPickedMainSeedInCurrentRoom()) return false;
+  if (plantRuntime.isPlanting) return false;
+  return true;
+}
+
 function updateSeedPosition() {
   updateSeedDryState();
   const now = Date.now();
   const shouldShowMainSeed =
-    !hasPickedMainSeedInCurrentRoom() &&
-    !plantRuntime.isPlanting &&
-    !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
+    onboardingShouldKeepWorldMainSeedVisible() ||
+    (!hasPickedMainSeedInCurrentRoom() &&
+      !plantRuntime.isPlanting &&
+      !(plantRuntime.isSeedDry && hasHandledDryMainSeed));
   // Auto-clear dry main seed after grace period even when the world sprite is hidden
   // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
   if (plantRuntime.isSeedDry && !hasHandledDryMainSeed && heldItem !== HELD_ITEM_SEED) {
-    if (!dryMainSeedVisibleSince) {
+    if (onboardingShouldKeepWorldMainSeedVisible()) {
+      dryMainSeedVisibleSince = 0;
+    } else if (!dryMainSeedVisibleSince) {
       dryMainSeedVisibleSince = now;
     } else if (now - dryMainSeedVisibleSince >= 20000) {
       hasHandledDryMainSeed = true;
@@ -4589,7 +4601,7 @@ function updatePlantState() {
     !plantRuntime.isSproutSelfSustaining &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
-    now - plantRuntime.becameEmptyAt >= plantDryMs
+    now - plantRuntime.becameEmptyAt >= mainPlantDryAfterEmptyMs
   ) {
     // Keep planted ground + dry soil; preserve sprout growth so stage 2 returns after watering.
     plantRuntime.status = "dry";
@@ -5173,6 +5185,12 @@ function loadSeedState() {
   applyLoadedPlantState(loaded.planted);
   npcX = loaded.planted.npcX;
   npcY = loaded.planted.npcY;
+  const legacyDefaultNpcX = SEED_START_X + 18;
+  if (npcX === legacyDefaultNpcX) {
+    npcX = NPC_START_X;
+    markWorldDirty();
+    saveSeedState();
+  }
 
   if (plantRuntime.isSeedPlanted) {
     heldItem = null;

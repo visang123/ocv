@@ -40,7 +40,8 @@ export const GUIDE_BOOK_START_X = 210;
 export const GUIDE_BOOK_START_Y = 300;
 export const GUIDE_BOOK_WIDTH = 10;
 export const GUIDE_BOOK_HEIGHT = 9;
-export const NPC_START_X = SEED_START_X + 18;
+/** ~6명(플레이어 폭 기준)만큼 오른쪽으로 배치 */
+export const NPC_START_X = SEED_START_X + 18 + 6 * PLAYER_WIDTH;
 export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 
 export const SECOND_MS = 1000;
@@ -106,6 +107,8 @@ export const plantWaterDistance = 40;
 export const maxWellWater = 3;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
+/** 월드 첫 식물(메인)만 물 0칸 후 이 시간이 지나면 흙이 마름. 나머지 식물은 plantDryMs 사용. */
+export const mainPlantDryAfterEmptyMs = 5 * MINUTE_MS;
 export const plantDryMs = 40 * SECOND_MS;
 export const plantWaterLevelTickMs = 20 * SECOND_MS;
 export const plantGrowthMs = 3 * SECOND_MS;
