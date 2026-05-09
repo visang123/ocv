@@ -5705,8 +5705,9 @@ function updateNpcPrompt() {
 
     npcBubble.dataset.speaker = "npc";
     npcBubble.dataset.promptShown = "true";
-    npcBubble.textContent =
-      "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
+    npcBubble.textContent = isNpcDialogueComplete
+      ? "\uB2E4\uC74C\uC5D0 \uB610 \uC624\uC2DC\uAC8C"
+      : "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     npcBubble.style.display = "block";
     layoutNpcSpeechBubble();
 
