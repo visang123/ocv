@@ -1367,7 +1367,15 @@ function isNearPlantSpotWithin(distance) {
 }
 
 function isPlantMasterVisible() {
-  return !isNpcDialogueComplete || isNpcDialogueRunning;
+  if (isNpcDialogueRunning) return true;
+  if (!isNpcDialogueComplete) {
+    return true;
+  }
+  return (
+    plantRuntime.isSproutGrown &&
+    plantRuntime.status !== "rotten" &&
+    plantRuntime.status !== "dry"
+  );
 }
 
 function isNearPlantMaster() {
@@ -2021,7 +2029,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (snapshot.mainPlant) {
+    if (snapshot.mainPlant && !plantRuntime.isPlanting) {
       applyLoadedPlantState(parseMainPlantFromSnapshot(snapshot.mainPlant));
       npcX = Number(snapshot.mainPlant.npcX) || npcX;
       npcY = Number(snapshot.mainPlant.npcY) || npcY;
@@ -3255,6 +3263,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.sproutEvolutionMs = 0;
       plantRuntime.sproutEvolutionLastTickAt = null;
       plantRuntime.isSproutSelfSustaining = false;
+      setNpcStartPosition();
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -3898,7 +3907,6 @@ function updateNpcPosition() {
     return;
   }
 
-  setNpcStartPosition();
   plantMaster.style.display = "block";
   setWorldPosition(plantMaster, npcX, npcY);
 
