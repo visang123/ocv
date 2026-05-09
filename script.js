@@ -2222,10 +2222,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (
-      snapshot.butterflies &&
-      (!snapshotSavedAt || snapshotSavedAt >= lastButterflyStateChangeAt)
-    ) {
+    // Always merge butterfly membership from other clients' saves. A timestamp
+    // guard would drop removals because the authority bumps lastButterflyStateChangeAt
+    // every movement broadcast while non-authority catches use an older savedAt.
+    if (snapshot.butterflies) {
       applyButterflySnapshot(snapshot.butterflies);
       if (snapshotSavedAt) {
         lastButterflyStateChangeAt = Math.max(
@@ -4678,6 +4678,10 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemoteBucketBroadcast(payload.payload);
     })
+    .on("broadcast", { event: "butterfly_catch" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteButterflyCatchBroadcast(payload.payload);
+    })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
       addNetworkDebugLog("system: " + JSON.stringify(payload || {}));
@@ -5446,10 +5450,11 @@ function getFitZoom() {
 // short cadence. Every other client just renders the broadcast positions and
 // animates wing frames locally.
 //
-// Catching is local-first: the player who pressed E/Q removes the butterfly
-// from local state immediately and pushes a snapshot save so other clients
-// pick up the deletion. Their inventory count is per-player and persisted to
-// localStorage.
+// Catching: the catcher removes the butterfly locally, saves world state, and
+// broadcasts `butterfly_catch` so every tab (including the authority) drops the
+// same id immediately. World snapshots from others always merge butterfly lists
+// so DB saves are not ignored when the authority's movement clock is ahead.
+// Inventory counts stay per-player (localStorage).
 //
 // Respawning is owned by the authority: while alive count is below the cap and
 // at least `butterflyRespawnMs` has passed since the last spawn, a new
@@ -5722,6 +5727,54 @@ function findCatchableButterfly() {
   return nearest;
 }
 
+function stripButterflyFromSharedList(butterflyId) {
+  const id = String(butterflyId || "");
+  if (!id) return false;
+  butterflyLocalCatchTombstoneById[id] = Date.now();
+  const had = butterflyState.list.some(function (b) {
+    return b.id === id;
+  });
+  butterflyState.list = butterflyState.list.filter(function (other) {
+    return other.id !== id;
+  });
+  removeButterflyRenderEntry(id);
+  return had;
+}
+
+function finalizeButterflyRemovalEffects(now) {
+  const t = now || Date.now();
+  if (!butterflyState.lastSpawnAt || t < butterflyState.lastSpawnAt) {
+    butterflyState.lastSpawnAt = t;
+  }
+  lastButterflyStateChangeAt = t;
+  markWorldDirty();
+  syncWorldState(true);
+}
+
+function broadcastButterflyCatch(butterflyId) {
+  if (!multiplayerChannel || !currentSessionId) return;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "butterfly_catch",
+      payload: {
+        butterflyId: String(butterflyId || ""),
+        from: currentSessionId,
+        at: Date.now()
+      }
+    })
+  ).catch(function () {
+    // World save still carries the removal if broadcast fails.
+  });
+}
+
+function handleRemoteButterflyCatchBroadcast(payload) {
+  if (!payload || !payload.butterflyId) return;
+  if (payload.from === currentSessionId) return;
+  if (!stripButterflyFromSharedList(payload.butterflyId)) return;
+  finalizeButterflyRemovalEffects();
+}
+
 function tryCatchButterfly() {
   const now = Date.now();
   if (now - lastLocalButterflyCatchAt < 200) return false;
@@ -5730,25 +5783,15 @@ function tryCatchButterfly() {
 
   lastLocalButterflyCatchAt = now;
   const caught = target.butterfly;
-  butterflyState.list = butterflyState.list.filter(function (other) {
-    return other.id !== caught.id;
-  });
-  butterflyLocalCatchTombstoneById[caught.id] = now;
-  removeButterflyRenderEntry(caught.id);
+  stripButterflyFromSharedList(caught.id);
   if (!butterflyState.caughtCounts[caught.color]) {
     butterflyState.caughtCounts[caught.color] = 0;
   }
   butterflyState.caughtCounts[caught.color] += 1;
   saveButterflyCaughtCounts();
 
-  // Reset spawn timer so the next refill respects the 2-minute cadence.
-  if (!butterflyState.lastSpawnAt || now < butterflyState.lastSpawnAt) {
-    butterflyState.lastSpawnAt = now;
-  }
-
-  lastButterflyStateChangeAt = now;
-  markWorldDirty();
-  syncWorldState(true);
+  broadcastButterflyCatch(caught.id);
+  finalizeButterflyRemovalEffects(now);
   updateButterflyInventoryUi();
   return true;
 }

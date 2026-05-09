@@ -64,8 +64,8 @@ export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
 
 // --- Butterflies ---
-/** Render size of a butterfly (world pixels). */
-export const BUTTERFLY_SIZE = 20;
+/** Render size of a butterfly (world pixels); width and height match. */
+export const BUTTERFLY_SIZE = 10;
 /** Maximum butterflies that can be alive on the shared map. */
 export const butterflyMaxAlive = 5;
 /** Available colors. Index doubles as the sprite-sheet row. */
