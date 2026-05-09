@@ -4286,6 +4286,7 @@ function tickPowderUpgrade(plant, now) {
   if (plant.growthTier >= 4) {
     plant.waterCapacity = 3;
     plant.waterLevel = Math.min(getPlantWaterCapacity(plant), Math.max(1, Number(plant.waterLevel) || 1));
+    plant.needsFirstWater = false;
     if (prevTier < 4 && (plant.grassOrdinal == null || plant.grassOrdinal <= 0)) {
       plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
     }
@@ -5563,10 +5564,11 @@ function triggerWaterSplash() {
 function getNearestWateringTarget() {
   let nearest = null;
   const mainPowderUpgrading = isPowderUpgradeInProgress(plantRuntime);
+  const mainTier = plantRuntime.growthTier || 0;
 
   if (
     plantRuntime.isSeedPlanted &&
-    (!plantRuntime.isSproutSelfSustaining || mainPowderUpgrading) &&
+    (!plantRuntime.isSproutSelfSustaining || mainPowderUpgrading || mainTier >= 3) &&
     plantRuntime.status !== "rotten" &&
     !plantRuntime.isOverwatered
   ) {
@@ -5587,7 +5589,8 @@ function getNearestWateringTarget() {
 
   appleState.extraPlants.forEach(function (plant) {
     const powderUpgrading = isPowderUpgradeInProgress(plant);
-    if (plant.isSproutSelfSustaining && !powderUpgrading) return;
+    const pTier = plant.growthTier || 0;
+    if (plant.isSproutSelfSustaining && !powderUpgrading && pTier < 3) return;
     if (plant.status === "rotten" || plant.isOverwatered) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
@@ -5831,6 +5834,25 @@ function updatePlantState() {
   }
 
   if (
+    plantRuntime.growthStartedAt != null &&
+    plantRuntime.status !== "dry" &&
+    plantRuntime.status !== "rotten" &&
+    !plantRuntime.isOverwatered &&
+    !plantRuntime.isSproutGrown &&
+    now - plantRuntime.growthStartedAt >= plantGrowthMs
+  ) {
+    plantRuntime.isSproutGrown = true;
+    plantRuntime.sproutGrownAt = now;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = now;
+    plantRuntime.isSproutSelfSustaining = false;
+    saveSeedState({
+      bumpMergeGuard: false,
+      skipWorldDirty: isSharedWorldMergeActive()
+    });
+  }
+
+  if (
     !plantRuntime.isSproutSelfSustaining &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
@@ -5881,9 +5903,7 @@ function updatePlantState() {
 }
 
 function shouldSuppressPlantWaterCardForSelfSustaining(plant) {
-  if (!plant || !plant.isSproutSelfSustaining) return false;
-  if (isPowderUpgradeInProgress(plant)) return false;
-  return (plant.growthTier || 0) < 4;
+  return false;
 }
 
 function removeMainPlant() {
