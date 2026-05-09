@@ -887,11 +887,6 @@ controlsButton.id = "controls-button";
 controlsButton.type = "button";
 controlsButton.textContent = "조작법";
 settingsModal.insertBefore(controlsButton, logoutButton);
-const resetGameButton = document.createElement("button");
-resetGameButton.id = "reset-game-button";
-resetGameButton.type = "button";
-resetGameButton.textContent = "초기화";
-settingsModal.insertBefore(resetGameButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
@@ -934,13 +929,6 @@ controlsOverlay.addEventListener("click", function (event) {
     controlsOverlay.classList.remove("is-open");
     controlsOverlay.setAttribute("aria-hidden", "true");
   }
-});
-
-resetGameButton.addEventListener("click", function () {
-  if (!window.confirm("게임을 초기화할까요?")) return;
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
-  resetGameForTesting();
 });
 
 logoutButton.addEventListener("click", function () {

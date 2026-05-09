@@ -1100,8 +1100,7 @@ body::-webkit-scrollbar {
 }
 
 #change-color-button,
-#controls-button,
-#reset-game-button {
+#controls-button {
   width: 180px;
   height: 48px;
   border: 0;
@@ -1114,8 +1113,7 @@ body::-webkit-scrollbar {
 }
 
 #change-color-button:hover,
-#controls-button:hover,
-#reset-game-button:hover {
+#controls-button:hover {
   background: #dbeafe;
 }
 
