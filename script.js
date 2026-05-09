@@ -4697,7 +4697,14 @@ function isPlayerNearTreeTrunk() {
     top: rootsTop,
     bottom: rootsBottom
   };
-  return isOverlappingRect(feetRect, rootsRect);
+  if (isOverlappingRect(feetRect, rootsRect)) return true;
+  const trunkRect = {
+    left: TREE_TRUNK_X,
+    right: TREE_TRUNK_X + TREE_TRUNK_WIDTH,
+    top: TREE_TRUNK_TOP,
+    bottom: rootsBottom
+  };
+  return isOverlappingRect(feetRect, trunkRect);
 }
 
 function isPlayerInTreeSpace() {
