@@ -505,6 +505,10 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
+/** 줄기 근처 X만 맞고 depth가 얕을 때 나무 모드로 들어가면 depth가 한 프레임에 맞춰져 순간이동처럼 보임 — 최소 접근 depth */
+const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 36;
+/** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
+const TREE_DEPTH_CLAMP_MAX_STEP = 26;
 const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 28;
 /** NPC 대화 진행 중 말풍선을 더 위로 (캐릭터 이름과 겹침 완화) */
 const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 22;
@@ -2137,8 +2141,8 @@ function pickUpGuideBook() {
   return true;
 }
 
-function loadGuideBookState() {
-  if (currentUserId) {
+function loadGuideBookState(skipMaybeResetTutorial) {
+  if (currentUserId && !skipMaybeResetTutorial) {
     maybeResetTutorialForNewLoginSession();
   }
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
@@ -2224,8 +2228,13 @@ function settlePlayerBeforeBackground() {
 }
 
 function applyDefaultState(options) {
-  const preserveTutorialProgress =
-    Boolean(options && options.preserveTutorialProgress);
+  const sharedWorldResetOnly =
+    Boolean(options && options.sharedWorldResetOnly);
+  if (sharedWorldResetOnly) {
+    try {
+      sessionStorage.removeItem("ovcTutorialWorldResetPending");
+    } catch (ePending) {}
+  }
   resetInputKeys(keys);
 
   playerX = spawnPlayerX;
@@ -2246,11 +2255,11 @@ function applyDefaultState(options) {
   lastMainSeedStateChangeAt = Date.now();
   hasPickedMainSeedThisWindow = false;
   sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-  if (!preserveTutorialProgress) {
+  if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
   }
   setStoredFlag(mainSeedCollectedKey, false);
-  if (!preserveTutorialProgress) {
+  if (!sharedWorldResetOnly) {
     setStoredFlag(hasGuideBookKey, false);
   }
   plantRuntime.isSeedPlanted = false;
@@ -2281,7 +2290,7 @@ function applyDefaultState(options) {
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
 
-  if (!preserveTutorialProgress) {
+  if (!sharedWorldResetOnly) {
     hasGuideBook = false;
     isGuideBookOpen = false;
     isGuideBookClickPromptActive = false;
@@ -2365,7 +2374,7 @@ function applyDefaultState(options) {
   seedWorldText.style.display = "none";
   seedInventory.style.display = "none";
   guideCard.style.display = "none";
-  if (!preserveTutorialProgress) {
+  if (!sharedWorldResetOnly) {
     guideBook.style.display = "block";
     guideBook.classList.remove("is-near");
     guideBookButton.style.display = "none";
@@ -2380,8 +2389,8 @@ function applyDefaultState(options) {
   updateWellCard();
   updateSeedPosition();
   updateBucketPosition();
-  if (preserveTutorialProgress) {
-    loadGuideBookState();
+  if (sharedWorldResetOnly) {
+    loadGuideBookState(true);
   } else {
     updateNpcPosition();
     updateGuidePages();
@@ -3044,10 +3053,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     lastWorldResetAt = Date.now();
     ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
-    // Keep multiplayer reset consistent across devices by clearing local world caches too.
+    // 공유 세계만: 로컬 월드 캐시 삭제 + 맵·자원 기본값(튜토리얼 세션/온보딩 키는 유지)
     clearStoredKeys(appStorageKeysSharedWorldReset);
     isWorldDirty = false;
-    applyDefaultState({ preserveTutorialProgress: true });
+    applyDefaultState({ sharedWorldResetOnly: true });
     savePlayerPosition(true);
     restartPlayerPositionOnly();
     isReloadingForWorldReset = true;
@@ -4243,11 +4252,15 @@ function getPlayerFootY() {
 function isPlayerNearTreeTrunk() {
   const centerX = getPlayerCenterX();
   const footY = getPlayerFootY();
+  const groundBack = getMaxGroundedPlayerDepth();
+  const deepEnoughForTrunk =
+    playerDepth >= groundBack - TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN;
 
   return (
+    deepEnoughForTrunk &&
     centerX >= TREE_TRUNK_X - TREE_CLIMB_DISTANCE &&
     centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE &&
-    footY <= getMaxGroundedPlayerDepth() + 4 &&
+    footY <= groundBack + 4 &&
     footY >= TREE_TRUNK_TOP - 18
   );
 }
@@ -4285,10 +4298,16 @@ function movePlayerVerticallyInTree(deltaDepth) {
 }
 
 function clampPlayerToTreeOutline() {
-  playerDepth = Math.max(
-    getMinTreePlayerDepth(),
-    Math.min(getMaxTreePlayerDepth(), playerDepth)
-  );
+  const minD = getMinTreePlayerDepth();
+  const maxD = getMaxTreePlayerDepth();
+  const target = Math.max(minD, Math.min(maxD, playerDepth));
+  if (playerDepth < target) {
+    playerDepth = Math.min(target, playerDepth + TREE_DEPTH_CLAMP_MAX_STEP);
+  } else if (playerDepth > target) {
+    playerDepth = Math.max(target, playerDepth - TREE_DEPTH_CLAMP_MAX_STEP);
+  } else {
+    playerDepth = target;
+  }
 }
 
 function getPlayerWorldY() {

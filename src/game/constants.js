@@ -37,11 +37,11 @@ export const SIGN_START_X = 138;
 export const SIGN_START_Y = 268;
 export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
-/** 책 — 씨앗·안내판과 떨어진 왼쪽 아래 */
-export const GUIDE_BOOK_START_X = 40;
-export const GUIDE_BOOK_START_Y = 318;
 export const GUIDE_BOOK_WIDTH = 10;
 export const GUIDE_BOOK_HEIGHT = 9;
+/** 책 — 공유·튜토리얼 동일 좌표; 기준점에서 오른쪽으로 4×책 너비 */
+export const GUIDE_BOOK_START_X = 40 + 4 * GUIDE_BOOK_WIDTH;
+export const GUIDE_BOOK_START_Y = 318;
 /** 책 오른쪽–씨앗 왼쪽 최소 간격(책 너비 약 5칸) */
 export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH * 5;
 /** 씨앗 — 안내판 오른쪽과, 책+5칸 간격 중 더 오른쪽(겹침 방지) */
@@ -176,7 +176,11 @@ export const appStorageKeys = [
   "magicPowderCountV1"
 ];
 
-/** 멀티 세계 전체 리셋 시 지우지 않음 — 튜토리얼/가이드 진행은 계정 로컬 진행으로 유지 */
+/**
+ * 공유 세계(resetToken) 리셋 시 로컬에서 지우는 키 = appStorageKeys − 이 집합.
+ * 온보딩/가이드/튜토리얼 완료 플래그는 건드리지 않음(공유 맵 데이터만 초기화).
+ * 튜토리얼용 월드 초기화는 설정의 「튜토리얼 하기」·세션 플래그 경로만 사용.
+ */
 const tutorialProgressStorageKeySet = new Set([
   movementTutorialCompleteKey,
   hasGuideBookKey,
