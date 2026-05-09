@@ -348,6 +348,9 @@ const networkDebugLines = [];
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
 ground.appendChild(playerBucketOverlay);
+const appLoadingScreen = document.getElementById("app-loading-screen");
+const appLoadingText = document.getElementById("app-loading-text");
+let appLoadingHideTimer = null;
 const BUCKET_DEBUG_TRACE = true;
 const playerTintCache = new Map();
 const playerBaseImage = new Image();
@@ -388,6 +391,27 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
+
+function showAppLoadingScreen(message) {
+  if (!appLoadingScreen) return;
+  clearTimeout(appLoadingHideTimer);
+  if (appLoadingText && message) {
+    appLoadingText.textContent = message;
+  }
+  appLoadingScreen.hidden = false;
+  document.body.classList.remove("is-game-ready");
+}
+
+function hideAppLoadingScreen() {
+  if (!appLoadingScreen) return;
+  clearTimeout(appLoadingHideTimer);
+  document.body.classList.add("is-game-ready");
+  appLoadingHideTimer = setTimeout(function () {
+    if (document.body.classList.contains("is-game-ready")) {
+      appLoadingScreen.hidden = true;
+    }
+  }, 260);
+}
 const MULTIPLAYER_BROADCAST_MIN_MS = 80;
 const MULTIPLAYER_HEARTBEAT_MS = 500;
 const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
@@ -1069,6 +1093,7 @@ function loadGuideBookState() {
 }
 
 function resetGameForTesting() {
+  showAppLoadingScreen("Resetting...");
   isReloadingForWorldReset = true;
   isWorldDirty = false;
   isWorldPolling = false;
@@ -5391,18 +5416,21 @@ addNetworkDebugLog(
 openCharacterSelectIfNeeded();
 if (!isWorldServerSyncAvailable()) {
   hasHydratedSharedWorldFromServer = true;
+  setTimeout(hideAppLoadingScreen, 300);
 }
 setTimeout(function () {
   if (isTabSessionSuperseded) return;
   if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
     pollWorldState(true);
   }
+  setTimeout(hideAppLoadingScreen, 700);
 }, 40);
 setTimeout(function () {
   if (isTabSessionSuperseded) return;
   if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
     hasHydratedSharedWorldFromServer = true;
   }
+  hideAppLoadingScreen();
 }, 8000);
 setInterval(function () {
   if (isTabSessionSuperseded) return;
@@ -5424,5 +5452,6 @@ window.addEventListener("resize", function () {
 });
 window.addEventListener("load", function () {
   updateCamera();
+  setTimeout(hideAppLoadingScreen, 450);
 });
 gameLoop();
