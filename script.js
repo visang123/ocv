@@ -1566,7 +1566,13 @@ function applyTutorialWorldResetIfPending() {
       pendingWorld = true;
     }
   } catch (e) {}
-  if (getStoredFlag(onboardingFlowDoneKey) || !pendingWorld) {
+  if (getStoredFlag(onboardingFlowDoneKey)) {
+    try {
+      sessionStorage.removeItem("ovcTutorialWorldResetPending");
+    } catch (eClear) {}
+    return false;
+  }
+  if (!pendingWorld) {
     return false;
   }
   tutorialWorldNeedsFullReset = false;
@@ -1575,7 +1581,6 @@ function applyTutorialWorldResetIfPending() {
   } catch (e2) {}
   applyDefaultState();
   loadGuideBookState();
-  loadOnboardingFlowState();
   setWorldPosition(player, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updateCamera();
@@ -1584,6 +1589,8 @@ function applyTutorialWorldResetIfPending() {
   saveSeedState();
   saveAppleState();
   saveBucketState();
+  updatePlantState();
+  updateOnboardingFlowUI();
   hasHydratedSharedWorldFromServer = true;
   return true;
 }
@@ -3024,9 +3031,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
     clearStoredKeys(appStorageKeysSharedWorldReset);
+    isWorldDirty = false;
     applyDefaultState({ preserveTutorialProgress: true });
     savePlayerPosition(true);
     restartPlayerPositionOnly();
+    isReloadingForWorldReset = true;
     setTimeout(function () {
       window.location.reload();
     }, 120);
@@ -7489,6 +7498,7 @@ function setup() {
 
 try {
   setup();
+  applyTutorialWorldResetIfPending();
   loadWellState();
   loadSeedState();
   loadAppleState();
