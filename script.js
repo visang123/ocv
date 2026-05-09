@@ -621,6 +621,7 @@ function applySupersededTabShutdown() {
       "<p style=\"margin:0;opacity:.9\">\uC774 \uD0ED\uC740 \uC5F0\uACB0\uC774 \uB04A\uC5B4\uC84C\uC2B5\uB2C8\uB2E4. \uC774 \uD0ED\uC740 \uB2EB\uC544 \uC8FC\uC138\uC694.</p></div>";
     document.body.appendChild(veil);
   }
+  hideAppLoadingScreen();
 }
 
 claimAccountSessionTabOwnership();
@@ -6448,41 +6449,48 @@ function setup() {
   updatePlantState();
 }
 
-setup();
-loadWellState();
-loadSeedState();
-loadAppleState();
-loadBucketState();
-loadGuideBookState();
-loadPlayerPosition();
-loadButterflyCaughtCounts();
-loadMagicPowderCount();
-updateButterflyInventoryUi();
-updateMagicPowderInventoryUi();
-addNetworkDebugLog(
-  "init: configured=" +
-  Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +
-  ", user=" +
-  (currentUserId || "-") +
-  ", color=" +
-  selectedPlayerColor
-);
-openCharacterSelectIfNeeded();
-if (!isWorldServerSyncAvailable()) {
-  hasHydratedSharedWorldFromServer = true;
-  setTimeout(hideAppLoadingScreen, 300);
+try {
+  setup();
+  loadWellState();
+  loadSeedState();
+  loadAppleState();
+  loadBucketState();
+  loadGuideBookState();
+  loadPlayerPosition();
+  loadButterflyCaughtCounts();
+  loadMagicPowderCount();
+  updateButterflyInventoryUi();
+  updateMagicPowderInventoryUi();
+  addNetworkDebugLog(
+    "init: configured=" +
+    Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +
+    ", user=" +
+    (currentUserId || "-") +
+    ", color=" +
+    selectedPlayerColor
+  );
+  openCharacterSelectIfNeeded();
+  if (!isWorldServerSyncAvailable()) {
+    hasHydratedSharedWorldFromServer = true;
+    setTimeout(hideAppLoadingScreen, 300);
+  }
+} catch (initError) {
+  console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
+  hideAppLoadingScreen();
 }
 setTimeout(function () {
-  if (isTabSessionSuperseded) return;
-  if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
-    pollWorldState(true);
+  if (!isTabSessionSuperseded) {
+    if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+      pollWorldState(true);
+    }
   }
   setTimeout(hideAppLoadingScreen, 700);
 }, 40);
 setTimeout(function () {
-  if (isTabSessionSuperseded) return;
-  if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
-    hasHydratedSharedWorldFromServer = true;
+  if (!isTabSessionSuperseded) {
+    if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+      hasHydratedSharedWorldFromServer = true;
+    }
   }
   hideAppLoadingScreen();
 }, 8000);
