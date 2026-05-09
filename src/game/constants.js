@@ -73,10 +73,16 @@ export const butterflyFrameCount = 5;
 /** Milliseconds between wing frames. */
 export const butterflyFrameMs = 140;
 /** Butterfly speed in world pixels per game frame (player speed is 1). */
-export const butterflySpeed = 1.5;
+export const butterflySpeed = 1.2;
 /** How long it takes a butterfly to drift to a fresh waypoint, in ms. */
-export const butterflyLegMinMs = 2000;
-export const butterflyLegMaxMs = 4500;
+export const butterflyLegMinMs = 3800;
+export const butterflyLegMaxMs = 8200;
+/** One full horizontal / vertical flutter cycle each (ms); both 2 minutes. */
+export const butterflyFlutterPeriodHorizontalMs = 2 * MINUTE_MS;
+export const butterflyFlutterPeriodVerticalMs = 2 * MINUTE_MS;
+/** Subtle world-px sway on top of waypoint motion. */
+export const butterflyFlutterAmplitudeX = 2.5;
+export const butterflyFlutterAmplitudeY = 2.5;
 /** Time between auto-spawns when below the map cap, in ms. */
 export const butterflyRespawnMs = 2 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */
@@ -104,12 +110,10 @@ export const plantWaterLevelTickMs = 20 * SECOND_MS;
 export const plantGrowthMs = 3 * SECOND_MS;
 export const overwaterWindowMs = 60 * MINUTE_MS;
 /**
- * Watering an already-wet plant within this window after the previous watering
- * causes immediate rot. Lets players actually trigger overwatering even though
- * the well is rate-limited (otherwise reaching waterLevel 2 + a third pour in
- * the 20s decay window is essentially impossible).
+ * How long the rotten soil image stays visible before the planted slot is
+ * fully cleared so the player can plant a new seed there.
  */
-export const quickRewaterMs = 8 * SECOND_MS;
+export const plantRotClearMs = 3 * SECOND_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";

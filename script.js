@@ -74,7 +74,7 @@ import {
   plantWaterLevelTickMs,
   plantGrowthMs,
   overwaterWindowMs,
-  quickRewaterMs,
+  plantRotClearMs,
   BUTTERFLY_SIZE,
   butterflyMaxAlive,
   butterflyColors,
@@ -83,6 +83,10 @@ import {
   butterflySpeed,
   butterflyLegMinMs,
   butterflyLegMaxMs,
+  butterflyFlutterPeriodHorizontalMs,
+  butterflyFlutterPeriodVerticalMs,
+  butterflyFlutterAmplitudeX,
+  butterflyFlutterAmplitudeY,
   butterflyRespawnMs,
   butterflyCatchDistance,
   butterflyBroadcastMs,
@@ -1245,6 +1249,7 @@ function applyDefaultState() {
   plantRuntime.waterLevelUpdatedAt = Date.now();
   plantRuntime.becameEmptyAt = null;
   plantRuntime.isOverwatered = false;
+  plantRuntime.rottenAt = null;
   plantRuntime.needsFirstWater = false;
   plantRuntime.growthStartedAt = null;
   plantRuntime.isSproutGrown = false;
@@ -1877,6 +1882,7 @@ function getSharedWorldSnapshot() {
           waterLevelUpdatedAt: plant.waterLevelUpdatedAt,
           becameEmptyAt: plant.becameEmptyAt,
           isOverwatered: Boolean(plant.isOverwatered),
+          rottenAt: plant.rottenAt || null,
           needsFirstWater: Boolean(plant.needsFirstWater),
           growthStartedAt: plant.growthStartedAt,
           isSproutGrown: Boolean(plant.isSproutGrown),
@@ -2064,6 +2070,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         plantWaterLevelUpdatedAt: Number(mp.plantWaterLevelUpdatedAt) || Date.now(),
         plantBecameEmptyAt: Number(mp.plantBecameEmptyAt) || null,
         isPlantOverwatered: Boolean(mp.isPlantOverwatered),
+        plantRottenAt: Number(mp.plantRottenAt) || null,
         plantNeedsFirstWater: Boolean(mp.plantNeedsFirstWater),
         plantGrowthStartedAt: Number(mp.plantGrowthStartedAt) || null,
         isSproutGrown: Boolean(mp.isSproutGrown),
@@ -2175,6 +2182,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
               waterLevelUpdatedAt: Number(plant.waterLevelUpdatedAt) || Date.now(),
               becameEmptyAt: Number(plant.becameEmptyAt) || null,
               isOverwatered: Boolean(plant.isOverwatered),
+              rottenAt: Number(plant.rottenAt) || null,
               needsFirstWater: Boolean(plant.needsFirstWater),
               growthStartedAt: Number(plant.growthStartedAt) || null,
               isSproutGrown: Boolean(plant.isSproutGrown),
@@ -2617,6 +2625,7 @@ function normalizeExtraPlantState(plant) {
     plant.needsFirstWater = !plant.growthStartedAt;
   }
   if (typeof plant.isOverwatered !== "boolean") plant.isOverwatered = false;
+  if (!Number.isFinite(plant.rottenAt)) plant.rottenAt = null;
   if (typeof plant.isSproutGrown !== "boolean") plant.isSproutGrown = false;
   if (typeof plant.isSproutSelfSustaining !== "boolean") plant.isSproutSelfSustaining = false;
   if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
@@ -2649,6 +2658,7 @@ function normalizeExtraPlantState(plant) {
 
   if (plant.status === "rotten" || plant.isOverwatered) {
     plant.status = "rotten";
+    if (!plant.rottenAt) plant.rottenAt = now;
     plant.growthStartedAt = null;
     plant.isSproutGrown = false;
     plant.sproutGrownAt = null;
@@ -2663,6 +2673,11 @@ function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
 
   if (plant.status === "rotten") {
+    if (plant.rottenAt && now - plant.rottenAt >= plantRotClearMs) {
+      plant.removed = true;
+      saveAppleState();
+      syncWorldState(true);
+    }
     return;
   }
 
@@ -3239,17 +3254,19 @@ function startPlanting() {
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
 
   window.setTimeout(function () {
+    const plantedAt = Date.now();
     plantRuntime.isPlanting = false;
     plantRuntime.isSeedPlanted = true;
-    plantRuntime.lastWateredAt = Date.now();
-    plantRuntime.wateredAtList = [];
+    plantRuntime.lastWateredAt = plantedAt;
+    plantRuntime.wateredAtList = [plantedAt];
     plantRuntime.status = "normal";
-    plantRuntime.waterLevel = 0;
-    plantRuntime.waterLevelUpdatedAt = Date.now();
-    plantRuntime.becameEmptyAt = Date.now();
+    plantRuntime.waterLevel = 1;
+    plantRuntime.waterLevelUpdatedAt = plantedAt;
+    plantRuntime.becameEmptyAt = null;
     plantRuntime.isOverwatered = false;
-    plantRuntime.needsFirstWater = true;
-    plantRuntime.growthStartedAt = null;
+    plantRuntime.rottenAt = null;
+    plantRuntime.needsFirstWater = false;
+    plantRuntime.growthStartedAt = plantedAt;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
     plantRuntime.sproutEvolutionMs = 0;
@@ -3334,18 +3351,20 @@ function plantInventorySeed(seedId) {
     inventorySeed.inInventory = false;
 
     if (!plantRuntime.isSeedPlanted) {
+      const plantedAt = Date.now();
       plantRuntime.spotX = plantX;
       plantRuntime.spotY = plantY;
       plantRuntime.isSeedPlanted = true;
-      plantRuntime.lastWateredAt = Date.now();
-      plantRuntime.wateredAtList = [];
+      plantRuntime.lastWateredAt = plantedAt;
+      plantRuntime.wateredAtList = [plantedAt];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 0;
-      plantRuntime.waterLevelUpdatedAt = Date.now();
-      plantRuntime.becameEmptyAt = Date.now();
+      plantRuntime.waterLevel = 1;
+      plantRuntime.waterLevelUpdatedAt = plantedAt;
+      plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
-      plantRuntime.needsFirstWater = true;
-      plantRuntime.growthStartedAt = null;
+      plantRuntime.rottenAt = null;
+      plantRuntime.needsFirstWater = false;
+      plantRuntime.growthStartedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
       plantRuntime.sproutEvolutionMs = 0;
@@ -3374,14 +3393,15 @@ function createExtraPlant(id, x, y) {
     y,
     plantedAt: now,
     lastWateredAt: now,
-    wateredAtList: [],
+    wateredAtList: [now],
     status: "normal",
-    waterLevel: 0,
+    waterLevel: 1,
     waterLevelUpdatedAt: now,
-    becameEmptyAt: now,
+    becameEmptyAt: null,
     isOverwatered: false,
-    needsFirstWater: true,
-    growthStartedAt: null,
+    rottenAt: null,
+    needsFirstWater: false,
+    growthStartedAt: now,
     isSproutGrown: false,
     sproutGrownAt: null,
     sproutEvolutionMs: 0,
@@ -3594,7 +3614,6 @@ function waterPlant(target) {
   }
 
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
-  const previousWateredAt = plantRuntime.lastWateredAt;
 
   plantRuntime.lastWateredAt = now;
   plantRuntime.needsFirstWater = false;
@@ -3615,23 +3634,17 @@ function waterPlant(target) {
     return;
   }
 
-  // Pouring water onto an already-wet plant in quick succession overwaters it.
-  // This is the practical rot trigger because the well's refill rate makes
-  // raising waterLevel to 2 and pouring again in time effectively impossible.
-  const isRapidRewater =
-    !isFirstWater &&
-    plantRuntime.waterLevel >= 1 &&
-    previousWateredAt !== null &&
-    Number.isFinite(previousWateredAt) &&
-    now - previousWateredAt < quickRewaterMs;
-
   if (isFirstWater || plantRuntime.waterLevel <= 0) {
     plantRuntime.waterLevel = 1;
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
-  } else if (plantRuntime.waterLevel >= 2 || isRapidRewater) {
+  } else if (plantRuntime.waterLevel >= 2) {
+    // Already at the cap. Pouring more water rots the plant: the soil flips to
+    // the rotten image and the sprout disappears, then the slot is cleared
+    // a few seconds later so the player can plant something new.
     plantRuntime.isOverwatered = true;
     plantRuntime.status = "rotten";
+    plantRuntime.rottenAt = now;
     plantRuntime.growthStartedAt = null;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -3680,7 +3693,6 @@ function waterExtraPlant(plant) {
   }
 
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
-  const previousWateredAt = plant.lastWateredAt;
 
   plant.lastWateredAt = now;
   plant.needsFirstWater = false;
@@ -3701,20 +3713,14 @@ function waterExtraPlant(plant) {
     return;
   }
 
-  const isRapidRewater =
-    !isFirstWater &&
-    plant.waterLevel >= 1 &&
-    previousWateredAt !== null &&
-    Number.isFinite(previousWateredAt) &&
-    now - previousWateredAt < quickRewaterMs;
-
   if (isFirstWater || plant.waterLevel <= 0) {
     plant.waterLevel = 1;
     plant.isOverwatered = false;
     plant.status = "normal";
-  } else if (plant.waterLevel >= 2 || isRapidRewater) {
+  } else if (plant.waterLevel >= 2) {
     plant.isOverwatered = true;
     plant.status = "rotten";
+    plant.rottenAt = now;
     plant.growthStartedAt = null;
     plant.isSproutGrown = false;
     plant.sproutGrownAt = null;
@@ -3802,6 +3808,21 @@ function updatePlantState() {
     saveSeedState();
   }
 
+  // Once the plant has rotted we let the rotten soil image linger briefly so
+  // the player can see the result, then clear the slot entirely so they can
+  // plant again. This also makes rot terminal: there's no path back to a
+  // healthy plant in the same slot.
+  if (
+    plantRuntime.status === "rotten" &&
+    plantRuntime.rottenAt &&
+    now - plantRuntime.rottenAt >= plantRotClearMs
+  ) {
+    removeMainPlant();
+    saveSeedState();
+    syncWorldState(true);
+    return;
+  }
+
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
 
   if (mainSoilRotten) {
@@ -3846,6 +3867,7 @@ function removeMainPlant() {
   plantRuntime.waterLevelUpdatedAt = Date.now();
   plantRuntime.becameEmptyAt = null;
   plantRuntime.isOverwatered = false;
+  plantRuntime.rottenAt = null;
   plantRuntime.needsFirstWater = false;
   plantRuntime.growthStartedAt = null;
   plantRuntime.isSproutGrown = false;
@@ -4214,6 +4236,9 @@ function applyLoadedPlantState(loadedPlant) {
   plantRuntime.waterLevelUpdatedAt = loadedPlant.plantWaterLevelUpdatedAt;
   plantRuntime.becameEmptyAt = loadedPlant.plantBecameEmptyAt;
   plantRuntime.isOverwatered = loadedPlant.isPlantOverwatered;
+  plantRuntime.rottenAt = Object.prototype.hasOwnProperty.call(loadedPlant, "plantRottenAt")
+    ? loadedPlant.plantRottenAt
+    : null;
   plantRuntime.needsFirstWater = loadedPlant.plantNeedsFirstWater;
   plantRuntime.growthStartedAt = loadedPlant.plantGrowthStartedAt;
   plantRuntime.isSproutGrown = loadedPlant.isSproutGrown;
@@ -4251,6 +4276,8 @@ function applyLoadedPlantState(loadedPlant) {
   plantRuntime.sproutEvolutionLastTickAt = Date.now();
 
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
+    plantRuntime.status = "rotten";
+    if (!plantRuntime.rottenAt) plantRuntime.rottenAt = Date.now();
     plantRuntime.growthStartedAt = null;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -4273,6 +4300,7 @@ function getPlantStateForStorage() {
     plantWaterLevelUpdatedAt: plantRuntime.waterLevelUpdatedAt,
     plantBecameEmptyAt: plantRuntime.becameEmptyAt,
     isPlantOverwatered: plantRuntime.isOverwatered,
+    plantRottenAt: plantRuntime.rottenAt,
     plantNeedsFirstWater: plantRuntime.needsFirstWater,
     plantGrowthStartedAt: plantRuntime.growthStartedAt,
     isSproutGrown: plantRuntime.isSproutGrown,
@@ -5551,21 +5579,27 @@ function ensureButterflyWaypoint(butterfly, now) {
   return waypoint;
 }
 
-function easeInOutSine(t) {
-  return -(Math.cos(Math.PI * t) - 1) / 2;
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 function simulateButterflyAuthorityStep(butterfly, now) {
   const waypoint = ensureButterflyWaypoint(butterfly, now);
   const total = Math.max(1, waypoint.endAt - waypoint.startAt);
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
-  const eased = easeInOutSine(t);
+  const eased = easeInOutCubic(t);
   const previousX = butterfly.x;
   butterfly.x = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
   butterfly.y = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
-  // Add a small flutter so the path doesn't look perfectly linear.
-  const flutterPhase = (now / 220 + butterfly.id.length) % (Math.PI * 2);
-  butterfly.y += Math.sin(flutterPhase) * 1.4;
+  // Slow horizontal + vertical sway (one full cycle each per configured period).
+  const salt =
+    butterfly.id.split("").reduce(function (acc, ch) {
+      return acc + ch.charCodeAt(0);
+    }, 0) % 6283;
+  const omegaX = (2 * Math.PI) / butterflyFlutterPeriodHorizontalMs;
+  const omegaY = (2 * Math.PI) / butterflyFlutterPeriodVerticalMs;
+  butterfly.x += Math.sin(now * omegaX + salt * 0.001) * butterflyFlutterAmplitudeX;
+  butterfly.y += Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * butterflyFlutterAmplitudeY;
   clampButterflyToBounds(butterfly);
   const dx = butterfly.x - previousX;
   if (Math.abs(dx) > 0.05) {

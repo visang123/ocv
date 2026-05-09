@@ -91,6 +91,7 @@ export function loadSeedStateFromStorage(config) {
     plantWaterLevelUpdatedAt: config.defaultSeedCreatedAt,
     plantBecameEmptyAt: null,
     isPlantOverwatered: false,
+    plantRottenAt: null,
     plantNeedsFirstWater: false,
     plantGrowthStartedAt: null,
     isSproutGrown: false,
@@ -121,6 +122,7 @@ export function loadSeedStateFromStorage(config) {
         Number(savedPlantedState.plantWaterLevelUpdatedAt) || config.defaultSeedCreatedAt;
       planted.plantBecameEmptyAt = Number(savedPlantedState.plantBecameEmptyAt) || null;
       planted.isPlantOverwatered = Boolean(savedPlantedState.isPlantOverwatered);
+      planted.plantRottenAt = Number(savedPlantedState.plantRottenAt) || null;
       planted.plantNeedsFirstWater = Boolean(savedPlantedState.plantNeedsFirstWater);
       planted.plantGrowthStartedAt =
         Number(savedPlantedState.plantGrowthStartedAt) || null;

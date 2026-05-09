@@ -33,6 +33,7 @@ export function createPlantState() {
     waterLevelUpdatedAt: Date.now(),
     becameEmptyAt: null,
     isOverwatered: false,
+    rottenAt: null,
     needsFirstWater: false,
     growthStartedAt: null,
     isSproutGrown: false,
