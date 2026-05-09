@@ -463,6 +463,11 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+/* 플레이어 대사 중: 닉네임(#player-name 42)보다 앞에 그려서 가리지 않음 */
+#player-bubble.is-in-front-of-name {
+  z-index: 56;
+}
+
 #player-alert {
   position: fixed;
   left: 0;

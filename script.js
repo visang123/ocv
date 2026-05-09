@@ -515,14 +515,17 @@ const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 108;
 const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 22;
-/** 플레이어·NPC 공통: 머리 윗선 위로 말풍선 붙일 때 간격(월드 단위) */
+/** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /**
  * NPC 발밑 y는 npcY, 논리 박스 높이는 NPC_HEIGHT.
- * 스프라이트 scale로 머리가 박스보다 위로 보이면 양수로 키워서 말풍선을 더 올림(월드 단위).
+ * 스프라이트 scale로 실제 머리가 더 위면 양수로 키움(머리 윗선을 위로 보정).
  */
 const NPC_HEAD_TOP_TRIM_WORLD = 0;
-/** 말풍선 전체를 화면에서 추가로 내리려면 양수(px). 머리 기준 맞춤 후 미세 조정용 */
+/** NPC 말풍선만: 너무 떠 보이면 양수로 키워서 아래로 내림(월드 단위) */
+const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 12;
+/** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
+const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
 
 function showAppLoadingScreen(message) {
@@ -745,7 +748,9 @@ function setPlayerBubbleWorldPosition(worldX, worldY) {
 function layoutNpcSpeechBubble() {
   const bubbleWidth = npcBubble.offsetWidth || 48;
   const npcHeadTop = npcY - NPC_HEIGHT - NPC_HEAD_TOP_TRIM_WORLD;
-  const bubbleWorldY = speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble);
+  const bubbleWorldY =
+    speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble) +
+    NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   setNpcBubbleWorldPosition(
     npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
     bubbleWorldY
@@ -5293,6 +5298,8 @@ function updateNpcPosition() {
 
   if (playerBubble.style.display === "block") {
     updatePlayerBubblePosition();
+  } else {
+    playerBubble.classList.remove("is-in-front-of-name");
   }
 
   updateNpcPrompt();
@@ -5304,7 +5311,13 @@ function updatePlayerBubblePosition() {
   const playerWorldTop =
     GROUND_WORLD_HEIGHT - playerRenderedHeight - playerDepth + jumpY;
   const bw = playerBubble.offsetWidth || 36;
-  const bubbleWorldY = speechBubbleTopWorldYFromHead(playerWorldTop, playerBubble);
+  const bubbleWorldY =
+    speechBubbleTopWorldYFromHead(playerWorldTop, playerBubble) -
+    PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD;
+  playerBubble.classList.toggle(
+    "is-in-front-of-name",
+    Boolean(isNpcDialogueRunning && playerBubble.style.display === "block")
+  );
   setPlayerBubbleWorldPosition(
     playerWorldLeft + PLAYER_WIDTH / 2 - bw / 2,
     bubbleWorldY
@@ -5971,7 +5984,9 @@ function updatePlayerName() {
   const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
   const y = toScreenY(playerBox.top) + 13;
 
-  playerName.classList.toggle("is-dialogue-layer", Boolean(isNpcDialogueRunning));
+  const npcLineShowing =
+    isNpcDialogueRunning && npcBubble.style.display === "block";
+  playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
   playerName.style.display = "block";
   playerName.style.transform = "translate(" + x + "px, " + y + "px)";
 }
