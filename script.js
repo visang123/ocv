@@ -5938,19 +5938,17 @@ function finishCharacterSelect() {
 function updatePlayerName() {
   if (!currentUserName || !hasSpawnedCharacter) {
     playerName.style.display = "none";
-    return;
-  }
-  if (isNpcDialogueRunning) {
-    playerName.style.display = "none";
+    playerName.classList.remove("is-dialogue-layer");
     return;
   }
 
   const playerBox = getPlayerBox();
+  playerName.textContent = nameForIngameUiDisplay(currentUserName);
   const nameWidth = playerName.offsetWidth || 36;
   const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
   const y = toScreenY(playerBox.top) + 13;
 
-  playerName.textContent = nameForIngameUiDisplay(currentUserName);
+  playerName.classList.toggle("is-dialogue-layer", Boolean(isNpcDialogueRunning));
   playerName.style.display = "block";
   playerName.style.transform = "translate(" + x + "px, " + y + "px)";
 }

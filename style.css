@@ -931,6 +931,12 @@ body::-webkit-scrollbar {
   white-space: nowrap;
 }
 
+/* 대화 중: 말풍선보다 앞 레이어(입체적으로 위) */
+#player-name.is-dialogue-layer {
+  z-index: 60;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+}
+
 #player {
   position: absolute;
   left: 0;
