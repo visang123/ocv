@@ -3629,15 +3629,38 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     }
 
     if (snapshot.mainPlant && !plantRuntime.isPlanting) {
-      applyLoadedPlantState(parseMainPlantFromSnapshot(snapshot.mainPlant));
-      npcX = Number(snapshot.mainPlant.npcX) || npcX;
-      npcY = Number(snapshot.mainPlant.npcY) || npcY;
-      plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
-      if (plantRuntime.isSeedPlanted) {
-        setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+      let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
+      const snapAt = snapshotSavedAt || 0;
+      if (
+        snapAt > 0 &&
+        snapAt < lastMainPlantStateChangeAt - 2000 &&
+        plantRuntime.isSeedPlanted &&
+        !incomingPlant.isSeedPlanted
+      ) {
+        incomingPlant = null;
       }
-      if (snapshotSavedAt) {
-        lastMainPlantStateChangeAt = Math.max(lastMainPlantStateChangeAt, snapshotSavedAt);
+      if (incomingPlant) {
+        if (
+          isPowderUpgradeInProgress(plantRuntime) &&
+          !isPowderUpgradeInProgress(incomingPlant) &&
+          (incomingPlant.growthTier || 0) === (plantRuntime.growthTier || 0)
+        ) {
+          incomingPlant = Object.assign({}, incomingPlant, {
+            powderUpgradeTargetTier: plantRuntime.powderUpgradeTargetTier,
+            powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
+            powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs
+          });
+        }
+        applyLoadedPlantState(incomingPlant);
+        npcX = Number(snapshot.mainPlant.npcX) || npcX;
+        npcY = Number(snapshot.mainPlant.npcY) || npcY;
+        plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
+        if (plantRuntime.isSeedPlanted) {
+          setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+        }
+        if (snapshotSavedAt) {
+          lastMainPlantStateChangeAt = Math.max(lastMainPlantStateChangeAt, snapshotSavedAt);
+        }
       }
     }
 
@@ -4215,7 +4238,7 @@ function normalizeExtraPlantState(plant) {
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
   }
-  plant.waterCapacity = plant.growthTier >= 4 ? 3 : 2;
+  plant.waterCapacity = plant.growthTier >= 3 ? 3 : 2;
   ensureGrassOrdinalIfNeeded(plant);
 }
 
@@ -4274,6 +4297,8 @@ function getSproutStageFromPlant(plant) {
 }
 
 function getPlantWaterCapacity(plant) {
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier >= 3) return 3;
   return Math.max(2, Number(plant.waterCapacity) || 2);
 }
 
@@ -4302,9 +4327,11 @@ function tickPowderUpgrade(plant, now) {
   plant.powderUpgradeTargetTier = 0;
   plant.powderUpgradeStartedAt = null;
   plant.powderUpgradeDurationMs = 0;
-  if (plant.growthTier >= 4) {
+  if (plant.growthTier >= 3) {
     plant.waterCapacity = 3;
-    plant.waterLevel = Math.min(getPlantWaterCapacity(plant), Math.max(1, Number(plant.waterLevel) || 1));
+    plant.waterLevel = Math.min(3, Math.max(1, Number(plant.waterLevel) || 1));
+  }
+  if (plant.growthTier >= 4) {
     plant.needsFirstWater = false;
     if (prevTier < 4 && (plant.grassOrdinal == null || plant.grassOrdinal <= 0)) {
       plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
@@ -4331,7 +4358,8 @@ function tickSproutEvolution(plant, now) {
     plant.sproutEvolutionMs = cap;
     plant.isSproutSelfSustaining = true;
     plant.growthTier = Math.max(Number(plant.growthTier) || 0, 3);
-    plant.waterLevel = Math.max(Number(plant.waterLevel) || 0, 2);
+    plant.waterCapacity = 3;
+    plant.waterLevel = Math.min(3, Math.max(Number(plant.waterLevel) || 0, 2));
     plant.becameEmptyAt = null;
     plant.status = "normal";
   }
@@ -4386,12 +4414,7 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 }
 
 function updateExtraPlantWaterLevel(plant, now) {
-  if (
-    (plant.isSproutSelfSustaining && (plant.growthTier || 0) < 4) ||
-    plant.isOverwatered ||
-    plant.status === "dry" ||
-    plant.status === "rotten"
-  ) {
+  if (plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") {
     return;
   }
 
@@ -5660,13 +5683,6 @@ function waterPlant(target) {
     return;
   }
 
-  if (
-    plantRuntime.isSproutSelfSustaining &&
-    !isPowderUpgradeInProgress(plantRuntime) &&
-    (plantRuntime.growthTier || 0) < 4
-  ) {
-    return;
-  }
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
 
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
@@ -5727,13 +5743,6 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
-  if (
-    plant.isSproutSelfSustaining &&
-    !isPowderUpgradeInProgress(plant) &&
-    (plant.growthTier || 0) < 4
-  ) {
-    return;
-  }
   updateExtraPlantWaterLevel(plant, now);
   const waterCapacity = getPlantWaterCapacity(plant);
 
@@ -5799,8 +5808,7 @@ function updatePlantWaterLevel() {
     !plantRuntime.isSeedPlanted ||
     plantRuntime.isOverwatered ||
     plantRuntime.status === "dry" ||
-    plantRuntime.status === "rotten" ||
-    (plantRuntime.isSproutSelfSustaining && (plantRuntime.growthTier || 0) < 4)
+    plantRuntime.status === "rotten"
   ) {
     return;
   }
@@ -6034,7 +6042,9 @@ function updatePlantGrowth() {
   const powderRatio = getPowderUpgradeRatio(plantRuntime, now);
   if (
     !plantRuntime.isSeedPlanted ||
-    (plantRuntime.growthStartedAt === null && powderRatio === null) ||
+    (plantRuntime.growthStartedAt === null &&
+      powderRatio === null &&
+      !plantRuntime.isSproutGrown) ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
     plantRuntime.isOverwatered
@@ -6419,7 +6429,9 @@ function applyLoadedPlantState(loadedPlant) {
   }
 
   plantRuntime.sproutEvolutionLastTickAt = Date.now();
-  plantRuntime.growthTier = Math.max(0, Number(loadedPlant.growthTier) || 0);
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "growthTier")) {
+    plantRuntime.growthTier = Math.max(0, Number(loadedPlant.growthTier) || 0);
+  }
   plantRuntime.waterCapacity = Math.max(2, Number(loadedPlant.waterCapacity) || 2);
   plantRuntime.powderUpgradeTargetTier = Math.max(
     0,
@@ -6455,7 +6467,7 @@ function applyLoadedPlantState(loadedPlant) {
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
-  plantRuntime.waterCapacity = plantRuntime.growthTier >= 4 ? 3 : 2;
+  plantRuntime.waterCapacity = plantRuntime.growthTier >= 3 ? 3 : 2;
   ensureGrassOrdinalIfNeeded(plantRuntime);
 }
 
