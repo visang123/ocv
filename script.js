@@ -3956,16 +3956,12 @@ function updateNpcPrompt() {
 function updatePlayerAlert() {
   if (playerAlert.style.display !== "block") return;
 
-  const playerRenderedHeight = player.offsetHeight || PLAYER_HEIGHT;
-  const playerWorldTop =
-    GROUND_WORLD_HEIGHT - playerRenderedHeight - playerDepth + jumpY;
+  const playerBox = getPlayerBox();
   const alertWidth = playerAlert.offsetWidth || 10;
   const alertHeight = playerAlert.offsetHeight || 10;
-  setWorldPosition(
-    playerAlert,
-    playerX + PLAYER_WIDTH / 2 - alertWidth / 2,
-    playerWorldTop - alertHeight - 2
-  );
+  const x = toScreenX(playerBox.left + playerBox.width / 2) - alertWidth / 2;
+  const y = toScreenY(playerBox.top) - alertHeight - 4;
+  playerAlert.style.transform = "translate(" + x + "px, " + y + "px)";
 }
 
 function updateGuideCard() {
@@ -5511,8 +5507,7 @@ function simulateButterflyAuthorityStep(butterfly, now) {
 function authoritySpawnButterfliesIfNeeded(now) {
   if (butterflyState.list.length >= butterflyMaxAlive) return false;
   if (!butterflyState.lastSpawnAt) {
-    butterflyState.lastSpawnAt = now;
-    return false;
+    return authorityFillToCapInstantly(now);
   }
   const elapsedCycles = Math.floor(
     (now - butterflyState.lastSpawnAt) / butterflyRespawnMs
@@ -5814,10 +5809,6 @@ function getButterflyStateForSnapshot() {
 
 function applyButterflySnapshot(snapshotButterflies) {
   if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
-  // Any snapshot - even an empty one - tells us another client (past or
-  // present) has already taken authority of butterflies for this world. Don't
-  // re-seed locally on top of that decision.
-  hasSeededInitialButterflies = true;
   const now = Date.now();
   // Purge old tombstones so the map stays bounded.
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
@@ -5828,6 +5819,9 @@ function applyButterflySnapshot(snapshotButterflies) {
   const incomingList = Array.isArray(snapshotButterflies.list)
     ? snapshotButterflies.list
     : [];
+  if (incomingList.length > 0) {
+    hasSeededInitialButterflies = true;
+  }
   const incomingById = {};
   incomingList.forEach(function (raw) {
     if (!raw || !raw.id) return;
@@ -5839,6 +5833,7 @@ function applyButterflySnapshot(snapshotButterflies) {
   // (otherwise we would constantly snap our own broadcasts back onto
   // ourselves) but still honor catches/spawns by reconciling membership.
   const iAmAuthority = isButterflyAuthority();
+  const prevLastSpawnAt = butterflyState.lastSpawnAt;
 
   const nextList = [];
   if (iAmAuthority) {
@@ -5894,10 +5889,21 @@ function applyButterflySnapshot(snapshotButterflies) {
   }
 
   butterflyState.list = nextList;
-  butterflyState.lastSpawnAt = getNumericButterflyValue(
-    snapshotButterflies.lastSpawnAt,
-    butterflyState.lastSpawnAt || Date.now()
-  );
+
+  const rawLast = snapshotButterflies.lastSpawnAt;
+  const parsedLast = Number(rawLast);
+  const hasValidSnapshotSpawnAt =
+    Number.isFinite(parsedLast) && parsedLast > 0;
+
+  if (hasValidSnapshotSpawnAt) {
+    butterflyState.lastSpawnAt = parsedLast;
+  } else if (nextList.length === 0) {
+    butterflyState.lastSpawnAt = 0;
+  } else {
+    const prevN = Number(prevLastSpawnAt);
+    butterflyState.lastSpawnAt =
+      Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
+  }
 }
 
 function gameLoop() {

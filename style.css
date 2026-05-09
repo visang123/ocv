@@ -455,9 +455,10 @@ body::-webkit-scrollbar {
 }
 
 #player-alert {
-  position: absolute;
+  position: fixed;
   left: 0;
   top: 0;
+  z-index: 45;
   display: none;
   width: 10px;
   height: 10px;
