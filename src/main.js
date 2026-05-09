@@ -1,2 +1,2 @@
-import "../script.js?v=20260516a";
+import "../script.js?v=20260517a";
 

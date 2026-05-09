@@ -516,10 +516,9 @@ const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 22;
 const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 6;
-/** 대화 중 추가로 위로 올리던 값 — 말풍선을 아래로 내리는 쪽으로 조정해 0 */
 const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 0;
-/** NPC 말풍선(호출/대화) 앵커를 월드 Y로 아래로 (숫자 클수록 더 아래) */
-const NPC_SPEECH_BUBBLE_Y_DROP_WORLD = 40;
+/** NPC 말풍선을 화면에서 아래로 (px). 월드 좌표와 별도로 적용해 확실히 보이게 함 */
+const NPC_SPEECH_BUBBLE_SCREEN_DOWN_PX = 48;
 const PLAYER_SPEECH_BUBBLE_EXTRA_LIFT = 26;
 
 function getNpcSpeechBubbleLiftWorld() {
@@ -705,6 +704,24 @@ function setWorldPosition(element, x, y) {
     WORLD_WIDTH,
     GROUND_WORLD_HEIGHT
   );
+}
+
+function accountDisplayNameForUi() {
+  try {
+    const fromStore = (localStorage.getItem(currentUserKey) || "").trim();
+    if (fromStore) {
+      return fromStore;
+    }
+  } catch (eStore) {}
+  return (currentUserName || "").trim();
+}
+
+function setNpcBubbleWorldPosition(worldX, worldY) {
+  const px = Math.round(toScreenX(worldX));
+  const py = Math.round(toScreenY(worldY));
+  const down = Math.round(NPC_SPEECH_BUBBLE_SCREEN_DOWN_PX);
+  npcBubble.style.transform =
+    "translate(" + px + "px, " + py + "px) translateY(" + down + "px)";
 }
 
 function isGameResetShortcut(event) {
@@ -5246,10 +5263,9 @@ function updateNpcPosition() {
     const bubbleWidth = npcBubble.offsetWidth || 48;
     const bubbleHeight = npcBubble.offsetHeight || 14;
     const bubbleLift = getNpcSpeechBubbleLiftWorld();
-    setWorldPosition(
-      npcBubble,
+    setNpcBubbleWorldPosition(
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift + NPC_SPEECH_BUBBLE_Y_DROP_WORLD
+      npcY - bubbleHeight - 3 - bubbleLift
     );
   }
 
@@ -5287,10 +5303,9 @@ function updateNpcPrompt() {
     const bubbleWidth = npcBubble.offsetWidth || 48;
     const bubbleHeight = npcBubble.offsetHeight || 14;
     const bubbleLift = getNpcSpeechBubbleLiftWorld();
-    setWorldPosition(
-      npcBubble,
+    setNpcBubbleWorldPosition(
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift + NPC_SPEECH_BUBBLE_Y_DROP_WORLD
+      npcY - bubbleHeight - 3 - bubbleLift
     );
 
     window.clearTimeout(npcPromptHideTimeout);
@@ -5854,7 +5869,7 @@ function openCharacterSelectIfNeeded() {
     return;
   }
 
-  playerName.textContent = nameForIngameUiDisplay(currentUserName);
+  playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
 
   if (hasSpawnedCharacter) {
     player.classList.remove("is-hidden-before-spawn");
@@ -5935,7 +5950,7 @@ function updatePlayerName() {
   }
 
   const playerBox = getPlayerBox();
-  playerName.textContent = nameForIngameUiDisplay(currentUserName);
+  playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
   const nameWidth = playerName.offsetWidth || 36;
   const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
   const y = toScreenY(playerBox.top) + 13;
@@ -6091,7 +6106,7 @@ function sendMultiplayerPresence(forceSend) {
   const state = {
     id: currentSessionId,
     userId: currentUserId,
-    name: nameForIngameUiDisplay(currentUserName),
+    name: nameForIngameUiDisplay(accountDisplayNameForUi()),
     action: plantRuntime.isPlanting
       ? "planting"
       : appleState.isEating
@@ -6308,7 +6323,7 @@ function sendMultiplayerLeave() {
       payload: {
         id: currentSessionId,
         userId: currentUserId,
-        name: nameForIngameUiDisplay(currentUserName),
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
         action: "leave",
         updatedAt: Date.now()
       }
