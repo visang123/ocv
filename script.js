@@ -870,6 +870,9 @@ butterflyInventory.addEventListener("click", function () {
 magicPowderInventory.addEventListener("click", function () {
   tryUseMagicPowder();
 });
+testWhiteButterflyButton.addEventListener("click", function () {
+  addWhiteButterfliesForTest();
+});
 
 characterSelectButton.addEventListener("click", function () {
   finishCharacterSelect();
@@ -901,6 +904,12 @@ networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
 networkDebugButton.setAttribute("aria-label", "로그");
 document.body.appendChild(networkDebugButton);
+const testWhiteButterflyButton = document.createElement("button");
+testWhiteButterflyButton.id = "test-white-butterfly-button";
+testWhiteButterflyButton.type = "button";
+testWhiteButterflyButton.textContent = "흰나비+10";
+testWhiteButterflyButton.setAttribute("aria-label", "흰나비 10마리 테스트");
+document.body.appendChild(testWhiteButterflyButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
 magicPowderInventory.id = "magic-powder-inventory";
@@ -2581,9 +2590,7 @@ function normalizeExtraPlantState(plant) {
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
   }
-  if (plant.growthTier >= 4) {
-    plant.waterCapacity = 3;
-  }
+  plant.waterCapacity = plant.growthTier >= 4 ? 3 : 2;
 }
 
 function updateExtraPlantState(plant, now) {
@@ -4365,9 +4372,7 @@ function applyLoadedPlantState(loadedPlant) {
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
-  if (plantRuntime.growthTier >= 4) {
-    plantRuntime.waterCapacity = 3;
-  }
+  plantRuntime.waterCapacity = plantRuntime.growthTier >= 4 ? 3 : 2;
 }
 
 function getPlantStateForStorage() {
@@ -5640,6 +5645,12 @@ function tryCraftMagicPowder() {
   }, magicPowderCraftMs);
   updateButterflyInventoryUi();
   return true;
+}
+
+function addWhiteButterfliesForTest() {
+  butterflyState.caughtCounts.white = (butterflyState.caughtCounts.white || 0) + 10;
+  saveButterflyCaughtCounts();
+  updateButterflyInventoryUi();
 }
 
 function generateButterflyId() {
