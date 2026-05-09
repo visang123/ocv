@@ -75,7 +75,6 @@ import {
   plantWaterLevelTickMs,
   plantGrowthMs,
   overwaterWindowMs,
-  plantRotClearMs,
   BUTTERFLY_SIZE,
   butterflyMaxAlive,
   butterflyColors,
@@ -2549,11 +2548,6 @@ function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
 
   if (plant.status === "rotten") {
-    if (plant.rottenAt && now - plant.rottenAt >= plantRotClearMs) {
-      plant.removed = true;
-      saveAppleState();
-      syncWorldState(true);
-    }
     return;
   }
 
@@ -3482,20 +3476,7 @@ function waterPlant(target) {
   updatePlantWaterLevel();
 
   if (plantRuntime.status === "dry") {
-    plantRuntime.status = "normal";
-    plantRuntime.waterLevel = 1;
-    plantRuntime.waterLevelUpdatedAt = now;
-    plantRuntime.becameEmptyAt = null;
-    plantRuntime.isOverwatered = false;
-    plantRuntime.needsFirstWater = false;
-    plantRuntime.lastWateredAt = now;
-    plantRuntime.wateredAtList = plantRuntime.wateredAtList
-      .filter(function (wateredAt) {
-        return now - wateredAt <= overwaterWindowMs;
-      })
-      .concat(now);
-    saveSeedState();
-    syncWorldState(true);
+    // Dry soil is terminal by design; watering cannot recover it.
     updatePlantState();
     return;
   }
@@ -3567,20 +3548,7 @@ function waterExtraPlant(plant) {
   updateExtraPlantWaterLevel(plant, now);
 
   if (plant.status === "dry") {
-    plant.status = "normal";
-    plant.waterLevel = 1;
-    plant.waterLevelUpdatedAt = now;
-    plant.becameEmptyAt = null;
-    plant.isOverwatered = false;
-    plant.needsFirstWater = false;
-    plant.lastWateredAt = now;
-    plant.wateredAtList = plant.wateredAtList
-      .filter(function (wateredAt) {
-        return now - wateredAt <= overwaterWindowMs;
-      })
-      .concat(now);
-    saveAppleState();
-    syncWorldState(true);
+    // Dry soil is terminal by design; watering cannot recover it.
     updateExtraSeedsAndPlants();
     return;
   }
@@ -3703,21 +3671,6 @@ function updatePlantState() {
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
     saveSeedState();
-  }
-
-  // Once the plant has rotted we let the rotten soil image linger briefly so
-  // the player can see the result, then clear the slot entirely so they can
-  // plant again. This also makes rot terminal: there's no path back to a
-  // healthy plant in the same slot.
-  if (
-    plantRuntime.status === "rotten" &&
-    plantRuntime.rottenAt &&
-    now - plantRuntime.rottenAt >= plantRotClearMs
-  ) {
-    removeMainPlant();
-    saveSeedState();
-    syncWorldState(true);
-    return;
   }
 
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
