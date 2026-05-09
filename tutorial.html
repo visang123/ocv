@@ -6,11 +6,20 @@
   <script>
     (function () {
       try {
-        if (!/[?&]ovc_world=1(?:&|$)/.test(location.search || "")) return;
+        var q = location.search || "";
+        var h = location.hash || "";
+        function ovcWantsWorldHub() {
+          if (/[?&]ovc_world=(?:1|true|yes)(?:&|$)/i.test(q)) return true;
+          if (/ovc_world=(?:1|true|yes)/i.test(h)) return true;
+          if (/^#world(?:=|:)?(?:1|true|yes)?$/i.test(h)) return true;
+          return false;
+        }
+        if (!ovcWantsWorldHub()) return;
         sessionStorage.setItem("ovcForceWorldHubV1", "1");
         var u = new URL("index.html", location.href);
         u.searchParams.set("v", "20260517e");
         u.searchParams.set("t", String(Date.now()));
+        u.searchParams.set("ovc_world", "1");
         location.replace(u.toString());
       } catch (e) {}
     })();
@@ -24,6 +33,9 @@
       <img class="app-loading-logo" src="이미지/ovc-logo-loading.png" alt="OVC">
       <div class="app-loading-title">OVC</div>
       <div id="app-loading-text" class="app-loading-text">Loading...</div>
+      <p class="tutorial-escape-to-world" style="margin:14px 12px 0;font-size:13px;line-height:1.45;text-align:center;">
+        <a href="index.html?ovc_world=1" style="color:#dbeafe;text-decoration:underline;font-weight:600;">본편(월드)으로 바로 가기 · 튜토리얼 건너뛰기</a>
+      </p>
     </div>
   </div>
   <div class="viewport">

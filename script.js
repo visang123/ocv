@@ -252,14 +252,27 @@ const ovcForceWorldHubUrlParam = "ovc_world";
 function ovcUrlIndicatesForceWorldHub() {
   try {
     if (typeof window === "undefined" || !window.location) return false;
-    return (
-      new URLSearchParams(window.location.search || "").get(
-        ovcForceWorldHubUrlParam
-      ) === "1"
+    var raw = new URLSearchParams(window.location.search || "").get(
+      ovcForceWorldHubUrlParam
     );
+    if (raw === "1" || raw === "true" || raw === "yes") return true;
+    var h = window.location.hash || "";
+    if (/ovc_world=(?:1|true|yes)/i.test(h)) return true;
+    if (/^#world(?:=|:)?(?:1|true|yes)?$/i.test(h)) return true;
+    return false;
   } catch (e) {
     return false;
   }
+}
+
+function ovcForceWorldHubIsRequested() {
+  try {
+    if (ovcUrlIndicatesForceWorldHub()) return true;
+    if (sessionStorage.getItem(ovcForceWorldHubSessionKey) === "1") {
+      return true;
+    }
+  } catch (e) {}
+  return false;
 }
 
 try {
@@ -349,15 +362,7 @@ const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
 function ovcApplyForceWorldHubBypassLoggedIn() {
   if (!currentUserId) return false;
-  var force = false;
-  try {
-    force =
-      sessionStorage.getItem(ovcForceWorldHubSessionKey) === "1" ||
-      ovcUrlIndicatesForceWorldHub();
-  } catch (eRead) {
-    return false;
-  }
-  if (!force) return false;
+  if (!ovcForceWorldHubIsRequested()) return false;
   try {
     sessionStorage.removeItem(ovcForceWorldHubSessionKey);
     sessionStorage.removeItem(ovcTutorialReplaySessionKey);
@@ -6128,6 +6133,7 @@ function finishCharacterSelect() {
   syncPlayerColorToServer(true);
 
   restoreWorldHubIfVeteranWithoutActiveReplay();
+  ovcApplyForceWorldHubBypassLoggedIn();
   var replayActiveForSpawn = false;
   try {
     replayActiveForSpawn =
@@ -7860,8 +7866,12 @@ function setup() {
 }
 
 try {
+  if (currentUserId) {
+    ovcApplyForceWorldHubBypassLoggedIn();
+  }
   setup();
   if (currentUserId) {
+    ovcApplyForceWorldHubBypassLoggedIn();
     repairOnboardingCompletionFromStoredStep();
     restoreWorldHubIfVeteranWithoutActiveReplay();
     if (getStoredFlag(onboardingFlowDoneKey)) {

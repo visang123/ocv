@@ -6,8 +6,15 @@
   <script>
     (function () {
       try {
-        if (!/[?&]ovc_world=1(?:&|$)/.test(location.search || "")) return;
-        sessionStorage.setItem("ovcForceWorldHubV1", "1");
+        var q = location.search || "";
+        var h = location.hash || "";
+        if (
+          /[?&]ovc_world=(?:1|true|yes)(?:&|$)/i.test(q) ||
+          /ovc_world=(?:1|true|yes)/i.test(h) ||
+          /^#world(?:=|:)?(?:1|true|yes)?$/i.test(h)
+        ) {
+          sessionStorage.setItem("ovcForceWorldHubV1", "1");
+        }
       } catch (e) {}
     })();
   </script>
