@@ -21,6 +21,7 @@ const growthFill = document.getElementById("growth-fill");
 const guideBook = document.getElementById("guide-book");
 const guideBookButton = document.getElementById("guide-book-button");
 const guideCard = document.getElementById("guide-card");
+const guideCloseButton = document.getElementById("guide-close-button");
 const guidePages = Array.from(document.querySelectorAll(".guide-page"));
 const guidePrev = document.getElementById("guide-prev");
 const guideNext = document.getElementById("guide-next");
@@ -69,6 +70,7 @@ export {
   guideBook,
   guideBookButton,
   guideCard,
+  guideCloseButton,
   guidePages,
   guidePrev,
   guideNext,

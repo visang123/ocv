@@ -110,6 +110,7 @@ import {
   guideBook,
   guideBookButton,
   guideCard,
+  guideCloseButton,
   guidePages,
   guidePrev,
   guideNext,
@@ -274,17 +275,11 @@ function storageKeyGuideBookPickedForRoom() {
 }
 
 function hasPickedMainSeedInCurrentRoom() {
-  if (getStoredFlag(storageKeyMainSeedPickedForRoom())) return true;
-  if (getStoredFlag(mainSeedCollectedKey)) {
-    setStoredFlag(storageKeyMainSeedPickedForRoom(), true);
-    return true;
-  }
-  return false;
+  return sessionStorage.getItem(storageKeyMainSeedPickedForRoom()) === "true";
 }
 
 function setMainSeedPickedForCurrentRoom() {
-  setStoredFlag(storageKeyMainSeedPickedForRoom(), true);
-  setStoredFlag(mainSeedCollectedKey, true);
+  sessionStorage.setItem(storageKeyMainSeedPickedForRoom(), "true");
 }
 
 function hasPickedGuideBookInCurrentRoom() {
@@ -360,7 +355,7 @@ playerBaseImage.addEventListener("load", function () {
     applyPlayerColor(selectedPlayerColor);
   }
 });
-playerBaseImage.src = "player-white.png";
+playerBaseImage.src = "이미지/player-white.png";
 if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
 }
@@ -420,6 +415,7 @@ function getAccountSessionLeaderStorageKey() {
 }
 
 function claimAccountSessionTabOwnership() {
+  const previousSessionId = sessionStorage.getItem(currentSessionKey) || "";
   const leaderToken = Date.now() + "-" + Math.random().toString(16).slice(2);
   const newSessionId = "session-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   sessionStorage.setItem(accountLeaderTokenSessionKey, leaderToken);
@@ -433,6 +429,17 @@ function claimAccountSessionTabOwnership() {
   );
   currentSessionId = newSessionId;
   sessionStorage.setItem(currentSessionKey, currentSessionId);
+
+  if (
+    previousSessionId &&
+    previousSessionId !== currentSessionId &&
+    window.OVCOnline &&
+    typeof window.OVCOnline.removePresence === "function"
+  ) {
+    Promise.resolve(window.OVCOnline.removePresence(previousSessionId)).catch(function () {
+      // Best effort cleanup for hard refreshes.
+    });
+  }
 }
 
 function onAccountSessionLeaderStorageEvent(event) {
@@ -498,24 +505,6 @@ function applySupersededTabShutdown() {
 claimAccountSessionTabOwnership();
 window.addEventListener("storage", onAccountSessionLeaderStorageEvent);
 
-window.addEventListener(
-  "keydown",
-  function (event) {
-    if (isTabSessionSuperseded) return;
-    if (
-      event.code === "KeyR" &&
-      event.shiftKey &&
-      (event.ctrlKey || event.metaKey) &&
-      !event.repeat
-    ) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      resetGameForTesting();
-    }
-  },
-  true
-);
-
 function toScreenX(worldX) {
   return toScreenXUtil(worldX, ground, WORLD_WIDTH);
 }
@@ -547,6 +536,10 @@ function setWorldPosition(element, x, y) {
 }
 
 document.addEventListener("keydown", function (event) {
+  if (event.code === "KeyR" && event.shiftKey && (event.ctrlKey || event.metaKey)) {
+    return;
+  }
+
   if (isTabSessionSuperseded) {
     event.preventDefault();
     return;
@@ -595,7 +588,10 @@ document.addEventListener("keydown", function (event) {
 
   if (key === "q" && !event.repeat) {
     event.preventDefault();
-    if (tryTalkToPlantMaster()) return;
+    if (isNearPlantMaster()) {
+      tryTalkToPlantMaster();
+      return;
+    }
     useHeldItem();
   }
 
@@ -614,6 +610,10 @@ document.addEventListener("keydown", function (event) {
 });
 
 document.addEventListener("keyup", function (event) {
+  if (event.code === "KeyR" && event.shiftKey && (event.ctrlKey || event.metaKey)) {
+    return;
+  }
+
   const key = getControlKey(event);
 
   if (key in keys) {
@@ -673,12 +673,22 @@ signBoard.addEventListener("click", function () {
   updateGuideCard();
 });
 
-guideCard.addEventListener("click", function () {
+function closeGuideCardFromClick() {
   isGuideBookOpen = false;
   if (isNearSignBoard()) {
     isGuideDismissedAtSign = true;
   }
   updateGuideCard();
+}
+
+guideCard.addEventListener("pointerdown", function (event) {
+  if (event.target.closest("#guide-nav")) return;
+  closeGuideCardFromClick();
+});
+
+guideCloseButton.addEventListener("click", function (event) {
+  event.stopPropagation();
+  closeGuideCardFromClick();
 });
 
 document.addEventListener("click", function (event) {
@@ -686,9 +696,7 @@ document.addEventListener("click", function (event) {
   if (guideCard.contains(event.target)) return;
   if (event.target === guideBookButton) return;
 
-  isGuideBookOpen = false;
-  isGuideDismissedAtSign = true;
-  updateGuideCard();
+  closeGuideCardFromClick();
 }, true);
 
 seed.addEventListener("mouseenter", function () {
@@ -2299,7 +2307,7 @@ function updateSeedPosition() {
   if (!shouldShowMainSeed) {
     isHoveringMainSeed = false;
   }
-  seed.src = plantRuntime.isSeedDry ? "seed-dry.png" : "seed.png";
+  seed.src = plantRuntime.isSeedDry ? "이미지/seed-dry.png" : "이미지/seed.png";
 
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
     heldItem = null;
@@ -2339,7 +2347,7 @@ function updateExtraSeedsAndPlants() {
   appleState.extraSeeds.forEach(function (extraSeed) {
     ensureExtraSeedElement(extraSeed);
     const isDry = isExtraSeedDry(extraSeed, now);
-    extraSeed.element.src = isDry ? "seed-dry.png" : "seed.png";
+    extraSeed.element.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
     extraSeed.element.style.display =
       extraSeed.planted || extraSeed.inInventory ? "none" : "block";
 
@@ -2460,13 +2468,23 @@ function normalizeExtraPlantState(plant) {
   } else {
     plant.sproutEvolutionMs = Math.max(0, plant.sproutEvolutionMs);
   }
+
+  if (plant.status === "rotten" || plant.isOverwatered) {
+    plant.status = "rotten";
+    plant.growthStartedAt = null;
+    plant.isSproutGrown = false;
+    plant.sproutGrownAt = null;
+    plant.sproutEvolutionMs = 0;
+    plant.sproutEvolutionLastTickAt = null;
+    plant.isSproutSelfSustaining = false;
+    plant.needsFirstWater = false;
+  }
 }
 
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
 
   if (plant.status === "rotten") {
-    plant.removed = true;
     return;
   }
 
@@ -2590,10 +2608,10 @@ function updateExtraPlantWaterLevel(plant, now) {
 }
 
 function getPlantSoilSrc(plant) {
-  if (plant.status === "rotten" || plant.isOverwatered) return "soil-rotten.png";
-  if (plant.status === "wet") return "soil-wet.png";
-  if (plant.status === "dry") return "soil-dry.png";
-  return "tilled-soil.png";
+  if (plant.status === "rotten" || plant.isOverwatered) return "이미지/soil-rotten.png";
+  if (plant.status === "wet") return "이미지/soil-wet.png";
+  if (plant.status === "dry") return "이미지/soil-dry.png";
+  return "이미지/tilled-soil.png";
 }
 
 function updateSeedInventory() {
@@ -2617,7 +2635,7 @@ function updateSeedInventory() {
       ? "\uBC84\uB9AC\uAE30 click"
       : "\uC2EC\uAE30 click";
     extraSeed.inventoryElement.classList.toggle("is-dry", isDry);
-    extraSeed.inventoryImage.src = isDry ? "seed-dry.png" : "seed.png";
+    extraSeed.inventoryImage.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
     extraSeed.inventoryElement.style.display = "block";
   });
 
@@ -2668,7 +2686,7 @@ function ensureSeedInventoryElement(extraSeed) {
 
   const image = document.createElement("img");
   image.alt = extraSeed.label || "seed";
-  image.src = "seed.png";
+  image.src = "이미지/seed.png";
   element.appendChild(image);
   seedInventory.appendChild(element);
 
@@ -2682,7 +2700,7 @@ function ensureExtraSeedElement(extraSeed) {
   const element = document.createElement("img");
   element.className = "extra-seed";
   element.alt = "extra seed";
-  element.src = "seed.png";
+  element.src = "이미지/seed.png";
   setWorldSize(element, SEED_SIZE);
   ground.appendChild(element);
   extraSeed.element = element;
@@ -2694,21 +2712,21 @@ function ensureExtraPlantElements(plant) {
   const spotElement = document.createElement("img");
   spotElement.className = "extra-plant-spot";
   spotElement.alt = "extra plant spot";
-  spotElement.src = "tilled-soil.png";
+  spotElement.src = "이미지/tilled-soil.png";
   setWorldSize(spotElement, PLANT_SPOT_WIDTH);
   ground.appendChild(spotElement);
 
   const sproutElement = document.createElement("img");
   sproutElement.className = "extra-sprout";
   sproutElement.alt = "extra sprout";
-  sproutElement.src = "sprout.png";
+  sproutElement.src = "이미지/sprout.png";
   setWorldSize(sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   ground.appendChild(sproutElement);
 
   const waterNeededElement = document.createElement("img");
   waterNeededElement.className = "extra-water-needed";
   waterNeededElement.alt = "water needed";
-  waterNeededElement.src = "water-needed.png";
+  waterNeededElement.src = "이미지/water-needed.png";
   setWorldSize(waterNeededElement, WATER_NEEDED_SIZE);
   ground.appendChild(waterNeededElement);
 
@@ -2740,9 +2758,9 @@ function clearExtraSeedAndPlantElements() {
 }
 
 function updateBucketPosition() {
-  bucket.src = isBucketFull ? "bucket-full.png" : "bucket-empty.png";
+  bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
   playerBucketOverlay.style.backgroundImage =
-    'url("' + (isBucketFull ? "bucket-full.png" : "bucket-empty.png") + '")';
+    'url("' + (isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png") + '")';
   const isBucketHeldByRemotePlayer =
     Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
     window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
@@ -3303,14 +3321,19 @@ function triggerWaterSplash() {
 function getNearestWateringTarget() {
   let nearest = null;
 
-  if (plantRuntime.isSeedPlanted && !plantRuntime.isSproutSelfSustaining) {
+  if (
+    plantRuntime.isSeedPlanted &&
+    !plantRuntime.isSproutSelfSustaining &&
+    plantRuntime.status !== "rotten" &&
+    !plantRuntime.isOverwatered
+  ) {
     const distance = getCenterDistance(
       plantRuntime.spotX,
       plantRuntime.spotY,
       PLANT_SPOT_WIDTH,
       PLANT_SPOT_HEIGHT
     );
-    if (distance < plantWaterDistance) {
+    if (distance <= plantWaterDistance) {
       nearest = {
         type: "main",
         plant: plantRuntime,
@@ -3321,8 +3344,9 @@ function getNearestWateringTarget() {
 
   appleState.extraPlants.forEach(function (plant) {
     if (plant.isSproutSelfSustaining) return;
+    if (plant.status === "rotten" || plant.isOverwatered) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
-    if (distance < plantWaterDistance && (!nearest || distance < nearest.distance)) {
+    if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
       nearest = {
         type: "extra",
         plant,
@@ -3421,6 +3445,7 @@ function waterPlant(target) {
     plantRuntime.sproutEvolutionMs = 0;
     plantRuntime.sproutEvolutionLastTickAt = null;
     plantRuntime.isSproutSelfSustaining = false;
+    plantRuntime.needsFirstWater = false;
   } else {
     plantRuntime.waterLevel += 1;
     plantRuntime.isOverwatered = false;
@@ -3495,6 +3520,7 @@ function waterExtraPlant(plant) {
     plant.sproutEvolutionMs = 0;
     plant.sproutEvolutionLastTickAt = null;
     plant.isSproutSelfSustaining = false;
+    plant.needsFirstWater = false;
   } else {
     plant.waterLevel += 1;
     plant.isOverwatered = false;
@@ -3505,6 +3531,7 @@ function waterExtraPlant(plant) {
   plant.becameEmptyAt = null;
 
   saveAppleState();
+  syncWorldState(true);
   updateExtraSeedsAndPlants();
 }
 
@@ -3577,13 +3604,13 @@ function updatePlantState() {
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
 
   if (mainSoilRotten) {
-    plantSpot.src = "soil-rotten.png";
+    plantSpot.src = "이미지/soil-rotten.png";
   } else if (plantRuntime.status === "wet") {
-    plantSpot.src = "soil-wet.png";
+    plantSpot.src = "이미지/soil-wet.png";
   } else if (plantRuntime.status === "dry") {
-    plantSpot.src = "soil-dry.png";
+    plantSpot.src = "이미지/soil-dry.png";
   } else {
-    plantSpot.src = "tilled-soil.png";
+    plantSpot.src = "이미지/tilled-soil.png";
   }
 
   if (mainSoilRotten) {
@@ -3910,13 +3937,13 @@ function refillWellIfNeeded() {
 }
 
 function updateWellImage() {
-  well.src = wellState.water > 0 ? "well.png" : "well-empty.png";
+  well.src = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
 }
 
 function updateWellCard() {
   const isVisible = isNearWell();
   const waterRatio = wellState.water / maxWellWater;
-  const wellImage = wellState.water > 0 ? "well.png" : "well-empty.png";
+  const wellImage = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
 
   wellCard.style.display = isVisible ? "flex" : "none";
   wellCardImage.src = wellImage;
@@ -4006,6 +4033,16 @@ function applyLoadedPlantState(loadedPlant) {
   }
 
   plantRuntime.sproutEvolutionLastTickAt = Date.now();
+
+  if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
+    plantRuntime.growthStartedAt = null;
+    plantRuntime.isSproutGrown = false;
+    plantRuntime.sproutGrownAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
+    plantRuntime.needsFirstWater = false;
+  }
 }
 
 function getPlantStateForStorage() {
@@ -4177,7 +4214,7 @@ function getTintedPlayerSrc(color) {
   }
 
   if (!playerBaseImageReady || !playerBaseImage.naturalWidth || !playerBaseImage.naturalHeight) {
-    return "player-white.png";
+    return "이미지/player-white.png";
   }
 
   const canvas = document.createElement("canvas");
@@ -4185,7 +4222,7 @@ function getTintedPlayerSrc(color) {
   canvas.height = playerBaseImage.naturalHeight;
   const context = canvas.getContext("2d");
   if (!context) {
-    return "player-white.png";
+    return "이미지/player-white.png";
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
@@ -4755,6 +4792,8 @@ function renderRemotePlayerState(state) {
   remotePlayer.worldY = nextY;
   remotePlayer.depth = Number(state.depth) || 0;
   remotePlayer.jumpY = Number(state.jumpY) || 0;
+  remotePlayer.userId = state.userId != null ? String(state.userId) : "";
+  remotePlayer.name = state.name || "OVC";
   const nextWaterSplashAt = Number(state.waterSplashAt || 0);
   if (
     nextWaterSplashAt > 0 &&
@@ -4822,7 +4861,15 @@ function pruneStaleRemotePlayers() {
 }
 
 function updateRemotePlayerCount() {
-  remotePlayerCount = Object.keys(remotePlayers).length;
+  const seenUsers = Object.create(null);
+  remotePlayerCount = Object.keys(remotePlayers).reduce(function (count, remoteId) {
+    const remotePlayer = remotePlayers[remoteId];
+    if (!remotePlayer) return count;
+    const userKey = remotePlayer.userId || ("name:" + (remotePlayer.name || remoteId));
+    if (seenUsers[userKey]) return count;
+    seenUsers[userKey] = true;
+    return count + 1;
+  }, 0);
   updateMultiplayerStatus(multiplayerStatusText);
 }
 

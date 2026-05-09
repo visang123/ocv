@@ -47,12 +47,12 @@ export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 
 /** Stage 1 sprout art duration after first sprout appears (ms). */
-export const sproutStage1Ms = 3 * SECOND_MS;
+export const sproutStage1Ms = 30 * SECOND_MS;
 /** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
 export const sproutStage2GrowMs = 1 * MINUTE_MS;
-export const sproutStage1Image = "sprout-stage1.svg";
-export const sproutStage2Image = "sprout-stage2.svg";
-export const sproutStage3Image = "sprout-stage3.svg";
+export const sproutStage1Image = "이미지/sprout-stage1.svg";
+export const sproutStage2Image = "이미지/sprout-stage2.svg";
+export const sproutStage3Image = "이미지/sprout-stage3.svg";
 /** Draw sizes per stage (world pixels). */
 export const SPROUT_STAGE_WIDTHS = [14, 22, 34];
 export const SPROUT_STAGE_HEIGHTS = [18, 32, 58];
@@ -67,12 +67,12 @@ export const guideInteractDistance = 60;
 export const npcInteractDistance = 60;
 export const wellUseDistance = 35;
 export const wellPourDistance = wellUseDistance;
-export const plantWaterDistance = 25;
+export const plantWaterDistance = 40;
 export const maxWellWater = 2;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
-export const plantDryMs = 2 * MINUTE_MS;
-export const plantWaterLevelTickMs = 1 * MINUTE_MS;
+export const plantDryMs = 40 * SECOND_MS;
+export const plantWaterLevelTickMs = 20 * SECOND_MS;
 export const plantGrowthMs = 3 * SECOND_MS;
 export const overwaterWindowMs = 60 * MINUTE_MS;
 

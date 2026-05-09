@@ -611,7 +611,7 @@ body::-webkit-scrollbar {
   display: none;
   width: 16px;
   height: 16px;
-  background: url("bucket-empty.png") center / contain no-repeat;
+  background: url("이미지/bucket-empty.png") center / contain no-repeat;
   pointer-events: none;
   z-index: 23;
 }
@@ -640,8 +640,8 @@ body::-webkit-scrollbar {
   background: var(--player-color, #fff);
   opacity: 0;
   mix-blend-mode: normal;
-  -webkit-mask: url("player-white.png") center / contain no-repeat;
-  mask: url("player-white.png") center / contain no-repeat;
+  -webkit-mask: url("이미지/player-white.png") center / contain no-repeat;
+  mask: url("이미지/player-white.png") center / contain no-repeat;
   pointer-events: none;
 }
 
@@ -713,8 +713,8 @@ body::-webkit-scrollbar {
   width: 82px;
   height: 164px;
   background: var(--preview-player-color, #ffffff);
-  -webkit-mask: url("player-white.png") center / contain no-repeat;
-  mask: url("player-white.png") center / contain no-repeat;
+  -webkit-mask: url("이미지/player-white.png") center / contain no-repeat;
+  mask: url("이미지/player-white.png") center / contain no-repeat;
 }
 
 .character-select-content h2 {
@@ -779,7 +779,7 @@ body::-webkit-scrollbar {
   top: 18px;
   width: 12px;
   height: 12px;
-  background: url("bucket-empty.png") center / contain no-repeat;
+  background: url("이미지/bucket-empty.png") center / contain no-repeat;
 }
 
 .remote-player-body {
@@ -1380,6 +1380,20 @@ body::-webkit-scrollbar {
   color: rgba(0, 0, 0, 0.96);
   font: 700 24px/1.45 Arial, sans-serif;
   z-index: 10;
+}
+
+#guide-close-button {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+  font: 700 24px/1 Arial, sans-serif;
+  cursor: pointer;
 }
 
 #guide-card p + p {
