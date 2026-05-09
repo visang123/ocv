@@ -253,15 +253,34 @@
           sessionStorage.setItem("ovcForceWorldHubV1", "1");
         } catch (e1) {}
         try {
+          var uid = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
+          if (uid) {
+            localStorage.setItem("ovcPendingWorldHubUserV1:" + uid, "1");
+          } else {
+            localStorage.setItem("ovcPendingWorldHubGuestV1", "1");
+          }
+        } catch (ePersist) {}
+        try {
           var u = new URL("index.html", location.href);
           u.searchParams.set("ovc_world", "1");
           u.searchParams.set("v", "20260517e");
           u.searchParams.set("t", String(Date.now()));
-          location.replace(u.toString());
+          var url = u.toString();
+          try {
+            window.top.location.replace(url);
+          } catch (eTop) {
+            location.replace(url);
+          }
         } catch (e2) {
-          location.replace(
-            "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
-          );
+          try {
+            window.top.location.replace(
+              "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
+            );
+          } catch (eTop2) {
+            location.replace(
+              "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
+            );
+          }
         }
       }
       function bind() {

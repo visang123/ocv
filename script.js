@@ -248,6 +248,45 @@ const ovcTutorialReplaySessionKey = "ovcTutorialReplaySessionV1";
 /** 튜토리얼 갇힘 탈출: `?ovc_world=1` 또는 sessionStorage 플래그 → index(월드)로 두고 온보딩 완료 저장 */
 const ovcForceWorldHubSessionKey = "ovcForceWorldHubV1";
 const ovcForceWorldHubUrlParam = "ovc_world";
+/** sessionStorage 말고도 탈출 의도를 남김(저장 실패·다른 탭 대비). 로그인 확정 시 제거. */
+const ovcPendingWorldHubGuestKey = "ovcPendingWorldHubGuestV1";
+
+function ovcPendingWorldHubUserStorageKey(userId) {
+  return "ovcPendingWorldHubUserV1:" + String(userId || "");
+}
+
+function ovcClearPendingWorldHubMarkers(userId) {
+  try {
+    sessionStorage.removeItem(ovcForceWorldHubSessionKey);
+    localStorage.removeItem(ovcPendingWorldHubGuestKey);
+    if (userId) localStorage.removeItem(ovcPendingWorldHubUserStorageKey(userId));
+  } catch (eClrMarkers) {}
+}
+
+function ovcHardNavigateToWorldIndex() {
+  try {
+    var u = new URL("index.html", window.location.href);
+    u.searchParams.set(ovcForceWorldHubUrlParam, "1");
+    u.searchParams.set("v", "20260517e");
+    u.searchParams.set("t", String(Date.now()));
+    var url = u.toString();
+    try {
+      window.top.location.replace(url);
+    } catch (eTop) {
+      window.location.replace(url);
+    }
+  } catch (eNav) {
+    try {
+      window.top.location.replace(
+        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
+      );
+    } catch (eTop2) {
+      window.location.replace(
+        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
+      );
+    }
+  }
+}
 
 function ovcUrlIndicatesForceWorldHub() {
   try {
@@ -269,6 +308,20 @@ function ovcForceWorldHubIsRequested() {
   try {
     if (ovcUrlIndicatesForceWorldHub()) return true;
     if (sessionStorage.getItem(ovcForceWorldHubSessionKey) === "1") {
+      return true;
+    }
+    if (localStorage.getItem(ovcPendingWorldHubGuestKey) === "1") {
+      return true;
+    }
+    var uidFromLs = "";
+    try {
+      uidFromLs = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
+    } catch (eUid) {}
+    if (
+      uidFromLs &&
+      localStorage.getItem(ovcPendingWorldHubUserStorageKey(uidFromLs)) ===
+        "1"
+    ) {
       return true;
     }
   } catch (e) {}
@@ -364,7 +417,7 @@ function ovcApplyForceWorldHubBypassLoggedIn() {
   if (!currentUserId) return false;
   if (!ovcForceWorldHubIsRequested()) return false;
   try {
-    sessionStorage.removeItem(ovcForceWorldHubSessionKey);
+    ovcClearPendingWorldHubMarkers(currentUserId);
     sessionStorage.removeItem(ovcTutorialReplaySessionKey);
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (eClr) {}
@@ -404,7 +457,7 @@ if (currentUserId) {
   isMainSeedAvailable = !hasPickedMainSeedInCurrentRoom();
   lastMainSeedStateChangeAt = Date.now();
   if (ovcApplyForceWorldHubBypassLoggedIn() && isTutorialDocumentEntry()) {
-    window.location.replace(ovcWorldIndexUrl());
+    ovcHardNavigateToWorldIndex();
   }
 }
 let isCharacterSelecting = false;
@@ -1280,11 +1333,12 @@ function skipTutorialFromSettings() {
   try {
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (e) {}
+  ovcClearPendingWorldHubMarkers(currentUserId || "");
   try {
     sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
   } catch (e2) {}
   isReloadingForWorldReset = true;
-  window.location.replace(ovcWorldIndexUrl());
+  ovcHardNavigateToWorldIndex();
 }
 
 function replayTutorialFromSettings() {
@@ -6134,6 +6188,15 @@ function finishCharacterSelect() {
 
   restoreWorldHubIfVeteranWithoutActiveReplay();
   ovcApplyForceWorldHubBypassLoggedIn();
+  if (
+    isTutorialDocumentEntry() &&
+    currentUserId &&
+    getStoredFlag(onboardingFlowDoneKey)
+  ) {
+    isReloadingForWorldReset = true;
+    ovcHardNavigateToWorldIndex();
+    return;
+  }
   var replayActiveForSpawn = false;
   try {
     replayActiveForSpawn =
@@ -7890,7 +7953,7 @@ try {
     getStoredFlag(onboardingFlowDoneKey)
   ) {
     ovcAbortedPageInit = true;
-    window.location.replace(ovcWorldIndexUrl());
+    ovcHardNavigateToWorldIndex();
   } else if (
     isWorldDocumentEntry() &&
     currentUserId &&
@@ -7905,6 +7968,20 @@ try {
     window.location.replace(ovcTutorialPageUrl());
   }
   if (!ovcAbortedPageInit) {
+    if (
+      isTutorialDocumentEntry() &&
+      ovcForceWorldHubIsRequested() &&
+      !currentUserId
+    ) {
+      ovcHardNavigateToWorldIndex();
+    } else if (
+      isTutorialDocumentEntry() &&
+      currentUserId &&
+      ovcForceWorldHubIsRequested()
+    ) {
+      ovcApplyForceWorldHubBypassLoggedIn();
+      ovcHardNavigateToWorldIndex();
+    } else {
     if (
       currentUserId &&
       !getStoredFlag(onboardingFlowDoneKey) &&
@@ -7963,6 +8040,7 @@ try {
     if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
       hasHydratedSharedWorldFromServer = true;
       setTimeout(hideAppLoadingScreen, 300);
+    }
     }
   }
 } catch (initError) {
