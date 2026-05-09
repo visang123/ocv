@@ -235,6 +235,15 @@ let movementTutorialPhase = 0;
 let movementTutorialBaseline = null;
 let onboardingFlowStep = 1;
 let onboardingJumpLatch = false;
+let onboardingFirstGuideEscHintShown = false;
+let onboardingEscHintTimerId = null;
+let onboardingCongratsTimerId = null;
+let onboardingTreeLeaveHintTimerId = null;
+let onboardingFinalHideTimerId = null;
+let onboardingButterflyCountBaseline = null;
+let onboardingTutorialEnteredTree = false;
+let onboardingSeedTutorialSecondLine = false;
+const ONBOARDING_MAX_STEP = 28;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
@@ -815,6 +824,20 @@ window.addEventListener(
     const direction = event.deltaY > 0 ? -1 : 1;
     zoomLevel = clampZoom(zoomLevel + direction * zoomStep);
     updateCamera();
+    if (!getStoredFlag(onboardingFlowDoneKey)) {
+      if (onboardingFlowStep === 19) {
+        onboardingFlowStep = 20;
+        persistOnboardingStep();
+        updateOnboardingFlowUI();
+      } else if (
+        onboardingFlowStep === 20 &&
+        zoomLevel <= getFitZoom() + 0.06
+      ) {
+        onboardingFlowStep = 21;
+        persistOnboardingStep();
+        updateOnboardingFlowUI();
+      }
+    }
   },
   { passive: false }
 );
@@ -847,9 +870,16 @@ function closeGuideCardFromClick() {
   }
   dismissGuideBookClickPrompt();
   updateGuideCard();
-  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 3) {
-    onboardingFlowStep = 4;
-    setStoredValue(onboardingFlowStepKey, "4");
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    if (onboardingFlowStep === 3) {
+      onboardingClearEscHintTimer();
+      onboardingFirstGuideEscHintShown = false;
+      onboardingFlowStep = 4;
+      persistOnboardingStep();
+    } else if (onboardingFlowStep === 10) {
+      onboardingFlowStep = 11;
+      persistOnboardingStep();
+    }
   }
 }
 
@@ -1157,9 +1187,9 @@ function createStarterSeedInventoryItem() {
   markWorldDirty();
   syncWorldState(true);
   saveAppleState();
-  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 4) {
-    onboardingFlowStep = 5;
-    setStoredValue(onboardingFlowStepKey, "5");
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 6) {
+    onboardingFlowStep = 7;
+    persistOnboardingStep();
   }
   return starterSeed;
 }
@@ -1302,8 +1332,24 @@ function syncMovementTutorialOverlay() {
 }
 
 function clearOnboardingHighlights() {
-  [guideBook, guideBookButton, seed, plantMaster, player].forEach(function (el) {
+  [
+    guideBook,
+    guideBookButton,
+    seed,
+    plantMaster,
+    player,
+    well,
+    bucket,
+    bigTree,
+    plantSpot,
+    appleInventory,
+    seedInventory,
+    inventoryApple
+  ].forEach(function (el) {
     if (el) el.classList.remove("onboarding-highlight");
+  });
+  treeAppleElements.forEach(function (el) {
+    el.classList.remove("onboarding-highlight");
   });
 }
 
@@ -1318,6 +1364,89 @@ function setOnboardingCalloutVisible(show, text) {
   onboardingCalloutText.textContent = text || "";
 }
 
+function persistOnboardingStep() {
+  setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
+}
+
+function onboardingClearEscHintTimer() {
+  if (onboardingEscHintTimerId) {
+    window.clearTimeout(onboardingEscHintTimerId);
+    onboardingEscHintTimerId = null;
+  }
+}
+
+function onboardingClearAllOnboardingTimers() {
+  onboardingClearEscHintTimer();
+  if (onboardingCongratsTimerId) {
+    window.clearTimeout(onboardingCongratsTimerId);
+    onboardingCongratsTimerId = null;
+  }
+  if (onboardingTreeLeaveHintTimerId) {
+    window.clearTimeout(onboardingTreeLeaveHintTimerId);
+    onboardingTreeLeaveHintTimerId = null;
+  }
+  if (onboardingFinalHideTimerId) {
+    window.clearTimeout(onboardingFinalHideTimerId);
+    onboardingFinalHideTimerId = null;
+  }
+}
+
+function scheduleOnboardingFirstGuideEscHint() {
+  onboardingClearEscHintTimer();
+  onboardingEscHintTimerId = window.setTimeout(function () {
+    onboardingEscHintTimerId = null;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 3) return;
+    onboardingFirstGuideEscHintShown = true;
+    updateOnboardingFlowUI();
+  }, 5000);
+}
+
+function onboardingScheduleTutorialCompleteHide() {
+  if (onboardingFinalHideTimerId) {
+    window.clearTimeout(onboardingFinalHideTimerId);
+  }
+  onboardingFinalHideTimerId = window.setTimeout(function () {
+    onboardingFinalHideTimerId = null;
+    setOnboardingCalloutVisible(false, "");
+    clearOnboardingHighlights();
+    setStoredFlag(onboardingFlowDoneKey, true);
+    onboardingFlowStep = 0;
+    setStoredValue(onboardingFlowStepKey, "0");
+  }, 7000);
+}
+
+function isPlayerNearTutorialTreeArea() {
+  const cx = BIG_TREE_X + BIG_TREE_WIDTH / 2;
+  const cy = BIG_TREE_Y + BIG_TREE_HEIGHT / 2;
+  const px = playerX + PLAYER_WIDTH / 2;
+  const py = getPlayerFootY() - (player.offsetHeight || PLAYER_HEIGHT) / 2;
+  return Math.hypot(px - cx, py - cy) < 100;
+}
+
+function isNearAnyUnpickedAppleTutorial() {
+  return appleState.apples.some(function (apple) {
+    if (appleState.pickedIds.includes(apple.id)) return false;
+    return (
+      getCenterDistance(apple.x, apple.y, apple.size, apple.size) < 36
+    );
+  });
+}
+
+function highlightUnpickedApplesForTutorial() {
+  const visibleById = {};
+  appleState.apples.forEach(function (apple) {
+    if (!appleState.pickedIds.includes(apple.id)) {
+      visibleById[apple.id] = true;
+    }
+  });
+  treeAppleElements.forEach(function (el) {
+    const id = el.dataset.appleId;
+    if (id && visibleById[id]) {
+      el.classList.add("onboarding-highlight");
+    }
+  });
+}
+
 function syncOnboardingFlowProgressFromWorld() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   let changed = false;
@@ -1325,44 +1454,111 @@ function syncOnboardingFlowProgressFromWorld() {
     onboardingFlowStep = 2;
     changed = true;
   }
-  if (hasPickedMainSeedInCurrentRoom() && onboardingFlowStep < 5) {
-    onboardingFlowStep = 5;
+  if (hasPickedMainSeedInCurrentRoom() && onboardingFlowStep < 7) {
+    onboardingFlowStep = 7;
     changed = true;
   }
-  if (plantRuntime.isSeedPlanted && onboardingFlowStep < 6) {
-    onboardingFlowStep = 6;
-    changed = true;
-  }
-  if (
-    isNpcDialogueComplete &&
-    plantRuntime.isSeedPlanted &&
-    onboardingFlowStep < 8
-  ) {
+  if (plantRuntime.isSeedPlanted && onboardingFlowStep < 8) {
     onboardingFlowStep = 8;
     changed = true;
   }
+  if (isNpcDialogueComplete && plantRuntime.isSeedPlanted && onboardingFlowStep < 10) {
+    onboardingFlowStep = 10;
+    changed = true;
+  }
   if (changed) {
-    setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
+    persistOnboardingStep();
   }
 }
 
 function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
+  onboardingFirstGuideEscHintShown = false;
+  onboardingButterflyCountBaseline = null;
+  onboardingTutorialEnteredTree = false;
+  onboardingClearAllOnboardingTimers();
   if (getStoredFlag(onboardingFlowDoneKey)) {
     onboardingFlowStep = 0;
     return;
   }
   const raw = parseInt(String(getStoredValue(onboardingFlowStepKey) || "1"), 10);
   onboardingFlowStep =
-    Number.isFinite(raw) && raw >= 1 && raw <= 8 ? raw : 1;
+    Number.isFinite(raw) && raw >= 1 && raw <= ONBOARDING_MAX_STEP ? raw : 1;
   syncOnboardingFlowProgressFromWorld();
+  if (
+    onboardingFlowStep === 3 &&
+    guideCard &&
+    guideCard.style.display === "block" &&
+    !onboardingFirstGuideEscHintShown
+  ) {
+    scheduleOnboardingFirstGuideEscHint();
+  }
 }
 
 function onboardingNotifyMainPlantPlanted() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
-  if (onboardingFlowStep === 5) {
+  if (onboardingFlowStep === 7) {
+    onboardingFlowStep = 8;
+    persistOnboardingStep();
+  }
+}
+
+function onboardingAutoAdvanceSteps() {
+  if (getStoredFlag(onboardingFlowDoneKey) || !hasSpawnedCharacter) return;
+
+  if (onboardingFlowStep === 5 && isNearSeed()) {
     onboardingFlowStep = 6;
-    setStoredValue(onboardingFlowStepKey, "6");
+    persistOnboardingStep();
+  }
+  if (
+    onboardingFlowStep === 20 &&
+    zoomLevel <= getFitZoom() + 0.06
+  ) {
+    onboardingFlowStep = 21;
+    persistOnboardingStep();
+  }
+  if (onboardingFlowStep === 8 && isNearPlantMaster()) {
+    onboardingFlowStep = 9;
+    persistOnboardingStep();
+  }
+  if (onboardingFlowStep === 11 && (isNearWell() || isNearBucket())) {
+    onboardingFlowStep = 12;
+    persistOnboardingStep();
+  }
+  if (
+    onboardingFlowStep === 15 &&
+    heldItem === HELD_ITEM_BUCKET &&
+    isBucketFull &&
+    getNearestWateringTarget() &&
+    getNearestWateringTarget().type === "main"
+  ) {
+    onboardingFlowStep = 16;
+    persistOnboardingStep();
+  }
+  if (onboardingFlowStep === 21 && isPlayerNearTutorialTreeArea()) {
+    onboardingFlowStep = 22;
+    persistOnboardingStep();
+  }
+  if (onboardingFlowStep === 22 && isPlayerInTreeSpace()) {
+    onboardingTutorialEnteredTree = true;
+  }
+  if (
+    onboardingFlowStep === 22 &&
+    isPlayerInTreeSpace() &&
+    isNearAnyUnpickedAppleTutorial()
+  ) {
+    onboardingFlowStep = 23;
+    persistOnboardingStep();
+  }
+  if (
+    onboardingFlowStep === 25 &&
+    onboardingTutorialEnteredTree &&
+    onboardingSeedTutorialSecondLine &&
+    !isPlayerInTreeSpace()
+  ) {
+    onboardingFlowStep = 26;
+    persistOnboardingStep();
+    onboardingScheduleTutorialCompleteHide();
   }
 }
 
@@ -1379,7 +1575,15 @@ function updateOnboardingFlowUI() {
     return;
   }
 
+  onboardingAutoAdvanceSteps();
+
   clearOnboardingHighlights();
+
+  const guideOpen = guideCard && guideCard.style.display === "block";
+
+  if (onboardingFlowStep === 3 && guideOpen && !onboardingEscHintTimerId && !onboardingFirstGuideEscHintShown) {
+    scheduleOnboardingFirstGuideEscHint();
+  }
 
   switch (onboardingFlowStep) {
     case 1: {
@@ -1398,11 +1602,12 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 3: {
-      const guideOpen = guideCard && guideCard.style.display === "block";
       if (guideOpen) {
+        const line1 = "게임과 관련된 설명을 볼 수 있습니다.";
+        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
-          "게임과 관련된 설명을 볼 수 있습니다."
+          onboardingFirstGuideEscHintShown ? line1 + "\n\n" + line2 : line1
         );
         if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
       } else {
@@ -1413,56 +1618,153 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "옆에 씨앗으로 이동 후, e키를 눌러 소지하세요."
-      );
-      if (seed) seed.classList.add("onboarding-highlight");
-      break;
-    }
-    case 5: {
-      setOnboardingCalloutVisible(
-        true,
-        "심고 싶은 위치로 이동 후, 클릭하세요.(제한시간 있음)"
+        "space바를 누르면 점프를 합니다. 해보세요!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
+    case 5: {
+      setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
+      if (seed) seed.classList.add("onboarding-highlight");
+      break;
+    }
     case 6: {
-      if (isNearPlantMaster()) {
-        onboardingFlowStep = 7;
-        setStoredValue(onboardingFlowStepKey, "7");
-        updateOnboardingFlowUI();
-        return;
-      }
-      setOnboardingCalloutVisible(
-        true,
-        "이제 새싹이 자라납니다. 키우는 비밀은 npc에게.\n\nnpc에게 이동하세요."
-      );
-      if (plantMaster) plantMaster.classList.add("onboarding-highlight");
+      setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
+      if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 7: {
+      setOnboardingCalloutVisible(
+        true,
+        "심고 싶은 위치로 이동후, 클릭 해 씨앗을 심으세요."
+      );
+      if (player) player.classList.add("onboarding-highlight");
+      break;
+    }
+    case 8: {
+      setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
+      if (plantMaster) plantMaster.classList.add("onboarding-highlight");
+      break;
+    }
+    case 9: {
       if (isNpcDialogueRunning) {
         setOnboardingCalloutVisible(false, "");
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      if (isNpcDialogueComplete) {
-        onboardingFlowStep = 8;
-        setStoredValue(onboardingFlowStepKey, "8");
-        onboardingJumpLatch = false;
-        updateOnboardingFlowUI();
-        return;
-      }
-      setOnboardingCalloutVisible(true, "q를 눌러 대화하세요.");
+      setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
-    case 8: {
+    case 10: {
+      if (guideOpen) {
+        setOnboardingCalloutVisible(
+          true,
+          "설명을 참고하고 설명창을 esc 또는 클릭으로 닫으세요."
+        );
+        if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+      } else {
+        setOnboardingCalloutVisible(false, "");
+      }
+      break;
+    }
+    case 11: {
+      setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
+      if (well) well.classList.add("onboarding-highlight");
+      if (bucket) bucket.classList.add("onboarding-highlight");
+      break;
+    }
+    case 12: {
       setOnboardingCalloutVisible(
         true,
-        "점프도 가능합니다. space바를 누르세요."
+        "양동이 근처로가 양동이를 e눌러 드세요."
       );
+      if (bucket) bucket.classList.add("onboarding-highlight");
+      break;
+    }
+    case 13: {
+      setOnboardingCalloutVisible(true, "e를눌러 다시 내려놓으세요.");
       if (player) player.classList.add("onboarding-highlight");
+      break;
+    }
+    case 14: {
+      setOnboardingCalloutVisible(
+        true,
+        "다시 양동이를 들어 우물 근처로 가서 q를 누르세요."
+      );
+      if (bucket) bucket.classList.add("onboarding-highlight");
+      if (well) well.classList.add("onboarding-highlight");
+      break;
+    }
+    case 15: {
+      setOnboardingCalloutVisible(true, "그대로 아까심은 씨앗으로 가세요.");
+      if (plantSpot) plantSpot.classList.add("onboarding-highlight");
+      break;
+    }
+    case 16: {
+      setOnboardingCalloutVisible(true, "q를 다시 눌러 물을 뿌리세요.");
+      if (plantSpot) plantSpot.classList.add("onboarding-highlight");
+      break;
+    }
+    case 17: {
+      setOnboardingCalloutVisible(
+        true,
+        "축하합니다! 식물 키우는 법을 배우셨습니다."
+      );
+      break;
+    }
+    case 18: {
+      setOnboardingCalloutVisible(
+        true,
+        "하늘에 날아다니는 나비를 e또는 q로 잡으세요"
+      );
+      break;
+    }
+    case 19: {
+      setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
+      break;
+    }
+    case 20: {
+      setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
+      break;
+    }
+    case 21: {
+      setOnboardingCalloutVisible(true, "오른쪽 위 나무로 이동하세요.");
+      if (bigTree) bigTree.classList.add("onboarding-highlight");
+      break;
+    }
+    case 22: {
+      setOnboardingCalloutVisible(
+        true,
+        "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
+      );
+      if (bigTree) bigTree.classList.add("onboarding-highlight");
+      highlightUnpickedApplesForTutorial();
+      break;
+    }
+    case 23: {
+      setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
+      highlightUnpickedApplesForTutorial();
+      break;
+    }
+    case 24: {
+      setOnboardingCalloutVisible(true, "열매를 클릭해 먹으세요.");
+      if (appleInventory) appleInventory.classList.add("onboarding-highlight");
+      if (inventoryApple) inventoryApple.classList.add("onboarding-highlight");
+      break;
+    }
+    case 25: {
+      const lineA = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
+      const lineB = "나무밖으로 이동하세요.";
+      setOnboardingCalloutVisible(
+        true,
+        onboardingSeedTutorialSecondLine ? lineA + "\n\n" + lineB : lineA
+      );
+      if (seedInventory) seedInventory.classList.add("onboarding-highlight");
+      break;
+    }
+    case 26: {
+      setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
     default:
@@ -1471,18 +1773,48 @@ function updateOnboardingFlowUI() {
 }
 
 function onboardingCheckJumpFinish() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 8) return;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 4) return;
   if (jumpY < -0.12) {
     onboardingJumpLatch = true;
   }
   if (onboardingJumpLatch && isOnGround && jumpY >= 0) {
-    onboardingFlowStep = 0;
-    setStoredFlag(onboardingFlowDoneKey, true);
-    setStoredValue(onboardingFlowStepKey, "0");
     onboardingJumpLatch = false;
-    setOnboardingCalloutVisible(false, "");
-    clearOnboardingHighlights();
+    onboardingFlowStep = 5;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
   }
+}
+
+function onboardingHookWateredMainPlantFromTutorial() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
+  onboardingFlowStep = 17;
+  persistOnboardingStep();
+  if (onboardingCongratsTimerId) {
+    window.clearTimeout(onboardingCongratsTimerId);
+  }
+  onboardingCongratsTimerId = window.setTimeout(function () {
+    onboardingCongratsTimerId = null;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 17) return;
+    onboardingFlowStep = 18;
+    onboardingButterflyCountBaseline = getTotalCaughtButterflies();
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+  }, 5000);
+  updateOnboardingFlowUI();
+}
+
+function onboardingHookFilledBucketAtWell() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 14) return;
+  onboardingFlowStep = 15;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function onboardingHookDroppedBucketForTutorial() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 13) return;
+  onboardingFlowStep = 14;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
 }
 
 function pickUpGuideBook() {
@@ -1497,7 +1829,7 @@ function pickUpGuideBook() {
   completeMovementTutorial();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 1) {
     onboardingFlowStep = 2;
-    setStoredValue(onboardingFlowStepKey, "2");
+    persistOnboardingStep();
   }
   return true;
 }
@@ -1642,6 +1974,11 @@ function applyDefaultState() {
   movementTutorialBaseline = null;
   onboardingFlowStep = 1;
   onboardingJumpLatch = false;
+  onboardingFirstGuideEscHintShown = false;
+  onboardingSeedTutorialSecondLine = false;
+  onboardingButterflyCountBaseline = null;
+  onboardingTutorialEnteredTree = false;
+  onboardingClearAllOnboardingTimers();
   setStoredFlag(onboardingFlowDoneKey, false);
   setStoredValue(onboardingFlowStepKey, "1");
   isGuideDismissedAtSign = false;
@@ -1809,8 +2146,13 @@ function startPlantMasterDialogue() {
     showPlayerAlert();
     guidePageIndex = 0;
     isGuideBookOpen = true;
+    if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 9) {
+      onboardingFlowStep = 10;
+      persistOnboardingStep();
+    }
     updateGuideCard();
     completeMovementTutorial();
+    updateOnboardingFlowUI();
   }, lines.length * 650 + 250);
 }
 
@@ -1885,6 +2227,13 @@ function pickUpNearestItem() {
     markWorldDirty();
     broadcastBucketState(true);
     syncWorldState(true);
+    if (!getStoredFlag(onboardingFlowDoneKey)) {
+      if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
+        onboardingFlowStep = 13;
+        persistOnboardingStep();
+        updateOnboardingFlowUI();
+      }
+    }
   }
 }
 
@@ -1958,6 +2307,11 @@ function pickApple() {
   appleState.count += 1;
   saveAppleState();
   updateApples();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 23) {
+    onboardingFlowStep = 24;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+  }
   return true;
 }
 
@@ -2012,6 +2366,21 @@ function eatApple() {
     appleState.isEating = false;
     playerStatus.textContent = "";
     createSeedFromApple();
+    if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 24) {
+      onboardingFlowStep = 25;
+      onboardingSeedTutorialSecondLine = false;
+      persistOnboardingStep();
+      if (onboardingTreeLeaveHintTimerId) {
+        window.clearTimeout(onboardingTreeLeaveHintTimerId);
+      }
+      onboardingTreeLeaveHintTimerId = window.setTimeout(function () {
+        onboardingTreeLeaveHintTimerId = null;
+        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 25) return;
+        onboardingSeedTutorialSecondLine = true;
+        updateOnboardingFlowUI();
+      }, 5000);
+      updateOnboardingFlowUI();
+    }
   }, appleEatMs);
 }
 
@@ -2724,6 +3093,7 @@ function dropBucket() {
   broadcastBucketState(true);
   saveBucketState();
   syncWorldState(true);
+  onboardingHookDroppedBucketForTutorial();
 }
 
 function updateSeedPosition() {
@@ -3866,6 +4236,7 @@ function useBucket() {
     syncWorldState(true);
     updateWellImage();
     updateWellCard();
+    onboardingHookFilledBucketAtWell();
     return;
   }
 
@@ -4085,6 +4456,7 @@ function waterPlant(target) {
   saveSeedState();
   syncWorldState(true);
   updatePlantState();
+  onboardingHookWateredMainPlantFromTutorial();
 }
 
 function waterExtraPlant(plant) {
@@ -4538,7 +4910,9 @@ function updateGuideCard() {
     guideCard.style.display === "block"
   ) {
     onboardingFlowStep = 3;
-    setStoredValue(onboardingFlowStepKey, "3");
+    onboardingFirstGuideEscHintShown = false;
+    persistOnboardingStep();
+    scheduleOnboardingFirstGuideEscHint();
   }
 }
 
@@ -6352,6 +6726,11 @@ function tryCatchButterfly() {
   broadcastButterflyCatch(caught.id);
   finalizeButterflyRemovalEffects(now);
   updateButterflyInventoryUi();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 18) {
+    onboardingFlowStep = 19;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+  }
   return true;
 }
 

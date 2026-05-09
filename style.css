@@ -656,7 +656,8 @@ body::-webkit-scrollbar {
 .onboarding-callout {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  top: 12px;
+  bottom: auto;
   transform: translateX(-50%);
   z-index: 56;
   max-width: min(92vw, 440px);
@@ -708,7 +709,15 @@ body::-webkit-scrollbar {
 #guide-book-button.onboarding-highlight,
 #seed.onboarding-highlight,
 #plant-master.onboarding-highlight,
-#player.onboarding-highlight {
+#player.onboarding-highlight,
+#well.onboarding-highlight,
+#bucket.onboarding-highlight,
+#big-tree.onboarding-highlight,
+#plant-spot.onboarding-highlight,
+#apple-inventory.onboarding-highlight,
+#seed-inventory.onboarding-highlight,
+.inventory-apple.onboarding-highlight,
+.tree-apple.onboarding-highlight {
   z-index: 5;
   outline: 3px solid #f59e0b;
   outline-offset: 3px;
