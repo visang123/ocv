@@ -739,11 +739,7 @@ document.addEventListener("keydown", function (event) {
   if (key === "Escape") {
     if (isGuideBookOpen || guideCard.style.display === "block") {
       event.preventDefault();
-      isGuideBookOpen = false;
-      if (isNearSignBoard()) {
-        isGuideDismissedAtSign = true;
-      }
-      updateGuideCard();
+      closeGuideCardFromClick();
     }
     return;
   }
@@ -804,11 +800,11 @@ window.addEventListener(
 );
 
 guideBookButton.addEventListener("click", function () {
-  if (isGuideBookClickPromptActive) {
-    isGuideBookClickPromptActive = false;
-    setStoredFlag(guideBookClickPromptDismissedKey, true);
-  }
+  const wasOpen = isGuideBookOpen;
   isGuideBookOpen = !isGuideBookOpen;
+  if (wasOpen) {
+    dismissGuideBookClickPrompt();
+  }
   updateGuideCard();
 });
 
@@ -818,11 +814,18 @@ signBoard.addEventListener("click", function () {
   updateGuideCard();
 });
 
+function dismissGuideBookClickPrompt() {
+  if (!isGuideBookClickPromptActive) return;
+  isGuideBookClickPromptActive = false;
+  setStoredFlag(guideBookClickPromptDismissedKey, true);
+}
+
 function closeGuideCardFromClick() {
   isGuideBookOpen = false;
   if (isNearSignBoard()) {
     isGuideDismissedAtSign = true;
   }
+  dismissGuideBookClickPrompt();
   updateGuideCard();
 }
 

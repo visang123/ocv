@@ -1575,29 +1575,29 @@ body #guide-book-button {
 }
 
 #guide-book-button.is-click-prompt {
-  outline: 4px solid #ffe86d;
-  outline-offset: 4px;
-  animation: guide-book-prompt-pulse 900ms ease-in-out infinite;
-}
-
-#guide-book-button.is-click-prompt::before {
-  content: "클릭해보세요!";
-  position: absolute;
-  left: 50%;
-  bottom: 82px;
-  transform: translateX(-50%);
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.97);
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  color: #111;
-  font: 900 13px/1 Arial, sans-serif;
-  white-space: nowrap;
+  position: relative;
+  outline: none;
+  background: rgba(154, 219, 245, 0.22);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 2px rgba(170, 235, 160, 0.55),
+    0 0 16px rgba(140, 220, 130, 0.42);
+  animation: guide-book-prompt-pulse 1.1s ease-in-out infinite;
 }
 
 @keyframes guide-book-prompt-pulse {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(170, 235, 160, 0.45),
+      0 0 12px rgba(140, 220, 130, 0.32);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(170, 235, 160, 0.72),
+      0 0 22px rgba(140, 220, 130, 0.5);
+  }
 }
 
 #seed-inventory {
@@ -1906,11 +1906,11 @@ body #guide-book-button {
 
 #magic-powder-inventory {
   position: fixed;
-  left: 330px;
-  bottom: 24px;
+  left: 322px;
+  bottom: 20px;
   display: none;
-  width: 58px;
-  height: 48px;
+  width: 76px;
+  height: 62px;
   z-index: 11;
   pointer-events: none;
 }
@@ -1928,8 +1928,8 @@ body #guide-book-button {
 #magic-powder-inventory.is-near:hover::before {
   content: "사용 click";
   position: absolute;
-  left: 28px;
-  bottom: 56px;
+  left: 38px;
+  bottom: 68px;
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
@@ -1944,8 +1944,8 @@ body #guide-book-button {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 42px;
-  height: 42px;
+  width: 58px;
+  height: 58px;
   background: url("이미지/magic-powder-gray.png") center / contain no-repeat;
 }
 
