@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
-  <link rel="stylesheet" href="style.css?v=20260512b">
+  <link rel="stylesheet" href="style.css?v=20260513b">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -54,6 +54,53 @@
         <div id="player-status" aria-live="polite"></div>
         <div id="player-name"></div>
         <img id="player" src="이미지/player-white.png" alt="&#54540;&#47112;&#51060;&#50612;">
+      </div>
+    </div>
+  </div>
+  <div
+    id="movement-tutorial-overlay"
+    class="movement-tutorial-overlay"
+    style="display: none"
+    aria-live="polite"
+  >
+    <div class="movement-tutorial-panel">
+      <p id="movement-tutorial-text" class="movement-tutorial-text"></p>
+      <div id="movement-tutorial-keys" class="movement-tutorial-keys">
+        <div class="movement-tutorial-cross-row">
+          <span class="movement-tutorial-cell"></span>
+          <span class="movement-tutorial-cell">
+            <span class="movement-tutorial-pair">
+              <kbd class="movement-tutorial-kbd" aria-hidden="true">↑</kbd>
+              <kbd class="movement-tutorial-kbd">W</kbd>
+            </span>
+          </span>
+          <span class="movement-tutorial-cell"></span>
+        </div>
+        <div class="movement-tutorial-cross-row">
+          <span class="movement-tutorial-cell">
+            <span class="movement-tutorial-pair">
+              <kbd class="movement-tutorial-kbd" aria-hidden="true">←</kbd>
+              <kbd class="movement-tutorial-kbd">A</kbd>
+            </span>
+          </span>
+          <span class="movement-tutorial-cell movement-tutorial-cross-mid"></span>
+          <span class="movement-tutorial-cell">
+            <span class="movement-tutorial-pair">
+              <kbd class="movement-tutorial-kbd" aria-hidden="true">→</kbd>
+              <kbd class="movement-tutorial-kbd">D</kbd>
+            </span>
+          </span>
+        </div>
+        <div class="movement-tutorial-cross-row">
+          <span class="movement-tutorial-cell"></span>
+          <span class="movement-tutorial-cell">
+            <span class="movement-tutorial-pair">
+              <kbd class="movement-tutorial-kbd" aria-hidden="true">↓</kbd>
+              <kbd class="movement-tutorial-kbd">S</kbd>
+            </span>
+          </span>
+          <span class="movement-tutorial-cell"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -165,6 +212,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="online-config.js?v=20260508ac"></script>
   <script src="ovc-online.js?v=20260508ac"></script>
-  <script type="module" src="src/main.js?v=20260512b"></script>
+  <script type="module" src="src/main.js?v=20260513b"></script>
 </body>
 </html>

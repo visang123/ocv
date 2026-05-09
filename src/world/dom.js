@@ -52,6 +52,9 @@ const butterflyInventorySlots = Array.from(
 const butterflyInventoryTotal = document.getElementById("butterfly-inventory-total");
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
+const movementTutorialOverlay = document.getElementById("movement-tutorial-overlay");
+const movementTutorialText = document.getElementById("movement-tutorial-text");
+const movementTutorialKeys = document.getElementById("movement-tutorial-keys");
 
 export {
   player,
@@ -103,5 +106,8 @@ export {
   butterflyInventorySlots,
   butterflyInventoryTotal,
   world,
-  ground
+  ground,
+  movementTutorialOverlay,
+  movementTutorialText,
+  movementTutorialKeys
 };

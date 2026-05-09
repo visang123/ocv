@@ -119,9 +119,13 @@ function goToGame() {
 function persistColorChoiceState(account) {
   if (!account || !account.id) return;
   var scopedChosenKey = "ovcUserHasChosenColorV1:" + account.id;
+  var scopedColorKey = "ovcUserColorV1:" + account.id;
   var hasChosen = Boolean(normalizeHexColor(account.color));
   localStorage.setItem(scopedChosenKey, hasChosen ? "true" : "false");
   localStorage.setItem(currentUserHasChosenColorKey, hasChosen ? account.id : "");
+  if (!hasChosen) {
+    localStorage.removeItem(scopedColorKey);
+  }
 }
 
 function validateSignup(name, password) {
@@ -264,7 +268,11 @@ async function handleLoginSubmit() {
     const finalColor = accountColor || "#ffffff";
     localStorage.setItem(currentUserColorKey, finalColor);
     localStorage.setItem(lastSelectedColorKey, finalColor);
-    localStorage.setItem(scopedKey, finalColor);
+    if (accountColor) {
+      localStorage.setItem(scopedKey, accountColor);
+    } else {
+      localStorage.removeItem(scopedKey);
+    }
     persistColorChoiceState(account);
     if (account.session_token) {
       localStorage.setItem(currentSessionTokenKey, account.session_token);
@@ -287,7 +295,11 @@ async function handleLoginSubmit() {
         const finalColor = accountColor || "#ffffff";
         localStorage.setItem(currentUserColorKey, finalColor);
         localStorage.setItem(lastSelectedColorKey, finalColor);
-        localStorage.setItem(scopedKey, finalColor);
+        if (accountColor) {
+          localStorage.setItem(scopedKey, accountColor);
+        } else {
+          localStorage.removeItem(scopedKey);
+        }
         persistColorChoiceState(account);
         goToGame();
         return;

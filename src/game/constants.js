@@ -132,6 +132,7 @@ export const playerPositionKey = "playerPositionV1";
 export const bucketStateKey = "bucketStateV1";
 export const mainDrySeedHandledKey = "mainDrySeedHandledV1";
 export const mainSeedCollectedKey = "mainSeedCollectedV1";
+export const movementTutorialCompleteKey = "movementTutorialCompleteV1";
 
 export const appStorageKeys = [
   "wellWaterV1",
@@ -150,6 +151,7 @@ export const appStorageKeys = [
   bucketStateKey,
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
+  movementTutorialCompleteKey,
   "butterflyCaughtCountsV1",
   "magicPowderCountV1"
 ];

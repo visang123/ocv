@@ -633,6 +633,105 @@ body::-webkit-scrollbar {
   outline-offset: 2px;
 }
 
+#guide-book.is-movement-tutorial-target {
+  outline: 3px solid #ffd92f;
+  outline-offset: 3px;
+  z-index: 4;
+  animation: guide-book-tutorial-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes guide-book-tutorial-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 217, 47, 0.55);
+  }
+
+  50% {
+    box-shadow: 0 0 12px 4px rgba(255, 217, 47, 0.45);
+  }
+}
+
+.movement-tutorial-overlay {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 55;
+  max-width: min(96vw, 520px);
+  pointer-events: none;
+}
+
+.movement-tutorial-panel {
+  margin: 0 auto;
+  padding: 14px 18px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.movement-tutorial-text {
+  margin: 0 0 12px;
+  color: #111;
+  font: 900 18px/1.35 Arial, sans-serif;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.movement-tutorial-overlay.is-book-only-phase .movement-tutorial-text {
+  margin-bottom: 0;
+}
+
+.movement-tutorial-keys {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.movement-tutorial-cross-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.movement-tutorial-cell {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+}
+
+.movement-tutorial-cross-mid {
+  flex: 0 0 28px;
+  min-height: 28px;
+}
+
+.movement-tutorial-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.movement-tutorial-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+  font: 900 15px/1 Arial, sans-serif;
+  color: #111;
+}
+
 .water-drop {
   position: absolute;
   width: 3px;
@@ -1913,6 +2012,14 @@ body #guide-book-button {
   height: 62px;
   z-index: 11;
   pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 0;
 }
 
 #magic-powder-inventory.is-near {
@@ -1946,7 +2053,11 @@ body #guide-book-button {
   bottom: 0;
   width: 58px;
   height: 58px;
-  background: url("이미지/magic-powder-gray.png") center / contain no-repeat;
+  background-color: transparent;
+  background-image: url("이미지/magic-powder-gray.png");
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 #magic-powder-count {
@@ -1957,9 +2068,10 @@ body #guide-book-button {
   height: 24px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.94);
   border: 2px solid #111;
   color: #111;
   font: 900 16px/20px Arial, sans-serif;
   text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }

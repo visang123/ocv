@@ -110,6 +110,7 @@ import {
   bucketStateKey,
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
+  movementTutorialCompleteKey,
   appStorageKeys
 } from "./src/game/constants.js";
 import {
@@ -162,7 +163,10 @@ import {
   butterflyInventorySlots,
   butterflyInventoryTotal,
   world,
-  ground
+  ground,
+  movementTutorialOverlay,
+  movementTutorialText,
+  movementTutorialKeys
 } from "./src/world/dom.js";
 import {
   createInputState,
@@ -222,6 +226,8 @@ let hasGuideBook = false;
 let isGuideBookOpen = false;
 let isGuideDismissedAtSign = false;
 let isGuideBookClickPromptActive = false;
+let movementTutorialPhase = 0;
+let movementTutorialBaseline = null;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
@@ -281,12 +287,12 @@ const savedUserScopedColor = normalizeHexColor(
 const hasChosenPlayerColor = currentUserId
   ? (
       localStorage.getItem(currentUserScopedHasChosenColorKey) === "true" ||
-      localStorage.getItem(currentUserHasChosenColorKey) === currentUserId ||
-      Boolean(savedUserScopedColor)
+      localStorage.getItem(currentUserHasChosenColorKey) === currentUserId
     )
   : false;
+const savedGlobalLoginColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
 let selectedPlayerColor =
-  savedUserScopedColor || "#ffffff";
+  savedUserScopedColor || savedGlobalLoginColor || "#ffffff";
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
@@ -1177,6 +1183,90 @@ function isNearGuideBook() {
   );
 }
 
+function shouldRunMovementTutorial() {
+  return (
+    Boolean(currentUserId) &&
+    hasSpawnedCharacter &&
+    !isCharacterSelecting &&
+    !isTabSessionSuperseded &&
+    !getStoredFlag(movementTutorialCompleteKey) &&
+    !hasGuideBook
+  );
+}
+
+function hideMovementTutorialOverlay() {
+  if (!movementTutorialOverlay) return;
+  movementTutorialOverlay.style.display = "none";
+  movementTutorialOverlay.classList.remove("is-book-only-phase");
+  if (movementTutorialKeys) movementTutorialKeys.style.display = "";
+  guideBook.classList.remove("is-movement-tutorial-target");
+}
+
+function completeMovementTutorial() {
+  setStoredFlag(movementTutorialCompleteKey, true);
+  movementTutorialPhase = 0;
+  movementTutorialBaseline = null;
+  hideMovementTutorialOverlay();
+}
+
+function prepareMovementTutorialBeforeMove() {
+  if (!shouldRunMovementTutorial()) {
+    if (movementTutorialPhase !== 0) {
+      movementTutorialPhase = 0;
+      movementTutorialBaseline = null;
+    }
+    hideMovementTutorialOverlay();
+    return;
+  }
+  if (movementTutorialPhase === 0) {
+    movementTutorialPhase = 1;
+    movementTutorialBaseline = {
+      x: playerX,
+      depth: playerDepth,
+      j: jumpY
+    };
+  }
+}
+
+function advanceMovementTutorialAfterMove() {
+  if (!shouldRunMovementTutorial()) return;
+  if (movementTutorialPhase === 1 && movementTutorialBaseline) {
+    const b = movementTutorialBaseline;
+    if (
+      Math.abs(playerX - b.x) > 2.5 ||
+      Math.abs(playerDepth - b.depth) > 2.5 ||
+      Math.abs(jumpY - b.j) > 4
+    ) {
+      movementTutorialPhase = 2;
+    }
+  }
+  syncMovementTutorialOverlay();
+}
+
+function syncMovementTutorialOverlay() {
+  if (!movementTutorialOverlay || !movementTutorialText || !movementTutorialKeys) return;
+  if (!shouldRunMovementTutorial() || movementTutorialPhase < 1) return;
+
+  movementTutorialOverlay.style.display = "block";
+  movementTutorialOverlay.classList.toggle(
+    "is-book-only-phase",
+    movementTutorialPhase === 2
+  );
+  if (movementTutorialPhase === 1) {
+    movementTutorialText.textContent =
+      "\uC774\uB3D9\uC740 \uBC29\uD5A5\uD0A4 \uB610\uB294 WSAD";
+    movementTutorialKeys.style.display = "flex";
+  } else {
+    movementTutorialText.textContent =
+      "\uD30C\uB780\uCC45\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694!";
+    movementTutorialKeys.style.display = "none";
+  }
+  guideBook.classList.toggle(
+    "is-movement-tutorial-target",
+    movementTutorialPhase === 2
+  );
+}
+
 function pickUpGuideBook() {
   if (!isNearGuideBook()) return false;
 
@@ -1186,6 +1276,7 @@ function pickUpGuideBook() {
   guideBook.style.display = "none";
   guideBookButton.style.display = "block";
   updateGuideCard();
+  completeMovementTutorial();
   return true;
 }
 
@@ -1318,6 +1409,8 @@ function applyDefaultState() {
   hasGuideBook = false;
   isGuideBookOpen = false;
   isGuideBookClickPromptActive = false;
+  movementTutorialPhase = 0;
+  movementTutorialBaseline = null;
   isGuideDismissedAtSign = false;
   hasHandledDryMainSeed = false;
   dryMainSeedVisibleSince = 0;
@@ -4182,6 +4275,10 @@ function updatePlayerAlert() {
 
 function updateGuideCard() {
   const nearSign = isNearSignBoard();
+  if (hasGuideBook) {
+    guideBook.style.display = "none";
+    guideBookButton.style.display = "block";
+  }
   const shouldShow =
     hasGuideBook && (isGuideBookOpen || (nearSign && !isGuideDismissedAtSign));
 
@@ -5531,6 +5628,7 @@ async function validateCurrentAccount() {
 function logout() {
   if (isLoggingOut) return;
   isLoggingOut = true;
+  const loggingOutUserId = currentUserId ? String(currentUserId).trim() : "";
   sendMultiplayerLeave();
   isCharacterSelecting = true;
   resetInputKeys(keys);
@@ -5548,7 +5646,16 @@ function logout() {
     localStorage.removeItem(currentUserKey);
     localStorage.removeItem(currentUserIdKey);
     localStorage.removeItem(currentSessionTokenKey);
+    localStorage.removeItem(currentUserColorKey);
+    localStorage.removeItem(currentUserHasChosenColorKey);
+    localStorage.removeItem(lastSelectedColorKey);
+    if (loggingOutUserId) {
+      localStorage.removeItem("ovcAccountSessionLeaderV1:" + loggingOutUserId);
+      localStorage.removeItem("ovcUserColorV1:" + loggingOutUserId);
+      localStorage.removeItem("ovcUserHasChosenColorV1:" + loggingOutUserId);
+    }
     sessionStorage.removeItem(currentSessionKey);
+    sessionStorage.removeItem(accountLeaderTokenSessionKey);
     window.location.href = "ovc-login.html?v=20260508ac";
   };
 
@@ -6235,7 +6342,9 @@ function gameLoop() {
   if (isTabSessionSuperseded) return;
   respawnApplesIfNeeded();
   refillWellIfNeeded();
+  prepareMovementTutorialBeforeMove();
   updatePlayerPosition();
+  advanceMovementTutorialAfterMove();
   updateSeedPosition();
   updateExtraSeedsAndPlants();
   updateSeedInventory();
@@ -6331,7 +6440,7 @@ function setup() {
   setWorldPosition(signBoard, signX, signY);
   setWorldPosition(guideBook, guideBookX, guideBookY);
   guideBook.style.display = hasGuideBook ? "none" : "block";
-  guideBookButton.style.display = "none";
+  guideBookButton.style.display = hasGuideBook ? "block" : "none";
   setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
   updateWellImage();
   updateSeedPosition();
