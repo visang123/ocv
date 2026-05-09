@@ -7,6 +7,19 @@ const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
 const APP_VERSION = "20260509a";
 const loginHandoffKey = "ovcLoginHandoffV1";
+/** script.js `onboardingFlowDoneKey` 와 동일 — 로그인 직후 진입 문서 선택용 */
+const ovcOnboardingFlowDoneStorageKey = "onboardingFlowDoneV2";
+
+function ovcIsOnboardingDoneForUserId(userId) {
+  if (!userId) return true;
+  const scoped =
+    "ovc-user-" + String(userId).trim() + ":" + ovcOnboardingFlowDoneStorageKey;
+  try {
+    return localStorage.getItem(scoped) === "true";
+  } catch (e) {
+    return true;
+  }
+}
 
 const loginForm = document.getElementById("login-form");
 const loginName = document.getElementById("login-name");
@@ -109,7 +122,7 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
   }, REQUEST_TIMEOUT_MS + 1000);
 }
 
-function goToGame() {
+function goToGame(account) {
   try {
     sessionStorage.setItem(
       "ovcGameSessionId",
@@ -117,7 +130,10 @@ function goToGame() {
     );
   } catch (e) {}
   sessionStorage.removeItem(loginHandoffKey);
-  const targetUrl = new URL("./index.html", window.location.href);
+  const onboarded =
+    account && account.id ? ovcIsOnboardingDoneForUserId(account.id) : true;
+  const htmlFile = onboarded ? "index.html" : "tutorial.html";
+  const targetUrl = new URL("./" + htmlFile, window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));
   window.location.replace(targetUrl.toString());
@@ -315,14 +331,14 @@ async function handleLoginSubmit() {
     finalizeSuccessfulLogin(account);
 
     loginMessage.textContent = "게임으로 이동 중...";
-    goToGame();
+    goToGame(account);
   } catch (error) {
     if (isRetryableLoginError(error)) {
       try {
         loginMessage.textContent = "대체 경로로 재시도 중...";
         const account = await loginWithSupabaseRestFallback(name, password);
         finalizeSuccessfulLogin(account);
-        goToGame();
+        goToGame(account);
         return;
       } catch (fallbackError) {
         loginMessage.textContent =

@@ -1245,10 +1245,10 @@ controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
   '<div class="controls-header"><strong>조작법</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / ?</span><p>위로 이동</p></div>' +
-  '<div><span>A / ?</span><p>왼쪽으로 이동</p></div>' +
-  '<div><span>S / ?</span><p>아래로 이동</p></div>' +
-  '<div><span>D / ?</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>W / \u2191</span><p>위로 이동</p></div>' +
+  '<div><span>A / \u2190</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / \u2193</span><p>아래로 이동</p></div>' +
+  '<div><span>D / \u2192</span><p>오른쪽으로 이동</p></div>' +
   '<div><span>Space</span><p>점프</p></div>' +
   '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
   '<div><span>Q</span><p>사용 / 대화</p></div>' +
@@ -6313,16 +6313,10 @@ function finishCharacterSelect() {
     ovcHardNavigateToWorldIndex();
     return;
   }
-  var replayActiveForSpawn = false;
-  try {
-    replayActiveForSpawn =
-      sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
-  } catch (eRepSpawn) {}
   if (
     isWorldDocumentEntry() &&
     currentUserId &&
-    !getStoredFlag(onboardingFlowDoneKey) &&
-    (!getStoredFlag(everBeenToWorldKey) || replayActiveForSpawn)
+    !getStoredFlag(onboardingFlowDoneKey)
   ) {
     isReloadingForWorldReset = true;
     try {
@@ -8058,11 +8052,6 @@ try {
     }
   }
   let ovcAbortedPageInit = false;
-  let ovcTutorialReplayActive = false;
-  try {
-    ovcTutorialReplayActive =
-      sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
-  } catch (eRepInit) {}
   if (
     isTutorialDocumentEntry() &&
     currentUserId &&
@@ -8073,9 +8062,7 @@ try {
   } else if (
     isWorldDocumentEntry() &&
     currentUserId &&
-    hasSpawnedCharacter &&
-    !getStoredFlag(onboardingFlowDoneKey) &&
-    (!getStoredFlag(everBeenToWorldKey) || ovcTutorialReplayActive)
+    !getStoredFlag(onboardingFlowDoneKey)
   ) {
     ovcAbortedPageInit = true;
     try {
