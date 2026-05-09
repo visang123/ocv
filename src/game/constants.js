@@ -77,7 +77,7 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
-export const minPlantSpacing = 3;
+export const minPlantSpacing = 1;
 
 // --- Butterflies ---
 /** World size (w = h). Half of original 20px tuning; matches setWorldSize + .butterfly CSS. */

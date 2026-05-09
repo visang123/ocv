@@ -161,6 +161,7 @@ import {
   seedDryGauge,
   seedDryText,
   seedWorldText,
+  plantHoverLabel,
   seedInventory,
   appleInventory,
   appleCountText,
@@ -1175,6 +1176,37 @@ seed.addEventListener("mouseenter", function () {
 seed.addEventListener("mouseleave", function () {
   isHoveringMainSeed = false;
 });
+
+if (ground && plantHoverLabel) {
+  ground.addEventListener("pointerover", function (e) {
+    const t = e.target;
+    if (t === plantSpot || t === sprout) {
+      if (plantRuntime.isSeedPlanted) showPlantHoverForPlant(plantRuntime);
+      return;
+    }
+    if (t.classList && (t.classList.contains("extra-plant-spot") || t.classList.contains("extra-sprout"))) {
+      const ep = extraPlantFromDomElement(t);
+      if (ep) showPlantHoverForPlant(ep);
+    }
+  });
+  ground.addEventListener("pointerout", function (e) {
+    const t = e.target;
+    if (t !== plantSpot && t !== sprout && (!t.classList || (!t.classList.contains("extra-plant-spot") && !t.classList.contains("extra-sprout")))) {
+      return;
+    }
+    const rel = e.relatedTarget;
+    if (
+      rel &&
+      (rel === plantSpot ||
+        rel === sprout ||
+        (rel.classList &&
+          (rel.classList.contains("extra-plant-spot") || rel.classList.contains("extra-sprout"))))
+    ) {
+      return;
+    }
+    hidePlantHoverLabel();
+  });
+}
 
 guidePrev.addEventListener("click", function (event) {
   event.stopPropagation();
@@ -3174,6 +3206,25 @@ function updateApples() {
   appleInventory.style.display = appleState.count > 0 ? "block" : "none";
   guideBookButton.style.display = hasGuideBook ? "block" : "none";
   appleCountText.textContent = String(appleState.count);
+  const appleTip =
+    "\uC0AC\uACFC \uBCF4\uC720 " +
+    appleState.count +
+    "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uBA39\uC2B5\uB2C8\uB2E4.";
+  if (inventoryApple) {
+    if (appleState.count > 0) {
+      inventoryApple.title = appleTip;
+    } else {
+      inventoryApple.removeAttribute("title");
+    }
+  }
+  if (appleInventory) {
+    if (appleState.count > 0) appleInventory.title = appleTip;
+    else appleInventory.removeAttribute("title");
+  }
+  if (appleCountText) {
+    if (appleState.count > 0) appleCountText.title = appleTip;
+    else appleCountText.removeAttribute("title");
+  }
 }
 
 function eatApple() {
@@ -4459,6 +4510,14 @@ function updateSeedInventory() {
       : "\uC2EC\uAE30 click";
     extraSeed.inventoryElement.classList.toggle("is-dry", isDry);
     extraSeed.inventoryImage.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
+    const invLabel = extraSeed.inventoryElement.dataset.label;
+    extraSeed.inventoryElement.title = isDry
+      ? invLabel + " (\uB9C8\uB978 \uCD94\uAC00 \uC528\uC557) \u2014 \uD074\uB9AD\uD558\uBA74 \uBC84\uB9BD\uB2C8\uB2E4."
+      : invLabel +
+        " \u2014 \uD074\uB9AD\uD558\uC5EC \uB4E4\uACE0 \uB098\uAC00 \uC2EC\uC73C\uC138\uC694. \uC57D " +
+        Math.ceil(remaining / 1000) +
+        "\uCD08 \uB0B4 \uC2EC\uC9C0 \uC54A\uC73C\uBA74 \uB9C8\uB985\uB2C8\uB2E4.";
+    extraSeed.inventoryImage.alt = invLabel;
     extraSeed.inventoryElement.style.display = "block";
   });
 
@@ -4543,7 +4602,7 @@ function ensureExtraPlantElements(plant) {
   spotElement.className = "extra-plant-spot";
   spotElement.alt = "extra plant spot";
   spotElement.src = "이미지/tilled-soil.png";
-  setWorldSize(spotElement, PLANT_SPOT_WIDTH);
+  setWorldSize(spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   ground.appendChild(spotElement);
 
   const sproutElement = document.createElement("img");
@@ -5298,6 +5357,30 @@ function getPlantWorldLabel(plant) {
   return name + "\uC758 \uC0C8\uC2F9";
 }
 
+function extraPlantFromDomElement(el) {
+  for (let i = 0; i < appleState.extraPlants.length; i++) {
+    const p = appleState.extraPlants[i];
+    if (!p) continue;
+    if (p.spotElement === el || p.sproutElement === el) return p;
+  }
+  return null;
+}
+
+function hidePlantHoverLabel() {
+  if (plantHoverLabel) plantHoverLabel.style.display = "none";
+}
+
+function showPlantHoverForPlant(plant) {
+  if (!plantHoverLabel || !plant || plant.spotX == null || plant.spotY == null) return;
+  plantHoverLabel.textContent = getPlantWorldLabel(plant);
+  plantHoverLabel.style.display = "block";
+  setWorldPosition(
+    plantHoverLabel,
+    plant.spotX + PLANT_SPOT_WIDTH / 2 - 23,
+    plant.spotY - 12
+  );
+}
+
 function plantProximityRectFromXYWH(x, y, w, h) {
   return {
     left: x,
@@ -5338,12 +5421,12 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uB098\uBB34");
   }
 
-  const wellPad = 18;
+  const wellPad = 3;
   if (plantSpotOverlapsExpandedRect(plantX, plantY, wellX, wellY, WELL_SIZE, WELL_SIZE, wellPad)) {
     return plantProximityPhraseForNoun("\uC6B0\uBB3C");
   }
 
-  const portalPad = 5;
+  const portalPad = 1;
   if (
     plantSpotOverlapsExpandedRect(
       plantX,
@@ -5358,7 +5441,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
 
-  const bookPad = 6;
+  const bookPad = 1;
   if (
     guideBook &&
     guideBook.style.display !== "none" &&
@@ -5376,14 +5459,14 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   }
 
   if (isPlantMasterVisible()) {
-    const npcPad = 8;
+    const npcPad = 1;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
       return plantProximityPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
     }
   }
 
   if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
-    const seedPad = 4;
+    const seedPad = 1;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
       return plantProximityPhraseForNoun("\uC528\uC557");
     }
@@ -5393,7 +5476,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || extraSeed.inInventory) return;
     if (!extraSeed.element || extraSeed.element.style.display === "none") return;
-    const seedPad = 4;
+    const seedPad = 1;
     if (
       plantSpotOverlapsExpandedRect(plantX, plantY, extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE, seedPad)
     ) {
@@ -5406,7 +5489,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
 
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
     const bsz = getBucketSize();
-    const bucketPad = 5;
+    const bucketPad = 1;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, bucketX, bucketY, bsz.width, bsz.height, bucketPad)) {
       return plantProximityPhraseForNoun("\uC591\uB3D9\uC774");
     }
@@ -5432,20 +5515,22 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
     return left < ax2 && right > ax1 && top < ay2 && bottom > ay1;
   }
 
+  const canopyInset = 12;
   if (
     overlap(
-      TREE_CANOPY_LEFT,
-      TREE_CANOPY_TOP,
-      TREE_CANOPY_RIGHT,
-      TREE_CANOPY_BOTTOM
+      TREE_CANOPY_LEFT + canopyInset,
+      TREE_CANOPY_TOP + canopyInset,
+      TREE_CANOPY_RIGHT - canopyInset,
+      TREE_CANOPY_BOTTOM - canopyInset
     )
   ) {
     return true;
   }
 
-  const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE;
-  const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE;
-  const trunkTop = TREE_TRUNK_TOP - 24;
+  const trunkInset = 5;
+  const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE + trunkInset;
+  const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE - trunkInset;
+  const trunkTop = TREE_TRUNK_TOP - 10;
   const trunkBottom = GROUND_WORLD_HEIGHT;
   if (overlap(trunkLeft, trunkTop, trunkRight, trunkBottom)) {
     return true;
@@ -6023,6 +6108,7 @@ function removeMainPlant() {
   plantRuntime.plantedAt = null;
   plantSpot.removeAttribute("title");
   sprout.removeAttribute("title");
+  hidePlantHoverLabel();
   if (plantCardTitle) plantCardTitle.textContent = "";
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
@@ -8304,21 +8390,42 @@ function updateButterflyInventoryUi() {
   });
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
+    butterflyInventoryTotal.title =
+      "\uC7A1\uC740 \uB098\uBE44 \uD569\uACC4 (" + total + "\uB9C8\uB9AC)";
   }
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
+  if (total > 0) {
+    butterflyInventory.title = canCraft
+      ? "\uB098\uBE44 " +
+        magicPowderCraftCost +
+        "\uB9C8\uB9AC \uC774\uC0C1 \u2014 \uD074\uB9AD\uD558\uBA74 \uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
+      : "\uB098\uBE44 \uD569\uACC4 " +
+        total +
+        "/" +
+        magicPowderCraftCost +
+        " \u2014 \uB354 \uC7A1\uC73C\uBA74 \uAC00\uB8E8\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+  } else {
+    butterflyInventory.removeAttribute("title");
+  }
 }
 
 function updateMagicPowderInventoryUi() {
   if (!magicPowderInventory || !magicPowderCountText) return;
+  const powderTitleBase =
+    "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \u2014 \uC7A5\uC131\uC7A5\uC774 \uD480(\uC0C8\uC2F9 4\uB2E8\uACC4)\uC5D0 \uAC00\uAE4C\uC774 \uB418\uBA74 \uD074\uB9AD\uD574 \uD55C \uB2E8\uACC4 \uB354 \uD0A4\uC6B8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
   if (magicPowderCount <= 0) {
     magicPowderInventory.style.display = "none";
     magicPowderInventory.classList.remove("is-near");
+    magicPowderInventory.removeAttribute("title");
     return;
   }
   magicPowderInventory.style.display = "block";
   magicPowderCountText.textContent = String(magicPowderCount);
+  magicPowderInventory.title =
+    powderTitleBase + " (\uBCF4\uC720 " + magicPowderCount + "\uAC1C)";
+  magicPowderCountText.title = magicPowderInventory.title;
   const nearTarget = getNearestPlantForMagicPowder();
   magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
 }
@@ -8598,13 +8705,13 @@ function setup() {
     if (extraSeed.element) setWorldSize(extraSeed.element, SEED_SIZE);
   });
   appleState.extraPlants.forEach(function (plant) {
-    if (plant.spotElement) setWorldSize(plant.spotElement, PLANT_SPOT_WIDTH);
+    if (plant.spotElement) setWorldSize(plant.spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (plant.waterNeededElement) setWorldSize(plant.waterNeededElement, WATER_NEEDED_SIZE);
     if (plant.sproutElement) setWorldSize(plant.sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   });
   setWorldSize(bucket, BUCKET_SIZE);
   setWorldSize(well, WELL_SIZE);
-  setWorldSize(plantSpot, PLANT_SPOT_WIDTH);
+  setWorldSize(plantSpot, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   setWorldSize(waterNeeded, WATER_NEEDED_SIZE);
   setWorldSize(sprout, SPROUT_WIDTH, SPROUT_HEIGHT);
   setWorldSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);

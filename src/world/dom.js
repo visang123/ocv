@@ -41,6 +41,7 @@ const seedCard = document.getElementById("seed-card");
 const seedDryGauge = document.getElementById("seed-dry-gauge");
 const seedDryText = document.getElementById("seed-dry-text");
 const seedWorldText = document.getElementById("seed-world-text");
+const plantHoverLabel = document.getElementById("plant-hover-label");
 const seedInventory = document.getElementById("seed-inventory");
 const appleInventory = document.getElementById("apple-inventory");
 const appleCountText = document.getElementById("apple-count");
@@ -102,6 +103,7 @@ export {
   seedDryGauge,
   seedDryText,
   seedWorldText,
+  plantHoverLabel,
   seedInventory,
   appleInventory,
   appleCountText,
