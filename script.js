@@ -2335,7 +2335,6 @@ function updateSeedPosition() {
   const shouldShowMainSeed =
     !hasPickedMainSeedInCurrentRoom() &&
     !plantRuntime.isPlanting &&
-    !plantRuntime.isSeedPlanted &&
     !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
   if (plantRuntime.isSeedDry && shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
     if (!dryMainSeedVisibleSince) {
@@ -4829,17 +4828,29 @@ function renderRemotePlayerState(state) {
   const nextX = Number(state.x) || 0;
   const nextY = -(Number(state.depth) || 0) + (Number(state.jumpY) || 0);
   const nextPositionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
+  const hasAction = typeof state.action === "string" && state.action !== "";
 
   remotePlayer.nameElement.textContent = state.name || "OVC";
-  remotePlayer.statusElement.textContent =
-    state.action === "planting"
-      ? "\uC528\uC557 \uC2EC\uB294\uC911..."
-      : state.action === "eating"
-        ? "\uBA39\uB294\uC911..."
-        : state.action === "watering"
-          ? "\uBB3C \uC8FC\uB294\uC911..."
-        : "";
-  remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
+  if (hasAction) {
+    remotePlayer.statusElement.textContent =
+      state.action === "planting"
+        ? "\uC528\uC557 \uC2EC\uB294\uC911..."
+        : state.action === "eating"
+          ? "\uBA39\uB294\uC911..."
+          : state.action === "watering"
+            ? "\uBB3C \uC8FC\uB294\uC911..."
+          : "";
+    remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
+    remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
+  } else if (
+    remotePlayer.statusElement.textContent &&
+    Date.now() - Number(remotePlayer.lastActionAt || 0) < 1800
+  ) {
+    remotePlayer.statusElement.style.display = "block";
+  } else {
+    remotePlayer.statusElement.textContent = "";
+    remotePlayer.statusElement.style.display = "none";
+  }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
   if (remotePlayer.positionKey !== nextPositionKey) {
@@ -4899,6 +4910,7 @@ function createRemotePlayer(remoteId) {
     depth: 0,
     jumpY: 0,
     lastWaterSplashAt: 0,
+    lastActionAt: 0,
     lastSeenAt: Date.now()
   };
   return remotePlayers[remoteId];
