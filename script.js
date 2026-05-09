@@ -543,20 +543,16 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
-/** 줄기 오작동 방지: 지면 쪽(큰 depth)에 충분히 가까울 때만 줄기 판정 — 값이 클수록 멀리서도 걸림 */
-const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 42;
-/** 줄기 X: NPC·씨앗 쪽으로 넓으면 나무 모드로 끌려 들어감 */
-const TREE_TRUNK_ENTER_X_LEFT_PAD = 0;
-/** 줄기 오른쪽 여유(기존 TREE_CLIMB_DISTANCE 7은 과함) */
-const TREE_TRUNK_ENTER_X_RIGHT_EXTRA = 3;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 느낌 완화) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 9;
 /**
- * 줄기 “땅에서 붙는” 판정: getPlayerFootY()만 좁게(지면 줄기 높이 근처).
- * 값은 월드 발밑 y; 범위를 줄이면 나무 모드 진입 y축만 더 타이트해짐.
+ * 보이는 기둥·뿌리 = style.css #big-tree 안의 .big-tree-trunk / .big-tree-roots 픽셀과 동일.
+ * (#big-tree 월드 크기 BIG_TREE_WIDTH×BIG_TREE_HEIGHT 와 1:1)
  */
-const TREE_TRUNK_FOOT_Y_MIN = 24;
-const TREE_TRUNK_FOOT_Y_MAX = 32;
+const TREE_CSS_TRUNK_HEIGHT = 118;
+const TREE_CSS_ROOTS_LEFT = 39;
+const TREE_CSS_ROOTS_WIDTH = 68;
+const TREE_CSS_ROOTS_BOTTOM_EXTEND = 2;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /**
@@ -1674,20 +1670,21 @@ function repairOnboardingCompletionFromStoredStep() {
 }
 
 /**
- * 월드에 들어왔던 계정이 「튜토리얼 하기」 없이 done=false가 되면(재생 포기·다른 탭 등)
- * 튜토리얼 페이지에 갇히지 않도록 월드 플래그를 복구한다.
+ * 한 번이라도 월드에 온 계정: 「튜토리얼 하기」 세션이 아니면 튜토리얼 미완료 상태를
+ * 본게임으로 되돌린다(리로드·로그아웃/로그인·탭 전환 후에도 월드).
  */
 function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!currentUserId) return;
   if (!getStoredFlag(everBeenToWorldKey)) return;
-  if (getStoredFlag(onboardingFlowDoneKey)) return;
   var replay = "";
   try {
     replay = sessionStorage.getItem(ovcTutorialReplaySessionKey) || "";
   } catch (e) {}
   if (replay === "1") return;
-  setStoredFlag(onboardingFlowDoneKey, true);
-  setStoredValue(onboardingFlowStepKey, "0");
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    setStoredFlag(onboardingFlowDoneKey, true);
+    setStoredValue(onboardingFlowStepKey, "0");
+  }
 }
 
 function resetTutorialProgressInStorage() {
@@ -2545,6 +2542,9 @@ function applyDefaultState(options) {
   growthCard.style.display = "none";
   sprout.style.display = "none";
   plantCard.style.display = "none";
+  if (mainPlantGrowthMeter && mainPlantGrowthMeter.element) {
+    mainPlantGrowthMeter.element.style.display = "none";
+  }
   seedCard.style.display = "none";
   seedWorldText.style.display = "none";
   seedInventory.style.display = "none";
@@ -4438,18 +4438,16 @@ function getPlayerFootY() {
 }
 
 function isPlayerNearTreeTrunk() {
-  const centerX = getPlayerCenterX();
-  const footY = getPlayerFootY();
-  const groundBack = getMaxGroundedPlayerDepth();
-  const deepEnoughForTrunk =
-    playerDepth >= groundBack - TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN;
-
+  const box = getPlayerBox();
+  const left = BIG_TREE_X + TREE_CSS_ROOTS_LEFT;
+  const right = BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH;
+  const top = BIG_TREE_Y + (BIG_TREE_HEIGHT - TREE_CSS_TRUNK_HEIGHT);
+  const bottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
   return (
-    deepEnoughForTrunk &&
-    centerX >= TREE_TRUNK_X - TREE_TRUNK_ENTER_X_LEFT_PAD &&
-    centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_TRUNK_ENTER_X_RIGHT_EXTRA &&
-    footY >= TREE_TRUNK_FOOT_Y_MIN &&
-    footY <= TREE_TRUNK_FOOT_Y_MAX
+    box.left < right &&
+    box.right > left &&
+    box.top < bottom &&
+    box.bottom > top
   );
 }
 
@@ -5164,6 +5162,9 @@ function updatePlantState() {
     plantCard.style.display = "none";
     growthCard.style.display = "none";
     sprout.style.display = "none";
+    if (mainPlantGrowthMeter && mainPlantGrowthMeter.element) {
+      mainPlantGrowthMeter.element.style.display = "none";
+    }
     return;
   }
 
@@ -6060,10 +6061,12 @@ function finishCharacterSelect() {
 
   syncPlayerColorToServer(true);
 
+  restoreWorldHubIfVeteranWithoutActiveReplay();
   if (
     isWorldDocumentEntry() &&
     currentUserId &&
-    !getStoredFlag(onboardingFlowDoneKey)
+    !getStoredFlag(onboardingFlowDoneKey) &&
+    !getStoredFlag(everBeenToWorldKey)
   ) {
     isReloadingForWorldReset = true;
     window.location.replace(ovcTutorialPageUrl());
@@ -7803,7 +7806,8 @@ try {
     isWorldDocumentEntry() &&
     currentUserId &&
     hasSpawnedCharacter &&
-    !getStoredFlag(onboardingFlowDoneKey)
+    !getStoredFlag(onboardingFlowDoneKey) &&
+    !getStoredFlag(everBeenToWorldKey)
   ) {
     ovcAbortedPageInit = true;
     window.location.replace(ovcTutorialPageUrl());
