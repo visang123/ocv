@@ -1611,6 +1611,7 @@ function tutorialRespawnMainSeedOnGround() {
     var isStarter = s.id === "starter-seed" || s.isStarter;
     if (!isStarter) return true;
     if (s.planted) return true;
+    if (s.inInventory) return true;
     if (s.element) s.element.remove();
     if (s.inventoryElement) s.inventoryElement.remove();
     return false;
@@ -2080,6 +2081,10 @@ function highlightUnpickedApplesForTutorial() {
       el.classList.add("onboarding-highlight");
     }
   });
+}
+
+function isMainGameTutorialInProgress() {
+  return !getStoredFlag(onboardingFlowDoneKey);
 }
 
 function syncOnboardingFlowProgressFromWorld() {
@@ -2878,8 +2883,12 @@ function startPlantMasterDialogue() {
       showPlayerAlert();
       guidePageIndex = 0;
       isGuideBookOpen = true;
-      if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 9) {
-        onboardingFlowStep = 10;
+      if (!getStoredFlag(onboardingFlowDoneKey)) {
+        if (onboardingFlowStep === 9) {
+          onboardingFlowStep = 10;
+        } else if (onboardingFlowStep < 2) {
+          onboardingFlowStep = 2;
+        }
         persistOnboardingStep();
       }
       completeMovementTutorial();
@@ -3943,6 +3952,7 @@ function updateExtraSeedsAndPlants() {
   appleState.extraSeeds = appleState.extraSeeds.filter(function (extraSeed) {
     const createdAt = Number(extraSeed.createdAt);
     const shouldAutoRemoveDrySeed =
+      !isMainGameTutorialInProgress() &&
       Number.isFinite(createdAt) &&
       !extraSeed.inInventory &&
       !extraSeed.planted &&
@@ -5284,6 +5294,7 @@ function getHeldExtraSeed() {
 }
 
 function isExtraSeedDry(extraSeed, now) {
+  if (isMainGameTutorialInProgress()) return false;
   const t = now || Date.now();
   const created = Number(extraSeed.createdAt);
   if (!Number.isFinite(created)) return false;
@@ -5751,6 +5762,12 @@ function updatePlantState() {
   updatePlantGrowth();
 }
 
+function shouldSuppressPlantWaterCardForSelfSustaining(plant) {
+  if (!plant || !plant.isSproutSelfSustaining) return false;
+  if (isPowderUpgradeInProgress(plant)) return false;
+  return (plant.growthTier || 0) < 4;
+}
+
 function removeMainPlant() {
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
@@ -5801,7 +5818,7 @@ function updatePlantCard() {
     if (
       plant.status === "dry" ||
       plant.status === "rotten" ||
-      (plant.isSproutSelfSustaining && (plant.growthTier || 0) < 4)
+      shouldSuppressPlantWaterCardForSelfSustaining(plant)
     ) {
       plantCard.style.display = "none";
       if (plantCardTitle) plantCardTitle.textContent = "";
@@ -5825,7 +5842,7 @@ function updatePlantCard() {
     !plantRuntime.isSeedPlanted ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
-    (plantRuntime.isSproutSelfSustaining && (plantRuntime.growthTier || 0) < 4) ||
+    shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime) ||
     !wateringTarget
   ) {
     plantCard.style.display = "none";
@@ -6380,6 +6397,10 @@ function saveSeedState(opts) {
 }
 
 function updateSeedDryState() {
+  if (isMainGameTutorialInProgress()) {
+    plantRuntime.isSeedDry = false;
+    return;
+  }
   plantRuntime.isSeedDry = Date.now() - plantRuntime.seedCreatedAt >= seedDryMs;
 }
 
