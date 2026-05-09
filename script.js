@@ -221,6 +221,7 @@ let guideBookY = GUIDE_BOOK_START_Y;
 let hasGuideBook = false;
 let isGuideBookOpen = false;
 let isGuideDismissedAtSign = false;
+let isGuideBookClickPromptActive = false;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
@@ -259,11 +260,14 @@ const currentUserIdKey = "ovcCurrentUserIdV1";
 const currentUserColorKey = "ovcCurrentUserColorV1";
 const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
+const guideBookClickPromptDismissedKeyBase = "ovcGuideBookClickPromptDismissedV1:";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
+const guideBookClickPromptDismissedKey =
+  guideBookClickPromptDismissedKeyBase + (currentUserId || "guest");
 let currentSessionId = "";
 const currentUserScopedColorKey = currentUserId
   ? "ovcUserColorV1:" + currentUserId
@@ -800,6 +804,10 @@ window.addEventListener(
 );
 
 guideBookButton.addEventListener("click", function () {
+  if (isGuideBookClickPromptActive) {
+    isGuideBookClickPromptActive = false;
+    setStoredFlag(guideBookClickPromptDismissedKey, true);
+  }
   isGuideBookOpen = !isGuideBookOpen;
   updateGuideCard();
 });
@@ -1182,9 +1190,13 @@ function loadGuideBookState() {
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
+  const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
+  isGuideBookClickPromptActive =
+    hasGuideBook && isGuidePlantPageUnlocked && !promptDismissed;
   guideBook.style.display = hasGuideBook ? "none" : "block";
   guideBookButton.style.display = hasGuideBook ? "block" : "none";
   updateGuidePages();
+  updateGuideCard();
   updateNpcPosition();
 }
 
@@ -1302,6 +1314,7 @@ function applyDefaultState() {
 
   hasGuideBook = false;
   isGuideBookOpen = false;
+  isGuideBookClickPromptActive = false;
   isGuideDismissedAtSign = false;
   hasHandledDryMainSeed = false;
   dryMainSeedVisibleSince = 0;
@@ -1457,6 +1470,8 @@ function startPlantMasterDialogue() {
     isGuidePlantPageUnlocked = true;
     setStoredFlag(npcDialogueCompleteKey, true);
     setStoredFlag(guidePlantPageUnlockedKey, true);
+    isGuideBookClickPromptActive = true;
+    setStoredFlag(guideBookClickPromptDismissedKey, false);
     updateNpcPosition();
     showPlayerAlert();
     guidePageIndex = 0;
@@ -4173,6 +4188,10 @@ function updateGuideCard() {
   }
 
   guideBook.classList.toggle("is-near", !hasGuideBook && isNearGuideBook());
+  guideBookButton.classList.toggle(
+    "is-click-prompt",
+    hasGuideBook && isGuideBookClickPromptActive
+  );
 }
 
 function getGuideMaxPage() {
