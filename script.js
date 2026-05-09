@@ -497,14 +497,10 @@ function showAppLoadingScreen(message) {
 }
 
 function hideAppLoadingScreen() {
-  if (!appLoadingScreen) return;
   clearTimeout(appLoadingHideTimer);
   document.body.classList.add("is-game-ready");
-  appLoadingHideTimer = setTimeout(function () {
-    if (document.body.classList.contains("is-game-ready")) {
-      appLoadingScreen.hidden = true;
-    }
-  }, 260);
+  if (!appLoadingScreen) return;
+  appLoadingScreen.hidden = true;
 }
 const MULTIPLAYER_BROADCAST_MIN_MS = 80;
 const MULTIPLAYER_HEARTBEAT_MS = 500;
@@ -1204,7 +1200,7 @@ function hideMovementTutorialOverlay() {
     movementTutorialLineBook.textContent = "";
   }
   if (movementTutorialKeys) movementTutorialKeys.style.display = "";
-  guideBook.classList.remove("is-movement-tutorial-target");
+  if (guideBook) guideBook.classList.remove("is-movement-tutorial-target");
 }
 
 function completeMovementTutorial() {
@@ -1271,10 +1267,12 @@ function syncMovementTutorialOverlay() {
     movementTutorialLineBook.hidden = true;
   }
   movementTutorialKeys.style.display = "flex";
-  guideBook.classList.toggle(
-    "is-movement-tutorial-target",
-    movementTutorialPhase === 2
-  );
+  if (guideBook) {
+    guideBook.classList.toggle(
+      "is-movement-tutorial-target",
+      movementTutorialPhase === 2
+    );
+  }
 }
 
 function pickUpGuideBook() {
