@@ -1611,15 +1611,23 @@ function persistOnboardingStep() {
 }
 
 /**
- * 튜토리얼 완료 시 step 키는 "0"으로 저장되지만, done 플래그만 유실되면
- * 초기화에서 resetTutorialProgressInStorage()가 튜토리얼을 되살린다.
- * 공유 월드 리셋 후 재로드 등에서도 동일. 저장된 step "0"이면 완료로 복구한다.
+ * 튜토리얼을 한 번이라도 끝낸 계정은 로컬에 완료 상태가 남아야 한다(리로드·탭 종료·로그아웃/로그인 후에도 월드).
+ * done 플래그만 유실된 경우 저장 스텝으로 복구한다.
+ * - "0": 정상 완료/건너뛰기 후 저장값
+ * - 27(ONBOARDING_MAX_STEP): 축하 단계 직후·7초 타이머가 done을 쓰기 전에 리로드된 경우
  */
 function repairOnboardingCompletionFromStoredStep() {
   if (!currentUserId) return;
   if (getStoredFlag(onboardingFlowDoneKey)) return;
-  if (String(getStoredValue(onboardingFlowStepKey) || "") === "0") {
+  var stepStr = String(getStoredValue(onboardingFlowStepKey) || "");
+  if (stepStr === "0") {
     setStoredFlag(onboardingFlowDoneKey, true);
+    return;
+  }
+  var stepNum = parseInt(stepStr, 10);
+  if (stepNum === ONBOARDING_MAX_STEP) {
+    setStoredFlag(onboardingFlowDoneKey, true);
+    setStoredValue(onboardingFlowStepKey, "0");
   }
 }
 
@@ -1866,6 +1874,12 @@ function loadOnboardingFlowState() {
   const raw = parseInt(String(getStoredValue(onboardingFlowStepKey) || "1"), 10);
   if (raw === 0) {
     setStoredFlag(onboardingFlowDoneKey, true);
+    onboardingFlowStep = 0;
+    return;
+  }
+  if (raw === ONBOARDING_MAX_STEP) {
+    setStoredFlag(onboardingFlowDoneKey, true);
+    setStoredValue(onboardingFlowStepKey, "0");
     onboardingFlowStep = 0;
     return;
   }
@@ -6873,6 +6887,8 @@ function logout() {
   const finishLogout = function () {
     try {
       sessionStorage.removeItem("ovcGameSessionId");
+      sessionStorage.removeItem("ovcTutorialWorldResetPending");
+      sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
     } catch (e) {}
     localStorage.removeItem(currentUserKey);
     localStorage.removeItem(currentUserIdKey);
