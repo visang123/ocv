@@ -154,6 +154,8 @@ export const movementTutorialCompleteKey = "movementTutorialCompleteV1";
 export const onboardingFlowStepKey = "onboardingFlowStepV2";
 export const onboardingFlowDoneKey = "onboardingFlowDoneV2";
 export const onboardingTutorialBindSessionKey = "onboardingTutorialBindSessionV1";
+/** 한 번이라도 월드(index)에서 플레이한 계정(튜토리얼 일회 재생·건너뛰기 후 복귀용). */
+export const everBeenToWorldKey = "ovcEverBeenToWorldV1";
 
 export const appStorageKeys = [
   "wellWaterV1",
@@ -176,6 +178,7 @@ export const appStorageKeys = [
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
+  everBeenToWorldKey,
   "butterflyCaughtCountsV1",
   "magicPowderCountV1"
 ];
@@ -192,7 +195,8 @@ const tutorialProgressStorageKeySet = new Set([
   guidePlantPageUnlockedKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
-  onboardingTutorialBindSessionKey
+  onboardingTutorialBindSessionKey,
+  everBeenToWorldKey
 ]);
 
 export const appStorageKeysSharedWorldReset = appStorageKeys.filter(function (k) {

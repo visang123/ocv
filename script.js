@@ -115,6 +115,7 @@ import {
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
+  everBeenToWorldKey,
   appStorageKeys,
   appStorageKeysSharedWorldReset
 } from "./src/game/constants.js";
@@ -241,6 +242,9 @@ function ovcWorldIndexUrl() {
 function ovcTutorialPageUrl() {
   return ovcHtmlPageUrl("tutorial.html");
 }
+
+/** 설정 「튜토리얼 하기」로 연 일회성 재생 세션(탭 단위). 없으면 월드 경험 계정은 튜토리얼에 갇히지 않게 복구한다. */
+const ovcTutorialReplaySessionKey = "ovcTutorialReplaySessionV1";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -539,12 +543,14 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
-/** 줄기 오작동 방지: 지면 “뒤”(큰 depth)에 가까울 때만 줄기 판정 */
-const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 108;
-/** 줄기 X: 왼쪽으로 넓게 잡으면 NPC·씨앗 쪽 이동 시 나무 모드로 들어감 — 줄기 실제 폭에 가깝게 */
-const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
-/** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
-const TREE_DEPTH_CLAMP_MAX_STEP = 22;
+/** 줄기 오작동 방지: 지면 쪽(큰 depth)에 충분히 가까울 때만 줄기 판정 — 값이 클수록 멀리서도 걸림 */
+const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 42;
+/** 줄기 X: NPC·씨앗 쪽으로 넓으면 나무 모드로 끌려 들어감 */
+const TREE_TRUNK_ENTER_X_LEFT_PAD = 0;
+/** 줄기 오른쪽 여유(기존 TREE_CLIMB_DISTANCE 7은 과함) */
+const TREE_TRUNK_ENTER_X_RIGHT_EXTRA = 3;
+/** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 느낌 완화) */
+const TREE_DEPTH_CLAMP_MAX_STEP = 9;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /**
@@ -1186,9 +1192,13 @@ function skipTutorialFromSettings() {
   if (!window.confirm("튜토리얼을 건너뛰고 자유롭게 플레이할까요?")) {
     return;
   }
+  try {
+    sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+  } catch (eReplay) {}
   onboardingClearAllOnboardingTimers();
   onboardingStep26OpenedSettingsWithEsc = false;
   setStoredFlag(onboardingFlowDoneKey, true);
+  setStoredFlag(everBeenToWorldKey, true);
   onboardingFlowStep = 0;
   setStoredValue(onboardingFlowStepKey, "0");
   persistOnboardingStep();
@@ -1245,6 +1255,9 @@ function replayTutorialFromSettings() {
       sessionStorage.setItem("ovcGameSessionId", sid);
     } catch (e2) {}
   }
+  try {
+    sessionStorage.setItem(ovcTutorialReplaySessionKey, "1");
+  } catch (eReplay) {}
   resetTutorialProgressInStorage();
   setStoredValue(onboardingTutorialBindSessionKey, sid);
   try {
@@ -1654,6 +1667,23 @@ function repairOnboardingCompletionFromStoredStep() {
   }
 }
 
+/**
+ * 월드에 들어왔던 계정이 「튜토리얼 하기」 없이 done=false가 되면(재생 포기·다른 탭 등)
+ * 튜토리얼 페이지에 갇히지 않도록 월드 플래그를 복구한다.
+ */
+function restoreWorldHubIfVeteranWithoutActiveReplay() {
+  if (!currentUserId) return;
+  if (!getStoredFlag(everBeenToWorldKey)) return;
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  var replay = "";
+  try {
+    replay = sessionStorage.getItem(ovcTutorialReplaySessionKey) || "";
+  } catch (e) {}
+  if (replay === "1") return;
+  setStoredFlag(onboardingFlowDoneKey, true);
+  setStoredValue(onboardingFlowStepKey, "0");
+}
+
 function resetTutorialProgressInStorage() {
   setStoredFlag(onboardingFlowDoneKey, false);
   setStoredValue(onboardingFlowStepKey, "1");
@@ -1798,9 +1828,13 @@ function onboardingScheduleTutorialCompleteHide() {
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
     setStoredFlag(onboardingFlowDoneKey, true);
+    setStoredFlag(everBeenToWorldKey, true);
     onboardingFlowStep = 0;
     setStoredValue(onboardingFlowStepKey, "0");
     tutorialWorldNeedsFullReset = false;
+    try {
+      sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+    } catch (eRep) {}
     try {
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
     } catch (e) {}
@@ -4407,9 +4441,9 @@ function isPlayerNearTreeTrunk() {
   return (
     deepEnoughForTrunk &&
     centerX >= TREE_TRUNK_X - TREE_TRUNK_ENTER_X_LEFT_PAD &&
-    centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE &&
-    footY <= groundBack + 4 &&
-    footY >= TREE_TRUNK_TOP - 18
+    centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_TRUNK_ENTER_X_RIGHT_EXTRA &&
+    footY <= groundBack + 2 &&
+    footY >= TREE_TRUNK_TOP - 6
   );
 }
 
@@ -6927,6 +6961,7 @@ function logout() {
       sessionStorage.removeItem("ovcGameSessionId");
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
       sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
+      sessionStorage.removeItem(ovcTutorialReplaySessionKey);
     } catch (e) {}
     localStorage.removeItem(currentUserKey);
     localStorage.removeItem(currentUserIdKey);
@@ -7745,6 +7780,10 @@ try {
   setup();
   if (currentUserId) {
     repairOnboardingCompletionFromStoredStep();
+    restoreWorldHubIfVeteranWithoutActiveReplay();
+    if (getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
   }
   let ovcAbortedPageInit = false;
   if (
@@ -7781,6 +7820,9 @@ try {
     loadAppleState();
     loadBucketState();
     loadGuideBookState();
+    if (currentUserId && getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
     loadPlayerPosition();
     loadButterflyCaughtCounts();
     loadMagicPowderCount();
