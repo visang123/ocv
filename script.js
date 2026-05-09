@@ -515,18 +515,15 @@ const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 108;
 const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 22;
-const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 6;
-const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 0;
-/** NPC 말풍선을 화면에서 아래로 (px). 월드 좌표와 별도로 적용해 확실히 보이게 함 */
-const NPC_SPEECH_BUBBLE_SCREEN_DOWN_PX = 48;
-const PLAYER_SPEECH_BUBBLE_EXTRA_LIFT = 26;
-
-function getNpcSpeechBubbleLiftWorld() {
-  return (
-    NPC_SPEECH_BUBBLE_EXTRA_LIFT +
-    (isNpcDialogueRunning ? NPC_DIALOGUE_BUBBLE_EXTRA_LIFT : 0)
-  );
-}
+/** 플레이어·NPC 공통: 머리 윗선 위로 말풍선 붙일 때 간격(월드 단위) */
+const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
+/**
+ * NPC 발밑 y는 npcY, 논리 박스 높이는 NPC_HEIGHT.
+ * 스프라이트 scale로 머리가 박스보다 위로 보이면 양수로 키워서 말풍선을 더 올림(월드 단위).
+ */
+const NPC_HEAD_TOP_TRIM_WORLD = 0;
+/** 말풍선 전체를 화면에서 추가로 내리려면 양수(px). 머리 기준 맞춤 후 미세 조정용 */
+const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
 
 function showAppLoadingScreen(message) {
   if (!appLoadingScreen) return;
@@ -716,12 +713,43 @@ function accountDisplayNameForUi() {
   return (currentUserName || "").trim();
 }
 
+function groundScreenPxToWorldY(px) {
+  const ch = ground.clientHeight || 1;
+  return (px * GROUND_WORLD_HEIGHT) / ch;
+}
+
+/** headTopWorldY: 캐릭터 머리(윗선) 월드 y. 말풍선 transform 기준 y(버블 꼭대기) */
+function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement) {
+  const bhWorld = groundScreenPxToWorldY(bubbleElement.offsetHeight || 12);
+  return headTopWorldY - SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD - bhWorld;
+}
+
 function setNpcBubbleWorldPosition(worldX, worldY) {
   const px = Math.round(toScreenX(worldX));
   const py = Math.round(toScreenY(worldY));
-  const down = Math.round(NPC_SPEECH_BUBBLE_SCREEN_DOWN_PX);
-  npcBubble.style.transform =
-    "translate(" + px + "px, " + py + "px) translateY(" + down + "px)";
+  const n = Math.round(SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX);
+  npcBubble.style.transform = n
+    ? "translate(" + px + "px, " + py + "px) translateY(" + n + "px)"
+    : "translate(" + px + "px, " + py + "px)";
+}
+
+function setPlayerBubbleWorldPosition(worldX, worldY) {
+  const px = Math.round(toScreenX(worldX));
+  const py = Math.round(toScreenY(worldY));
+  const n = Math.round(SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX);
+  playerBubble.style.transform = n
+    ? "translate(" + px + "px, " + py + "px) translateY(" + n + "px)"
+    : "translate(" + px + "px, " + py + "px)";
+}
+
+function layoutNpcSpeechBubble() {
+  const bubbleWidth = npcBubble.offsetWidth || 48;
+  const npcHeadTop = npcY - NPC_HEIGHT - NPC_HEAD_TOP_TRIM_WORLD;
+  const bubbleWorldY = speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble);
+  setNpcBubbleWorldPosition(
+    npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
+    bubbleWorldY
+  );
 }
 
 function isGameResetShortcut(event) {
@@ -5260,13 +5288,7 @@ function updateNpcPosition() {
   setWorldPosition(plantMaster, npcX, npcY);
 
   if (npcBubble.style.display === "block") {
-    const bubbleWidth = npcBubble.offsetWidth || 48;
-    const bubbleHeight = npcBubble.offsetHeight || 14;
-    const bubbleLift = getNpcSpeechBubbleLiftWorld();
-    setNpcBubbleWorldPosition(
-      npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift
-    );
+    layoutNpcSpeechBubble();
   }
 
   if (playerBubble.style.display === "block") {
@@ -5281,11 +5303,11 @@ function updatePlayerBubblePosition() {
   const playerRenderedHeight = player.offsetHeight || PLAYER_HEIGHT;
   const playerWorldTop =
     GROUND_WORLD_HEIGHT - playerRenderedHeight - playerDepth + jumpY;
-
-  setWorldPosition(
-    playerBubble,
-    playerWorldLeft + PLAYER_WIDTH / 2 - 13,
-    playerWorldTop - 22 - PLAYER_SPEECH_BUBBLE_EXTRA_LIFT
+  const bw = playerBubble.offsetWidth || 36;
+  const bubbleWorldY = speechBubbleTopWorldYFromHead(playerWorldTop, playerBubble);
+  setPlayerBubbleWorldPosition(
+    playerWorldLeft + PLAYER_WIDTH / 2 - bw / 2,
+    bubbleWorldY
   );
 }
 
@@ -5300,13 +5322,7 @@ function updateNpcPrompt() {
     npcBubble.textContent =
       "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     npcBubble.style.display = "block";
-    const bubbleWidth = npcBubble.offsetWidth || 48;
-    const bubbleHeight = npcBubble.offsetHeight || 14;
-    const bubbleLift = getNpcSpeechBubbleLiftWorld();
-    setNpcBubbleWorldPosition(
-      npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift
-    );
+    layoutNpcSpeechBubble();
 
     window.clearTimeout(npcPromptHideTimeout);
     npcPromptHideTimeout = window.setTimeout(function () {
