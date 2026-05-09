@@ -40,7 +40,12 @@ export function createPlantState() {
     sproutGrownAt: null,
     sproutEvolutionMs: 0,
     sproutEvolutionLastTickAt: null,
-    isSproutSelfSustaining: false
+    isSproutSelfSustaining: false,
+    growthTier: 0,
+    waterCapacity: 2,
+    powderUpgradeTargetTier: 0,
+    powderUpgradeStartedAt: null,
+    powderUpgradeDurationMs: 0
   };
 }
 

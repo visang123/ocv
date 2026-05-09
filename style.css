@@ -513,7 +513,7 @@ body::-webkit-scrollbar {
 
 .plant-water-bar {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   height: 25px;
 }
@@ -1769,6 +1769,28 @@ body #guide-book-button {
   pointer-events: none;
 }
 
+#butterfly-inventory.is-craftable {
+  pointer-events: auto;
+  cursor: pointer;
+  outline: 3px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+
+#butterfly-inventory.is-craftable:hover::before {
+  content: "가루 제작 click";
+  position: absolute;
+  left: 50%;
+  bottom: 54px;
+  transform: translateX(-50%);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  color: #111;
+  font: 900 13px/1 Arial, sans-serif;
+  white-space: nowrap;
+}
+
 .butterfly-inventory-slot {
   position: relative;
   width: 36px;
@@ -1838,5 +1860,78 @@ body #guide-book-button {
   background: #111;
   color: #fff;
   font: 900 14px/20px Arial, sans-serif;
+  text-align: center;
+}
+
+#magic-powder-inventory {
+  position: fixed;
+  left: 330px;
+  bottom: 24px;
+  display: none;
+  width: 58px;
+  height: 48px;
+  z-index: 11;
+  pointer-events: none;
+}
+
+#magic-powder-inventory.is-near {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#magic-powder-inventory.is-near .magic-powder-icon {
+  outline: 4px solid #fff;
+  outline-offset: 4px;
+}
+
+#magic-powder-inventory.is-near:hover::before {
+  content: "사용 click";
+  position: absolute;
+  left: 28px;
+  bottom: 56px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  color: #111;
+  font: 900 16px/1 Arial, sans-serif;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.magic-powder-icon {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, #f7f7f7 0 8px, transparent 9px),
+    radial-gradient(circle at 55% 58%, #9ca3af 0 17px, #6b7280 19px, #4b5563 100%);
+  border: 3px solid #374151;
+}
+
+.magic-powder-icon::before {
+  content: "✶";
+  position: absolute;
+  left: 13px;
+  top: 8px;
+  color: rgba(243, 244, 246, 0.9);
+  font: 900 16px/1 Arial, sans-serif;
+}
+
+#magic-powder-count {
+  position: absolute;
+  right: 0;
+  top: 0;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid #111;
+  color: #111;
+  font: 900 16px/20px Arial, sans-serif;
   text-align: center;
 }

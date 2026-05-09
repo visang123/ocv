@@ -99,6 +99,11 @@ export function loadSeedStateFromStorage(config) {
     sproutEvolutionMs: 0,
     sproutEvolutionLastTickAt: null,
     isSproutSelfSustaining: false,
+    growthTier: 0,
+    waterCapacity: 2,
+    powderUpgradeTargetTier: 0,
+    powderUpgradeStartedAt: null,
+    powderUpgradeDurationMs: 0,
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -116,7 +121,7 @@ export function loadSeedStateFromStorage(config) {
         : [];
       planted.plantState = savedPlantedState.plantState || "normal";
       planted.plantWaterLevel = Number.isFinite(Number(savedPlantedState.plantWaterLevel))
-        ? Math.max(0, Math.min(2, Number(savedPlantedState.plantWaterLevel)))
+        ? Math.max(0, Math.min(3, Number(savedPlantedState.plantWaterLevel)))
         : 1;
       planted.plantWaterLevelUpdatedAt =
         Number(savedPlantedState.plantWaterLevelUpdatedAt) || config.defaultSeedCreatedAt;
@@ -136,6 +141,17 @@ export function loadSeedStateFromStorage(config) {
       planted.sproutEvolutionLastTickAt =
         Number(savedPlantedState.sproutEvolutionLastTickAt) || null;
       planted.isSproutSelfSustaining = Boolean(savedPlantedState.isSproutSelfSustaining);
+      planted.growthTier = Math.max(0, Number(savedPlantedState.growthTier) || 0);
+      planted.waterCapacity = Math.max(2, Number(savedPlantedState.waterCapacity) || 2);
+      planted.powderUpgradeTargetTier = Math.max(
+        0,
+        Number(savedPlantedState.powderUpgradeTargetTier) || 0
+      );
+      planted.powderUpgradeStartedAt = Number(savedPlantedState.powderUpgradeStartedAt) || null;
+      planted.powderUpgradeDurationMs = Math.max(
+        0,
+        Number(savedPlantedState.powderUpgradeDurationMs) || 0
+      );
       planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
       planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
     } catch (error) {
@@ -234,7 +250,7 @@ export function loadAppleStateFromStorage(config) {
                 : [],
               status: plantData.status || "normal",
               waterLevel: Number.isFinite(Number(plantData.waterLevel))
-                ? Math.max(0, Math.min(2, Number(plantData.waterLevel)))
+                ? Math.max(0, Math.min(3, Number(plantData.waterLevel)))
                 : 1,
               waterLevelUpdatedAt: Number(plantData.waterLevelUpdatedAt) || plantedAt,
               becameEmptyAt: Number(plantData.becameEmptyAt) || null,
@@ -249,7 +265,18 @@ export function loadAppleStateFromStorage(config) {
               sproutEvolutionMs: Math.max(0, Number(plantData.sproutEvolutionMs) || 0),
               sproutEvolutionLastTickAt:
                 Number(plantData.sproutEvolutionLastTickAt) || null,
-              isSproutSelfSustaining: Boolean(plantData.isSproutSelfSustaining)
+              isSproutSelfSustaining: Boolean(plantData.isSproutSelfSustaining),
+              growthTier: Math.max(0, Number(plantData.growthTier) || 0),
+              waterCapacity: Math.max(2, Number(plantData.waterCapacity) || 2),
+              powderUpgradeTargetTier: Math.max(
+                0,
+                Number(plantData.powderUpgradeTargetTier) || 0
+              ),
+              powderUpgradeStartedAt: Number(plantData.powderUpgradeStartedAt) || null,
+              powderUpgradeDurationMs: Math.max(
+                0,
+                Number(plantData.powderUpgradeDurationMs) || 0
+              )
             };
           })
         : []
@@ -316,7 +343,12 @@ export function saveAppleStateToStorage(config) {
           sproutGrownAt: plant.sproutGrownAt,
           sproutEvolutionMs: plant.sproutEvolutionMs,
           sproutEvolutionLastTickAt: plant.sproutEvolutionLastTickAt,
-          isSproutSelfSustaining: plant.isSproutSelfSustaining
+          isSproutSelfSustaining: plant.isSproutSelfSustaining,
+          growthTier: plant.growthTier,
+          waterCapacity: plant.waterCapacity,
+          powderUpgradeTargetTier: plant.powderUpgradeTargetTier,
+          powderUpgradeStartedAt: plant.powderUpgradeStartedAt,
+          powderUpgradeDurationMs: plant.powderUpgradeDurationMs
         };
       })
     })

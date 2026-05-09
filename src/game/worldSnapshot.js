@@ -10,7 +10,7 @@ const DEFAULT_SEED_LABEL = "\uC528\uC557";
 export function readWaterLevel(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
-  return Math.max(0, Math.min(2, number));
+  return Math.max(0, Math.min(3, number));
 }
 
 export function resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt) {
@@ -94,6 +94,27 @@ export function parseMainPlantFromSnapshot(mp) {
   if (Object.prototype.hasOwnProperty.call(mp, "isSproutSelfSustaining")) {
     plantedFromSnapshot.isSproutSelfSustaining = Boolean(mp.isSproutSelfSustaining);
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "growthTier")) {
+    plantedFromSnapshot.growthTier = Math.max(0, Number(mp.growthTier) || 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "waterCapacity")) {
+    plantedFromSnapshot.waterCapacity = Math.max(2, Number(mp.waterCapacity) || 2);
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "powderUpgradeTargetTier")) {
+    plantedFromSnapshot.powderUpgradeTargetTier = Math.max(
+      0,
+      Number(mp.powderUpgradeTargetTier) || 0
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "powderUpgradeStartedAt")) {
+    plantedFromSnapshot.powderUpgradeStartedAt = Number(mp.powderUpgradeStartedAt) || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "powderUpgradeDurationMs")) {
+    plantedFromSnapshot.powderUpgradeDurationMs = Math.max(
+      0,
+      Number(mp.powderUpgradeDurationMs) || 0
+    );
+  }
   return plantedFromSnapshot;
 }
 
@@ -155,6 +176,21 @@ export function parseExtraPlantFromSnapshot(plant) {
       "isSproutSelfSustaining"
     )
       ? Boolean(plant.isSproutSelfSustaining)
-      : false
+      : false,
+    growthTier: Object.prototype.hasOwnProperty.call(plant, "growthTier")
+      ? Math.max(0, Number(plant.growthTier) || 0)
+      : 0,
+    waterCapacity: Object.prototype.hasOwnProperty.call(plant, "waterCapacity")
+      ? Math.max(2, Number(plant.waterCapacity) || 2)
+      : 2,
+    powderUpgradeTargetTier: Object.prototype.hasOwnProperty.call(plant, "powderUpgradeTargetTier")
+      ? Math.max(0, Number(plant.powderUpgradeTargetTier) || 0)
+      : 0,
+    powderUpgradeStartedAt: Object.prototype.hasOwnProperty.call(plant, "powderUpgradeStartedAt")
+      ? Number(plant.powderUpgradeStartedAt) || null
+      : null,
+    powderUpgradeDurationMs: Object.prototype.hasOwnProperty.call(plant, "powderUpgradeDurationMs")
+      ? Math.max(0, Number(plant.powderUpgradeDurationMs) || 0)
+      : 0
   };
 }

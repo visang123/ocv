@@ -103,7 +103,7 @@ export const npcInteractDistance = 60;
 export const wellUseDistance = 35;
 export const wellPourDistance = wellUseDistance;
 export const plantWaterDistance = 40;
-export const maxWellWater = 2;
+export const maxWellWater = 3;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
 export const plantDryMs = 40 * SECOND_MS;
@@ -115,6 +115,10 @@ export const overwaterWindowMs = 60 * MINUTE_MS;
  * fully cleared so the player can plant a new seed there.
  */
 export const plantRotClearMs = 3 * SECOND_MS;
+export const magicPowderCraftCost = 10;
+export const magicPowderCraftMs = 3 * SECOND_MS;
+export const level4GrowMs = 2 * MINUTE_MS;
+export const level5GrowMs = 3 * MINUTE_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";
@@ -146,5 +150,6 @@ export const appStorageKeys = [
   bucketStateKey,
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
-  "butterflyCaughtCountsV1"
+  "butterflyCaughtCountsV1",
+  "magicPowderCountV1"
 ];

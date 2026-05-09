@@ -76,6 +76,10 @@ import {
   plantGrowthMs,
   overwaterWindowMs,
   BUTTERFLY_SIZE,
+  magicPowderCraftCost,
+  magicPowderCraftMs,
+  level4GrowMs,
+  level5GrowMs,
   butterflyMaxAlive,
   butterflyColors,
   butterflyFrameCount,
@@ -264,15 +268,21 @@ let currentSessionId = "";
 const currentUserScopedColorKey = currentUserId
   ? "ovcUserColorV1:" + currentUserId
   : "";
+const currentUserScopedHasChosenColorKey = currentUserId
+  ? "ovcUserHasChosenColorV1:" + currentUserId
+  : "";
 const savedUserScopedColor = normalizeHexColor(
   currentUserScopedColorKey ? localStorage.getItem(currentUserScopedColorKey) : ""
 );
-const savedGlobalPlayerColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
-const savedLastPlayerColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
-const hasChosenPlayerColor =
-  localStorage.getItem(currentUserHasChosenColorKey) === currentUserId;
+const hasChosenPlayerColor = currentUserId
+  ? (
+      localStorage.getItem(currentUserScopedHasChosenColorKey) === "true" ||
+      localStorage.getItem(currentUserHasChosenColorKey) === currentUserId ||
+      Boolean(savedUserScopedColor)
+    )
+  : false;
 let selectedPlayerColor =
-  savedUserScopedColor || savedGlobalPlayerColor || savedLastPlayerColor || "#ffffff";
+  savedUserScopedColor || "#ffffff";
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
@@ -385,6 +395,10 @@ const butterflyState = {
 };
 let hasSeededInitialButterflies = false;
 const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
+const magicPowderCountKey = "magicPowderCountV1";
+let magicPowderCount = 0;
+let isCraftingMagicPowder = false;
+let magicPowderCraftTimer = null;
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
@@ -850,6 +864,12 @@ guideNext.addEventListener("click", function (event) {
 inventoryApple.addEventListener("click", function () {
   eatApple();
 });
+butterflyInventory.addEventListener("click", function () {
+  tryCraftMagicPowder();
+});
+magicPowderInventory.addEventListener("click", function () {
+  tryUseMagicPowder();
+});
 
 characterSelectButton.addEventListener("click", function () {
   finishCharacterSelect();
@@ -882,6 +902,13 @@ networkDebugButton.type = "button";
 networkDebugButton.setAttribute("aria-label", "로그");
 document.body.appendChild(networkDebugButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
+const magicPowderInventory = document.createElement("button");
+magicPowderInventory.id = "magic-powder-inventory";
+magicPowderInventory.type = "button";
+magicPowderInventory.innerHTML =
+  '<div class="magic-powder-icon"></div><div id="magic-powder-count">0</div>';
+document.body.appendChild(magicPowderInventory);
+const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-count");
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
@@ -1258,6 +1285,11 @@ function applyDefaultState() {
   plantRuntime.sproutEvolutionMs = 0;
   plantRuntime.sproutEvolutionLastTickAt = null;
   plantRuntime.isSproutSelfSustaining = false;
+  plantRuntime.growthTier = 0;
+  plantRuntime.waterCapacity = 2;
+  plantRuntime.powderUpgradeTargetTier = 0;
+  plantRuntime.powderUpgradeStartedAt = null;
+  plantRuntime.powderUpgradeDurationMs = 0;
 
   hasGuideBook = false;
   isGuideBookOpen = false;
@@ -1291,11 +1323,16 @@ function applyDefaultState() {
     butterflyState.caughtCounts[color] = 0;
   });
   hasSeededInitialButterflies = false;
+  magicPowderCount = 0;
+  isCraftingMagicPowder = false;
+  clearTimeout(magicPowderCraftTimer);
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     delete butterflyLocalCatchTombstoneById[id];
   });
   saveButterflyCaughtCounts();
+  saveMagicPowderCount();
   updateButterflyInventoryUi();
+  updateMagicPowderInventoryUi();
 
   wellState.water = maxWellWater;
   wellState.lastRefillAt = Date.now();
@@ -1893,7 +1930,12 @@ function getSharedWorldSnapshot() {
           sproutGrownAt: plant.sproutGrownAt,
           sproutEvolutionMs: plant.sproutEvolutionMs,
           sproutEvolutionLastTickAt: plant.sproutEvolutionLastTickAt,
-          isSproutSelfSustaining: plant.isSproutSelfSustaining
+          isSproutSelfSustaining: plant.isSproutSelfSustaining,
+          growthTier: plant.growthTier || 0,
+          waterCapacity: plant.waterCapacity || 2,
+          powderUpgradeTargetTier: plant.powderUpgradeTargetTier || 0,
+          powderUpgradeStartedAt: plant.powderUpgradeStartedAt || null,
+          powderUpgradeDurationMs: plant.powderUpgradeDurationMs || 0
         };
       })
     },
@@ -1914,6 +1956,7 @@ function refreshUiAfterSharedWorldApply() {
   refreshSharedWaterIndicators();
   updateSeedInventory();
   updateButterflyInventoryUi();
+  updateMagicPowderInventoryUi();
 }
 
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
@@ -2491,6 +2534,11 @@ function normalizeExtraPlantState(plant) {
   if (!Number.isFinite(plant.rottenAt)) plant.rottenAt = null;
   if (typeof plant.isSproutGrown !== "boolean") plant.isSproutGrown = false;
   if (typeof plant.isSproutSelfSustaining !== "boolean") plant.isSproutSelfSustaining = false;
+  if (!Number.isFinite(plant.growthTier)) plant.growthTier = 0;
+  if (!Number.isFinite(plant.waterCapacity)) plant.waterCapacity = 2;
+  if (!Number.isFinite(plant.powderUpgradeTargetTier)) plant.powderUpgradeTargetTier = 0;
+  if (!Number.isFinite(plant.powderUpgradeDurationMs)) plant.powderUpgradeDurationMs = 0;
+  if (!Number.isFinite(plant.powderUpgradeStartedAt)) plant.powderUpgradeStartedAt = null;
   if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
     plant.sproutEvolutionLastTickAt = null;
   }
@@ -2530,10 +2578,20 @@ function normalizeExtraPlantState(plant) {
     plant.isSproutSelfSustaining = false;
     plant.needsFirstWater = false;
   }
+  if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
+    plant.growthTier = 3;
+  }
+  if (plant.growthTier >= 4) {
+    plant.waterCapacity = 3;
+  }
 }
 
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
+  if (tickPowderUpgrade(plant, now)) {
+    saveAppleState();
+    syncWorldState(true);
+  }
 
   if (plant.status === "rotten") {
     return;
@@ -2573,10 +2631,48 @@ function updateExtraPlantState(plant, now) {
 
 function getSproutStageFromPlant(plant) {
   if (!plant.isSproutGrown) return 0;
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier >= 5) return 5;
+  if (tier >= 4) return 4;
   if (plant.isSproutSelfSustaining) return 3;
   const ev = plant.sproutEvolutionMs || 0;
   if (ev < sproutStage1Ms) return 1;
   return 2;
+}
+
+function getPlantWaterCapacity(plant) {
+  return Math.max(2, Number(plant.waterCapacity) || 2);
+}
+
+function isPowderUpgradeInProgress(plant) {
+  return (
+    Number(plant.powderUpgradeTargetTier) > 0 &&
+    Number(plant.powderUpgradeDurationMs) > 0 &&
+    Number(plant.powderUpgradeStartedAt) > 0
+  );
+}
+
+function getPowderUpgradeRatio(plant, now) {
+  if (!isPowderUpgradeInProgress(plant)) return null;
+  const startedAt = Number(plant.powderUpgradeStartedAt) || 0;
+  const duration = Number(plant.powderUpgradeDurationMs) || 0;
+  if (!startedAt || !duration) return null;
+  return Math.min(1, Math.max(0, (now - startedAt) / duration));
+}
+
+function tickPowderUpgrade(plant, now) {
+  if (!isPowderUpgradeInProgress(plant)) return false;
+  const ratio = getPowderUpgradeRatio(plant, now);
+  if (ratio === null || ratio < 1) return false;
+  plant.growthTier = Math.max(plant.growthTier || 0, Number(plant.powderUpgradeTargetTier) || 0);
+  plant.powderUpgradeTargetTier = 0;
+  plant.powderUpgradeStartedAt = null;
+  plant.powderUpgradeDurationMs = 0;
+  if (plant.growthTier >= 4) {
+    plant.waterCapacity = 3;
+    plant.waterLevel = Math.min(getPlantWaterCapacity(plant), Math.max(1, Number(plant.waterLevel) || 1));
+  }
+  return true;
 }
 
 function tickSproutEvolution(plant, now) {
@@ -2596,6 +2692,7 @@ function tickSproutEvolution(plant, now) {
   if (plant.sproutEvolutionMs >= cap) {
     plant.sproutEvolutionMs = cap;
     plant.isSproutSelfSustaining = true;
+    plant.growthTier = Math.max(Number(plant.growthTier) || 0, 3);
     plant.waterLevel = Math.max(Number(plant.waterLevel) || 0, 2);
     plant.becameEmptyAt = null;
     plant.status = "normal";
@@ -2609,10 +2706,13 @@ function getSproutImageForStage(stage) {
 }
 
 function getSproutSizeForStage(stage) {
-  const idx = Math.min(2, Math.max(0, stage - 1));
+  const idx = Math.min(2, Math.max(0, Math.min(stage, 3) - 1));
+  const growthScale = stage >= 5 ? 1.55 : stage >= 4 ? 1.35 : 1;
+  const baseWidth = SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH;
+  const baseHeight = SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT;
   return {
-    width: SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH,
-    height: SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT
+    width: Math.max(1, Math.round(baseWidth * growthScale)),
+    height: Math.max(1, Math.round(baseHeight * growthScale))
   };
 }
 
@@ -2623,6 +2723,8 @@ function getPlantGrowthRatio(plant, now) {
 }
 
 function getPlantSecondGrowthRatio(plant, now) {
+  const powderRatio = getPowderUpgradeRatio(plant, now);
+  if (powderRatio !== null) return powderRatio;
   if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten") return null;
   if (plant.isSproutSelfSustaining) return null;
   const ev = plant.sproutEvolutionMs || 0;
@@ -2646,7 +2748,14 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 }
 
 function updateExtraPlantWaterLevel(plant, now) {
-  if (plant.isSproutSelfSustaining || plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") return;
+  if (
+    (plant.isSproutSelfSustaining && (plant.growthTier || 0) < 4) ||
+    plant.isOverwatered ||
+    plant.status === "dry" ||
+    plant.status === "rotten"
+  ) {
+    return;
+  }
 
   const elapsedTicks = Math.floor((now - plant.waterLevelUpdatedAt) / plantWaterLevelTickMs);
   if (elapsedTicks <= 0) return;
@@ -3141,6 +3250,11 @@ function startPlanting() {
     plantRuntime.sproutEvolutionMs = 0;
     plantRuntime.sproutEvolutionLastTickAt = null;
     plantRuntime.isSproutSelfSustaining = false;
+    plantRuntime.growthTier = 0;
+    plantRuntime.waterCapacity = 2;
+    plantRuntime.powderUpgradeTargetTier = 0;
+    plantRuntime.powderUpgradeStartedAt = null;
+    plantRuntime.powderUpgradeDurationMs = 0;
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
@@ -3239,6 +3353,11 @@ function plantInventorySeed(seedId) {
       plantRuntime.sproutEvolutionMs = 0;
       plantRuntime.sproutEvolutionLastTickAt = null;
       plantRuntime.isSproutSelfSustaining = false;
+      plantRuntime.growthTier = 0;
+      plantRuntime.waterCapacity = 2;
+      plantRuntime.powderUpgradeTargetTier = 0;
+      plantRuntime.powderUpgradeStartedAt = null;
+      plantRuntime.powderUpgradeDurationMs = 0;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -3276,7 +3395,12 @@ function createExtraPlant(id, x, y) {
     sproutGrownAt: null,
     sproutEvolutionMs: 0,
     sproutEvolutionLastTickAt: null,
-    isSproutSelfSustaining: false
+    isSproutSelfSustaining: false,
+    growthTier: 0,
+    waterCapacity: 2,
+    powderUpgradeTargetTier: 0,
+    powderUpgradeStartedAt: null,
+    powderUpgradeDurationMs: 0
   };
 }
 
@@ -3382,6 +3506,74 @@ function useBucket() {
 
 }
 
+function getNearestPlantForMagicPowder() {
+  let nearest = null;
+  if (
+    plantRuntime.isSeedPlanted &&
+    plantRuntime.status !== "dry" &&
+    plantRuntime.status !== "rotten"
+  ) {
+    const distance = getCenterDistance(
+      plantRuntime.spotX,
+      plantRuntime.spotY,
+      PLANT_SPOT_WIDTH,
+      PLANT_SPOT_HEIGHT
+    );
+    if (distance <= plantWaterDistance) {
+      nearest = { type: "main", plant: plantRuntime, distance };
+    }
+  }
+  appleState.extraPlants.forEach(function (plant) {
+    if (!plant || plant.status === "dry" || plant.status === "rotten") return;
+    const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
+    if (distance > plantWaterDistance) return;
+    if (!nearest || distance < nearest.distance) {
+      nearest = { type: "extra", plant, distance };
+    }
+  });
+  return nearest;
+}
+
+function getNextPowderTargetTier(plant) {
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier < 3) return 0;
+  if (tier === 3) return 4;
+  if (tier === 4) return 5;
+  return 0;
+}
+
+function applyMagicPowderToPlant(plant) {
+  const nextTier = getNextPowderTargetTier(plant);
+  if (!nextTier || isPowderUpgradeInProgress(plant)) return false;
+  const now = Date.now();
+  plant.powderUpgradeTargetTier = nextTier;
+  plant.powderUpgradeStartedAt = now;
+  plant.powderUpgradeDurationMs = nextTier === 4 ? level4GrowMs : level5GrowMs;
+  plant.needsFirstWater = true;
+  plant.becameEmptyAt = null;
+  return true;
+}
+
+function tryUseMagicPowder() {
+  if (magicPowderCount <= 0) return false;
+  const target = getNearestPlantForMagicPowder();
+  if (!target) return false;
+  if (!applyMagicPowderToPlant(target.plant)) return false;
+
+  magicPowderCount = Math.max(0, magicPowderCount - 1);
+  saveMagicPowderCount();
+  if (target.type === "main") {
+    saveSeedState();
+  } else {
+    saveAppleState();
+  }
+  syncWorldState(true);
+  updateMagicPowderInventoryUi();
+  updatePlantState();
+  updateExtraSeedsAndPlants();
+  return true;
+}
+
 function triggerWaterSplash() {
   const bucketSize = getBucketSize();
   const splashX = bucketX + bucketSize.width / 2;
@@ -3472,6 +3664,7 @@ function waterPlant(target) {
   if (plantRuntime.isSproutSelfSustaining) {
     return;
   }
+  const waterCapacity = getPlantWaterCapacity(plantRuntime);
 
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
 
@@ -3499,7 +3692,7 @@ function waterPlant(target) {
     plantRuntime.waterLevel = 1;
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
-  } else if (plantRuntime.waterLevel >= 2) {
+  } else if (plantRuntime.waterLevel >= waterCapacity) {
     // Already at the cap. Pouring more water rots the plant: the soil flips to
     // the rotten image and the sprout disappears, then the slot is cleared
     // a few seconds later so the player can plant something new.
@@ -3514,7 +3707,7 @@ function waterPlant(target) {
     plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.needsFirstWater = false;
   } else {
-    plantRuntime.waterLevel += 1;
+    plantRuntime.waterLevel = Math.min(waterCapacity, plantRuntime.waterLevel + 1);
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   }
@@ -3534,6 +3727,7 @@ function waterExtraPlant(plant) {
     return;
   }
   updateExtraPlantWaterLevel(plant, now);
+  const waterCapacity = getPlantWaterCapacity(plant);
 
   if (plant.status === "dry") {
     // Dry soil is terminal by design; watering cannot recover it.
@@ -3567,7 +3761,7 @@ function waterExtraPlant(plant) {
     plant.waterLevel = 1;
     plant.isOverwatered = false;
     plant.status = "normal";
-  } else if (plant.waterLevel >= 2) {
+  } else if (plant.waterLevel >= waterCapacity) {
     plant.isOverwatered = true;
     plant.status = "rotten";
     plant.rottenAt = now;
@@ -3579,7 +3773,7 @@ function waterExtraPlant(plant) {
     plant.isSproutSelfSustaining = false;
     plant.needsFirstWater = false;
   } else {
-    plant.waterLevel += 1;
+    plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
     plant.status = "normal";
   }
@@ -3598,7 +3792,7 @@ function updatePlantWaterLevel() {
     plantRuntime.isOverwatered ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
-    plantRuntime.isSproutSelfSustaining
+    (plantRuntime.isSproutSelfSustaining && (plantRuntime.growthTier || 0) < 4)
   ) {
     return;
   }
@@ -3622,7 +3816,7 @@ function updatePlantWaterLevel() {
     plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
   }
 
-  if (plantRuntime.waterLevel < 2 && !plantRuntime.isOverwatered) {
+  if (plantRuntime.waterLevel < getPlantWaterCapacity(plantRuntime) && !plantRuntime.isOverwatered) {
     plantRuntime.isOverwatered = false;
   }
 
@@ -3643,6 +3837,10 @@ function updatePlantState() {
 
   const now = Date.now();
   updatePlantWaterLevel();
+  if (tickPowderUpgrade(plantRuntime, now)) {
+    saveSeedState();
+    syncWorldState(true);
+  }
 
   if (plantRuntime.isSproutGrown && !plantRuntime.isSproutSelfSustaining) {
     tickSproutEvolution(plantRuntime, now);
@@ -3713,6 +3911,11 @@ function removeMainPlant() {
   plantRuntime.sproutEvolutionMs = 0;
   plantRuntime.sproutEvolutionLastTickAt = null;
   plantRuntime.isSproutSelfSustaining = false;
+  plantRuntime.growthTier = 0;
+  plantRuntime.waterCapacity = 2;
+  plantRuntime.powderUpgradeTargetTier = 0;
+  plantRuntime.powderUpgradeStartedAt = null;
+  plantRuntime.powderUpgradeDurationMs = 0;
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
   sprout.style.display = "none";
@@ -3728,7 +3931,11 @@ function updatePlantCard() {
   const wateringTarget = getNearestWateringTarget();
   if (wateringTarget && wateringTarget.type === "extra") {
     const plant = wateringTarget.plant;
-    if (plant.status === "dry" || plant.status === "rotten" || plant.isSproutSelfSustaining) {
+    if (
+      plant.status === "dry" ||
+      plant.status === "rotten" ||
+      (plant.isSproutSelfSustaining && (plant.growthTier || 0) < 4)
+    ) {
       plantCard.style.display = "none";
       return;
     }
@@ -3736,8 +3943,10 @@ function updatePlantCard() {
     plantCard.style.display = "block";
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
-    plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plant.waterLevel + "/2";
+    const waterCapacity = getPlantWaterCapacity(plant);
+    plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plant.waterLevel + "/" + waterCapacity;
     plantWaterSegments.forEach(function (segment, index) {
+      segment.style.display = index < waterCapacity ? "block" : "none";
       segment.classList.toggle("is-filled", index < plant.waterLevel);
     });
     return;
@@ -3747,7 +3956,7 @@ function updatePlantCard() {
     !plantRuntime.isSeedPlanted ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
-    plantRuntime.isSproutSelfSustaining ||
+    (plantRuntime.isSproutSelfSustaining && (plantRuntime.growthTier || 0) < 4) ||
     !wateringTarget
   ) {
     plantCard.style.display = "none";
@@ -3757,16 +3966,26 @@ function updatePlantCard() {
   plantCard.style.display = "block";
   plantCard.classList.toggle("is-dry", plantRuntime.status === "dry");
   plantCard.classList.toggle("is-overwatered", plantRuntime.isOverwatered);
-  plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plantRuntime.waterLevel + "/2";
+  const waterCapacity = getPlantWaterCapacity(plantRuntime);
+  plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plantRuntime.waterLevel + "/" + waterCapacity;
 
   plantWaterSegments.forEach(function (segment, index) {
+    segment.style.display = index < waterCapacity ? "block" : "none";
     segment.classList.toggle("is-filled", index < plantRuntime.waterLevel);
   });
 
 }
 
 function updatePlantGrowth() {
-  if (!plantRuntime.isSeedPlanted || plantRuntime.growthStartedAt === null || plantRuntime.status === "dry" || plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
+  const now = Date.now();
+  const powderRatio = getPowderUpgradeRatio(plantRuntime, now);
+  if (
+    !plantRuntime.isSeedPlanted ||
+    (plantRuntime.growthStartedAt === null && powderRatio === null) ||
+    plantRuntime.status === "dry" ||
+    plantRuntime.status === "rotten" ||
+    plantRuntime.isOverwatered
+  ) {
     growthCard.style.display = "none";
     mainPlantGrowthMeter.element.style.display = "none";
     sprout.style.display =
@@ -3777,9 +3996,10 @@ function updatePlantGrowth() {
     return;
   }
 
-  const now = Date.now();
-  const elapsed = now - plantRuntime.growthStartedAt;
-  const growthRatio = Math.min(1, elapsed / plantGrowthMs);
+  const elapsed = plantRuntime.growthStartedAt === null ? 0 : now - plantRuntime.growthStartedAt;
+  const growthRatio = plantRuntime.growthStartedAt === null
+    ? 1
+    : Math.min(1, elapsed / plantGrowthMs);
   const secondGrowthRatio = getPlantSecondGrowthRatio(plantRuntime, now);
   updatePlantGrowthMeter(
     mainPlantGrowthMeter.element,
@@ -4119,6 +4339,17 @@ function applyLoadedPlantState(loadedPlant) {
   }
 
   plantRuntime.sproutEvolutionLastTickAt = Date.now();
+  plantRuntime.growthTier = Math.max(0, Number(loadedPlant.growthTier) || 0);
+  plantRuntime.waterCapacity = Math.max(2, Number(loadedPlant.waterCapacity) || 2);
+  plantRuntime.powderUpgradeTargetTier = Math.max(
+    0,
+    Number(loadedPlant.powderUpgradeTargetTier) || 0
+  );
+  plantRuntime.powderUpgradeStartedAt = Number(loadedPlant.powderUpgradeStartedAt) || null;
+  plantRuntime.powderUpgradeDurationMs = Math.max(
+    0,
+    Number(loadedPlant.powderUpgradeDurationMs) || 0
+  );
 
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     plantRuntime.status = "rotten";
@@ -4130,6 +4361,12 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.sproutEvolutionLastTickAt = null;
     plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.needsFirstWater = false;
+  }
+  if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
+    plantRuntime.growthTier = 3;
+  }
+  if (plantRuntime.growthTier >= 4) {
+    plantRuntime.waterCapacity = 3;
   }
 }
 
@@ -4153,6 +4390,11 @@ function getPlantStateForStorage() {
     sproutEvolutionMs: plantRuntime.sproutEvolutionMs,
     sproutEvolutionLastTickAt: plantRuntime.sproutEvolutionLastTickAt,
     isSproutSelfSustaining: plantRuntime.isSproutSelfSustaining,
+    growthTier: plantRuntime.growthTier,
+    waterCapacity: plantRuntime.waterCapacity,
+    powderUpgradeTargetTier: plantRuntime.powderUpgradeTargetTier,
+    powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
+    powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs,
     npcX,
     npcY
   };
@@ -4431,6 +4673,9 @@ function finishCharacterSelect() {
   isCharacterSelecting = false;
   localStorage.setItem(currentUserColorKey, selectedPlayerColor);
   localStorage.setItem(currentUserHasChosenColorKey, currentUserId);
+  if (currentUserScopedHasChosenColorKey) {
+    localStorage.setItem(currentUserScopedHasChosenColorKey, "true");
+  }
   characterSelectOverlay.classList.remove("is-open");
   player.classList.remove("is-hidden-before-spawn");
   applyPlayerColor(selectedPlayerColor);
@@ -5329,11 +5574,72 @@ function loadButterflyCaughtCounts() {
   }
 }
 
+function loadMagicPowderCount() {
+  const raw = Number(getStoredValue(magicPowderCountKey) || 0);
+  magicPowderCount = Math.max(0, Math.floor(raw));
+}
+
 function saveButterflyCaughtCounts() {
   setStoredValue(
     butterflyCaughtCountsKey,
     JSON.stringify(butterflyState.caughtCounts)
   );
+}
+
+function saveMagicPowderCount() {
+  setStoredValue(magicPowderCountKey, String(Math.max(0, Math.floor(magicPowderCount))));
+}
+
+function getTotalCaughtButterflies() {
+  return butterflyColors.reduce(function (total, color) {
+    return total + Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
+  }, 0);
+}
+
+function removeRandomButterfliesFromInventory(count) {
+  const pickedColors = [];
+  butterflyColors.forEach(function (color) {
+    const amount = Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
+    for (let i = 0; i < amount; i += 1) pickedColors.push(color);
+  });
+  for (let i = pickedColors.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = pickedColors[i];
+    pickedColors[i] = pickedColors[j];
+    pickedColors[j] = tmp;
+  }
+  const removing = Math.min(Math.max(0, count), pickedColors.length);
+  for (let i = 0; i < removing; i += 1) {
+    const color = pickedColors[i];
+    butterflyState.caughtCounts[color] = Math.max(
+      0,
+      (butterflyState.caughtCounts[color] || 0) - 1
+    );
+  }
+}
+
+function tryCraftMagicPowder() {
+  if (isCraftingMagicPowder) return false;
+  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
+  if (getTotalCaughtButterflies() < magicPowderCraftCost) return false;
+
+  isCraftingMagicPowder = true;
+  plantRuntime.isPlanting = true;
+  playerStatus.textContent = "마법의 가루 생성중...";
+  clearTimeout(magicPowderCraftTimer);
+  magicPowderCraftTimer = window.setTimeout(function () {
+    removeRandomButterfliesFromInventory(magicPowderCraftCost);
+    magicPowderCount += 1;
+    saveButterflyCaughtCounts();
+    saveMagicPowderCount();
+    isCraftingMagicPowder = false;
+    plantRuntime.isPlanting = false;
+    playerStatus.textContent = "";
+    updateButterflyInventoryUi();
+    updateMagicPowderInventoryUi();
+  }, magicPowderCraftMs);
+  updateButterflyInventoryUi();
+  return true;
 }
 
 function generateButterflyId() {
@@ -5657,6 +5963,21 @@ function updateButterflyInventoryUi() {
     butterflyInventoryTotal.textContent = String(total);
   }
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
+  const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
+  butterflyInventory.classList.toggle("is-craftable", canCraft);
+}
+
+function updateMagicPowderInventoryUi() {
+  if (!magicPowderInventory || !magicPowderCountText) return;
+  if (magicPowderCount <= 0) {
+    magicPowderInventory.style.display = "none";
+    magicPowderInventory.classList.remove("is-near");
+    return;
+  }
+  magicPowderInventory.style.display = "block";
+  magicPowderCountText.textContent = String(magicPowderCount);
+  const nearTarget = getNearestPlantForMagicPowder();
+  magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
 }
 
 function updateButterflies() {
@@ -5877,6 +6198,7 @@ function gameLoop() {
   pruneStaleRemotePlayers();
   updatePlayerAlert();
   updateButterflies();
+  updateMagicPowderInventoryUi();
   updateCamera();
   updatePlayerName();
   sendMultiplayerPresence(false);
@@ -5975,7 +6297,9 @@ loadBucketState();
 loadGuideBookState();
 loadPlayerPosition();
 loadButterflyCaughtCounts();
+loadMagicPowderCount();
 updateButterflyInventoryUi();
+updateMagicPowderInventoryUi();
 addNetworkDebugLog(
   "init: configured=" +
   Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +

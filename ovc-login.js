@@ -116,6 +116,14 @@ function goToGame() {
   window.location.replace(targetUrl.toString());
 }
 
+function persistColorChoiceState(account) {
+  if (!account || !account.id) return;
+  var scopedChosenKey = "ovcUserHasChosenColorV1:" + account.id;
+  var hasChosen = Boolean(normalizeHexColor(account.color));
+  localStorage.setItem(scopedChosenKey, hasChosen ? "true" : "false");
+  localStorage.setItem(currentUserHasChosenColorKey, hasChosen ? account.id : "");
+}
+
 function validateSignup(name, password) {
   if (!koreanNamePattern.test(name)) {
     return "이름은 한글 자음/모음을 포함해서 1~3글자로 입력하세요.";
@@ -253,13 +261,11 @@ async function handleLoginSubmit() {
     localStorage.setItem(currentUserIdKey, account.id);
     const accountColor = normalizeHexColor(account.color);
     const scopedKey = "ovcUserColorV1:" + account.id;
-    const scopedColor = normalizeHexColor(localStorage.getItem(scopedKey));
-    const storedColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
-    const fallbackColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
-    const finalColor = accountColor || scopedColor || storedColor || fallbackColor || "#ffffff";
+    const finalColor = accountColor || "#ffffff";
     localStorage.setItem(currentUserColorKey, finalColor);
     localStorage.setItem(lastSelectedColorKey, finalColor);
     localStorage.setItem(scopedKey, finalColor);
+    persistColorChoiceState(account);
     if (account.session_token) {
       localStorage.setItem(currentSessionTokenKey, account.session_token);
     }
@@ -278,13 +284,11 @@ async function handleLoginSubmit() {
         localStorage.setItem(currentUserIdKey, account.id);
         const accountColor = normalizeHexColor(account.color);
         const scopedKey = "ovcUserColorV1:" + account.id;
-        const scopedColor = normalizeHexColor(localStorage.getItem(scopedKey));
-        const storedColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
-        const fallbackColor = normalizeHexColor(localStorage.getItem(lastSelectedColorKey));
-        const finalColor = accountColor || scopedColor || storedColor || fallbackColor || "#ffffff";
+        const finalColor = accountColor || "#ffffff";
         localStorage.setItem(currentUserColorKey, finalColor);
         localStorage.setItem(lastSelectedColorKey, finalColor);
         localStorage.setItem(scopedKey, finalColor);
+        persistColorChoiceState(account);
         goToGame();
         return;
       } catch (fallbackError) {
