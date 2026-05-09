@@ -14,8 +14,8 @@ export const SPROUT_WIDTH = 14;
 export const SPROUT_HEIGHT = 18;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
-export const NPC_WIDTH = 25;
-export const NPC_HEIGHT = 50;
+export const NPC_WIDTH = 13;
+export const NPC_HEIGHT = 26;
 
 export const BIG_TREE_X = WORLD_WIDTH - BIG_TREE_WIDTH - 8;
 export const BIG_TREE_Y = -BIG_TREE_HEIGHT + 10;
