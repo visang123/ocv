@@ -367,6 +367,9 @@ let onboardingButterflyCountBaseline = null;
 let onboardingTutorialEnteredTree = false;
 let onboardingSeedTutorialSecondLine = false;
 const ONBOARDING_MAX_STEP = 27;
+/** tutorial.html: 땅의 튜토리얼 씨앗이 사라진 뒤 다시 놓기까지(ms) */
+const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
+let tutorialMainSeedRespawnTimerId = null;
 let onboardingStep26OpenedSettingsWithEsc = false;
 let tutorialWorldNeedsFullReset = false;
 let heldItem = null;
@@ -1299,6 +1302,7 @@ function skipTutorialFromSettings() {
   if (!window.confirm("튜토리얼을 건너뛰고 자유롭게 플레이할까요?")) {
     return;
   }
+  clearTutorialMainSeedRespawnTimer();
   try {
     sessionStorage.removeItem(ovcTutorialReplaySessionKey);
   } catch (eReplay) {}
@@ -1547,6 +1551,56 @@ function canPickUpSeed() {
   );
 }
 
+function clearTutorialMainSeedRespawnTimer() {
+  if (tutorialMainSeedRespawnTimerId !== null) {
+    window.clearTimeout(tutorialMainSeedRespawnTimerId);
+    tutorialMainSeedRespawnTimerId = null;
+  }
+}
+
+function scheduleTutorialMainSeedRespawnFromGround() {
+  if (!isTutorialDocumentEntry()) return;
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  clearTutorialMainSeedRespawnTimer();
+  tutorialMainSeedRespawnTimerId = window.setTimeout(function () {
+    tutorialMainSeedRespawnTimerId = null;
+    if (!isTutorialDocumentEntry()) return;
+    if (getStoredFlag(onboardingFlowDoneKey)) return;
+    if (plantRuntime.isSeedPlanted) return;
+    tutorialRespawnMainSeedOnGround();
+  }, TUTORIAL_MAIN_SEED_RESPAWN_MS);
+}
+
+function tutorialRespawnMainSeedOnGround() {
+  try {
+    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  } catch (eRm) {}
+  hasPickedMainSeedThisWindow = false;
+  appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
+    var isStarter = s.id === "starter-seed" || s.isStarter;
+    if (!isStarter) return true;
+    if (s.planted) return true;
+    if (s.element) s.element.remove();
+    if (s.inventoryElement) s.inventoryElement.remove();
+    return false;
+  });
+  if (heldItem === HELD_ITEM_SEED) {
+    heldItem = null;
+  }
+  plantRuntime.isSeedDry = false;
+  hasHandledDryMainSeed = false;
+  dryMainSeedVisibleSince = 0;
+  setStoredFlag(mainDrySeedHandledKey, false);
+  isMainSeedAvailable = true;
+  lastMainSeedStateChangeAt = Date.now();
+  updateSeedInventory();
+  updateExtraSeedsAndPlants();
+  updateSeedPosition();
+  saveAppleState();
+  markWorldDirty();
+  syncWorldState(true);
+}
+
 function createStarterSeedInventoryItem() {
   if (hasPickedMainSeedInCurrentRoom()) return null;
 
@@ -1577,6 +1631,7 @@ function createStarterSeedInventoryItem() {
     onboardingFlowStep = 7;
     persistOnboardingStep();
   }
+  scheduleTutorialMainSeedRespawnFromGround();
   return starterSeed;
 }
 
@@ -1802,6 +1857,7 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
 }
 
 function resetTutorialProgressInStorage() {
+  clearTutorialMainSeedRespawnTimer();
   setStoredFlag(onboardingFlowDoneKey, false);
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
@@ -2071,6 +2127,7 @@ function loadOnboardingFlowState() {
 }
 
 function onboardingNotifyMainPlantPlanted() {
+  clearTutorialMainSeedRespawnTimer();
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   if (onboardingFlowStep === 7) {
     onboardingFlowStep = 8;
@@ -2510,6 +2567,7 @@ function settlePlayerBeforeBackground() {
 }
 
 function applyDefaultState(options) {
+  clearTutorialMainSeedRespawnTimer();
   const sharedWorldResetOnly =
     Boolean(options && options.sharedWorldResetOnly);
   if (sharedWorldResetOnly) {
@@ -2716,6 +2774,10 @@ function isPlantMasterVisible() {
   if (!isNpcDialogueComplete) {
     return true;
   }
+  /** 온보딩(튜토리얼) 끝 전에는 대화 반복을 위해 항상 표시 */
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    return true;
+  }
   return (
     plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "rotten" &&
@@ -2730,11 +2792,12 @@ function isNearPlantMaster() {
 }
 
 function tryTalkToPlantMaster() {
-  if (
-    !isNearPlantMaster() ||
-    isNpcDialogueRunning ||
-    isNpcDialogueComplete
-  ) {
+  if (!isNearPlantMaster() || isNpcDialogueRunning) {
+    return false;
+  }
+  var canRepeatWhileOnboarding =
+    isNpcDialogueComplete && !getStoredFlag(onboardingFlowDoneKey);
+  if (isNpcDialogueComplete && !canRepeatWhileOnboarding) {
     return false;
   }
 
@@ -2751,6 +2814,9 @@ function startPlantMasterDialogue() {
     { speaker: "npc", text: "!!" }
   ];
 
+  var skipFirstTalkUnlockEffects =
+    isNpcDialogueComplete && !getStoredFlag(onboardingFlowDoneKey);
+
   isNpcDialogueRunning = true;
   npcBubble.style.display = "none";
   playerBubble.style.display = "none";
@@ -2766,26 +2832,29 @@ function startPlantMasterDialogue() {
     npcBubble.style.display = "none";
     playerBubble.style.display = "none";
     isNpcDialogueRunning = false;
-    isNpcDialogueComplete = true;
-    isGuidePlantPageUnlocked = true;
-    hasGuideBook = true;
-    setGuideBookPickedForCurrentRoom();
-    guideBook.style.display = "none";
-    guideBookButton.style.display = "block";
-    setStoredFlag(npcDialogueCompleteKey, true);
-    setStoredFlag(guidePlantPageUnlockedKey, true);
-    isGuideBookClickPromptActive = true;
-    setStoredFlag(guideBookClickPromptDismissedKey, false);
-    updateNpcPosition();
-    showPlayerAlert();
-    guidePageIndex = 0;
-    isGuideBookOpen = true;
-    if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 9) {
-      onboardingFlowStep = 10;
-      persistOnboardingStep();
+    npcBubble.dataset.promptShown = "false";
+    if (!skipFirstTalkUnlockEffects) {
+      isNpcDialogueComplete = true;
+      isGuidePlantPageUnlocked = true;
+      hasGuideBook = true;
+      setGuideBookPickedForCurrentRoom();
+      guideBook.style.display = "none";
+      guideBookButton.style.display = "block";
+      setStoredFlag(npcDialogueCompleteKey, true);
+      setStoredFlag(guidePlantPageUnlockedKey, true);
+      isGuideBookClickPromptActive = true;
+      setStoredFlag(guideBookClickPromptDismissedKey, false);
+      showPlayerAlert();
+      guidePageIndex = 0;
+      isGuideBookOpen = true;
+      if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 9) {
+        onboardingFlowStep = 10;
+        persistOnboardingStep();
+      }
+      completeMovementTutorial();
     }
+    updateNpcPosition();
     updateGuideCard();
-    completeMovementTutorial();
     updateOnboardingFlowUI();
   }, lines.length * 650 + 250);
 }
@@ -3771,6 +3840,7 @@ function updateSeedPosition() {
       dryMainSeedVisibleSince = 0;
       markWorldDirty();
       syncWorldState(true);
+      scheduleTutorialMainSeedRespawnFromGround();
     }
   } else if (!plantRuntime.isSeedDry || hasHandledDryMainSeed) {
     dryMainSeedVisibleSince = 0;
@@ -5560,7 +5630,8 @@ function updatePlayerBubblePosition() {
 }
 
 function updateNpcPrompt() {
-  if (isNpcDialogueRunning || isNpcDialogueComplete) return;
+  if (isNpcDialogueRunning) return;
+  if (isNpcDialogueComplete && getStoredFlag(onboardingFlowDoneKey)) return;
 
   if (isNearPlantMaster()) {
     if (npcBubble.dataset.promptShown === "true") return;
