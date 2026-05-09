@@ -6062,11 +6062,16 @@ function finishCharacterSelect() {
   syncPlayerColorToServer(true);
 
   restoreWorldHubIfVeteranWithoutActiveReplay();
+  var replayActiveForSpawn = false;
+  try {
+    replayActiveForSpawn =
+      sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
+  } catch (eRepSpawn) {}
   if (
     isWorldDocumentEntry() &&
     currentUserId &&
     !getStoredFlag(onboardingFlowDoneKey) &&
-    !getStoredFlag(everBeenToWorldKey)
+    (!getStoredFlag(everBeenToWorldKey) || replayActiveForSpawn)
   ) {
     isReloadingForWorldReset = true;
     window.location.replace(ovcTutorialPageUrl());
@@ -7795,6 +7800,11 @@ try {
     }
   }
   let ovcAbortedPageInit = false;
+  let ovcTutorialReplayActive = false;
+  try {
+    ovcTutorialReplayActive =
+      sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
+  } catch (eRepInit) {}
   if (
     isTutorialDocumentEntry() &&
     currentUserId &&
@@ -7807,7 +7817,7 @@ try {
     currentUserId &&
     hasSpawnedCharacter &&
     !getStoredFlag(onboardingFlowDoneKey) &&
-    !getStoredFlag(everBeenToWorldKey)
+    (!getStoredFlag(everBeenToWorldKey) || ovcTutorialReplayActive)
   ) {
     ovcAbortedPageInit = true;
     window.location.replace(ovcTutorialPageUrl());
