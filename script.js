@@ -706,10 +706,15 @@ const keys = createInputState();
 function isRemotePresenceSameLoggedInAccount(state) {
   if (!state || !currentUserId) return false;
   const remoteUserId = state.userId != null ? String(state.userId).trim() : "";
-  if (!remoteUserId || remoteUserId !== String(currentUserId).trim()) return false;
   const remoteSession = state.id != null ? String(state.id) : "";
   if (!remoteSession || remoteSession === String(currentSessionId)) return false;
-  return true;
+  if (remoteUserId && remoteUserId === String(currentUserId).trim()) return true;
+  if (!remoteUserId && currentUserName) {
+    const remoteName = nameForIngameUiDisplay(state.name || "");
+    const mine = nameForIngameUiDisplay(accountDisplayNameForUi());
+    if (remoteName && mine && remoteName === mine) return true;
+  }
+  return false;
 }
 
 if (!currentUserName || !currentUserId) {
@@ -1723,6 +1728,7 @@ function isNearGuideBook() {
 
 function shouldRunMovementTutorial() {
   return (
+    isTutorialDocumentEntry() &&
     Boolean(currentUserId) &&
     hasSpawnedCharacter &&
     !isCharacterSelecting &&
@@ -1840,6 +1846,10 @@ function clearOnboardingHighlights() {
 
 function setOnboardingCalloutVisible(show, text) {
   if (!onboardingCallout || !onboardingCalloutText) return;
+  if (show && isWorldDocumentEntry()) {
+    show = false;
+    text = "";
+  }
   if (!show) {
     onboardingCallout.style.display = "none";
     onboardingCalloutText.textContent = "";
@@ -1917,6 +1927,7 @@ function resetTutorialProgressInStorage() {
 }
 
 function isSharedWorldSyncPausedForTutorial() {
+  if (isWorldDocumentEntry()) return false;
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
@@ -2096,6 +2107,7 @@ function highlightUnpickedApplesForTutorial() {
 }
 
 function isMainGameTutorialInProgress() {
+  if (isWorldDocumentEntry()) return false;
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
@@ -2273,6 +2285,13 @@ function updateOnboardingFlowUI() {
   if (!hasSpawnedCharacter || isCharacterSelecting || isTabSessionSuperseded) {
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
+    updateSettingsTutorialButtons();
+    return;
+  }
+  if (isWorldDocumentEntry()) {
+    setOnboardingCalloutVisible(false, "");
+    clearOnboardingHighlights();
+    hideMovementTutorialOverlay();
     updateSettingsTutorialButtons();
     return;
   }
