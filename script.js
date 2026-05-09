@@ -540,6 +540,17 @@ document.addEventListener("keydown", function (event) {
     return;
   }
 
+  if (
+    event.code === "KeyR" &&
+    event.altKey &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.repeat
+  ) {
+    event.preventDefault();
+    resetGameForTesting();
+    return;
+  }
+
   if (isTabSessionSuperseded) {
     event.preventDefault();
     return;
@@ -1095,7 +1106,7 @@ function applyDefaultState() {
   plantRuntime.isSeedDry = false;
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
-  removeStoredValue(storageKeyMainSeedPickedForRoom());
+  sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
   removeStoredValue(storageKeyGuideBookPickedForRoom());
   setStoredFlag(mainSeedCollectedKey, false);
   setStoredFlag(hasGuideBookKey, false);
