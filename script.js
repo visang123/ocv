@@ -1071,6 +1071,10 @@ window.addEventListener(
   function (event) {
     event.preventDefault();
 
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 19) {
+      return;
+    }
+
     const direction = event.deltaY > 0 ? -1 : 1;
     zoomLevel = clampZoom(zoomLevel + direction * zoomStep);
     updateCamera();
@@ -1093,6 +1097,10 @@ window.addEventListener(
 );
 
 guideBookButton.addEventListener("click", function () {
+  if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
+    flashOnboardingOrderHint("");
+    return;
+  }
   const wasOpen = isGuideBookOpen;
   isGuideBookOpen = !isGuideBookOpen;
   if (wasOpen) {
@@ -1102,6 +1110,10 @@ guideBookButton.addEventListener("click", function () {
 });
 
 signBoard.addEventListener("click", function () {
+  if (isOnboardingLinearGateActive()) {
+    flashOnboardingOrderHint("");
+    return;
+  }
   isGuideDismissedAtSign = false;
   isGuideBookOpen = true;
   updateGuideCard();
@@ -2087,6 +2099,29 @@ function isMainGameTutorialInProgress() {
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
+function isOnboardingLinearGateActive() {
+  return (
+    isMainGameTutorialInProgress() &&
+    hasSpawnedCharacter &&
+    !isCharacterSelecting &&
+    !isTabSessionSuperseded
+  );
+}
+
+function flashOnboardingOrderHint(message) {
+  flashPlantProximityWarning(message || "\uC21C\uC11C\uB300\uB85C \uC9C4\uD589\uD574 \uC8FC\uC138\uC694.");
+  updatePlayerStatus();
+}
+
+function onboardingAllowsBucketQUse() {
+  return onboardingFlowStep === 14 || onboardingFlowStep === 16;
+}
+
+function onboardingAllowsGuideBookButtonToggle() {
+  const s = onboardingFlowStep;
+  return s === 2 || s === 3 || s === 10 || s >= 17;
+}
+
 function syncOnboardingFlowProgressFromWorld() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   let changed = false;
@@ -2499,6 +2534,10 @@ function onboardingHookDroppedBucketForTutorial() {
 }
 
 function pickUpGuideBook() {
+  if (isOnboardingLinearGateActive()) {
+    if (hasGuideBook) return false;
+    if (onboardingFlowStep !== 1 && onboardingFlowStep !== 2) return false;
+  }
   if (!isNearGuideBook()) return false;
 
   hasGuideBook = true;
@@ -2834,6 +2873,10 @@ function tryTalkToPlantMaster() {
   if (!isNearPlantMaster() || isNpcDialogueRunning) {
     return false;
   }
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 9) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
   if (isNpcDialogueComplete && plantRuntime.isSeedPlanted) {
     return false;
   }
@@ -2940,6 +2983,10 @@ function pickUpNearestItem() {
     seedDistance <= bucketDistance &&
     seedDistance <= extraSeedDistance
   ) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep !== 6) {
+      flashOnboardingOrderHint("");
+      return;
+    }
     createStarterSeedInventoryItem();
     updateSeedPosition();
     updateSeedInventory();
@@ -2952,6 +2999,10 @@ function pickUpNearestItem() {
     extraSeedDistance <= pickupDistance &&
     extraSeedDistance <= bucketDistance
   ) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      return;
+    }
     extraSeed.seed.inInventory = true;
     saveAppleState();
     updateExtraSeedsAndPlants();
@@ -2961,6 +3012,10 @@ function pickUpNearestItem() {
   }
 
   if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12 && onboardingFlowStep !== 14) {
+      flashOnboardingOrderHint("");
+      return;
+    }
     const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
     bucketX = handPosition.x;
     bucketY = handPosition.y;
@@ -3032,6 +3087,9 @@ function getNearestPickableExtraSeed() {
 }
 
 function pickApple() {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 23) {
+    return false;
+  }
   respawnApplesIfNeeded();
   const apple = appleState.apples.find(function (candidate) {
     return !appleState.pickedIds.includes(candidate.id) && isPlayerOverlappingRect(
@@ -3098,6 +3156,10 @@ function updateApples() {
 
 function eatApple() {
   if (appleState.count <= 0 || appleState.isEating || plantRuntime.isPlanting || isNpcDialogueRunning) return;
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 24) {
+    flashOnboardingOrderHint("");
+    return;
+  }
 
   appleState.count -= 1;
   appleState.isEating = true;
@@ -3816,6 +3878,21 @@ function pollWorldState(forcePoll) {
 }
 
 function dropHeldItem() {
+  if (isOnboardingLinearGateActive()) {
+    if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== 13) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+    if (heldItem === HELD_ITEM_SEED && onboardingFlowStep !== 7) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+    if (isHeldExtraSeed(heldItem) && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+  }
+
   if (heldItem === HELD_ITEM_SEED) {
     dropSeed();
     return;
@@ -4360,6 +4437,13 @@ function discardInventorySeed(seedId) {
 
   const seedToRemove = appleState.extraSeeds[seedIndex];
   if (!seedToRemove.inInventory || seedToRemove.planted) return;
+  if (
+    isOnboardingLinearGateActive() &&
+    (seedToRemove.isStarter || seedToRemove.id === "starter-seed")
+  ) {
+    flashOnboardingOrderHint("");
+    return;
+  }
 
   if (seedToRemove.inventoryElement) {
     seedToRemove.inventoryElement.remove();
@@ -4793,6 +4877,11 @@ function getPlayerWorldY() {
 function startPlanting() {
   updateSeedDryState();
 
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== 7) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+
   if (heldItem !== HELD_ITEM_SEED || plantRuntime.isPlanting || !isOnGround || plantRuntime.isSeedDry) return;
 
   const playerBox = getPlayerBox();
@@ -4853,6 +4942,10 @@ function startPlanting() {
 }
 
 function startPlantingExtraSeed() {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    flashOnboardingOrderHint("");
+    return;
+  }
   const extraSeed = getHeldExtraSeed();
   if (
     !extraSeed ||
@@ -4896,6 +4989,20 @@ function plantInventorySeed(seedId) {
   const inventorySeed = appleState.extraSeeds.find(function (extraSeed) {
     return extraSeed.id === seedId;
   });
+
+  if (isOnboardingLinearGateActive() && inventorySeed) {
+    const isStarter = inventorySeed.id === "starter-seed" || inventorySeed.isStarter;
+    if (isStarter && onboardingFlowStep !== 7) {
+      flashOnboardingOrderHint("");
+      updateSeedInventory();
+      return;
+    }
+    if (!isStarter && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      updateSeedInventory();
+      return;
+    }
+  }
 
   if (
     !inventorySeed ||
@@ -5304,6 +5411,13 @@ function isExtraSeedDry(extraSeed, now) {
 function useHeldItem() {
   if (plantRuntime.isPlanting || appleState.isEating) return;
 
+  if (isOnboardingLinearGateActive()) {
+    if (heldItem === HELD_ITEM_BUCKET && !onboardingAllowsBucketQUse()) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+  }
+
   if (heldItem === HELD_ITEM_SEED) {
     startPlanting();
     return;
@@ -5412,6 +5526,10 @@ function applyMagicPowderToPlant(plant) {
 }
 
 function tryUseMagicPowder() {
+  if (isOnboardingLinearGateActive()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
   if (magicPowderCount <= 0) return false;
   const target = getNearestPlantForMagicPowder();
   if (!target) return false;
@@ -7699,6 +7817,10 @@ function removeRandomButterfliesFromInventory(count) {
 }
 
 function tryCraftMagicPowder() {
+  if (isOnboardingLinearGateActive()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
   if (isCraftingMagicPowder) return false;
   if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
   if (getTotalCaughtButterflies() < magicPowderCraftCost) return false;
@@ -8015,6 +8137,9 @@ function handleRemoteButterflyCatchBroadcast(payload) {
 }
 
 function tryCatchButterfly() {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 18) {
+    return false;
+  }
   const now = Date.now();
   if (now - lastLocalButterflyCatchAt < 200) return false;
   const target = findCatchableButterfly();
