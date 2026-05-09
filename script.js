@@ -555,8 +555,8 @@ const TREE_DEPTH_CLAMP_MAX_STEP = 9;
  * 줄기 “땅에서 붙는” 판정: getPlayerFootY()만 좁게(지면 줄기 높이 근처).
  * 값은 월드 발밑 y; 범위를 줄이면 나무 모드 진입 y축만 더 타이트해짐.
  */
-const TREE_TRUNK_FOOT_Y_MIN = 20;
-const TREE_TRUNK_FOOT_Y_MAX = 36;
+const TREE_TRUNK_FOOT_Y_MIN = 24;
+const TREE_TRUNK_FOOT_Y_MAX = 32;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /**
