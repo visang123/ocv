@@ -2279,6 +2279,10 @@ function applyDefaultState(options) {
 
   seedX = SEED_START_X;
   seedY = SEED_START_Y;
+  signX = SIGN_START_X;
+  signY = SIGN_START_Y;
+  guideBookX = GUIDE_BOOK_START_X;
+  guideBookY = GUIDE_BOOK_START_Y;
   plantRuntime.seedCreatedAt = Date.now();
   setStoredValue(seedCreatedAtKey, String(plantRuntime.seedCreatedAt));
   plantRuntime.isSeedDry = false;
@@ -2420,6 +2424,8 @@ function applyDefaultState(options) {
   updateWellCard();
   updateSeedPosition();
   updateBucketPosition();
+  setWorldPosition(signBoard, signX, signY);
+  setWorldPosition(guideBook, guideBookX, guideBookY);
   if (sharedWorldResetOnly) {
     loadGuideBookState(true);
   } else {
@@ -5612,8 +5618,26 @@ function loadSeedState() {
   npcX = loaded.planted.npcX;
   npcY = loaded.planted.npcY;
   const legacyDefaultNpcX = SEED_START_X + 18;
+  let npcLayoutNeedsPersist = false;
   if (npcX === legacyDefaultNpcX) {
     npcX = NPC_START_X;
+    npcLayoutNeedsPersist = true;
+  }
+  // Tutorial never applies the shared snapshot; NPC stays on old saved coords unless we realign.
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    signX = SIGN_START_X;
+    signY = SIGN_START_Y;
+    guideBookX = GUIDE_BOOK_START_X;
+    guideBookY = GUIDE_BOOK_START_Y;
+    setWorldPosition(signBoard, signX, signY);
+    setWorldPosition(guideBook, guideBookX, guideBookY);
+    if (npcX !== NPC_START_X || npcY !== NPC_START_Y) {
+      npcX = NPC_START_X;
+      npcY = NPC_START_Y;
+      npcLayoutNeedsPersist = true;
+    }
+  }
+  if (npcLayoutNeedsPersist) {
     markWorldDirty();
     saveSeedState();
   }
