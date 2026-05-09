@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>이동 중...</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #07101f;
+      color: #f8fbff;
+      font: 700 16px/1.4 Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div>페이지를 찾는 중입니다...</div>
+  <script>
+    (function () {
+      var currentUserKey = "ovcCurrentUserV1";
+      var appVersion = "20260508ac";
+      var forcedRepoBase = "/ocv/";
+
+      function resolveBasePath() {
+        var path = window.location.pathname || "/";
+        if (path.indexOf(forcedRepoBase) === 0) {
+          return forcedRepoBase;
+        }
+        if (window.location.hostname === "visang123.github.io") {
+          return forcedRepoBase;
+        }
+        var parts = path.split("/").filter(Boolean);
+        return parts.length ? "/" + parts[0] + "/" : "/";
+      }
+
+      var hasSession = Boolean((localStorage.getItem(currentUserKey) || "").trim());
+      var nextFile = hasSession ? "index.html" : "ovc-login.html?v=" + appVersion;
+      var basePath = resolveBasePath();
+      var target = new URL(nextFile, window.location.origin + basePath);
+      window.location.replace(target.toString());
+    })();
+  </script>
+</body>
+</html>
