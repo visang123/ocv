@@ -713,8 +713,7 @@ document.addEventListener("keydown", function (event) {
   if (key === "q" && !event.repeat) {
     event.preventDefault();
     if (isNearPlantMaster()) {
-      tryTalkToPlantMaster();
-      return;
+      if (tryTalkToPlantMaster()) return;
     }
     if (tryCatchButterfly()) return;
     useHeldItem();
@@ -1376,21 +1375,6 @@ function isPlantMasterVisible() {
     plantRuntime.status !== "rotten" &&
     plantRuntime.status !== "dry"
   );
-}
-
-function syncNpcWorldPositionToMainPlant() {
-  if (plantRuntime.isSeedPlanted) {
-    var spotRight = plantRuntime.spotX + PLANT_SPOT_WIDTH;
-    npcX = spotRight + 8;
-    npcY = plantRuntime.spotY + PLANT_SPOT_HEIGHT - NPC_HEIGHT;
-    if (npcX + NPC_WIDTH > WORLD_WIDTH - 6) {
-      npcX = plantRuntime.spotX - NPC_WIDTH - 6;
-    }
-    npcX = Math.max(4, Math.min(WORLD_WIDTH - NPC_WIDTH - 4, npcX));
-  } else {
-    npcX = NPC_START_X;
-    npcY = NPC_START_Y;
-  }
 }
 
 function isNearPlantMaster() {
@@ -3917,13 +3901,17 @@ function updateNpcPosition() {
     return;
   }
 
-  syncNpcWorldPositionToMainPlant();
   plantMaster.style.display = "block";
   setWorldPosition(plantMaster, npcX, npcY);
 
   if (npcBubble.style.display === "block") {
-    // Sprite is bottom-aligned in NPC_HEIGHT; hat sits lower than legacy silhouette top.
-    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 13, npcY + 6);
+    const bubbleWidth = npcBubble.offsetWidth || 48;
+    const bubbleHeight = npcBubble.offsetHeight || 14;
+    setWorldPosition(
+      npcBubble,
+      npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
+      npcY - bubbleHeight - 3
+    );
   }
 
   if (playerBubble.style.display === "block") {
@@ -3957,7 +3945,13 @@ function updateNpcPrompt() {
     npcBubble.textContent =
       "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     npcBubble.style.display = "block";
-    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 24, npcY + 8);
+    const bubbleWidth = npcBubble.offsetWidth || 48;
+    const bubbleHeight = npcBubble.offsetHeight || 14;
+    setWorldPosition(
+      npcBubble,
+      npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
+      npcY - bubbleHeight - 3
+    );
 
     window.clearTimeout(npcPromptHideTimeout);
     npcPromptHideTimeout = window.setTimeout(function () {

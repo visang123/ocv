@@ -10,8 +10,8 @@ export const WELL_SIZE = 38;
 export const PLANT_SPOT_WIDTH = 14;
 export const PLANT_SPOT_HEIGHT = 7;
 export const WATER_NEEDED_SIZE = 8;
-export const SPROUT_WIDTH = 14;
-export const SPROUT_HEIGHT = 18;
+export const SPROUT_WIDTH = 5;
+export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
 export const NPC_WIDTH = 13;
@@ -54,8 +54,8 @@ export const sproutStage1Image = "이미지/sprout-stage1.svg";
 export const sproutStage2Image = "이미지/sprout-stage2.svg";
 export const sproutStage3Image = "이미지/sprout-stage3.svg";
 /** Draw sizes per stage (world pixels). */
-export const SPROUT_STAGE_WIDTHS = [14, 22, 34];
-export const SPROUT_STAGE_HEIGHTS = [18, 32, 58];
+export const SPROUT_STAGE_WIDTHS = [5, 7, 11];
+export const SPROUT_STAGE_HEIGHTS = [6, 11, 19];
 
 export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
