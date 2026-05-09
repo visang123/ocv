@@ -867,12 +867,6 @@ inventoryApple.addEventListener("click", function () {
 butterflyInventory.addEventListener("click", function () {
   tryCraftMagicPowder();
 });
-magicPowderInventory.addEventListener("click", function () {
-  tryUseMagicPowder();
-});
-testWhiteButterflyButton.addEventListener("click", function () {
-  addWhiteButterfliesForTest();
-});
 
 characterSelectButton.addEventListener("click", function () {
   finishCharacterSelect();
@@ -918,6 +912,12 @@ magicPowderInventory.innerHTML =
   '<div class="magic-powder-icon"></div><div id="magic-powder-count">0</div>';
 document.body.appendChild(magicPowderInventory);
 const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-count");
+magicPowderInventory.addEventListener("click", function () {
+  tryUseMagicPowder();
+});
+testWhiteButterflyButton.addEventListener("click", function () {
+  addWhiteButterfliesForTest();
+});
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
