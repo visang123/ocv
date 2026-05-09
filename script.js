@@ -551,6 +551,12 @@ const TREE_TRUNK_ENTER_X_LEFT_PAD = 0;
 const TREE_TRUNK_ENTER_X_RIGHT_EXTRA = 3;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 느낌 완화) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 9;
+/**
+ * 줄기 “땅에서 붙는” 판정: getPlayerFootY()만 좁게(지면 줄기 높이 근처).
+ * 값은 월드 발밑 y; 범위를 줄이면 나무 모드 진입 y축만 더 타이트해짐.
+ */
+const TREE_TRUNK_FOOT_Y_MIN = 14;
+const TREE_TRUNK_FOOT_Y_MAX = 42;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /**
@@ -4442,8 +4448,8 @@ function isPlayerNearTreeTrunk() {
     deepEnoughForTrunk &&
     centerX >= TREE_TRUNK_X - TREE_TRUNK_ENTER_X_LEFT_PAD &&
     centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_TRUNK_ENTER_X_RIGHT_EXTRA &&
-    footY <= groundBack + 2 &&
-    footY >= TREE_TRUNK_TOP - 6
+    footY >= TREE_TRUNK_FOOT_Y_MIN &&
+    footY <= TREE_TRUNK_FOOT_Y_MAX
   );
 }
 
