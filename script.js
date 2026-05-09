@@ -293,6 +293,16 @@ const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
+/** 임시: 최신 빌드 반영 확인용 표시 이름. 끄려면 false. */
+const TEMP_OVERRIDE_INGAME_DISPLAY_NAME = true;
+const TEMP_INGAME_DISPLAY_NAME = "커서";
+
+function nameForIngameUiDisplay(realName) {
+  if (TEMP_OVERRIDE_INGAME_DISPLAY_NAME) {
+    return TEMP_INGAME_DISPLAY_NAME;
+  }
+  return (realName || "").trim() || "OVC";
+}
 const guideBookClickPromptDismissedKey =
   guideBookClickPromptDismissedKeyBase + (currentUserId || "guest");
 let currentSessionId = "";
@@ -454,6 +464,7 @@ let remoteBucketUpdateAtById = {};
 let lastBucketTraceAtByKey = {};
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
+let networkDebugDomStale = false;
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
 ground.appendChild(playerBucketOverlay);
@@ -505,10 +516,12 @@ const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
 const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
-/** 줄기 근처 X만 맞고 depth가 얕을 때 나무 모드로 들어가면 depth가 한 프레임에 맞춰져 순간이동처럼 보임 — 최소 접근 depth */
-const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 36;
+/** 줄기 오작동 방지: 지면 “뒤”(큰 depth)에 가까울 때만 줄기 판정 */
+const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 108;
+/** 줄기 X: 왼쪽으로 넓게 잡으면 NPC·씨앗 쪽 이동 시 나무 모드로 들어감 — 줄기 실제 폭에 가깝게 */
+const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
-const TREE_DEPTH_CLAMP_MAX_STEP = 26;
+const TREE_DEPTH_CLAMP_MAX_STEP = 22;
 const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 28;
 /** NPC 대화 진행 중 말풍선을 더 위로 (캐릭터 이름과 겹침 완화) */
 const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 22;
@@ -726,6 +739,16 @@ document.addEventListener("keydown", function (event) {
   }
 
   if (isGameResetShortcut(event)) return;
+
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    (event.code === "KeyC" ||
+      event.code === "KeyV" ||
+      event.code === "KeyX" ||
+      event.code === "KeyA")
+  ) {
+    return;
+  }
 
   if (isTabSessionSuperseded) {
     event.preventDefault();
@@ -1091,7 +1114,7 @@ function closeSettingsOverlayFromEscape() {
 }
 
 function skipTutorialFromSettings() {
-  if (!window.confirm("\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uAC74\uB108\uB6B0\uACE0 \uC790\uC720\uB86D\uAC8C \uD50C\uB808\uC774\uD560\uAE4C\uC694?")) {
+  if (!window.confirm("튜토리얼을 건너뛰고 자유롭게 플레이할까요?")) {
     return;
   }
   onboardingClearAllOnboardingTimers();
@@ -1134,7 +1157,7 @@ function skipTutorialFromSettings() {
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
-      "\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uCC98\uC74C\uBD80\uD130 \uB2E4\uC2DC \uC9C4\uD589\uD560\uAE4C\uC694? \uD398\uC774\uC9C0\uAC00 \uC0C8\uB85C\uACE0\uCE68\uB429\uB2C8\uB2E4."
+      "튜토리얼을 처음부터 다시 진행할까요? 페이지가 새로고침됩니다."
     )
   ) {
     return;
@@ -1226,6 +1249,14 @@ adminOpenButton.addEventListener("dblclick", function () {
 
 networkDebugButton.addEventListener("dblclick", function () {
   networkDebugPanel.classList.toggle("is-visible");
+  networkDebugDomStale = true;
+  refreshNetworkDebugPanelDom();
+});
+
+document.addEventListener("selectionchange", function () {
+  if (networkDebugDomStale) {
+    refreshNetworkDebugPanelDom();
+  }
 });
 
 adminCloseButton.addEventListener("click", function () {
@@ -4258,7 +4289,7 @@ function isPlayerNearTreeTrunk() {
 
   return (
     deepEnoughForTrunk &&
-    centerX >= TREE_TRUNK_X - TREE_CLIMB_DISTANCE &&
+    centerX >= TREE_TRUNK_X - TREE_TRUNK_ENTER_X_LEFT_PAD &&
     centerX <= TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE &&
     footY <= groundBack + 4 &&
     footY >= TREE_TRUNK_TOP - 18
@@ -5807,7 +5838,7 @@ function openCharacterSelectIfNeeded() {
     return;
   }
 
-  playerName.textContent = currentUserName;
+  playerName.textContent = nameForIngameUiDisplay(currentUserName);
 
   if (hasSpawnedCharacter) {
     player.classList.remove("is-hidden-before-spawn");
@@ -5895,7 +5926,7 @@ function updatePlayerName() {
   const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
   const y = toScreenY(playerBox.top) + 13;
 
-  playerName.textContent = currentUserName;
+  playerName.textContent = nameForIngameUiDisplay(currentUserName);
   playerName.style.display = "block";
   playerName.style.transform = "translate(" + x + "px, " + y + "px)";
 }
@@ -5911,7 +5942,7 @@ function setupMultiplayer() {
   if (isSharedWorldSyncPausedForTutorial()) {
     teardownMultiplayerForTutorial();
     updateMultiplayerStatus(
-      "\uD29C\uD1A0\uB9AC\uC5BC: \uB2E4\uB978 \uD50C\uB808\uC774\uC5B4/\uC138\uC0C1 \uBE44\uACF5\uC720 \u00B7 \uBA40\uD2F0 \uBBF8\uC5F0\uACB0"
+      "튜토리얼: 다른 플레이어/세상 비공유 · 멀티 미연결"
     );
     addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
@@ -6046,7 +6077,7 @@ function sendMultiplayerPresence(forceSend) {
   const state = {
     id: currentSessionId,
     userId: currentUserId,
-    name: currentUserName,
+    name: nameForIngameUiDisplay(currentUserName),
     action: plantRuntime.isPlanting
       ? "planting"
       : appleState.isEating
@@ -6263,7 +6294,7 @@ function sendMultiplayerLeave() {
       payload: {
         id: currentSessionId,
         userId: currentUserId,
-        name: currentUserName,
+        name: nameForIngameUiDisplay(currentUserName),
         action: "leave",
         updatedAt: Date.now()
       }
@@ -6330,7 +6361,9 @@ function renderRemotePlayerState(state) {
   const nextPositionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
   const hasAction = typeof state.action === "string" && state.action !== "";
 
-  remotePlayer.nameElement.textContent = state.name || "OVC";
+  remotePlayer.nameElement.textContent = nameForIngameUiDisplay(
+    state.name || "OVC"
+  );
   if (hasAction) {
     remotePlayer.statusElement.textContent =
       state.action === "planting"
@@ -6647,6 +6680,33 @@ function showOnlineDebugMessage(message) {
   }, 3000);
 }
 
+function isNetworkDebugPanelActiveTextSelection() {
+  if (!networkDebugPanel || !networkDebugPanel.classList.contains("is-visible")) {
+    return false;
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) {
+    return false;
+  }
+  const anchor = sel.anchorNode;
+  const focus = sel.focusNode;
+  if (!anchor || !focus) {
+    return false;
+  }
+  return networkDebugPanel.contains(anchor) && networkDebugPanel.contains(focus);
+}
+
+function refreshNetworkDebugPanelDom() {
+  if (!networkDebugPanel || !networkDebugDomStale) {
+    return;
+  }
+  if (isNetworkDebugPanelActiveTextSelection()) {
+    return;
+  }
+  networkDebugPanel.textContent = networkDebugLines.join("\n");
+  networkDebugDomStale = false;
+}
+
 function addNetworkDebugLog(message) {
   if (!networkDebugPanel || !message) return;
   const timestamp = new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -6654,7 +6714,8 @@ function addNetworkDebugLog(message) {
   while (networkDebugLines.length > 14) {
     networkDebugLines.shift();
   }
-  networkDebugPanel.textContent = networkDebugLines.join("\n");
+  networkDebugDomStale = true;
+  refreshNetworkDebugPanelDom();
 }
 
 function addBucketTrace(key, message, minIntervalMs) {
