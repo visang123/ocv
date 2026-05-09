@@ -183,6 +183,15 @@ import {
 } from "./src/game/storage.js";
 import { createWellState, createAppleState, createPlantState } from "./src/game/state.js";
 import {
+  readWaterLevel,
+  resolveSnapshotSavedAt,
+  dedupeExtraSeedsPreferInventory,
+  parseMainPlantFromSnapshot,
+  parseTreeAppleFromSnapshot,
+  parseSharedGroundSeedFromSnapshot,
+  parseExtraPlantFromSnapshot
+} from "./src/game/worldSnapshot.js";
+import {
   HELD_ITEM_SEED,
   HELD_ITEM_BUCKET,
   isHeldExtraSeed,
@@ -423,6 +432,7 @@ if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
 }
 
+/** World-units per frame at ~60 Hz; multiplied by frameScale so real speed is monitor-independent. */
 const speed = 1;
 const treeMoveSpeed = speed * 0.5;
 const treeClimbSpeed = treeMoveSpeed;
@@ -430,6 +440,10 @@ const treeFallSpeed = treeMoveSpeed * 3.5;
 const groundFootInset = 8;
 const jumpPower = 4.5;
 const gravity = 0.8;
+/** Legacy tuning assumed ~60fps; scale per-frame deltas by dt * this. */
+const MOVEMENT_REFERENCE_HZ = 60;
+const MOVEMENT_DT_CAP_SEC = 0.05;
+let lastMovementTickMs = 0;
 const appleState = createAppleState([
   { id: "apple-1", x: BIG_TREE_X + 31, y: BIG_TREE_Y + 45, size: 10 },
   { id: "apple-2", x: BIG_TREE_X + 76, y: BIG_TREE_Y + 21, size: 10 },
@@ -1898,62 +1912,19 @@ function getSharedWorldSnapshot() {
   };
 }
 
-function readWaterLevel(value, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return fallback;
-  return Math.max(0, Math.min(2, number));
-}
-
-function resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt) {
-  let savedAt = Number(snapshot.savedAt || 0);
-  if (!savedAt && serverRowUpdatedAt) {
-    const parsed =
-      typeof serverRowUpdatedAt === "string"
-        ? Date.parse(serverRowUpdatedAt)
-        : Number(serverRowUpdatedAt);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      savedAt = parsed;
-    }
-  }
-  return savedAt;
-}
-
-function dedupeExtraSeedsPreferInventory(extraSeeds) {
-  const byId = Object.create(null);
-  extraSeeds.forEach(function (seed) {
-    const id = String(seed.id);
-    const prev = byId[id];
-    if (!prev) {
-      byId[id] = seed;
-      return;
-    }
-    const pickInv = Boolean(seed.inInventory);
-    const prevInv = Boolean(prev.inInventory);
-    let winner = prev;
-    let loser = seed;
-    if (pickInv && !prevInv) {
-      winner = seed;
-      loser = prev;
-    } else if (prevInv && !pickInv) {
-      winner = prev;
-      loser = seed;
-    }
-    if (loser !== winner) {
-      if (loser.element && typeof loser.element.remove === "function") {
-        loser.element.remove();
-      }
-      if (loser.inventoryElement && typeof loser.inventoryElement.remove === "function") {
-        loser.inventoryElement.remove();
-      }
-      loser.element = undefined;
-      loser.inventoryElement = undefined;
-      loser.inventoryImage = undefined;
-    }
-    byId[id] = winner;
-  });
-  return Object.keys(byId).map(function (key) {
-    return byId[key];
-  });
+/** Re-run DOM / UI that depends on world state after `applySharedWorldSnapshot` mutates models. */
+function refreshUiAfterSharedWorldApply() {
+  updateWellImage();
+  updateWellCard();
+  updateSeedPosition();
+  updateBucketPosition();
+  updateApples();
+  updateExtraSeedsAndPlants();
+  updatePlantState();
+  ensureSharedPlantVisuals();
+  refreshSharedWaterIndicators();
+  updateSeedInventory();
+  updateButterflyInventoryUi();
 }
 
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
@@ -2038,13 +2009,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (
-      snapshot.well &&
-      (
-        !snapshotSavedAt ||
-        snapshotSavedAt >= lastWellStateChangeAt
-      )
-    ) {
+    // Shared world rows are authoritative once the server reports a new updated_at.
+    // Do not gate well / main plant / apples on local timestamps or client clocks —
+    // that drops remote plants when lastAppleStateChangeAt / lastMainPlantStateChangeAt
+    // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
+    if (snapshot.well) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
       if (snapshotSavedAt) {
@@ -2052,41 +2021,8 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (
-      snapshot.mainPlant &&
-      (
-        !snapshotSavedAt ||
-        snapshotSavedAt >= lastMainPlantStateChangeAt
-      )
-    ) {
-      const mp = snapshot.mainPlant;
-      const plantedFromSnapshot = {
-        isSeedPlanted: Boolean(mp.isSeedPlanted),
-        plantSpotX: Number(mp.plantSpotX) || 0,
-        plantSpotY: Number(mp.plantSpotY) || 0,
-        plantLastWateredAt: Number(mp.plantLastWateredAt) || null,
-        plantWateredAtList: Array.isArray(mp.plantWateredAtList) ? mp.plantWateredAtList : [],
-        plantState: mp.plantState || "normal",
-        plantWaterLevel: readWaterLevel(mp.plantWaterLevel, 1),
-        plantWaterLevelUpdatedAt: Number(mp.plantWaterLevelUpdatedAt) || Date.now(),
-        plantBecameEmptyAt: Number(mp.plantBecameEmptyAt) || null,
-        isPlantOverwatered: Boolean(mp.isPlantOverwatered),
-        plantRottenAt: Number(mp.plantRottenAt) || null,
-        plantNeedsFirstWater: Boolean(mp.plantNeedsFirstWater),
-        plantGrowthStartedAt: Number(mp.plantGrowthStartedAt) || null,
-        isSproutGrown: Boolean(mp.isSproutGrown),
-        plantSproutGrownAt: Number(mp.plantSproutGrownAt) || null
-      };
-      if (Object.prototype.hasOwnProperty.call(mp, "sproutEvolutionMs")) {
-        plantedFromSnapshot.sproutEvolutionMs = Number(mp.sproutEvolutionMs) || 0;
-      }
-      if (Object.prototype.hasOwnProperty.call(mp, "sproutEvolutionLastTickAt")) {
-        plantedFromSnapshot.sproutEvolutionLastTickAt = Number(mp.sproutEvolutionLastTickAt) || null;
-      }
-      if (Object.prototype.hasOwnProperty.call(mp, "isSproutSelfSustaining")) {
-        plantedFromSnapshot.isSproutSelfSustaining = Boolean(mp.isSproutSelfSustaining);
-      }
-      applyLoadedPlantState(plantedFromSnapshot);
+    if (snapshot.mainPlant) {
+      applyLoadedPlantState(parseMainPlantFromSnapshot(snapshot.mainPlant));
       npcX = Number(snapshot.mainPlant.npcX) || npcX;
       npcY = Number(snapshot.mainPlant.npcY) || npcY;
       plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
@@ -2098,13 +2034,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (
-      snapshot.apples &&
-      (
-        !snapshotSavedAt ||
-        snapshotSavedAt >= lastAppleStateChangeAt
-      )
-    ) {
+    if (snapshot.apples) {
       const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
         return Boolean(extraSeed.inInventory) && !extraSeed.planted;
       }).map(function (extraSeed) {
@@ -2128,18 +2058,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       appleState.nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
       appleState.lastSpawnAt = Number(snapshot.apples.lastSpawnAt) || Date.now();
       appleState.apples = Array.isArray(snapshot.apples.apples)
-        ? snapshot.apples.apples.map(function (apple) {
-            const localX = Number(apple.localX) || 20;
-            const localY = Number(apple.localY) || 20;
-            return {
-              id: String(apple.id),
-              localX,
-              localY,
-              x: BIG_TREE_X + localX,
-              y: BIG_TREE_Y + localY,
-              size: Number(apple.size) || 10
-            };
-          })
+        ? snapshot.apples.apples.map(parseTreeAppleFromSnapshot)
         : appleState.apples;
       appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
         ? snapshot.apples.extraSeeds
@@ -2149,18 +2068,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
               // Merging both would duplicate ids: one hidden (inventory) and one visible ghost.
               return !localInventorySeedIds[String(extraSeed.id)];
             })
-            .map(function (extraSeed) {
-              return {
-                id: String(extraSeed.id),
-                x: Number(extraSeed.x) || 0,
-                y: Number(extraSeed.y) || 0,
-                createdAt: Number(extraSeed.createdAt) || Date.now(),
-                planted: Boolean(extraSeed.planted),
-                inInventory: false,
-                label: extraSeed.label || "\uC528\uC557",
-                isStarter: Boolean(extraSeed.isStarter)
-              };
-            })
+            .map(parseSharedGroundSeedFromSnapshot)
         : [];
       if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
         // Ignore stale world seeds from snapshot, but never drop inventory-only seeds.
@@ -2170,41 +2078,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
       appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
       appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
-        ? snapshot.apples.extraPlants.map(function (plant) {
-            return {
-              id: String(plant.id),
-              x: Number(plant.x) || 0,
-              y: Number(plant.y) || 0,
-              plantedAt: Number(plant.plantedAt) || Date.now(),
-              lastWateredAt: Number(plant.lastWateredAt) || null,
-              wateredAtList: Array.isArray(plant.wateredAtList) ? plant.wateredAtList.slice() : [],
-              status: plant.status || "normal",
-              waterLevel: readWaterLevel(plant.waterLevel, 1),
-              waterLevelUpdatedAt: Number(plant.waterLevelUpdatedAt) || Date.now(),
-              becameEmptyAt: Number(plant.becameEmptyAt) || null,
-              isOverwatered: Boolean(plant.isOverwatered),
-              rottenAt: Number(plant.rottenAt) || null,
-              needsFirstWater: Boolean(plant.needsFirstWater),
-              growthStartedAt: Number(plant.growthStartedAt) || null,
-              isSproutGrown: Boolean(plant.isSproutGrown),
-              sproutGrownAt: Number(plant.sproutGrownAt) || null,
-              sproutEvolutionMs: Object.prototype.hasOwnProperty.call(plant, "sproutEvolutionMs")
-                ? Math.max(0, Number(plant.sproutEvolutionMs) || 0)
-                : 0,
-              sproutEvolutionLastTickAt: Object.prototype.hasOwnProperty.call(
-                plant,
-                "sproutEvolutionLastTickAt"
-              )
-                ? Number(plant.sproutEvolutionLastTickAt) || null
-                : null,
-              isSproutSelfSustaining: Object.prototype.hasOwnProperty.call(
-                plant,
-                "isSproutSelfSustaining"
-              )
-                ? Boolean(plant.isSproutSelfSustaining)
-                : false
-            };
-          })
+        ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
         : [];
       const now = Date.now();
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
@@ -2235,17 +2109,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    updateWellImage();
-    updateWellCard();
-    updateSeedPosition();
-    updateBucketPosition();
-    updateApples();
-    updateExtraSeedsAndPlants();
-    updatePlantState();
-    ensureSharedPlantVisuals();
-    refreshSharedWaterIndicators();
-    updateSeedInventory();
-    updateButterflyInventoryUi();
+    refreshUiAfterSharedWorldApply();
   } finally {
     isApplyingWorldState = false;
   }
@@ -2468,7 +2332,9 @@ function updateSeedPosition() {
     !hasPickedMainSeedInCurrentRoom() &&
     !plantRuntime.isPlanting &&
     !(plantRuntime.isSeedDry && hasHandledDryMainSeed);
-  if (plantRuntime.isSeedDry && shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
+  // Auto-clear dry main seed after grace period even when the world sprite is hidden
+  // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
+  if (plantRuntime.isSeedDry && !hasHandledDryMainSeed && heldItem !== HELD_ITEM_SEED) {
     if (!dryMainSeedVisibleSince) {
       dryMainSeedVisibleSince = now;
     } else if (now - dryMainSeedVisibleSince >= 20000) {
@@ -2481,7 +2347,7 @@ function updateSeedPosition() {
       markWorldDirty();
       syncWorldState(true);
     }
-  } else {
+  } else if (!plantRuntime.isSeedDry || hasHandledDryMainSeed) {
     dryMainSeedVisibleSince = 0;
   }
   // Main seed is a fixed world object (next to the book), not a roaming synced item.
@@ -2516,11 +2382,13 @@ function updateExtraSeedsAndPlants() {
   let didAutoRemoveDryExtraSeed = false;
 
   appleState.extraSeeds = appleState.extraSeeds.filter(function (extraSeed) {
+    const createdAt = Number(extraSeed.createdAt);
     const shouldAutoRemoveDrySeed =
+      Number.isFinite(createdAt) &&
       !extraSeed.inInventory &&
       !extraSeed.planted &&
       isExtraSeedDry(extraSeed, now) &&
-      now - Number(extraSeed.createdAt || 0) >= seedDryMs + 20000;
+      now - createdAt >= seedDryMs + 20000;
     if (!shouldAutoRemoveDrySeed) return true;
     if (extraSeed.element) extraSeed.element.remove();
     if (extraSeed.inventoryElement) extraSeed.inventoryElement.remove();
@@ -3030,16 +2898,27 @@ function updateBucketPosition() {
 
 function updatePlayerPosition() {
   if (isCharacterSelecting || !hasSpawnedCharacter) {
+    lastMovementTickMs = performance.now();
     setWorldPosition(player, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
 
   if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) {
+    lastMovementTickMs = performance.now();
     setWorldPosition(player, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
+
+  const nowMs = performance.now();
+  if (lastMovementTickMs <= 0) {
+    lastMovementTickMs = nowMs - 1000 / MOVEMENT_REFERENCE_HZ;
+  }
+  let dtSec = (nowMs - lastMovementTickMs) / 1000;
+  lastMovementTickMs = nowMs;
+  dtSec = Math.min(MOVEMENT_DT_CAP_SEC, Math.max(0, dtSec));
+  const frameScale = dtSec * MOVEMENT_REFERENCE_HZ;
 
   const previousPlayerX = playerX;
   const previousPlayerDepth = playerDepth;
@@ -3051,11 +2930,11 @@ function updatePlayerPosition() {
   const currentSpeed = isInTree ? treeMoveSpeed : speed;
 
   if (keys.ArrowLeft || keys.a) {
-    playerX -= currentSpeed;
+    playerX -= currentSpeed * frameScale;
   }
 
   if (keys.ArrowRight || keys.d) {
-    playerX += currentSpeed;
+    playerX += currentSpeed * frameScale;
   }
 
   const shouldTreeFall =
@@ -3068,7 +2947,7 @@ function updatePlayerPosition() {
     isTreeFalling = true;
     jumpY = 0;
     velocityY = 0;
-    playerDepth -= treeFallSpeed;
+    playerDepth -= treeFallSpeed * frameScale;
     if (playerDepth <= groundMaxDepth) {
       playerDepth = groundMaxDepth;
       isOnGround = true;
@@ -3083,22 +2962,22 @@ function updatePlayerPosition() {
     isOnGround = true;
 
     if (keys.ArrowUp || keys.w) {
-      movePlayerVerticallyInTree(treeClimbSpeed);
+      movePlayerVerticallyInTree(treeClimbSpeed * frameScale);
     }
 
     if (keys.ArrowDown || keys.s) {
-      movePlayerVerticallyInTree(-treeClimbSpeed);
+      movePlayerVerticallyInTree(-treeClimbSpeed * frameScale);
     }
   } else {
     if (keys.ArrowUp || keys.w) {
-      playerDepth += speed;
+      playerDepth += speed * frameScale;
     }
 
     if (keys.ArrowDown || keys.s) {
-      playerDepth -= speed;
+      playerDepth -= speed * frameScale;
     }
-    velocityY += gravity;
-    jumpY += velocityY;
+    velocityY += gravity * frameScale;
+    jumpY += velocityY * frameScale;
   }
 
   const maxX = Math.max(0, WORLD_WIDTH - PLAYER_WIDTH);
@@ -3446,7 +3325,10 @@ function getHeldExtraSeed() {
 }
 
 function isExtraSeedDry(extraSeed, now) {
-  return (now || Date.now()) - extraSeed.createdAt >= seedDryMs;
+  const t = now || Date.now();
+  const created = Number(extraSeed.createdAt);
+  if (!Number.isFinite(created)) return false;
+  return t - created >= seedDryMs;
 }
 
 function useHeldItem() {
@@ -3777,7 +3659,7 @@ function updatePlantWaterLevel() {
     plantRuntime.isOverwatered = false;
   }
 
-  saveSeedState();
+  saveSeedState({ bumpMergeGuard: false });
 }
 
 function updatePlantState() {
@@ -4338,8 +4220,13 @@ function loadSeedState() {
   updateSeedDryState();
 }
 
-function saveSeedState() {
-  lastMainPlantStateChangeAt = Date.now();
+/**
+ * @param {{ bumpMergeGuard?: boolean }} [opts] - Set bumpMergeGuard:false when saving
+ *   simulation-only deltas (water tick, etc.) so remote players' plant updates still apply.
+ */
+function saveSeedState(opts) {
+  const bump = !opts || opts.bumpMergeGuard !== false;
+  if (bump) lastMainPlantStateChangeAt = Date.now();
   saveSeedStateToStorage({
     seedCreatedAtKey,
     seedPlantedStateKey,
@@ -5583,15 +5470,12 @@ function ensureButterflyWaypoint(butterfly, now) {
   return waypoint;
 }
 
-function easeInOutCubic(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
 function simulateButterflyAuthorityStep(butterfly, now) {
   const waypoint = ensureButterflyWaypoint(butterfly, now);
   const total = Math.max(1, waypoint.endAt - waypoint.startAt);
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
-  const eased = easeInOutCubic(t);
+  // Linear progress: ease-in-out made speed → 0 at each waypoint (looked like stopping).
+  const eased = t;
   const previousX = butterfly.x;
   butterfly.x = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
   butterfly.y = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
@@ -5852,6 +5736,10 @@ function updateButterflies() {
   }
   // Non-authority clients just render whatever the snapshot gave us. Wing
   // frames are still animated locally for smoothness.
+  const smoothRemoteButterflies =
+    sharedHydrated && onlineAvailable && !isButterflyAuthority();
+  /** Higher = follow network snapshots faster (less “pause” between 250ms updates). */
+  const butterflyRenderLerp = 0.78;
 
   // Render
   const aliveIds = {};
@@ -5859,10 +5747,25 @@ function updateButterflies() {
   butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = ensureButterflyRenderEntry(butterfly);
+    let drawX = butterfly.x;
+    let drawY = butterfly.y;
+    if (smoothRemoteButterflies) {
+      if (typeof butterfly._renderX !== "number" || typeof butterfly._renderY !== "number") {
+        butterfly._renderX = drawX;
+        butterfly._renderY = drawY;
+      }
+      butterfly._renderX += (drawX - butterfly._renderX) * butterflyRenderLerp;
+      butterfly._renderY += (drawY - butterfly._renderY) * butterflyRenderLerp;
+      drawX = butterfly._renderX;
+      drawY = butterfly._renderY;
+    } else {
+      butterfly._renderX = butterfly.x;
+      butterfly._renderY = butterfly.y;
+    }
     setWorldPosition(
       entry.element,
-      butterfly.x - BUTTERFLY_SIZE / 2,
-      butterfly.y - BUTTERFLY_SIZE / 2
+      drawX - BUTTERFLY_SIZE / 2,
+      drawY - BUTTERFLY_SIZE / 2
     );
     applyButterflySpriteFrame(
       entry,

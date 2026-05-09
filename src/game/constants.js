@@ -64,7 +64,7 @@ export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
 
 // --- Butterflies ---
-/** Render size of a butterfly (world pixels); width and height match. */
+/** World size (w = h). Half of original 20px tuning; matches setWorldSize + .butterfly CSS. */
 export const BUTTERFLY_SIZE = 10;
 /** Maximum butterflies that can be alive on the shared map. */
 export const butterflyMaxAlive = 5;
@@ -77,14 +77,13 @@ export const butterflyFrameMs = 140;
 /** Butterfly speed in world pixels per game frame (player speed is 1). */
 export const butterflySpeed = 1.2;
 /** How long it takes a butterfly to drift to a fresh waypoint, in ms. */
-export const butterflyLegMinMs = 3800;
-export const butterflyLegMaxMs = 8200;
-/** One full horizontal / vertical flutter cycle each (ms); both 2 minutes. */
-export const butterflyFlutterPeriodHorizontalMs = 2 * MINUTE_MS;
-export const butterflyFlutterPeriodVerticalMs = 2 * MINUTE_MS;
-/** Subtle world-px sway on top of waypoint motion. */
-export const butterflyFlutterAmplitudeX = 2.5;
-export const butterflyFlutterAmplitudeY = 2.5;
+export const butterflyLegMinMs = 2400;
+export const butterflyLegMaxMs = 5200;
+/** Visible bob on top of waypoint path (short periods so motion never looks frozen). */
+export const butterflyFlutterPeriodHorizontalMs = 2800;
+export const butterflyFlutterPeriodVerticalMs = 3400;
+export const butterflyFlutterAmplitudeX = 2;
+export const butterflyFlutterAmplitudeY = 2.2;
 /** Time between auto-spawns when below the map cap, in ms. */
 export const butterflyRespawnMs = 2 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */

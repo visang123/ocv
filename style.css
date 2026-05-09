@@ -197,6 +197,7 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+/* World size is BUTTERFLY_SIZE (10); CSS fallback before setWorldSize runs */
 .butterfly {
   position: absolute;
   left: 0;
