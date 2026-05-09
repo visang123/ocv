@@ -2169,6 +2169,11 @@ function isWorldServerSyncAvailable() {
   );
 }
 
+/** Shared row is authoritative; passive local ticks must not push over others' saves. */
+function isSharedWorldMergeActive() {
+  return isWorldServerSyncAvailable() && hasHydratedSharedWorldFromServer;
+}
+
 function syncWorldState(forceSave) {
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
@@ -3513,6 +3518,7 @@ function waterPlant(target) {
 
   if (plantRuntime.isOverwatered || plantRuntime.status === "rotten") {
     saveSeedState();
+    syncWorldState(true);
     updatePlantState();
     return;
   }
@@ -3571,6 +3577,7 @@ function waterExtraPlant(plant) {
       })
       .concat(now);
     saveAppleState();
+    syncWorldState(true);
     updateExtraSeedsAndPlants();
     return;
   }
@@ -3592,6 +3599,7 @@ function waterExtraPlant(plant) {
 
   if (plant.isOverwatered || plant.status === "rotten") {
     saveAppleState();
+    syncWorldState(true);
     updateExtraSeedsAndPlants();
     return;
   }
@@ -3659,7 +3667,10 @@ function updatePlantWaterLevel() {
     plantRuntime.isOverwatered = false;
   }
 
-  saveSeedState({ bumpMergeGuard: false });
+  saveSeedState({
+    bumpMergeGuard: false,
+    skipWorldDirty: isSharedWorldMergeActive()
+  });
 }
 
 function updatePlantState() {
@@ -4221,11 +4232,12 @@ function loadSeedState() {
 }
 
 /**
- * @param {{ bumpMergeGuard?: boolean }} [opts] - Set bumpMergeGuard:false when saving
- *   simulation-only deltas (water tick, etc.) so remote players' plant updates still apply.
+ * @param {{ bumpMergeGuard?: boolean, skipWorldDirty?: boolean }} [opts] - bumpMergeGuard:false
+ *   for sim-only deltas. skipWorldDirty:true stops enqueueing a shared save (e.g. water decay online).
  */
 function saveSeedState(opts) {
-  const bump = !opts || opts.bumpMergeGuard !== false;
+  opts = opts || {};
+  const bump = opts.bumpMergeGuard !== false;
   if (bump) lastMainPlantStateChangeAt = Date.now();
   saveSeedStateToStorage({
     seedCreatedAtKey,
@@ -4233,7 +4245,7 @@ function saveSeedState(opts) {
     seedCreatedAt: plantRuntime.seedCreatedAt,
     plantedState: getPlantStateForStorage()
   });
-  markWorldDirty();
+  if (!opts.skipWorldDirty) markWorldDirty();
 }
 
 function updateSeedDryState() {
