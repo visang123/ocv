@@ -64,6 +64,8 @@ import {
   sproutStage5Image,
   SPROUT_STAGE_WIDTHS,
   SPROUT_STAGE_HEIGHTS,
+  grassStage4WorldScale,
+  grassStage5WorldScale,
   pickupDistance,
   guideInteractDistance,
   npcInteractDistance,
@@ -4457,7 +4459,8 @@ function getSproutImageForStage(stage) {
 
 function getSproutSizeForStage(stage) {
   const idx = Math.min(2, Math.max(0, Math.min(stage, 3) - 1));
-  const growthScale = stage >= 5 ? 1.55 : stage >= 4 ? 1.35 : 1;
+  const growthScale =
+    stage >= 5 ? grassStage5WorldScale : stage >= 4 ? grassStage4WorldScale : 1;
   const baseWidth = SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH;
   const baseHeight = SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT;
   return {
