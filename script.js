@@ -1285,8 +1285,6 @@ magicPowderInventory.id = "magic-powder-inventory";
 magicPowderInventory.type = "button";
 magicPowderInventory.innerHTML =
   '<div class="magic-powder-icon"></div><div id="magic-powder-count">0</div>';
-magicPowderInventory.title =
-  "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \u2014 \uC7A5\uC131\uC7A5\uC774 \uD480(\uC0C8\uC2F9 4\uB2E8\uACC4)\uC5D0 \uAC00\uAE4C\uC774 \uB418\uBA74 \uD074\uB9AD\uD574 \uD55C \uB2E8\uACC4 \uB354 \uD0A4\uC6B8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
 document.body.appendChild(magicPowderInventory);
 const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-count");
 magicPowderInventory.addEventListener("click", function () {
@@ -5319,6 +5317,18 @@ function butterflyTooltipForColor(color) {
   return "\uB098\uBE44";
 }
 
+/** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
+function setInstantHoverTip(el, text) {
+  if (!el) return;
+  if (text) {
+    el.setAttribute("data-ovc-tip", text);
+    el.setAttribute("aria-label", text);
+  } else {
+    el.removeAttribute("data-ovc-tip");
+    el.removeAttribute("aria-label");
+  }
+}
+
 /** 살아 있는 식물만, 심은 시각 기준: 새싹(티어 4 미만)과 풀(티어 4 이상)을 소유자별로 따로 번호 부여. */
 function refreshPlantIdentityOrdinals() {
   const groups = Object.create(null);
@@ -8263,7 +8273,7 @@ function ensureButterflyRenderEntry(butterfly) {
   element.appendChild(sprite);
   ground.appendChild(element);
   setWorldSize(element, BUTTERFLY_SIZE, BUTTERFLY_SIZE);
-  element.title = butterflyTooltipForColor(butterfly.color);
+  setInstantHoverTip(element, butterflyTooltipForColor(butterfly.color));
   entry = {
     element,
     sprite,
@@ -8420,7 +8430,7 @@ function updateButterflyInventoryUi() {
   let total = 0;
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
-    slot.title = butterflyTooltipForColor(color);
+    setInstantHoverTip(slot, butterflyTooltipForColor(color));
     const count = butterflyState.caughtCounts[color] || 0;
     total += count;
     const countNode = slot.querySelector(".butterfly-inventory-count");
@@ -8429,24 +8439,29 @@ function updateButterflyInventoryUi() {
   });
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
-    butterflyInventoryTotal.title =
-      "\uC7A1\uC740 \uB098\uBE44 \uD569\uACC4 (" + total + "\uB9C8\uB9AC)";
+    setInstantHoverTip(
+      butterflyInventoryTotal,
+      "\uC7A1\uC740 \uB098\uBE44 \uD569\uACC4 (" + total + "\uB9C8\uB9AC)"
+    );
   }
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
   if (total > 0) {
-    butterflyInventory.title = canCraft
-      ? "\uB098\uBE44 " +
-        magicPowderCraftCost +
-        "\uB9C8\uB9AC \uC774\uC0C1 \u2014 \uD074\uB9AD\uD558\uBA74 \uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
-      : "\uB098\uBE44 \uD569\uACC4 " +
-        total +
-        "/" +
-        magicPowderCraftCost +
-        " \u2014 \uB354 \uC7A1\uC73C\uBA74 \uAC00\uB8E8\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+    setInstantHoverTip(
+      butterflyInventory,
+      canCraft
+        ? "\uB098\uBE44 " +
+            magicPowderCraftCost +
+            "\uB9C8\uB9AC \uC774\uC0C1 \u2014 \uD074\uB9AD\uD558\uBA74 \uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
+        : "\uB098\uBE44 \uD569\uACC4 " +
+            total +
+            "/" +
+            magicPowderCraftCost +
+            " \u2014 \uB354 \uC7A1\uC73C\uBA74 \uAC00\uB8E8\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    );
   } else {
-    butterflyInventory.removeAttribute("title");
+    setInstantHoverTip(butterflyInventory, null);
   }
 }
 
@@ -8457,16 +8472,21 @@ function updateMagicPowderInventoryUi() {
   if (magicPowderCount <= 0) {
     magicPowderInventory.style.display = "none";
     magicPowderInventory.classList.remove("is-near");
-    magicPowderInventory.removeAttribute("title");
+    setInstantHoverTip(magicPowderInventory, null);
+    setInstantHoverTip(magicPowderCountText, null);
     return;
   }
   magicPowderInventory.style.display = "block";
   magicPowderCountText.textContent = String(magicPowderCount);
-  magicPowderInventory.title =
-    powderTitleBase + " (\uBCF4\uC720 " + magicPowderCount + "\uAC1C)";
-  magicPowderCountText.title = magicPowderInventory.title;
+  let powderTip = powderTitleBase + " (\uBCF4\uC720 " + magicPowderCount + "\uAC1C)";
   const nearTarget = getNearestPlantForMagicPowder();
   magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
+  if (nearTarget) {
+    powderTip +=
+      "\n\u2014 \uC7A5\uC131\uC7A5(\uD480) \uADFC\uCC98\uC5D0\uC11C \uD074\uB9AD\uD558\uBA74 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.";
+  }
+  setInstantHoverTip(magicPowderInventory, powderTip);
+  setInstantHoverTip(magicPowderCountText, null);
 }
 
 function updateButterflies() {
@@ -8539,7 +8559,7 @@ function updateButterflies() {
       drawX - BUTTERFLY_SIZE / 2,
       drawY - BUTTERFLY_SIZE / 2
     );
-    entry.element.title = butterflyTooltipForColor(butterfly.color);
+    setInstantHoverTip(entry.element, butterflyTooltipForColor(butterfly.color));
     applyButterflySpriteFrame(
       entry,
       butterfly.color,
