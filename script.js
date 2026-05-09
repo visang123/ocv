@@ -3303,7 +3303,7 @@ function triggerWaterSplash() {
 function getNearestWateringTarget() {
   let nearest = null;
 
-  if (plantRuntime.isSeedPlanted) {
+  if (plantRuntime.isSeedPlanted && !plantRuntime.isSproutSelfSustaining) {
     const distance = getCenterDistance(
       plantRuntime.spotX,
       plantRuntime.spotY,
@@ -3320,6 +3320,7 @@ function getNearestWateringTarget() {
   }
 
   appleState.extraPlants.forEach(function (plant) {
+    if (plant.isSproutSelfSustaining) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance < plantWaterDistance && (!nearest || distance < nearest.distance)) {
       nearest = {
@@ -3639,7 +3640,7 @@ function updatePlantCard() {
   const wateringTarget = getNearestWateringTarget();
   if (wateringTarget && wateringTarget.type === "extra") {
     const plant = wateringTarget.plant;
-    if (plant.status === "dry" || plant.status === "rotten") {
+    if (plant.status === "dry" || plant.status === "rotten" || plant.isSproutSelfSustaining) {
       plantCard.style.display = "none";
       return;
     }
