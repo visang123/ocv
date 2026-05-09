@@ -411,6 +411,8 @@ body::-webkit-scrollbar {
   height: 26px;
   object-fit: contain;
   object-position: center bottom;
+  transform: scale(0.53);
+  transform-origin: 50% 100%;
   display: none;
   user-select: none;
   pointer-events: none;
