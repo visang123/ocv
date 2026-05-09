@@ -1372,10 +1372,25 @@ function isPlantMasterVisible() {
     return true;
   }
   return (
-    plantRuntime.isSproutGrown &&
+    plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.status !== "dry"
   );
+}
+
+function syncNpcWorldPositionToMainPlant() {
+  if (plantRuntime.isSeedPlanted) {
+    var spotRight = plantRuntime.spotX + PLANT_SPOT_WIDTH;
+    npcX = spotRight + 8;
+    npcY = plantRuntime.spotY + PLANT_SPOT_HEIGHT - NPC_HEIGHT;
+    if (npcX + NPC_WIDTH > WORLD_WIDTH - 6) {
+      npcX = plantRuntime.spotX - NPC_WIDTH - 6;
+    }
+    npcX = Math.max(4, Math.min(WORLD_WIDTH - NPC_WIDTH - 4, npcX));
+  } else {
+    npcX = NPC_START_X;
+    npcY = NPC_START_Y;
+  }
 }
 
 function isNearPlantMaster() {
@@ -1452,11 +1467,6 @@ function showPlayerAlert() {
   window.setTimeout(function () {
     playerAlert.style.display = "none";
   }, 1800);
-}
-
-function setNpcStartPosition() {
-  npcX = NPC_START_X;
-  npcY = NPC_START_Y;
 }
 
 function toggleSeed() {
@@ -3165,12 +3175,12 @@ function startPlanting() {
     plantRuntime.sproutEvolutionMs = 0;
     plantRuntime.sproutEvolutionLastTickAt = null;
     plantRuntime.isSproutSelfSustaining = false;
-    setNpcStartPosition();
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
     setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
     updatePlantState();
+    updateNpcPosition();
     saveSeedState();
   }, plantActionMs);
 }
@@ -3263,10 +3273,10 @@ function plantInventorySeed(seedId) {
       plantRuntime.sproutEvolutionMs = 0;
       plantRuntime.sproutEvolutionLastTickAt = null;
       plantRuntime.isSproutSelfSustaining = false;
-      setNpcStartPosition();
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
+      updateNpcPosition();
       saveSeedState();
     } else {
       appleState.extraPlants.push(createExtraPlant("plant-" + inventorySeed.id, plantX, plantY));
@@ -3907,6 +3917,7 @@ function updateNpcPosition() {
     return;
   }
 
+  syncNpcWorldPositionToMainPlant();
   plantMaster.style.display = "block";
   setWorldPosition(plantMaster, npcX, npcY);
 

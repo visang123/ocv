@@ -406,6 +406,7 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 28;
   width: 25px;
   height: 50px;
   object-fit: contain;
@@ -422,6 +423,7 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 29;
   display: none;
   min-width: 20px;
   padding: 2px 4px;
@@ -440,6 +442,7 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 29;
   display: none;
   min-width: 18px;
   padding: 2px 4px;
