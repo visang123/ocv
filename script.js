@@ -1627,7 +1627,7 @@ function applyTutorialWorldResetIfPending() {
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (e2) {}
   applyDefaultState();
-  loadGuideBookState();
+  loadGuideBookState(true);
   setWorldPosition(player, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updateCamera();
@@ -1662,9 +1662,6 @@ function maybeResetTutorialForNewLoginSession() {
     setStoredValue(onboardingTutorialBindSessionKey, sid);
     return;
   }
-  const bound = getStoredValue(onboardingTutorialBindSessionKey) || "";
-  if (bound === sid) return;
-  resetTutorialProgressInStorage();
   setStoredValue(onboardingTutorialBindSessionKey, sid);
 }
 
@@ -7621,6 +7618,12 @@ function setup() {
 
 try {
   setup();
+  if (currentUserId && !getStoredFlag(onboardingFlowDoneKey)) {
+    resetTutorialProgressInStorage();
+    try {
+      sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+    } catch (eTutorialPage) {}
+  }
   applyTutorialWorldResetIfPending();
   loadWellState();
   loadSeedState();
