@@ -17,9 +17,9 @@ export const BIG_TREE_HEIGHT = 190;
 export const NPC_WIDTH = 13;
 export const NPC_HEIGHT = 26;
 
-/** Right-anchored tree, shifted left by 1.5× tree width from the original spot. */
+/** Right-anchored tree, shifted left (several × tree width) from the original corner. */
 export const BIG_TREE_X =
-  WORLD_WIDTH - BIG_TREE_WIDTH - 8 - Math.round(BIG_TREE_WIDTH * 1.5);
+  WORLD_WIDTH - BIG_TREE_WIDTH - 8 - Math.round(BIG_TREE_WIDTH * 3.35);
 export const BIG_TREE_Y = -BIG_TREE_HEIGHT + 10;
 export const TREE_TRUNK_X = BIG_TREE_X + 58;
 export const TREE_TRUNK_WIDTH = 30;
@@ -32,18 +32,21 @@ export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108;
 
 export const WELL_START_X = 320;
 export const WELL_START_Y = 190;
-export const SIGN_START_X = 165;
-export const SIGN_START_Y = 274;
+/** 안내판 — 책·씨앗·NPC와 간격을 두기 위해 약간 왼쪽·위로 */
+export const SIGN_START_X = 138;
+export const SIGN_START_Y = 268;
 export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
-export const SEED_START_X = SIGN_START_X + SIGN_WIDTH + 27;
+/** 씨앗 — 안내판과 더 멀리 */
+export const SEED_START_X = SIGN_START_X + SIGN_WIDTH + 46;
 export const SEED_START_Y = SIGN_START_Y + SIGN_HEIGHT - SEED_SIZE;
-export const GUIDE_BOOK_START_X = 210;
-export const GUIDE_BOOK_START_Y = 300;
+/** 책 — 안내판·씨앗과 떨어진 왼쪽 아래 */
+export const GUIDE_BOOK_START_X = 92;
+export const GUIDE_BOOK_START_Y = 312;
 export const GUIDE_BOOK_WIDTH = 10;
 export const GUIDE_BOOK_HEIGHT = 9;
-/** ~6명(플레이어 폭 기준)만큼 오른쪽으로 배치 */
-export const NPC_START_X = SEED_START_X + 18 + 6 * PLAYER_WIDTH;
+/** 식물의 달인 — 씨앗에서 플레이어 폭 기준 더 오른쪽으로 */
+export const NPC_START_X = SEED_START_X + 36 + 8 * PLAYER_WIDTH;
 export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 
 export const SECOND_MS = 1000;
