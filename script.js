@@ -1578,10 +1578,9 @@ function hasTutorialStarterSeedInPlay() {
 }
 
 /**
- * 온보딩 중인데 '줍힘'만 남고 씨앗 추적이 없으면 땅 씨앗이 영원히 안 나옴 → 플래그 정리
+ * 메인 작물 미심인데 '줍힘'만 남고 씨앗 추적이 없으면 땅 씨앗이 안 나옴 → 플래그·건조 상태 정리
  */
 function recoverWorldMainSeedIfOnboardingStuck() {
-  if (getStoredFlag(onboardingFlowDoneKey)) return;
   if (plantRuntime.isSeedPlanted || plantRuntime.isPlanting) return;
   if (!hasPickedMainSeedInCurrentRoom()) return;
   if (hasTutorialStarterSeedInPlay()) return;
@@ -1591,6 +1590,10 @@ function recoverWorldMainSeedIfOnboardingStuck() {
   hasPickedMainSeedThisWindow = false;
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
+  plantRuntime.isSeedDry = false;
+  hasHandledDryMainSeed = false;
+  dryMainSeedVisibleSince = 0;
+  setStoredFlag(mainDrySeedHandledKey, false);
 }
 
 function tutorialRespawnMainSeedOnGround() {
@@ -2820,9 +2823,7 @@ function tryTalkToPlantMaster() {
   if (!isNearPlantMaster() || isNpcDialogueRunning) {
     return false;
   }
-  var canRepeatWhileOnboarding =
-    isNpcDialogueComplete && !getStoredFlag(onboardingFlowDoneKey);
-  if (isNpcDialogueComplete && !canRepeatWhileOnboarding) {
+  if (isNpcDialogueComplete && plantRuntime.isSeedPlanted) {
     return false;
   }
 
@@ -2839,8 +2840,7 @@ function startPlantMasterDialogue() {
     { speaker: "npc", text: "!!" }
   ];
 
-  var skipFirstTalkUnlockEffects =
-    isNpcDialogueComplete && !getStoredFlag(onboardingFlowDoneKey);
+  var skipFirstTalkUnlockEffects = isNpcDialogueComplete;
 
   isNpcDialogueRunning = true;
   npcBubble.style.display = "none";
@@ -3844,6 +3844,19 @@ function onboardingShouldKeepWorldMainSeedVisible() {
 function updateSeedPosition() {
   updateSeedDryState();
   recoverWorldMainSeedIfOnboardingStuck();
+  if (!plantRuntime.isSeedPlanted && !plantRuntime.isPlanting) {
+    if (
+      hasHandledDryMainSeed &&
+      !plantRuntime.isSeedDry &&
+      !hasPickedMainSeedInCurrentRoom() &&
+      !hasTutorialStarterSeedInPlay() &&
+      heldItem !== HELD_ITEM_SEED
+    ) {
+      hasHandledDryMainSeed = false;
+      setStoredFlag(mainDrySeedHandledKey, false);
+      dryMainSeedVisibleSince = 0;
+    }
+  }
   const now = Date.now();
   const shouldShowMainSeed =
     onboardingShouldKeepWorldMainSeedVisible() ||
@@ -5657,7 +5670,13 @@ function updatePlayerBubblePosition() {
 
 function updateNpcPrompt() {
   if (isNpcDialogueRunning) return;
-  if (isNpcDialogueComplete && getStoredFlag(onboardingFlowDoneKey)) return;
+  if (
+    isNpcDialogueComplete &&
+    getStoredFlag(onboardingFlowDoneKey) &&
+    plantRuntime.isSeedPlanted
+  ) {
+    return;
+  }
 
   if (isNearPlantMaster()) {
     if (npcBubble.dataset.promptShown === "true") return;
