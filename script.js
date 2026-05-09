@@ -5641,7 +5641,11 @@ function waterPlant(target) {
     return;
   }
 
-  if (plantRuntime.isSproutSelfSustaining && !isPowderUpgradeInProgress(plantRuntime)) {
+  if (
+    plantRuntime.isSproutSelfSustaining &&
+    !isPowderUpgradeInProgress(plantRuntime) &&
+    (plantRuntime.growthTier || 0) < 4
+  ) {
     return;
   }
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -5704,7 +5708,11 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
-  if (plant.isSproutSelfSustaining && !isPowderUpgradeInProgress(plant)) {
+  if (
+    plant.isSproutSelfSustaining &&
+    !isPowderUpgradeInProgress(plant) &&
+    (plant.growthTier || 0) < 4
+  ) {
     return;
   }
   updateExtraPlantWaterLevel(plant, now);
