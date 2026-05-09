@@ -75,6 +75,41 @@ body::-webkit-scrollbar {
   font: 700 13px/1.3 Arial, sans-serif;
 }
 
+/**
+ * tutorial.html 전용: 로딩 오버레이는 is-game-ready 후 클릭 불가라
+ * 본편 이동은 항상 보이는 고정 버튼으로 둔다.
+ */
+.ovc-tutorial-to-world-banner {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  pointer-events: auto;
+  padding: 11px 20px;
+  border-radius: 999px;
+  background: rgba(7, 16, 31, 0.94);
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  color: #dbeafe;
+  font: 700 13px/1.2 Arial, sans-serif;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  max-width: calc(100vw - 24px);
+  white-space: normal;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ovc-tutorial-to-world-banner:hover {
+  background: rgba(15, 30, 55, 0.96);
+  color: #f0f9ff;
+}
+
+.ovc-tutorial-to-world-banner:active {
+  opacity: 0.88;
+}
+
 .viewport {
   width: 100vw;
   height: 100vh;

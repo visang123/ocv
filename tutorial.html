@@ -33,8 +33,8 @@
       <img class="app-loading-logo" src="이미지/ovc-logo-loading.png" alt="OVC">
       <div class="app-loading-title">OVC</div>
       <div id="app-loading-text" class="app-loading-text">Loading...</div>
-      <p class="tutorial-escape-to-world" style="margin:14px 12px 0;font-size:13px;line-height:1.45;text-align:center;">
-        <a href="index.html?ovc_world=1" style="color:#dbeafe;text-decoration:underline;font-weight:600;">본편(월드)으로 바로 가기 · 튜토리얼 건너뛰기</a>
+      <p class="tutorial-escape-to-world" style="margin:14px 12px 0;font-size:12px;line-height:1.45;text-align:center;color:rgba(248,251,255,0.65);">
+        맵이 보이면 화면 <strong style="color:#dbeafe;">맨 아래</strong> 「본편(월드)으로」를 누르세요.
       </p>
     </div>
   </div>
@@ -242,6 +242,42 @@
   </div>
   <div id="online-debug-toast" aria-live="polite"></div>
   <div id="network-debug-panel" aria-live="polite"></div>
+
+  <button type="button" id="ovc-leave-tutorial-to-world" class="ovc-tutorial-to-world-banner">
+    본편(월드)으로 이동 · 튜토리얼 건너뛰기
+  </button>
+  <script>
+    (function () {
+      function ovcGoToWorldFromTutorial() {
+        try {
+          sessionStorage.setItem("ovcForceWorldHubV1", "1");
+        } catch (e1) {}
+        try {
+          var u = new URL("index.html", location.href);
+          u.searchParams.set("ovc_world", "1");
+          u.searchParams.set("v", "20260517e");
+          u.searchParams.set("t", String(Date.now()));
+          location.replace(u.toString());
+        } catch (e2) {
+          location.replace(
+            "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
+          );
+        }
+      }
+      function bind() {
+        var el = document.getElementById("ovc-leave-tutorial-to-world");
+        if (!el) return;
+        el.addEventListener("click", function () {
+          ovcGoToWorldFromTutorial();
+        });
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bind);
+      } else {
+        bind();
+      }
+    })();
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="online-config.js?v=20260509a"></script>
