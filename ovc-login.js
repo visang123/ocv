@@ -5,7 +5,7 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
-const APP_VERSION = "20260508ac";
+const APP_VERSION = "20260509a";
 const loginHandoffKey = "ovcLoginHandoffV1";
 
 const loginForm = document.getElementById("login-form");
@@ -24,6 +24,7 @@ const signupButton = document.getElementById("signup-button");
 const signupMessage = document.getElementById("signup-message");
 const passwordToggleButtons = Array.from(document.querySelectorAll(".password-toggle"));
 const REQUEST_TIMEOUT_MS = 12000;
+let loginSubmitInFlight = false;
 
 // Disabled automatic redirect to prevent login/index redirect loops on new hosts.
 // User should explicitly log in from this page.
@@ -114,6 +115,39 @@ function goToGame() {
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));
   window.location.replace(targetUrl.toString());
+}
+
+function isRetryableLoginError(error) {
+  const m = String((error && error.message) || "");
+  return (
+    m.includes("지연") ||
+    /timeout/i.test(m) ||
+    m.includes("Failed to fetch") ||
+    m.includes("연결하지 못") ||
+    m.includes("온라인 서버에 연결") ||
+    m.includes("NetworkError") ||
+    m.includes("Load failed") ||
+    m.includes("네트워크")
+  );
+}
+
+function finalizeSuccessfulLogin(account) {
+  localStorage.setItem(currentUserKey, account.name);
+  localStorage.setItem(currentUserIdKey, account.id);
+  const accountColor = normalizeHexColor(account.color);
+  const scopedKey = "ovcUserColorV1:" + account.id;
+  const finalColor = accountColor || "#ffffff";
+  localStorage.setItem(currentUserColorKey, finalColor);
+  localStorage.setItem(lastSelectedColorKey, finalColor);
+  if (accountColor) {
+    localStorage.setItem(scopedKey, accountColor);
+  } else {
+    localStorage.removeItem(scopedKey);
+  }
+  persistColorChoiceState(account);
+  if (account.session_token) {
+    localStorage.setItem(currentSessionTokenKey, account.session_token);
+  }
 }
 
 function persistColorChoiceState(account) {
@@ -230,7 +264,7 @@ signupButton.addEventListener("click", function () {
 });
 
 async function handleLoginSubmit() {
-  if (loginButton.disabled) return;
+  if (loginButton.disabled || loginSubmitInFlight) return;
   const name = normalizeName(loginName.value);
   const password = loginPassword.value;
 
@@ -239,6 +273,7 @@ async function handleLoginSubmit() {
     return;
   }
 
+  loginSubmitInFlight = true;
   loginButton.disabled = true;
   loginMessage.textContent = "로그인 중... (1/3 요청 준비)";
   const loginWatchdog = startUiWatchdog(
@@ -252,55 +287,35 @@ async function handleLoginSubmit() {
       throw new Error("온라인 로그인 모듈을 불러오지 못했습니다. 페이지를 새로고침 해주세요.");
     }
     loginMessage.textContent = "로그인 중... (2/3 서버 요청)";
-    let account = await withTimeout(
-      window.OVCOnline.login(name, password),
-      REQUEST_TIMEOUT_MS,
-      "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
-    );
+    let account = null;
+    try {
+      account = await withTimeout(
+        window.OVCOnline.login(name, password),
+        REQUEST_TIMEOUT_MS,
+        "로그인이 지연되고 있습니다. 네트워크나 Supabase 설정을 확인해주세요."
+      );
+    } catch (primaryErr) {
+      if (isRetryableLoginError(primaryErr)) {
+        loginMessage.textContent = "연결 문제 감지, 대체 경로 시도 중...";
+        account = await loginWithSupabaseRestFallback(name, password);
+      } else {
+        throw primaryErr;
+      }
+    }
     if (!account || !account.id || !account.name) {
       account = await loginWithSupabaseRestFallback(name, password);
     }
     loginMessage.textContent = "로그인 중... (3/3 계정 저장)";
-    localStorage.setItem(currentUserKey, account.name);
-    localStorage.setItem(currentUserIdKey, account.id);
-    const accountColor = normalizeHexColor(account.color);
-    const scopedKey = "ovcUserColorV1:" + account.id;
-    const finalColor = accountColor || "#ffffff";
-    localStorage.setItem(currentUserColorKey, finalColor);
-    localStorage.setItem(lastSelectedColorKey, finalColor);
-    if (accountColor) {
-      localStorage.setItem(scopedKey, accountColor);
-    } else {
-      localStorage.removeItem(scopedKey);
-    }
-    persistColorChoiceState(account);
-    if (account.session_token) {
-      localStorage.setItem(currentSessionTokenKey, account.session_token);
-    }
+    finalizeSuccessfulLogin(account);
 
     loginMessage.textContent = "게임으로 이동 중...";
     goToGame();
   } catch (error) {
-    const timeoutLikeMessage =
-      typeof error.message === "string" &&
-      (error.message.includes("지연") || error.message.includes("timeout"));
-    if (timeoutLikeMessage) {
+    if (isRetryableLoginError(error)) {
       try {
-        loginMessage.textContent = "로그인 지연 감지, 대체 경로 시도 중...";
+        loginMessage.textContent = "대체 경로로 재시도 중...";
         const account = await loginWithSupabaseRestFallback(name, password);
-        localStorage.setItem(currentUserKey, account.name);
-        localStorage.setItem(currentUserIdKey, account.id);
-        const accountColor = normalizeHexColor(account.color);
-        const scopedKey = "ovcUserColorV1:" + account.id;
-        const finalColor = accountColor || "#ffffff";
-        localStorage.setItem(currentUserColorKey, finalColor);
-        localStorage.setItem(lastSelectedColorKey, finalColor);
-        if (accountColor) {
-          localStorage.setItem(scopedKey, accountColor);
-        } else {
-          localStorage.removeItem(scopedKey);
-        }
-        persistColorChoiceState(account);
+        finalizeSuccessfulLogin(account);
         goToGame();
         return;
       } catch (fallbackError) {
@@ -317,6 +332,7 @@ async function handleLoginSubmit() {
   } finally {
     clearTimeout(loginWatchdog);
     loginButton.disabled = false;
+    loginSubmitInFlight = false;
   }
 }
 

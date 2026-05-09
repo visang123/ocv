@@ -2,14 +2,46 @@
   const config = window.OVC_ONLINE_CONFIG || {};
   let client = null;
 
+  function resolveCreateClientFn() {
+    var sb = window.supabase;
+    if (sb && typeof sb.createClient === "function") {
+      return function (url, key) {
+        return sb.createClient(url, key);
+      };
+    }
+    if (sb && sb.default && typeof sb.default.createClient === "function") {
+      return function (url, key) {
+        return sb.default.createClient(url, key);
+      };
+    }
+    if (typeof window.createClient === "function") {
+      return function (url, key) {
+        return window.createClient(url, key);
+      };
+    }
+    return null;
+  }
+
+  function hasValidSupabaseProjectUrl() {
+    if (!config.supabaseUrl || typeof config.supabaseUrl !== "string") return false;
+    var u = config.supabaseUrl.trim();
+    if (u.includes("netlify.app")) return false;
+    return /^https:\/\/.+\.supabase\.co\/?$/i.test(u);
+  }
+
   function isConfigured() {
     return Boolean(
-      config.supabaseUrl &&
+      hasValidSupabaseProjectUrl() &&
         config.supabaseKey &&
-        /^https:\/\/[a-zA-Z0-9-]+\.supabase\.co\/?$/.test(config.supabaseUrl) &&
-        !config.supabaseUrl.includes("netlify.app") &&
-        window.supabase &&
-        typeof window.supabase.createClient === "function"
+        resolveCreateClientFn()
+    );
+  }
+
+  function canLoginViaSupabaseRest() {
+    return Boolean(
+      hasValidSupabaseProjectUrl() &&
+        config.supabaseKey &&
+        config.accountsTable
     );
   }
 
@@ -17,7 +49,9 @@
     if (!isConfigured()) return null;
 
     if (!client) {
-      client = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+      var factory = resolveCreateClientFn();
+      if (!factory) return null;
+      client = factory(config.supabaseUrl.trim().replace(/\/$/, ""), config.supabaseKey);
     }
 
     return client;
@@ -42,6 +76,67 @@
         return byte.toString(16).padStart(2, "0");
       })
       .join("");
+  }
+
+  async function loginViaSupabaseRest(normalizedName, password) {
+    const passwordHash = await sha256Hex(password);
+    const base = config.supabaseUrl.trim().replace(/\/$/, "");
+    const tableSeg = encodeURIComponent(config.accountsTable);
+    const url =
+      base +
+      "/rest/v1/" +
+      tableSeg +
+      "?select=id,name,color&name=eq." +
+      encodeURIComponent(normalizedName) +
+      "&password_hash=eq." +
+      encodeURIComponent(passwordHash) +
+      "&limit=1";
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: "Bearer " + config.supabaseKey
+        }
+      });
+    } catch (error) {
+      throw normalizeOnlineError(error);
+    }
+
+    if (!response.ok) {
+      throw new Error("로그인 요청 실패: " + response.status);
+    }
+
+    const rows = await response.json();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error("이름 또는 비밀번호가 맞지 않습니다.");
+    }
+
+    const data = rows[0];
+    const sessionToken = generateSessionToken();
+    try {
+      const patchUrl = base + "/rest/v1/" + tableSeg + "?id=eq." + encodeURIComponent(String(data.id));
+      const patchRes = await fetch(patchUrl, {
+        method: "PATCH",
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: "Bearer " + config.supabaseKey,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({ session_token: sessionToken })
+      });
+      if (patchRes.ok) {
+        return { ...data, session_token: sessionToken };
+      }
+    } catch (patchErr) {
+      if (window.console && typeof window.console.warn === "function") {
+        window.console.warn("[OVC login] session token REST patch skipped:", patchErr);
+      }
+    }
+    return { ...data };
   }
 
   async function signUp(name, password) {
@@ -86,6 +181,13 @@
     const normalizedName = normalizeName(name);
     const supabaseClient = getClient();
     if (!supabaseClient) {
+      if (canLoginViaSupabaseRest()) {
+        try {
+          return await loginViaSupabaseRest(normalizedName, password);
+        } catch (error) {
+          throw normalizeOnlineError(error);
+        }
+      }
       return loginWithLocalServer(normalizedName, password);
     }
 

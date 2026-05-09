@@ -538,7 +538,7 @@ function isRemotePresenceSameLoggedInAccount(state) {
 }
 
 if (!currentUserName || !currentUserId) {
-  window.location.replace("ovc-login.html?v=20260508ac");
+  window.location.replace("ovc-login.html?v=20260509a");
   throw new Error("OVC login required");
 }
 
@@ -5408,7 +5408,7 @@ function buildCharacterColorGrid() {
 
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
-    window.location.replace("ovc-login.html?v=20260508ac");
+    window.location.replace("ovc-login.html?v=20260509a");
     return;
   }
 
@@ -6298,7 +6298,7 @@ function logout() {
     }
     sessionStorage.removeItem(currentSessionKey);
     sessionStorage.removeItem(accountLeaderTokenSessionKey);
-    window.location.href = "ovc-login.html?v=20260508ac";
+    window.location.href = "ovc-login.html?v=20260509a";
   };
 
   if (multiplayerChannel) {
