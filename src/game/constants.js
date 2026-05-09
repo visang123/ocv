@@ -69,6 +69,9 @@ export const sproutStage2GrowMs = 1 * MINUTE_MS;
 export const sproutStage1Image = "이미지/sprout-stage1.svg";
 export const sproutStage2Image = "이미지/sprout-stage2.svg";
 export const sproutStage3Image = "이미지/sprout-stage3.svg";
+/** 4·5단계 — 제공 스프라이트 시트에서 정면 썸네일 추출본 */
+export const sproutStage4Image = "이미지/grass-stage4-front.png";
+export const sproutStage5Image = "이미지/grass-stage5-front.png";
 /** Draw sizes per stage (world pixels). */
 export const SPROUT_STAGE_WIDTHS = [5, 7, 11];
 export const SPROUT_STAGE_HEIGHTS = [6, 11, 19];
@@ -124,7 +127,15 @@ export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
 /** 월드 첫 식물(메인)만 물 0칸 후 이 시간이 지나면 흙이 마름. 나머지 식물은 plantDryMs 사용. */
 export const mainPlantDryAfterEmptyMs = 5 * MINUTE_MS;
+/** 마법 가루 적용 중(또는 4단계 이상) 메인 작물이 물이 바짝 마른 뒤 흙이 마르기까지 */
+export const mainPlantDryAfterPowderMs = 5 * MINUTE_MS;
+export const mainPlantDryAfterEmptyTier4Ms = 6 * MINUTE_MS;
+export const mainPlantDryAfterEmptyTier5Ms = 8 * MINUTE_MS;
 export const plantDryMs = 40 * SECOND_MS;
+/** 가루 진행 중·고단계 추가 식물의 마름 타이밍(1·2단계와 동일 로직, 수치만 조정) */
+export const plantDryMsDuringPowderMs = 45 * SECOND_MS;
+export const plantDryMsTier4Ms = 50 * SECOND_MS;
+export const plantDryMsTier5Ms = 70 * SECOND_MS;
 export const plantWaterLevelTickMs = 20 * SECOND_MS;
 export const plantGrowthMs = 3 * SECOND_MS;
 export const overwaterWindowMs = 60 * MINUTE_MS;

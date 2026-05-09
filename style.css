@@ -128,6 +128,7 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   transform-origin: 0 0;
+  pointer-events: auto;
 }
 
 .ground {
@@ -183,7 +184,7 @@ body::-webkit-scrollbar {
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-  z-index: 4;
+  z-index: 80;
 }
 
 .extra-seed {
@@ -282,6 +283,7 @@ body::-webkit-scrollbar {
 .butterfly-sprite {
   width: 100%;
   height: 100%;
+  pointer-events: none;
   background-image: url("이미지/butterfly-sheet.png");
   background-repeat: no-repeat;
   /* Sheet is 5 cols x 3 rows; size to scale a single cell to the slot. */
@@ -2217,6 +2219,7 @@ body #guide-book-button {
 .butterfly-inventory-icon {
   width: 30px;
   height: 30px;
+  pointer-events: none;
   background-image: url("이미지/butterfly-sheet.png");
   background-repeat: no-repeat;
   background-size: 500% 300%;
@@ -2248,6 +2251,7 @@ body #guide-book-button {
   color: #111;
   font: 900 11px/14px Arial, sans-serif;
   text-align: center;
+  pointer-events: none;
 }
 
 .butterfly-inventory-slot.is-empty .butterfly-inventory-icon {
@@ -2273,6 +2277,7 @@ body #guide-book-button {
   color: #fff;
   font: 900 14px/20px Arial, sans-serif;
   text-align: center;
+  pointer-events: none;
 }
 
 #magic-powder-inventory {
@@ -2326,6 +2331,7 @@ body #guide-book-button {
   bottom: 0;
   width: 64px;
   height: 64px;
+  pointer-events: none;
   background-color: transparent;
   background-image: url("이미지/magic-powder-gray.png?v=20260509b");
   background-position: center;
@@ -2348,4 +2354,5 @@ body #guide-book-button {
   font: 900 17px/22px Arial, sans-serif;
   text-align: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
 }

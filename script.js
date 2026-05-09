@@ -60,6 +60,8 @@ import {
   sproutStage1Image,
   sproutStage2Image,
   sproutStage3Image,
+  sproutStage4Image,
+  sproutStage5Image,
   SPROUT_STAGE_WIDTHS,
   SPROUT_STAGE_HEIGHTS,
   pickupDistance,
@@ -73,6 +75,12 @@ import {
   seedDryMs,
   plantDryMs,
   mainPlantDryAfterEmptyMs,
+  mainPlantDryAfterPowderMs,
+  mainPlantDryAfterEmptyTier4Ms,
+  mainPlantDryAfterEmptyTier5Ms,
+  plantDryMsDuringPowderMs,
+  plantDryMsTier4Ms,
+  plantDryMsTier5Ms,
   plantWaterLevelTickMs,
   plantGrowthMs,
   overwaterWindowMs,
@@ -4312,11 +4320,11 @@ function updateExtraPlantState(plant, now) {
   }
 
   if (
-    !plant.isSproutSelfSustaining &&
+    canPlantWiltFromEmptyWater(plant) &&
     plant.status !== "rotten" &&
     plant.status !== "dry" &&
     plant.becameEmptyAt !== null &&
-    now - plant.becameEmptyAt >= plantDryMs
+    now - plant.becameEmptyAt >= getExtraDryDelayMs(plant)
   ) {
     plant.status = "dry";
     plant.needsFirstWater = true;
@@ -4372,11 +4380,39 @@ function getPowderUpgradeRatio(plant, now) {
   return Math.min(1, Math.max(0, (now - startedAt) / duration));
 }
 
+function isHighTierPlantCare(plant) {
+  return (
+    isPowderUpgradeInProgress(plant) ||
+    Math.max(0, Number(plant.growthTier) || 0) >= 4
+  );
+}
+
+function canPlantWiltFromEmptyWater(plant) {
+  return !plant.isSproutSelfSustaining || isHighTierPlantCare(plant);
+}
+
+function getMainDryAfterEmptyMsForPlant(plant) {
+  if (!canPlantWiltFromEmptyWater(plant)) return mainPlantDryAfterEmptyMs;
+  if (isPowderUpgradeInProgress(plant)) return mainPlantDryAfterPowderMs;
+  const t = Math.max(0, Number(plant.growthTier) || 0);
+  if (t >= 5) return mainPlantDryAfterEmptyTier5Ms;
+  if (t >= 4) return mainPlantDryAfterEmptyTier4Ms;
+  return mainPlantDryAfterEmptyMs;
+}
+
+function getExtraDryDelayMs(plant) {
+  if (!canPlantWiltFromEmptyWater(plant)) return plantDryMs;
+  if (isPowderUpgradeInProgress(plant)) return plantDryMsDuringPowderMs;
+  const t = Math.max(0, Number(plant.growthTier) || 0);
+  if (t >= 5) return plantDryMsTier5Ms;
+  if (t >= 4) return plantDryMsTier4Ms;
+  return plantDryMs;
+}
+
 function tickPowderUpgrade(plant, now) {
   if (!isPowderUpgradeInProgress(plant)) return false;
   const ratio = getPowderUpgradeRatio(plant, now);
   if (ratio === null || ratio < 1) return false;
-  const prevTier = plant.growthTier || 0;
   plant.growthTier = Math.max(plant.growthTier || 0, Number(plant.powderUpgradeTargetTier) || 0);
   plant.powderUpgradeTargetTier = 0;
   plant.powderUpgradeStartedAt = null;
@@ -4384,9 +4420,6 @@ function tickPowderUpgrade(plant, now) {
   if (plant.growthTier >= 3) {
     plant.waterCapacity = 3;
     plant.waterLevel = Math.min(3, Math.max(1, Number(plant.waterLevel) || 1));
-  }
-  if (plant.growthTier >= 4) {
-    plant.needsFirstWater = false;
   }
   return true;
 }
@@ -4417,6 +4450,8 @@ function tickSproutEvolution(plant, now) {
 }
 
 function getSproutImageForStage(stage) {
+  if (stage >= 5) return sproutStage5Image;
+  if (stage >= 4) return sproutStage4Image;
   if (stage >= 3) return sproutStage3Image;
   if (stage === 2) return sproutStage2Image;
   return sproutStage1Image;
@@ -6023,10 +6058,10 @@ function updatePlantState() {
   }
 
   if (
-    !plantRuntime.isSproutSelfSustaining &&
+    canPlantWiltFromEmptyWater(plantRuntime) &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
-    now - plantRuntime.becameEmptyAt >= mainPlantDryAfterEmptyMs
+    now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime)
   ) {
     // Keep planted ground + dry soil; preserve sprout growth so stage 2 returns after watering.
     plantRuntime.status = "dry";
@@ -8158,7 +8193,11 @@ function ensureButterflyWaypoint(butterfly, now) {
 }
 
 function simulateButterflyAuthorityStep(butterfly, now) {
-  const waypoint = ensureButterflyWaypoint(butterfly, now);
+  let waypoint = butterflyAuthorityWaypointById[butterfly.id];
+  if (waypoint && now > waypoint.endAt + 3000) {
+    delete butterflyAuthorityWaypointById[butterfly.id];
+  }
+  waypoint = ensureButterflyWaypoint(butterfly, now);
   const total = Math.max(1, waypoint.endAt - waypoint.startAt);
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
   // Linear progress: ease-in-out made speed → 0 at each waypoint (looked like stopping).
@@ -8472,7 +8511,7 @@ function updateButterflies() {
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
   /** Higher = follow network snapshots faster (less “pause” between 250ms updates). */
-  const butterflyRenderLerp = 0.78;
+  const butterflyRenderLerp = 0.92;
 
   // Render
   const aliveIds = {};
