@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
-  <link rel="stylesheet" href="style.css?v=20260513b">
+  <link rel="stylesheet" href="style.css?v=20260514a">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -64,7 +64,10 @@
     aria-live="polite"
   >
     <div class="movement-tutorial-panel">
-      <p id="movement-tutorial-text" class="movement-tutorial-text"></p>
+      <div class="movement-tutorial-text-block">
+        <p id="movement-tutorial-line-move" class="movement-tutorial-text"></p>
+        <p id="movement-tutorial-line-book" class="movement-tutorial-text movement-tutorial-line-book" hidden></p>
+      </div>
       <div id="movement-tutorial-keys" class="movement-tutorial-keys">
         <div class="movement-tutorial-cross-row">
           <span class="movement-tutorial-cell"></span>
@@ -212,6 +215,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="online-config.js?v=20260508ac"></script>
   <script src="ovc-online.js?v=20260508ac"></script>
-  <script type="module" src="src/main.js?v=20260513c"></script>
+  <script type="module" src="src/main.js?v=20260514a"></script>
 </body>
 </html>

@@ -53,7 +53,8 @@ const butterflyInventoryTotal = document.getElementById("butterfly-inventory-tot
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
 const movementTutorialOverlay = document.getElementById("movement-tutorial-overlay");
-const movementTutorialText = document.getElementById("movement-tutorial-text");
+const movementTutorialLineMove = document.getElementById("movement-tutorial-line-move");
+const movementTutorialLineBook = document.getElementById("movement-tutorial-line-book");
 const movementTutorialKeys = document.getElementById("movement-tutorial-keys");
 
 export {
@@ -108,6 +109,7 @@ export {
   world,
   ground,
   movementTutorialOverlay,
-  movementTutorialText,
+  movementTutorialLineMove,
+  movementTutorialLineBook,
   movementTutorialKeys
 };

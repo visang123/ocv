@@ -165,7 +165,8 @@ import {
   world,
   ground,
   movementTutorialOverlay,
-  movementTutorialText,
+  movementTutorialLineMove,
+  movementTutorialLineBook,
   movementTutorialKeys
 } from "./src/world/dom.js";
 import {
@@ -1198,7 +1199,10 @@ function shouldRunMovementTutorial() {
 function hideMovementTutorialOverlay() {
   if (!movementTutorialOverlay) return;
   movementTutorialOverlay.style.display = "none";
-  movementTutorialOverlay.classList.remove("is-book-only-phase");
+  if (movementTutorialLineBook) {
+    movementTutorialLineBook.hidden = true;
+    movementTutorialLineBook.textContent = "";
+  }
   if (movementTutorialKeys) movementTutorialKeys.style.display = "";
   guideBook.classList.remove("is-movement-tutorial-target");
 }
@@ -1245,23 +1249,28 @@ function advanceMovementTutorialAfterMove() {
 }
 
 function syncMovementTutorialOverlay() {
-  if (!movementTutorialOverlay || !movementTutorialText || !movementTutorialKeys) return;
+  if (
+    !movementTutorialOverlay ||
+    !movementTutorialLineMove ||
+    !movementTutorialLineBook ||
+    !movementTutorialKeys
+  ) {
+    return;
+  }
   if (!shouldRunMovementTutorial() || movementTutorialPhase < 1) return;
 
   movementTutorialOverlay.style.display = "block";
-  movementTutorialOverlay.classList.toggle(
-    "is-book-only-phase",
-    movementTutorialPhase === 2
-  );
-  if (movementTutorialPhase === 1) {
-    movementTutorialText.textContent =
-      "\uC774\uB3D9\uC740 \uBC29\uD5A5\uD0A4 \uB610\uB294 WSAD";
-    movementTutorialKeys.style.display = "flex";
-  } else {
-    movementTutorialText.textContent =
+  movementTutorialLineMove.textContent =
+    "\uC774\uB3D9\uC740 \uBC29\uD5A5\uD0A4 \uB610\uB294 WSAD";
+  if (movementTutorialPhase === 2) {
+    movementTutorialLineBook.textContent =
       "\uD30C\uB780\uCC45\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694!";
-    movementTutorialKeys.style.display = "none";
+    movementTutorialLineBook.hidden = false;
+  } else {
+    movementTutorialLineBook.textContent = "";
+    movementTutorialLineBook.hidden = true;
   }
+  movementTutorialKeys.style.display = "flex";
   guideBook.classList.toggle(
     "is-movement-tutorial-target",
     movementTutorialPhase === 2
@@ -1283,6 +1292,12 @@ function pickUpGuideBook() {
 
 function loadGuideBookState() {
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
+  if (hasGuideBook) {
+    setStoredFlag(movementTutorialCompleteKey, true);
+    movementTutorialPhase = 0;
+    movementTutorialBaseline = null;
+    hideMovementTutorialOverlay();
+  }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
@@ -1578,6 +1593,7 @@ function startPlantMasterDialogue() {
     guidePageIndex = 0;
     isGuideBookOpen = true;
     updateGuideCard();
+    completeMovementTutorial();
   }, lines.length * 650 + 250);
 }
 
