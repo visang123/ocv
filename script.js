@@ -115,7 +115,8 @@ import {
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
-  appStorageKeys
+  appStorageKeys,
+  appStorageKeysSharedWorldReset
 } from "./src/game/constants.js";
 import {
   player,
@@ -2200,7 +2201,9 @@ function settlePlayerBeforeBackground() {
   }
 }
 
-function applyDefaultState() {
+function applyDefaultState(options) {
+  const preserveTutorialProgress =
+    Boolean(options && options.preserveTutorialProgress);
   resetInputKeys(keys);
 
   playerX = spawnPlayerX;
@@ -2221,9 +2224,13 @@ function applyDefaultState() {
   lastMainSeedStateChangeAt = Date.now();
   hasPickedMainSeedThisWindow = false;
   sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-  removeStoredValue(storageKeyGuideBookPickedForRoom());
+  if (!preserveTutorialProgress) {
+    removeStoredValue(storageKeyGuideBookPickedForRoom());
+  }
   setStoredFlag(mainSeedCollectedKey, false);
-  setStoredFlag(hasGuideBookKey, false);
+  if (!preserveTutorialProgress) {
+    setStoredFlag(hasGuideBookKey, false);
+  }
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
   heldItem = null;
@@ -2252,28 +2259,42 @@ function applyDefaultState() {
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
 
-  hasGuideBook = false;
-  isGuideBookOpen = false;
-  isGuideBookClickPromptActive = false;
-  movementTutorialPhase = 0;
-  movementTutorialBaseline = null;
-  onboardingFlowStep = 1;
-  onboardingJumpLatch = false;
-  onboardingFirstGuideEscHintShown = false;
-  onboardingSeedTutorialSecondLine = false;
-  onboardingButterflyCountBaseline = null;
-  onboardingTutorialEnteredTree = false;
-  onboardingClearAllOnboardingTimers();
-  setStoredFlag(onboardingFlowDoneKey, false);
-  setStoredValue(onboardingFlowStepKey, "1");
-  isGuideDismissedAtSign = false;
-  hasHandledDryMainSeed = false;
-  dryMainSeedVisibleSince = 0;
-  setStoredFlag(mainDrySeedHandledKey, false);
-  isNpcDialogueRunning = false;
-  isNpcDialogueComplete = false;
-  isGuidePlantPageUnlocked = false;
-  guidePageIndex = 0;
+  if (!preserveTutorialProgress) {
+    hasGuideBook = false;
+    isGuideBookOpen = false;
+    isGuideBookClickPromptActive = false;
+    movementTutorialPhase = 0;
+    movementTutorialBaseline = null;
+    onboardingFlowStep = 1;
+    onboardingJumpLatch = false;
+    onboardingFirstGuideEscHintShown = false;
+    onboardingSeedTutorialSecondLine = false;
+    onboardingButterflyCountBaseline = null;
+    onboardingTutorialEnteredTree = false;
+    onboardingClearAllOnboardingTimers();
+    setStoredFlag(onboardingFlowDoneKey, false);
+    setStoredValue(onboardingFlowStepKey, "1");
+    isGuideDismissedAtSign = false;
+    hasHandledDryMainSeed = false;
+    dryMainSeedVisibleSince = 0;
+    setStoredFlag(mainDrySeedHandledKey, false);
+    isNpcDialogueRunning = false;
+    isNpcDialogueComplete = false;
+    isGuidePlantPageUnlocked = false;
+    guidePageIndex = 0;
+  } else {
+    onboardingClearAllOnboardingTimers();
+    isGuideDismissedAtSign = false;
+    hasHandledDryMainSeed = false;
+    dryMainSeedVisibleSince = 0;
+    setStoredFlag(mainDrySeedHandledKey, false);
+    isNpcDialogueRunning = false;
+    isGuideBookOpen = false;
+    isGuideBookClickPromptActive = false;
+    movementTutorialPhase = 0;
+    movementTutorialBaseline = null;
+    guidePageIndex = 0;
+  }
   isTreeFalling = false;
   wasPlayerInTree = false;
   appleState.count = 0;
@@ -2322,9 +2343,11 @@ function applyDefaultState() {
   seedWorldText.style.display = "none";
   seedInventory.style.display = "none";
   guideCard.style.display = "none";
-  guideBook.style.display = "block";
-  guideBook.classList.remove("is-near");
-  guideBookButton.style.display = "none";
+  if (!preserveTutorialProgress) {
+    guideBook.style.display = "block";
+    guideBook.classList.remove("is-near");
+    guideBookButton.style.display = "none";
+  }
   hasShownFirstSeedFocus = false;
   window.clearTimeout(firstSeedFocusTimeout);
   seedInventory.classList.remove("is-first-seed-focus");
@@ -2335,8 +2358,12 @@ function applyDefaultState() {
   updateWellCard();
   updateSeedPosition();
   updateBucketPosition();
-  updateNpcPosition();
-  updateGuidePages();
+  if (preserveTutorialProgress) {
+    loadGuideBookState();
+  } else {
+    updateNpcPosition();
+    updateGuidePages();
+  }
   updateApples();
   updateExtraSeedsAndPlants();
 }
@@ -2996,8 +3023,8 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // Keep multiplayer reset consistent across devices by clearing local world caches too.
-    clearStoredKeys(appStorageKeys);
-    applyDefaultState();
+    clearStoredKeys(appStorageKeysSharedWorldReset);
+    applyDefaultState({ preserveTutorialProgress: true });
     savePlayerPosition(true);
     restartPlayerPositionOnly();
     setTimeout(function () {
