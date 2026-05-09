@@ -133,6 +133,8 @@ export const bucketStateKey = "bucketStateV1";
 export const mainDrySeedHandledKey = "mainDrySeedHandledV1";
 export const mainSeedCollectedKey = "mainSeedCollectedV1";
 export const movementTutorialCompleteKey = "movementTutorialCompleteV1";
+export const onboardingFlowStepKey = "onboardingFlowStepV1";
+export const onboardingFlowDoneKey = "onboardingFlowDoneV1";
 
 export const appStorageKeys = [
   "wellWaterV1",
@@ -152,6 +154,8 @@ export const appStorageKeys = [
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
   movementTutorialCompleteKey,
+  onboardingFlowStepKey,
+  onboardingFlowDoneKey,
   "butterflyCaughtCountsV1",
   "magicPowderCountV1"
 ];

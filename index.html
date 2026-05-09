@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
-  <link rel="stylesheet" href="style.css?v=20260515a">
+  <link rel="stylesheet" href="style.css?v=20260515c">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -55,6 +55,11 @@
         <div id="player-name"></div>
         <img id="player" src="이미지/player-white.png" alt="&#54540;&#47112;&#51060;&#50612;">
       </div>
+    </div>
+  </div>
+  <div id="onboarding-callout" class="onboarding-callout" style="display: none" aria-live="polite">
+    <div class="onboarding-callout-panel">
+      <p id="onboarding-callout-text" class="onboarding-callout-text"></p>
     </div>
   </div>
   <div
@@ -215,7 +220,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="online-config.js?v=20260508ac"></script>
   <script src="ovc-online.js?v=20260508ac"></script>
-  <script type="module" src="src/main.js?v=20260515a"></script>
+  <script type="module" src="src/main.js?v=20260515c"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

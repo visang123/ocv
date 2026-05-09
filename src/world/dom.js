@@ -52,6 +52,8 @@ const butterflyInventorySlots = Array.from(
 const butterflyInventoryTotal = document.getElementById("butterfly-inventory-total");
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
+const onboardingCallout = document.getElementById("onboarding-callout");
+const onboardingCalloutText = document.getElementById("onboarding-callout-text");
 const movementTutorialOverlay = document.getElementById("movement-tutorial-overlay");
 const movementTutorialLineMove = document.getElementById("movement-tutorial-line-move");
 const movementTutorialLineBook = document.getElementById("movement-tutorial-line-book");
@@ -108,6 +110,8 @@ export {
   butterflyInventoryTotal,
   world,
   ground,
+  onboardingCallout,
+  onboardingCalloutText,
   movementTutorialOverlay,
   movementTutorialLineMove,
   movementTutorialLineBook,

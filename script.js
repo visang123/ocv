@@ -111,6 +111,8 @@ import {
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
   movementTutorialCompleteKey,
+  onboardingFlowStepKey,
+  onboardingFlowDoneKey,
   appStorageKeys
 } from "./src/game/constants.js";
 import {
@@ -164,6 +166,8 @@ import {
   butterflyInventoryTotal,
   world,
   ground,
+  onboardingCallout,
+  onboardingCalloutText,
   movementTutorialOverlay,
   movementTutorialLineMove,
   movementTutorialLineBook,
@@ -229,6 +233,8 @@ let isGuideDismissedAtSign = false;
 let isGuideBookClickPromptActive = false;
 let movementTutorialPhase = 0;
 let movementTutorialBaseline = null;
+let onboardingFlowStep = 1;
+let onboardingJumpLatch = false;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
@@ -841,6 +847,10 @@ function closeGuideCardFromClick() {
   }
   dismissGuideBookClickPrompt();
   updateGuideCard();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 3) {
+    onboardingFlowStep = 4;
+    setStoredValue(onboardingFlowStepKey, "4");
+  }
 }
 
 guideCard.addEventListener("pointerdown", function (event) {
@@ -1146,6 +1156,10 @@ function createStarterSeedInventoryItem() {
   markWorldDirty();
   syncWorldState(true);
   saveAppleState();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 4) {
+    onboardingFlowStep = 5;
+    setStoredValue(onboardingFlowStepKey, "5");
+  }
   return starterSeed;
 }
 
@@ -1198,7 +1212,8 @@ function shouldRunMovementTutorial() {
     !isCharacterSelecting &&
     !isTabSessionSuperseded &&
     !getStoredFlag(movementTutorialCompleteKey) &&
-    !hasGuideBook
+    !hasGuideBook &&
+    !(onboardingFlowStep === 1 && isNearGuideBook())
   );
 }
 
@@ -1285,6 +1300,190 @@ function syncMovementTutorialOverlay() {
   }
 }
 
+function clearOnboardingHighlights() {
+  [guideBook, guideBookButton, seed, plantMaster, player].forEach(function (el) {
+    if (el) el.classList.remove("onboarding-highlight");
+  });
+}
+
+function setOnboardingCalloutVisible(show, text) {
+  if (!onboardingCallout || !onboardingCalloutText) return;
+  if (!show) {
+    onboardingCallout.style.display = "none";
+    onboardingCalloutText.textContent = "";
+    return;
+  }
+  onboardingCallout.style.display = "block";
+  onboardingCalloutText.textContent = text || "";
+}
+
+function syncOnboardingFlowProgressFromWorld() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  let changed = false;
+  if (hasGuideBook && onboardingFlowStep < 2) {
+    onboardingFlowStep = 2;
+    changed = true;
+  }
+  if (hasPickedMainSeedInCurrentRoom() && onboardingFlowStep < 5) {
+    onboardingFlowStep = 5;
+    changed = true;
+  }
+  if (plantRuntime.isSeedPlanted && onboardingFlowStep < 6) {
+    onboardingFlowStep = 6;
+    changed = true;
+  }
+  if (
+    isNpcDialogueComplete &&
+    plantRuntime.isSeedPlanted &&
+    onboardingFlowStep < 8
+  ) {
+    onboardingFlowStep = 8;
+    changed = true;
+  }
+  if (changed) {
+    setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
+  }
+}
+
+function loadOnboardingFlowState() {
+  onboardingJumpLatch = false;
+  if (getStoredFlag(onboardingFlowDoneKey)) {
+    onboardingFlowStep = 0;
+    return;
+  }
+  const raw = parseInt(String(getStoredValue(onboardingFlowStepKey) || "1"), 10);
+  onboardingFlowStep =
+    Number.isFinite(raw) && raw >= 1 && raw <= 8 ? raw : 1;
+  syncOnboardingFlowProgressFromWorld();
+}
+
+function onboardingNotifyMainPlantPlanted() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep === 5) {
+    onboardingFlowStep = 6;
+    setStoredValue(onboardingFlowStepKey, "6");
+  }
+}
+
+function updateOnboardingFlowUI() {
+  if (!onboardingCallout || !onboardingCalloutText) return;
+  if (!hasSpawnedCharacter || isCharacterSelecting || isTabSessionSuperseded) {
+    setOnboardingCalloutVisible(false, "");
+    clearOnboardingHighlights();
+    return;
+  }
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep <= 0) {
+    setOnboardingCalloutVisible(false, "");
+    clearOnboardingHighlights();
+    return;
+  }
+
+  clearOnboardingHighlights();
+
+  switch (onboardingFlowStep) {
+    case 1: {
+      if (isNearGuideBook() && !hasGuideBook) {
+        hideMovementTutorialOverlay();
+        setOnboardingCalloutVisible(true, "E키를 눌러 책을 소지하세요.");
+        if (guideBook) guideBook.classList.add("onboarding-highlight");
+      } else {
+        setOnboardingCalloutVisible(false, "");
+      }
+      break;
+    }
+    case 2: {
+      setOnboardingCalloutVisible(true, "왼쪽 아래 책을 눌러보세요.");
+      if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+      break;
+    }
+    case 3: {
+      const guideOpen = guideCard && guideCard.style.display === "block";
+      if (guideOpen) {
+        setOnboardingCalloutVisible(
+          true,
+          "게임과 관련된 설명을 볼 수 있습니다."
+        );
+        if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+      } else {
+        setOnboardingCalloutVisible(false, "");
+      }
+      break;
+    }
+    case 4: {
+      setOnboardingCalloutVisible(
+        true,
+        "옆에 씨앗으로 이동 후, e키를 눌러 소지하세요."
+      );
+      if (seed) seed.classList.add("onboarding-highlight");
+      break;
+    }
+    case 5: {
+      setOnboardingCalloutVisible(
+        true,
+        "심고 싶은 위치로 이동 후, 클릭하세요.(제한시간 있음)"
+      );
+      if (player) player.classList.add("onboarding-highlight");
+      break;
+    }
+    case 6: {
+      if (isNearPlantMaster()) {
+        onboardingFlowStep = 7;
+        setStoredValue(onboardingFlowStepKey, "7");
+        updateOnboardingFlowUI();
+        return;
+      }
+      setOnboardingCalloutVisible(
+        true,
+        "이제 새싹이 자라납니다. 키우는 비밀은 npc에게.\n\nnpc에게 이동하세요."
+      );
+      if (plantMaster) plantMaster.classList.add("onboarding-highlight");
+      break;
+    }
+    case 7: {
+      if (isNpcDialogueRunning) {
+        setOnboardingCalloutVisible(false, "");
+        if (plantMaster) plantMaster.classList.add("onboarding-highlight");
+        break;
+      }
+      if (isNpcDialogueComplete) {
+        onboardingFlowStep = 8;
+        setStoredValue(onboardingFlowStepKey, "8");
+        onboardingJumpLatch = false;
+        updateOnboardingFlowUI();
+        return;
+      }
+      setOnboardingCalloutVisible(true, "q를 눌러 대화하세요.");
+      if (plantMaster) plantMaster.classList.add("onboarding-highlight");
+      break;
+    }
+    case 8: {
+      setOnboardingCalloutVisible(
+        true,
+        "점프도 가능합니다. space바를 누르세요."
+      );
+      if (player) player.classList.add("onboarding-highlight");
+      break;
+    }
+    default:
+      setOnboardingCalloutVisible(false, "");
+  }
+}
+
+function onboardingCheckJumpFinish() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 8) return;
+  if (jumpY < -0.12) {
+    onboardingJumpLatch = true;
+  }
+  if (onboardingJumpLatch && isOnGround && jumpY >= 0) {
+    onboardingFlowStep = 0;
+    setStoredFlag(onboardingFlowDoneKey, true);
+    setStoredValue(onboardingFlowStepKey, "0");
+    onboardingJumpLatch = false;
+    setOnboardingCalloutVisible(false, "");
+    clearOnboardingHighlights();
+  }
+}
+
 function pickUpGuideBook() {
   if (!isNearGuideBook()) return false;
 
@@ -1295,6 +1494,10 @@ function pickUpGuideBook() {
   guideBookButton.style.display = "block";
   updateGuideCard();
   completeMovementTutorial();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 1) {
+    onboardingFlowStep = 2;
+    setStoredValue(onboardingFlowStepKey, "2");
+  }
   return true;
 }
 
@@ -1316,6 +1519,7 @@ function loadGuideBookState() {
   updateGuidePages();
   updateGuideCard();
   updateNpcPosition();
+  loadOnboardingFlowState();
 }
 
 function resetGameForTesting() {
@@ -1435,6 +1639,10 @@ function applyDefaultState() {
   isGuideBookClickPromptActive = false;
   movementTutorialPhase = 0;
   movementTutorialBaseline = null;
+  onboardingFlowStep = 1;
+  onboardingJumpLatch = false;
+  setStoredFlag(onboardingFlowDoneKey, false);
+  setStoredValue(onboardingFlowStepKey, "1");
   isGuideDismissedAtSign = false;
   hasHandledDryMainSeed = false;
   dryMainSeedVisibleSince = 0;
@@ -3416,6 +3624,7 @@ function startPlanting() {
     updatePlantState();
     updateNpcPosition();
     saveSeedState();
+    onboardingNotifyMainPlantPlanted();
   }, plantActionMs);
 }
 
@@ -3517,6 +3726,7 @@ function plantInventorySeed(seedId) {
       updatePlantState();
       updateNpcPosition();
       saveSeedState();
+      onboardingNotifyMainPlantPlanted();
     } else {
       appleState.extraPlants.push(createExtraPlant("plant-" + inventorySeed.id, plantX, plantY));
       updateExtraSeedsAndPlants();
@@ -4319,6 +4529,16 @@ function updateGuideCard() {
     "is-click-prompt",
     hasGuideBook && isGuideBookClickPromptActive
   );
+
+  if (
+    !getStoredFlag(onboardingFlowDoneKey) &&
+    onboardingFlowStep === 2 &&
+    shouldShow &&
+    guideCard.style.display === "block"
+  ) {
+    onboardingFlowStep = 3;
+    setStoredValue(onboardingFlowStepKey, "3");
+  }
 }
 
 function getGuideMaxPage() {
@@ -4848,6 +5068,7 @@ function finishCharacterSelect() {
 
   syncPlayerColorToServer(true);
 
+  loadOnboardingFlowState();
   setupMultiplayer();
 }
 
@@ -6369,6 +6590,7 @@ function gameLoop() {
   refillWellIfNeeded();
   prepareMovementTutorialBeforeMove();
   updatePlayerPosition();
+  onboardingCheckJumpFinish();
   advanceMovementTutorialAfterMove();
   updateSeedPosition();
   updateExtraSeedsAndPlants();
@@ -6379,6 +6601,7 @@ function gameLoop() {
   updatePlantState();
   updateNpcPosition();
   updateGuideCard();
+  updateOnboardingFlowUI();
   pruneStaleRemotePlayers();
   updatePlayerAlert();
   updateButterflies();
