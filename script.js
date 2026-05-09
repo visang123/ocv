@@ -535,21 +535,33 @@ function setWorldPosition(element, x, y) {
   );
 }
 
+function isGameResetShortcut(event) {
+  return (
+    event.code === "KeyR" &&
+    event.altKey &&
+    !event.shiftKey &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.repeat
+  );
+}
+
+window.addEventListener(
+  "keydown",
+  function (event) {
+    if (!isGameResetShortcut(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    resetGameForTesting();
+  },
+  true
+);
+
 document.addEventListener("keydown", function (event) {
   if (event.code === "KeyR" && event.shiftKey && (event.ctrlKey || event.metaKey)) {
     return;
   }
 
-  if (
-    event.code === "KeyR" &&
-    event.altKey &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.repeat
-  ) {
-    event.preventDefault();
-    resetGameForTesting();
-    return;
-  }
+  if (isGameResetShortcut(event)) return;
 
   if (isTabSessionSuperseded) {
     event.preventDefault();
@@ -775,6 +787,11 @@ controlsButton.id = "controls-button";
 controlsButton.type = "button";
 controlsButton.textContent = "조작법";
 settingsModal.insertBefore(controlsButton, logoutButton);
+const resetGameButton = document.createElement("button");
+resetGameButton.id = "reset-game-button";
+resetGameButton.type = "button";
+resetGameButton.textContent = "초기화";
+settingsModal.insertBefore(resetGameButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
@@ -817,6 +834,13 @@ controlsOverlay.addEventListener("click", function (event) {
     controlsOverlay.classList.remove("is-open");
     controlsOverlay.setAttribute("aria-hidden", "true");
   }
+});
+
+resetGameButton.addEventListener("click", function () {
+  if (!window.confirm("게임을 초기화할까요?")) return;
+  settingsOverlay.classList.remove("is-open");
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  resetGameForTesting();
 });
 
 logoutButton.addEventListener("click", function () {
@@ -2586,7 +2610,9 @@ function getPlantSecondGrowthRatio(plant, now) {
   if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten") return null;
   if (plant.isSproutSelfSustaining) return null;
   const ev = plant.sproutEvolutionMs || 0;
-  if (ev < sproutStage1Ms) return null;
+  if (ev < sproutStage1Ms) {
+    return Math.min(1, Math.max(0, ev / sproutStage1Ms));
+  }
   return Math.min(1, Math.max(0, (ev - sproutStage1Ms) / sproutStage2GrowMs));
 }
 
