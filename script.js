@@ -2177,7 +2177,8 @@ function refreshSharedWaterIndicators() {
     plantRuntime.needsFirstWater &&
     plantRuntime.status !== "dry" &&
     plantRuntime.status !== "rotten" &&
-    !plantRuntime.isOverwatered
+    !plantRuntime.isOverwatered &&
+    !isPowderUpgradeInProgress(plantRuntime)
   ) {
     waterNeeded.style.display = "block";
     setWorldPosition(
@@ -2189,7 +2190,12 @@ function refreshSharedWaterIndicators() {
 
   appleState.extraPlants.forEach(function (plant) {
     if (!plant.waterNeededElement) return;
-    if (plant.needsFirstWater && plant.status !== "dry" && plant.status !== "rotten") {
+    if (
+      plant.needsFirstWater &&
+      plant.status !== "dry" &&
+      plant.status !== "rotten" &&
+      !isPowderUpgradeInProgress(plant)
+    ) {
       plant.waterNeededElement.style.display = "block";
       setWorldPosition(
         plant.waterNeededElement,
@@ -2501,7 +2507,10 @@ function updateExtraSeedsAndPlants() {
     plant.sproutElement.src = getSproutImageForStage(stage);
     plant.sproutElement.classList.toggle("is-big", stage >= 2);
     plant.waterNeededElement.style.display =
-      plant.needsFirstWater && plant.status !== "dry" && plant.status !== "rotten"
+      plant.needsFirstWater &&
+      plant.status !== "dry" &&
+      plant.status !== "rotten" &&
+      !isPowderUpgradeInProgress(plant)
         ? "block"
         : "none";
     if (plant.waterNeededElement.style.display === "block") {
@@ -3594,10 +3603,11 @@ function triggerWaterSplash() {
 
 function getNearestWateringTarget() {
   let nearest = null;
+  const mainPowderUpgrading = isPowderUpgradeInProgress(plantRuntime);
 
   if (
     plantRuntime.isSeedPlanted &&
-    !plantRuntime.isSproutSelfSustaining &&
+    (!plantRuntime.isSproutSelfSustaining || mainPowderUpgrading) &&
     plantRuntime.status !== "rotten" &&
     !plantRuntime.isOverwatered
   ) {
@@ -3617,7 +3627,8 @@ function getNearestWateringTarget() {
   }
 
   appleState.extraPlants.forEach(function (plant) {
-    if (plant.isSproutSelfSustaining) return;
+    const powderUpgrading = isPowderUpgradeInProgress(plant);
+    if (plant.isSproutSelfSustaining && !powderUpgrading) return;
     if (plant.status === "rotten" || plant.isOverwatered) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
@@ -3668,7 +3679,7 @@ function waterPlant(target) {
     return;
   }
 
-  if (plantRuntime.isSproutSelfSustaining) {
+  if (plantRuntime.isSproutSelfSustaining && !isPowderUpgradeInProgress(plantRuntime)) {
     return;
   }
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -3730,7 +3741,7 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
-  if (plant.isSproutSelfSustaining) {
+  if (plant.isSproutSelfSustaining && !isPowderUpgradeInProgress(plant)) {
     return;
   }
   updateExtraPlantWaterLevel(plant, now);
@@ -3883,7 +3894,11 @@ function updatePlantState() {
     plantCard.style.display = "none";
     growthCard.style.display = "none";
     sprout.style.display = "none";
-  } else if (plantRuntime.needsFirstWater && plantRuntime.status !== "dry") {
+  } else if (
+    plantRuntime.needsFirstWater &&
+    plantRuntime.status !== "dry" &&
+    !isPowderUpgradeInProgress(plantRuntime)
+  ) {
     waterNeeded.style.display = "block";
     setWorldPosition(
       waterNeeded,
