@@ -198,6 +198,8 @@ let npcPromptHideTimeout = null;
 let hasShownFirstSeedFocus = false;
 let hasHandledDryMainSeed = false;
 let isMainSeedAvailable = true;
+let hasPickedMainSeedThisWindow =
+  sessionStorage.getItem(storageKeyMainSeedPickedForRoom()) === "true";
 let lastMainSeedStateChangeAt = 0;
 let dryMainSeedVisibleSince = 0;
 let firstSeedFocusTimeout = null;
@@ -275,10 +277,11 @@ function storageKeyGuideBookPickedForRoom() {
 }
 
 function hasPickedMainSeedInCurrentRoom() {
-  return sessionStorage.getItem(storageKeyMainSeedPickedForRoom()) === "true";
+  return hasPickedMainSeedThisWindow;
 }
 
 function setMainSeedPickedForCurrentRoom() {
+  hasPickedMainSeedThisWindow = true;
   sessionStorage.setItem(storageKeyMainSeedPickedForRoom(), "true");
 }
 
@@ -967,7 +970,6 @@ function canPickUpSeed() {
   updateSeedDryState();
   return (
     !hasPickedMainSeedInCurrentRoom() &&
-    !plantRuntime.isSeedPlanted &&
     !plantRuntime.isSeedDry
   );
 }
@@ -1143,6 +1145,7 @@ function applyDefaultState() {
   plantRuntime.isSeedDry = false;
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
+  hasPickedMainSeedThisWindow = false;
   sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
   removeStoredValue(storageKeyGuideBookPickedForRoom());
   setStoredFlag(mainSeedCollectedKey, false);
@@ -4844,7 +4847,7 @@ function renderRemotePlayerState(state) {
     remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
   } else if (
     remotePlayer.statusElement.textContent &&
-    Date.now() - Number(remotePlayer.lastActionAt || 0) < 1800
+    Date.now() - Number(remotePlayer.lastActionAt || 0) < 6500
   ) {
     remotePlayer.statusElement.style.display = "block";
   } else {
