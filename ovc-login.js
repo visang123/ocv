@@ -110,7 +110,7 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
 
 function goToGame() {
   sessionStorage.removeItem(loginHandoffKey);
-  const targetUrl = new URL("/index.html", window.location.origin);
+  const targetUrl = new URL("./index.html", window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));
   window.location.replace(targetUrl.toString());
