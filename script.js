@@ -293,14 +293,7 @@ const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
-/** 임시: 최신 빌드 반영 확인용 표시 이름. 끄려면 false. */
-const TEMP_OVERRIDE_INGAME_DISPLAY_NAME = true;
-const TEMP_INGAME_DISPLAY_NAME = "커서";
-
 function nameForIngameUiDisplay(realName) {
-  if (TEMP_OVERRIDE_INGAME_DISPLAY_NAME) {
-    return TEMP_INGAME_DISPLAY_NAME;
-  }
   return (realName || "").trim() || "OVC";
 }
 const guideBookClickPromptDismissedKey =
@@ -522,9 +515,11 @@ const TREE_TRUNK_MIN_GROUND_DEPTH_MARGIN = 108;
 const TREE_TRUNK_ENTER_X_LEFT_PAD = 2;
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 방지) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 22;
-const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 28;
-/** NPC 대화 진행 중 말풍선을 더 위로 (캐릭터 이름과 겹침 완화) */
-const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 22;
+const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 6;
+/** 대화 중 추가로 위로 올리던 값 — 말풍선을 아래로 내리는 쪽으로 조정해 0 */
+const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 0;
+/** NPC 말풍선(호출/대화) 앵커를 월드 Y로 아래로 (숫자 클수록 더 아래) */
+const NPC_SPEECH_BUBBLE_Y_DROP_WORLD = 40;
 const PLAYER_SPEECH_BUBBLE_EXTRA_LIFT = 26;
 
 function getNpcSpeechBubbleLiftWorld() {
@@ -5254,7 +5249,7 @@ function updateNpcPosition() {
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift
+      npcY - bubbleHeight - 3 - bubbleLift + NPC_SPEECH_BUBBLE_Y_DROP_WORLD
     );
   }
 
@@ -5295,7 +5290,7 @@ function updateNpcPrompt() {
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - bubbleLift
+      npcY - bubbleHeight - 3 - bubbleLift + NPC_SPEECH_BUBBLE_Y_DROP_WORLD
     );
 
     window.clearTimeout(npcPromptHideTimeout);
@@ -7620,6 +7615,7 @@ try {
   setup();
   if (currentUserId && !getStoredFlag(onboardingFlowDoneKey)) {
     resetTutorialProgressInStorage();
+    clearStoredKeys(appStorageKeysSharedWorldReset);
     try {
       sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
     } catch (eTutorialPage) {}
