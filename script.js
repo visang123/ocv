@@ -51,6 +51,7 @@ import {
   NPC_START_X,
   NPC_START_Y,
   appleEatMs,
+  plantActionMs,
   appleRespawnMs,
   minPlantSpacing,
   biggerSproutMs,
@@ -1605,7 +1606,7 @@ function eatApple() {
 
   appleState.count -= 1;
   appleState.isEating = true;
-  playerStatus.textContent = "\uBA39\uB294\uC911...";
+  playerStatus.textContent = "\uC0AC\uACFC\uBA39\uB294\uC911...";
   saveAppleState();
   updateApples();
 
@@ -3279,7 +3280,7 @@ function startPlanting() {
     setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
     updatePlantState();
     saveSeedState();
-  }, 5000);
+  }, plantActionMs);
 }
 
 function startPlantingExtraSeed() {
@@ -3310,7 +3311,7 @@ function startPlantingExtraSeed() {
     playerStatus.textContent = "";
     updateExtraSeedsAndPlants();
     saveAppleState();
-  }, 5000);
+  }, plantActionMs);
 }
 
 function plantInventorySeed(seedId) {
@@ -3382,7 +3383,7 @@ function plantInventorySeed(seedId) {
     playerStatus.textContent = "";
     updateSeedInventory();
     saveAppleState();
-  }, 5000);
+  }, plantActionMs);
 }
 
 function createExtraPlant(id, x, y) {
@@ -5023,15 +5024,13 @@ function renderRemotePlayerState(state) {
       state.action === "planting"
         ? "\uC528\uC557 \uC2EC\uB294\uC911..."
         : state.action === "eating"
-          ? "\uBA39\uB294\uC911..."
-          : state.action === "watering"
-            ? "\uBB3C \uC8FC\uB294\uC911..."
+          ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
           : "";
     remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
     remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
   } else if (
     remotePlayer.statusElement.textContent &&
-    Date.now() - Number(remotePlayer.lastActionAt || 0) < 6500
+    Date.now() - Number(remotePlayer.lastActionAt || 0) < Math.max(plantActionMs, appleEatMs) + 400
   ) {
     remotePlayer.statusElement.style.display = "block";
   } else {

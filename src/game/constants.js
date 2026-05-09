@@ -58,6 +58,8 @@ export const SPROUT_STAGE_WIDTHS = [14, 22, 34];
 export const SPROUT_STAGE_HEIGHTS = [18, 32, 58];
 
 export const appleEatMs = 3 * SECOND_MS;
+/** Planting (any seed) locks movement and shows status for this long (ms). */
+export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
 
