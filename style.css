@@ -197,6 +197,38 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+.butterfly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+
+.butterfly-sprite {
+  width: 100%;
+  height: 100%;
+  background-image: url("이미지/butterfly-sheet.png");
+  background-repeat: no-repeat;
+  /* Sheet is 5 cols x 3 rows; size to scale a single cell to the slot. */
+  background-size: 500% 300%;
+  /* Source butterflies face left; flipped horizontally when moving right. */
+  transform-origin: 50% 50%;
+  image-rendering: auto;
+}
+
+.butterfly.is-facing-right .butterfly-sprite {
+  transform: scaleX(-1);
+}
+
+.butterfly.is-catchable {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+
 #big-tree {
   position: absolute;
   left: 0;
@@ -1709,5 +1741,93 @@ body #guide-book-button {
   border: 2px solid #111;
   color: #111;
   font: 900 16px/20px Arial, sans-serif;
+  text-align: center;
+}
+
+#butterfly-inventory {
+  position: fixed;
+  left: 178px;
+  bottom: 24px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 4px 28px 4px 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  z-index: 11;
+  pointer-events: none;
+}
+
+.butterfly-inventory-slot {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.butterfly-inventory-icon {
+  width: 30px;
+  height: 30px;
+  background-image: url("이미지/butterfly-sheet.png");
+  background-repeat: no-repeat;
+  background-size: 500% 300%;
+  background-position: 0% 0%;
+}
+
+.butterfly-inventory-slot[data-color="brown"] .butterfly-inventory-icon {
+  background-position: 0% 0%;
+}
+
+.butterfly-inventory-slot[data-color="yellow"] .butterfly-inventory-icon {
+  background-position: 0% 50%;
+}
+
+.butterfly-inventory-slot[data-color="white"] .butterfly-inventory-icon {
+  background-position: 0% 100%;
+}
+
+.butterfly-inventory-count {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid #111;
+  color: #111;
+  font: 900 11px/14px Arial, sans-serif;
+  text-align: center;
+}
+
+.butterfly-inventory-slot.is-empty .butterfly-inventory-icon {
+  filter: grayscale(100%) opacity(0.45);
+}
+
+.butterfly-inventory-slot.is-empty .butterfly-inventory-count {
+  background: #f5f5f5;
+  color: #666;
+  border-color: #999;
+}
+
+#butterfly-inventory-total {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font: 900 14px/20px Arial, sans-serif;
   text-align: center;
 }

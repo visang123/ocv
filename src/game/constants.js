@@ -60,6 +60,34 @@ export const SPROUT_STAGE_HEIGHTS = [18, 32, 58];
 export const appleEatMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
 export const minPlantSpacing = 5;
+
+// --- Butterflies ---
+/** Render size of a butterfly (world pixels). */
+export const BUTTERFLY_SIZE = 20;
+/** Maximum butterflies that can be alive on the shared map. */
+export const butterflyMaxAlive = 5;
+/** Available colors. Index doubles as the sprite-sheet row. */
+export const butterflyColors = ["brown", "yellow", "white"];
+/** Wing-flap frames per color in the sprite sheet. */
+export const butterflyFrameCount = 5;
+/** Milliseconds between wing frames. */
+export const butterflyFrameMs = 140;
+/** Butterfly speed in world pixels per game frame (player speed is 1). */
+export const butterflySpeed = 1.5;
+/** How long it takes a butterfly to drift to a fresh waypoint, in ms. */
+export const butterflyLegMinMs = 2000;
+export const butterflyLegMaxMs = 4500;
+/** Time between auto-spawns when below the map cap, in ms. */
+export const butterflyRespawnMs = 2 * MINUTE_MS;
+/** How close (px, center distance) the player must be to catch a butterfly. */
+export const butterflyCatchDistance = 25;
+/** Authority (lowest sessionId) broadcasts butterfly positions on this cadence. */
+export const butterflyBroadcastMs = 250;
+/** Bounding box (world coords) the butterflies stay within while flying. */
+export const butterflyBoundsLeft = 24;
+export const butterflyBoundsRight = 936;
+export const butterflyBoundsTop = 24;
+export const butterflyBoundsBottom = 300;
 /** Legacy: used only to migrate old saves into stage-3 self-sustaining sprouts. */
 export const biggerSproutMs = 30 * SECOND_MS;
 export const pickupDistance = 28;
@@ -112,5 +140,6 @@ export const appStorageKeys = [
   playerPositionKey,
   bucketStateKey,
   mainDrySeedHandledKey,
-  mainSeedCollectedKey
+  mainSeedCollectedKey,
+  "butterflyCaughtCountsV1"
 ];

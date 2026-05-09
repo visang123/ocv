@@ -75,6 +75,21 @@ import {
   plantGrowthMs,
   overwaterWindowMs,
   quickRewaterMs,
+  BUTTERFLY_SIZE,
+  butterflyMaxAlive,
+  butterflyColors,
+  butterflyFrameCount,
+  butterflyFrameMs,
+  butterflySpeed,
+  butterflyLegMinMs,
+  butterflyLegMaxMs,
+  butterflyRespawnMs,
+  butterflyCatchDistance,
+  butterflyBroadcastMs,
+  butterflyBoundsLeft,
+  butterflyBoundsRight,
+  butterflyBoundsTop,
+  butterflyBoundsBottom,
   playerPositionKey,
   wellWaterKey,
   lastWellRefillKey,
@@ -135,6 +150,9 @@ import {
   appleCountText,
   treeAppleElements,
   inventoryApple,
+  butterflyInventory,
+  butterflyInventorySlots,
+  butterflyInventoryTotal,
   world,
   ground
 } from "./src/world/dom.js";
@@ -321,7 +339,39 @@ let lastWaterSplashY = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
 let lastWellStateChangeAt = 0;
+let lastButterflyStateChangeAt = 0;
 let localApplePickedAtById = {};
+/**
+ * Map of butterfly id -> local DOM render entry. Holds the wrapper element,
+ * the sprite child element, and the most recently applied frame index so we
+ * only touch the DOM when a frame actually changes.
+ */
+const butterflyRenderById = {};
+/**
+ * Authority-only simulation state per butterfly: where it currently is, where
+ * it is heading, and when the leg started/ends. Non-authority clients ignore
+ * this and follow the broadcast positions instead.
+ */
+const butterflyAuthorityWaypointById = {};
+let lastButterflyBroadcastAt = 0;
+let lastLocalButterflyCatchAt = 0;
+/**
+ * Map of butterflyId -> ms timestamp of when this client caught it locally.
+ * Used to suppress the butterfly from re-appearing if the authority's stale
+ * pre-catch broadcast arrives after the catch was saved. Entries are pruned
+ * after a few seconds, by which time the authority has reconciled.
+ */
+const butterflyLocalCatchTombstoneById = {};
+const BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS = 8000;
+const butterflyState = {
+  list: [],
+  // 0 means "never seeded yet"; the authority replaces it with a real time the
+  // first time it spawns or refills the population.
+  lastSpawnAt: 0,
+  caughtCounts: { brown: 0, yellow: 0, white: 0 }
+};
+let hasSeededInitialButterflies = false;
+const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
@@ -626,6 +676,9 @@ document.addEventListener("keydown", function (event) {
     const now = Date.now();
     if (now - lastPickupToggleAt < 180) return;
     lastPickupToggleAt = now;
+    // Catching is allowed even with hands full: nothing else uses E for the
+    // butterfly's slot, and forcing a drop first would feel clumsy.
+    if (tryCatchButterfly()) return;
     if (heldItem) {
       if (heldItem === HELD_ITEM_BUCKET && now - lastBucketPickupAt < 260) {
         return;
@@ -644,6 +697,7 @@ document.addEventListener("keydown", function (event) {
       tryTalkToPlantMaster();
       return;
     }
+    if (tryCatchButterfly()) return;
     useHeldItem();
   }
 
@@ -1221,6 +1275,21 @@ function applyDefaultState() {
   appleState.extraSeeds = [];
   appleState.extraPlants = [];
   localApplePickedAtById = {};
+
+  // Reset butterflies: drop any visible butterflies and zero out the player's
+  // collected counts so the world starts fresh.
+  Object.keys(butterflyRenderById).forEach(removeButterflyRenderEntry);
+  butterflyState.list = [];
+  butterflyState.lastSpawnAt = 0;
+  butterflyColors.forEach(function (color) {
+    butterflyState.caughtCounts[color] = 0;
+  });
+  hasSeededInitialButterflies = false;
+  Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
+    delete butterflyLocalCatchTombstoneById[id];
+  });
+  saveButterflyCaughtCounts();
+  updateButterflyInventoryUi();
 
   wellState.water = maxWellWater;
   wellState.lastRefillAt = Date.now();
@@ -1817,7 +1886,8 @@ function getSharedWorldSnapshot() {
           isSproutSelfSustaining: plant.isSproutSelfSustaining
         };
       })
-    }
+    },
+    butterflies: getButterflyStateForSnapshot()
   };
 }
 
@@ -2143,6 +2213,19 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
+    if (
+      snapshot.butterflies &&
+      (!snapshotSavedAt || snapshotSavedAt >= lastButterflyStateChangeAt)
+    ) {
+      applyButterflySnapshot(snapshot.butterflies);
+      if (snapshotSavedAt) {
+        lastButterflyStateChangeAt = Math.max(
+          lastButterflyStateChangeAt,
+          snapshotSavedAt
+        );
+      }
+    }
+
     updateWellImage();
     updateWellCard();
     updateSeedPosition();
@@ -2153,6 +2236,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     ensureSharedPlantVisuals();
     refreshSharedWaterIndicators();
     updateSeedInventory();
+    updateButterflyInventoryUi();
   } finally {
     isApplyingWorldState = false;
   }
@@ -5326,6 +5410,504 @@ function getFitZoom() {
   return Math.max(window.innerWidth / WORLD_WIDTH, window.innerHeight / WORLD_HEIGHT);
 }
 
+// ----------------------------------------------------------------------------
+// Butterflies
+//
+// Butterflies are a shared, multiplayer entity. To avoid two clients fighting
+// over their positions we elect a single "authority" (the lowest active
+// sessionId) that simulates random-walk movement and broadcasts positions on a
+// short cadence. Every other client just renders the broadcast positions and
+// animates wing frames locally.
+//
+// Catching is local-first: the player who pressed E/Q removes the butterfly
+// from local state immediately and pushes a snapshot save so other clients
+// pick up the deletion. Their inventory count is per-player and persisted to
+// localStorage.
+//
+// Respawning is owned by the authority: while alive count is below the cap and
+// at least `butterflyRespawnMs` has passed since the last spawn, a new
+// butterfly appears at a random in-bounds position with a random color.
+// ----------------------------------------------------------------------------
+
+function loadButterflyCaughtCounts() {
+  try {
+    const raw = getStoredValue(butterflyCaughtCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    butterflyColors.forEach(function (color) {
+      const count = Math.max(0, Math.floor(Number(parsed[color]) || 0));
+      butterflyState.caughtCounts[color] = count;
+    });
+  } catch (error) {
+    // Corrupt save - reset to zeros silently.
+    butterflyColors.forEach(function (color) {
+      butterflyState.caughtCounts[color] = 0;
+    });
+  }
+}
+
+function saveButterflyCaughtCounts() {
+  setStoredValue(
+    butterflyCaughtCountsKey,
+    JSON.stringify(butterflyState.caughtCounts)
+  );
+}
+
+function generateButterflyId() {
+  return "butterfly-" + Date.now().toString(36) + "-" + Math.random().toString(16).slice(2, 8);
+}
+
+function pickRandomButterflyColor() {
+  return butterflyColors[Math.floor(Math.random() * butterflyColors.length)];
+}
+
+function pickRandomButterflySpawnPoint() {
+  const x = butterflyBoundsLeft + Math.random() * (butterflyBoundsRight - butterflyBoundsLeft);
+  const y = butterflyBoundsTop + Math.random() * (butterflyBoundsBottom - butterflyBoundsTop);
+  return { x, y };
+}
+
+function pickButterflyWaypoint(fromX, fromY) {
+  // Aim for a point at least a bit away so we don't pick the same spot.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const target = pickRandomButterflySpawnPoint();
+    const dx = target.x - fromX;
+    const dy = target.y - fromY;
+    if (dx * dx + dy * dy >= 60 * 60) {
+      return target;
+    }
+  }
+  return pickRandomButterflySpawnPoint();
+}
+
+function createButterfly(now, options) {
+  const spawn = (options && options.spawn) || pickRandomButterflySpawnPoint();
+  const color = (options && options.color) || pickRandomButterflyColor();
+  const id = (options && options.id) || generateButterflyId();
+  return {
+    id,
+    color,
+    x: spawn.x,
+    y: spawn.y,
+    dirX: Math.random() < 0.5 ? -1 : 1,
+    spawnedAt: now
+  };
+}
+
+function isButterflyAuthority() {
+  if (!currentSessionId) return false;
+  // Remote players are keyed by their sessionId. Election is "lowest active
+  // sessionId wins"; lexicographic ordering on the random suffix is fine
+  // because everyone uses the same generation scheme.
+  const now = Date.now();
+  const ids = [currentSessionId];
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const remote = remotePlayers[remoteId];
+    if (!remote) return;
+    if (remote.lastSeenAt && now - remote.lastSeenAt > 30000) return;
+    ids.push(remoteId);
+  });
+  ids.sort();
+  return ids[0] === currentSessionId;
+}
+
+function getNumericButterflyValue(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function clampButterflyToBounds(butterfly) {
+  if (butterfly.x < butterflyBoundsLeft) butterfly.x = butterflyBoundsLeft;
+  if (butterfly.x > butterflyBoundsRight) butterfly.x = butterflyBoundsRight;
+  if (butterfly.y < butterflyBoundsTop) butterfly.y = butterflyBoundsTop;
+  if (butterfly.y > butterflyBoundsBottom) butterfly.y = butterflyBoundsBottom;
+}
+
+function ensureButterflyWaypoint(butterfly, now) {
+  let waypoint = butterflyAuthorityWaypointById[butterfly.id];
+  if (!waypoint || now >= waypoint.endAt) {
+    const target = pickButterflyWaypoint(butterfly.x, butterfly.y);
+    const dx = target.x - butterfly.x;
+    const dy = target.y - butterfly.y;
+    const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    // Pixels-per-frame to ms-per-pixel @ ~60fps.
+    const msPerFrame = 1000 / 60;
+    const baseDuration = (distance / butterflySpeed) * msPerFrame;
+    const jitter =
+      butterflyLegMinMs +
+      Math.random() * (butterflyLegMaxMs - butterflyLegMinMs);
+    const duration = Math.max(butterflyLegMinMs, Math.min(butterflyLegMaxMs, baseDuration + jitter * 0.25));
+    waypoint = {
+      startX: butterfly.x,
+      startY: butterfly.y,
+      targetX: target.x,
+      targetY: target.y,
+      startAt: now,
+      endAt: now + duration
+    };
+    butterflyAuthorityWaypointById[butterfly.id] = waypoint;
+  }
+  return waypoint;
+}
+
+function easeInOutSine(t) {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
+function simulateButterflyAuthorityStep(butterfly, now) {
+  const waypoint = ensureButterflyWaypoint(butterfly, now);
+  const total = Math.max(1, waypoint.endAt - waypoint.startAt);
+  const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
+  const eased = easeInOutSine(t);
+  const previousX = butterfly.x;
+  butterfly.x = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
+  butterfly.y = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
+  // Add a small flutter so the path doesn't look perfectly linear.
+  const flutterPhase = (now / 220 + butterfly.id.length) % (Math.PI * 2);
+  butterfly.y += Math.sin(flutterPhase) * 1.4;
+  clampButterflyToBounds(butterfly);
+  const dx = butterfly.x - previousX;
+  if (Math.abs(dx) > 0.05) {
+    butterfly.dirX = dx > 0 ? 1 : -1;
+  }
+}
+
+function authoritySpawnButterfliesIfNeeded(now) {
+  if (butterflyState.list.length >= butterflyMaxAlive) return false;
+  if (!butterflyState.lastSpawnAt) {
+    butterflyState.lastSpawnAt = now;
+    return false;
+  }
+  const elapsedCycles = Math.floor(
+    (now - butterflyState.lastSpawnAt) / butterflyRespawnMs
+  );
+  if (elapsedCycles <= 0) return false;
+
+  const slotsAvailable = butterflyMaxAlive - butterflyState.list.length;
+  const toSpawn = Math.min(elapsedCycles, slotsAvailable);
+  for (let i = 0; i < toSpawn; i += 1) {
+    butterflyState.list.push(createButterfly(now));
+  }
+  // Advance lastSpawnAt by the consumed cycles so leftover time carries over
+  // toward the next spawn instead of being lost.
+  butterflyState.lastSpawnAt += toSpawn * butterflyRespawnMs;
+  return toSpawn > 0;
+}
+
+function authorityFillToCapInstantly(now) {
+  let added = false;
+  while (butterflyState.list.length < butterflyMaxAlive) {
+    butterflyState.list.push(createButterfly(now));
+    added = true;
+  }
+  if (added) butterflyState.lastSpawnAt = now;
+  return added;
+}
+
+function ensureButterflyRenderEntry(butterfly) {
+  let entry = butterflyRenderById[butterfly.id];
+  if (entry && entry.element && entry.element.isConnected) return entry;
+  const element = document.createElement("div");
+  element.className = "butterfly";
+  element.dataset.butterflyId = butterfly.id;
+  const sprite = document.createElement("div");
+  sprite.className = "butterfly-sprite";
+  element.appendChild(sprite);
+  ground.appendChild(element);
+  setWorldSize(element, BUTTERFLY_SIZE, BUTTERFLY_SIZE);
+  entry = {
+    element,
+    sprite,
+    color: null,
+    frame: -1,
+    facingRight: null,
+    catchable: null
+  };
+  butterflyRenderById[butterfly.id] = entry;
+  return entry;
+}
+
+function removeButterflyRenderEntry(id) {
+  const entry = butterflyRenderById[id];
+  if (entry && entry.element && entry.element.parentNode) {
+    entry.element.parentNode.removeChild(entry.element);
+  }
+  delete butterflyRenderById[id];
+  delete butterflyAuthorityWaypointById[id];
+}
+
+function applyButterflySpriteFrame(entry, color, frame) {
+  if (entry.color === color && entry.frame === frame) return;
+  const colorIndex = Math.max(0, butterflyColors.indexOf(color));
+  // Sprite sheet uses 5 cols (frame) and 3 rows (color).
+  // background-position needs each cell offset; with background-size 500% 300%
+  // each unit is 100% / (cols-1) horizontally and 100% / (rows-1) vertically.
+  const xPercent = (frame / (butterflyFrameCount - 1)) * 100;
+  const yPercent = (colorIndex / (butterflyColors.length - 1)) * 100;
+  entry.sprite.style.backgroundPosition = xPercent + "% " + yPercent + "%";
+  entry.color = color;
+  entry.frame = frame;
+}
+
+function applyButterflyFacing(entry, facingRight) {
+  if (entry.facingRight === facingRight) return;
+  entry.element.classList.toggle("is-facing-right", facingRight);
+  entry.facingRight = facingRight;
+}
+
+function applyButterflyCatchable(entry, catchable) {
+  if (entry.catchable === catchable) return;
+  entry.element.classList.toggle("is-catchable", catchable);
+  entry.catchable = catchable;
+}
+
+function getButterflyAnimationFrame(now, butterfly) {
+  // Phase the animation by id length so the swarm doesn't beat in sync.
+  const offset = butterfly.id.length * 53;
+  return Math.floor((now + offset) / butterflyFrameMs) % butterflyFrameCount;
+}
+
+function getButterflyCenterDistance(butterfly) {
+  return getCenterDistance(
+    butterfly.x - BUTTERFLY_SIZE / 2,
+    butterfly.y - BUTTERFLY_SIZE / 2,
+    BUTTERFLY_SIZE,
+    BUTTERFLY_SIZE
+  );
+}
+
+function findCatchableButterfly() {
+  let nearest = null;
+  butterflyState.list.forEach(function (butterfly) {
+    const distance = getButterflyCenterDistance(butterfly);
+    if (distance > butterflyCatchDistance) return;
+    if (!nearest || distance < nearest.distance) {
+      nearest = { butterfly, distance };
+    }
+  });
+  return nearest;
+}
+
+function tryCatchButterfly() {
+  const now = Date.now();
+  if (now - lastLocalButterflyCatchAt < 200) return false;
+  const target = findCatchableButterfly();
+  if (!target) return false;
+
+  lastLocalButterflyCatchAt = now;
+  const caught = target.butterfly;
+  butterflyState.list = butterflyState.list.filter(function (other) {
+    return other.id !== caught.id;
+  });
+  butterflyLocalCatchTombstoneById[caught.id] = now;
+  removeButterflyRenderEntry(caught.id);
+  if (!butterflyState.caughtCounts[caught.color]) {
+    butterflyState.caughtCounts[caught.color] = 0;
+  }
+  butterflyState.caughtCounts[caught.color] += 1;
+  saveButterflyCaughtCounts();
+
+  // Reset spawn timer so the next refill respects the 2-minute cadence.
+  if (!butterflyState.lastSpawnAt || now < butterflyState.lastSpawnAt) {
+    butterflyState.lastSpawnAt = now;
+  }
+
+  lastButterflyStateChangeAt = now;
+  markWorldDirty();
+  syncWorldState(true);
+  updateButterflyInventoryUi();
+  return true;
+}
+
+function updateButterflyInventoryUi() {
+  if (!butterflyInventory) return;
+  let total = 0;
+  butterflyInventorySlots.forEach(function (slot) {
+    const color = slot.dataset.color;
+    const count = butterflyState.caughtCounts[color] || 0;
+    total += count;
+    const countNode = slot.querySelector(".butterfly-inventory-count");
+    if (countNode) countNode.textContent = String(count);
+    slot.classList.toggle("is-empty", count === 0);
+  });
+  if (butterflyInventoryTotal) {
+    butterflyInventoryTotal.textContent = String(total);
+  }
+  butterflyInventory.style.display = total > 0 ? "flex" : "none";
+}
+
+function updateButterflies() {
+  const now = Date.now();
+
+  // Wait until either (a) we know there's no online sync available so this
+  // client is definitely authoritative on its own world, or (b) we have
+  // hydrated shared state from the server. This avoids one client racing to
+  // seed butterflies while another is still loading the existing population.
+  const onlineAvailable = isWorldServerSyncAvailable();
+  const sharedHydrated = hasHydratedSharedWorldFromServer || !onlineAvailable;
+
+  if (sharedHydrated && isButterflyAuthority()) {
+    // Authority: simulate movement, spawn fresh butterflies on cadence.
+    if (
+      !hasSeededInitialButterflies &&
+      butterflyState.list.length === 0 &&
+      !butterflyState.lastSpawnAt
+    ) {
+      // First time this world has had a butterfly authority - fill the cap so
+      // the player always sees the requested 5 butterflies on arrival.
+      authorityFillToCapInstantly(now);
+      hasSeededInitialButterflies = true;
+      lastButterflyStateChangeAt = now;
+      markWorldDirty();
+    }
+    butterflyState.list.forEach(function (butterfly) {
+      simulateButterflyAuthorityStep(butterfly, now);
+    });
+    if (authoritySpawnButterfliesIfNeeded(now)) {
+      lastButterflyStateChangeAt = now;
+      markWorldDirty();
+    }
+    if (now - lastButterflyBroadcastAt >= butterflyBroadcastMs) {
+      lastButterflyBroadcastAt = now;
+      lastButterflyStateChangeAt = now;
+      markWorldDirty();
+    }
+  }
+  // Non-authority clients just render whatever the snapshot gave us. Wing
+  // frames are still animated locally for smoothness.
+
+  // Render
+  const aliveIds = {};
+  const catchTarget = findCatchableButterfly();
+  butterflyState.list.forEach(function (butterfly) {
+    aliveIds[butterfly.id] = true;
+    const entry = ensureButterflyRenderEntry(butterfly);
+    setWorldPosition(
+      entry.element,
+      butterfly.x - BUTTERFLY_SIZE / 2,
+      butterfly.y - BUTTERFLY_SIZE / 2
+    );
+    applyButterflySpriteFrame(
+      entry,
+      butterfly.color,
+      getButterflyAnimationFrame(now, butterfly)
+    );
+    applyButterflyFacing(entry, butterfly.dirX > 0);
+    applyButterflyCatchable(
+      entry,
+      Boolean(catchTarget && catchTarget.butterfly.id === butterfly.id)
+    );
+  });
+  Object.keys(butterflyRenderById).forEach(function (id) {
+    if (!aliveIds[id]) removeButterflyRenderEntry(id);
+  });
+}
+
+function getButterflyStateForSnapshot() {
+  return {
+    lastSpawnAt: butterflyState.lastSpawnAt,
+    list: butterflyState.list.map(function (butterfly) {
+      return {
+        id: butterfly.id,
+        color: butterfly.color,
+        x: Math.round(butterfly.x * 100) / 100,
+        y: Math.round(butterfly.y * 100) / 100,
+        dirX: butterfly.dirX > 0 ? 1 : -1,
+        spawnedAt: butterfly.spawnedAt || null
+      };
+    })
+  };
+}
+
+function applyButterflySnapshot(snapshotButterflies) {
+  if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
+  // Any snapshot - even an empty one - tells us another client (past or
+  // present) has already taken authority of butterflies for this world. Don't
+  // re-seed locally on top of that decision.
+  hasSeededInitialButterflies = true;
+  const now = Date.now();
+  // Purge old tombstones so the map stays bounded.
+  Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
+    if (now - butterflyLocalCatchTombstoneById[id] > BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS) {
+      delete butterflyLocalCatchTombstoneById[id];
+    }
+  });
+  const incomingList = Array.isArray(snapshotButterflies.list)
+    ? snapshotButterflies.list
+    : [];
+  const incomingById = {};
+  incomingList.forEach(function (raw) {
+    if (!raw || !raw.id) return;
+    if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
+    incomingById[String(raw.id)] = raw;
+  });
+
+  // If we are currently the authority we keep our locally-simulated positions
+  // (otherwise we would constantly snap our own broadcasts back onto
+  // ourselves) but still honor catches/spawns by reconciling membership.
+  const iAmAuthority = isButterflyAuthority();
+
+  const nextList = [];
+  if (iAmAuthority) {
+    butterflyState.list.forEach(function (butterfly) {
+      if (incomingById[butterfly.id]) {
+        nextList.push(butterfly);
+        delete incomingById[butterfly.id];
+      } else {
+        // Removed remotely (e.g. someone else caught it before our save
+        // landed). Drop it locally too.
+        removeButterflyRenderEntry(butterfly.id);
+      }
+    });
+    Object.keys(incomingById).forEach(function (id) {
+      const raw = incomingById[id];
+      const butterfly = createButterfly(Date.now(), {
+        id: raw.id,
+        color: raw.color,
+        spawn: {
+          x: getNumericButterflyValue(raw.x, butterflyBoundsLeft),
+          y: getNumericButterflyValue(raw.y, butterflyBoundsTop)
+        }
+      });
+      butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
+      butterfly.spawnedAt = getNumericButterflyValue(raw.spawnedAt, Date.now());
+      nextList.push(butterfly);
+    });
+  } else {
+    incomingList.forEach(function (raw) {
+      if (!raw || !raw.id) return;
+      if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
+      const existing = butterflyState.list.find(function (b) {
+        return b.id === raw.id;
+      });
+      const butterfly = existing || {
+        id: String(raw.id),
+        color: raw.color || pickRandomButterflyColor(),
+        spawnedAt: getNumericButterflyValue(raw.spawnedAt, Date.now())
+      };
+      butterfly.color = raw.color || butterfly.color;
+      butterfly.x = getNumericButterflyValue(raw.x, butterfly.x || butterflyBoundsLeft);
+      butterfly.y = getNumericButterflyValue(raw.y, butterfly.y || butterflyBoundsTop);
+      butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
+      nextList.push(butterfly);
+    });
+    // Drop any local butterflies the authority no longer reports.
+    butterflyState.list.forEach(function (butterfly) {
+      const stillExists = nextList.some(function (b) {
+        return b.id === butterfly.id;
+      });
+      if (!stillExists) removeButterflyRenderEntry(butterfly.id);
+    });
+  }
+
+  butterflyState.list = nextList;
+  butterflyState.lastSpawnAt = getNumericButterflyValue(
+    snapshotButterflies.lastSpawnAt,
+    butterflyState.lastSpawnAt || Date.now()
+  );
+}
+
 function gameLoop() {
   if (isTabSessionSuperseded) return;
   respawnApplesIfNeeded();
@@ -5342,6 +5924,7 @@ function gameLoop() {
   updateGuideCard();
   pruneStaleRemotePlayers();
   updatePlayerAlert();
+  updateButterflies();
   updateCamera();
   updatePlayerName();
   sendMultiplayerPresence(false);
@@ -5439,6 +6022,8 @@ loadAppleState();
 loadBucketState();
 loadGuideBookState();
 loadPlayerPosition();
+loadButterflyCaughtCounts();
+updateButterflyInventoryUi();
 addNetworkDebugLog(
   "init: configured=" +
   Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +

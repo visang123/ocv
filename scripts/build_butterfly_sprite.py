@@ -20,20 +20,18 @@ SRC = (
 DST_DIR = r"C:\Users\USER\Desktop\OVC\이미지"
 DST = os.path.join(DST_DIR, "butterfly-sheet.png")
 
-CELL = 160
+CELL = 150
 COLS = 5
 ROWS = 3
 
 # Empirically chosen centers for the 15 butterflies in the source image.
-LABEL_PAD = 150  # left padding where the colored labels live
-ROW_HEIGHT = 682 / ROWS
-CELL_X = (1024 - LABEL_PAD) / COLS
+# Each row uses the same x-centers; rows are evenly spaced vertically.
+ROW_CENTERS_Y = [110, 340, 575]
+COL_CENTERS_X = [228, 400, 575, 750, 925]
 
 centers = []
-for row in range(ROWS):
-    cy = int(ROW_HEIGHT * row + ROW_HEIGHT / 2)
-    for col in range(COLS):
-        cx = int(LABEL_PAD + CELL_X * col + CELL_X / 2)
+for cy in ROW_CENTERS_Y:
+    for cx in COL_CENTERS_X:
         centers.append((cx, cy))
 
 src = Image.open(SRC).convert("RGBA")
