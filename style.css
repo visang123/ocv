@@ -427,17 +427,19 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  z-index: 29;
+  z-index: 35;
   display: none;
   min-width: 20px;
-  padding: 2px 4px;
+  max-width: 120px;
+  padding: 2px 5px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 8px;
   color: #111;
-  font: 700 5px/1.2 Arial, sans-serif;
+  font: 700 5px/1.25 Arial, sans-serif;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
   user-select: none;
   pointer-events: none;
 }
@@ -2059,11 +2061,12 @@ body #guide-book-button {
   align-items: center;
   gap: 6px;
   height: 48px;
+  min-width: 154px;
   padding: 4px 28px 4px 6px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.85);
   border: 2px solid rgba(0, 0, 0, 0.2);
-  z-index: 11;
+  z-index: 12;
   pointer-events: none;
 }
 
@@ -2162,12 +2165,13 @@ body #guide-book-button {
 }
 
 #magic-powder-inventory {
+  /* 나비 인벤(178px~약332px) 오른쪽에 두고 겹침·가림 방지 */
   position: fixed;
-  left: 300px;
-  bottom: 18px;
+  left: calc(178px + 154px + 2 * 2px + 14px);
+  bottom: 24px;
   display: none;
-  width: 96px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   z-index: 11;
   pointer-events: none;
   margin: 0;
@@ -2193,8 +2197,8 @@ body #guide-book-button {
 #magic-powder-inventory.is-near:hover::before {
   content: "사용 click";
   position: absolute;
-  left: 48px;
-  bottom: 86px;
+  left: 36px;
+  bottom: 78px;
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
@@ -2209,15 +2213,14 @@ body #guide-book-button {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 76px;
-  height: 76px;
+  width: 64px;
+  height: 64px;
   background-color: transparent;
-  background-image: url("이미지/magic-powder-gray.png");
+  background-image: url("이미지/magic-powder-gray.png?v=20260509b");
   background-position: center;
   background-size: contain;
   background-repeat: no-repeat;
-  /* PNG에 검은 배경이 깔려 있을 때: screen 블렌드로 어두운 배경을 뒤 콘텐츠와 합성 */
-  mix-blend-mode: screen;
+  image-rendering: auto;
 }
 
 #magic-powder-count {

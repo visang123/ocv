@@ -506,7 +506,16 @@ const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
 const NPC_SPEECH_BUBBLE_EXTRA_LIFT = 28;
+/** NPC 대화 진행 중 말풍선을 더 위로 (캐릭터 이름과 겹침 완화) */
+const NPC_DIALOGUE_BUBBLE_EXTRA_LIFT = 22;
 const PLAYER_SPEECH_BUBBLE_EXTRA_LIFT = 26;
+
+function getNpcSpeechBubbleLiftWorld() {
+  return (
+    NPC_SPEECH_BUBBLE_EXTRA_LIFT +
+    (isNpcDialogueRunning ? NPC_DIALOGUE_BUBBLE_EXTRA_LIFT : 0)
+  );
+}
 
 function showAppLoadingScreen(message) {
   if (!appLoadingScreen) return;
@@ -1111,6 +1120,9 @@ function skipTutorialFromSettings() {
   try {
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (e) {}
+  try {
+    sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
+  } catch (e2) {}
   isReloadingForWorldReset = true;
   window.location.reload();
 }
@@ -1669,6 +1681,9 @@ function onboardingScheduleTutorialCompleteHide() {
     try {
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
     } catch (e) {}
+    try {
+      sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
+    } catch (e2) {}
     isReloadingForWorldReset = true;
     window.location.reload();
   }, 7000);
@@ -5182,10 +5197,11 @@ function updateNpcPosition() {
   if (npcBubble.style.display === "block") {
     const bubbleWidth = npcBubble.offsetWidth || 48;
     const bubbleHeight = npcBubble.offsetHeight || 14;
+    const bubbleLift = getNpcSpeechBubbleLiftWorld();
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - NPC_SPEECH_BUBBLE_EXTRA_LIFT
+      npcY - bubbleHeight - 3 - bubbleLift
     );
   }
 
@@ -5222,10 +5238,11 @@ function updateNpcPrompt() {
     npcBubble.style.display = "block";
     const bubbleWidth = npcBubble.offsetWidth || 48;
     const bubbleHeight = npcBubble.offsetHeight || 14;
+    const bubbleLift = getNpcSpeechBubbleLiftWorld();
     setWorldPosition(
       npcBubble,
       npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
-      npcY - bubbleHeight - 3 - NPC_SPEECH_BUBBLE_EXTRA_LIFT
+      npcY - bubbleHeight - 3 - bubbleLift
     );
 
     window.clearTimeout(npcPromptHideTimeout);
@@ -5849,6 +5866,10 @@ function updatePlayerName() {
     playerName.style.display = "none";
     return;
   }
+  if (isNpcDialogueRunning) {
+    playerName.style.display = "none";
+    return;
+  }
 
   const playerBox = getPlayerBox();
   const nameWidth = playerName.offsetWidth || 36;
@@ -5871,7 +5892,7 @@ function setupMultiplayer() {
   if (isSharedWorldSyncPausedForTutorial()) {
     teardownMultiplayerForTutorial();
     updateMultiplayerStatus(
-      "\uD29C\uD1A0\uB9AC\uC5BC \uC911 \u2014 \uB2E8\uB3C5 \uC138\uC0C1, \uBA40\uD2F0 \uC5F0\uACB0 \uC548 \uB428"
+      "\uD29C\uD1A0\uB9AC\uC5BC: \uB2E4\uB978 \uD50C\uB808\uC774\uC5B4/\uC138\uC0C1 \uBE44\uACF5\uC720 \u00B7 \uBA40\uD2F0 \uBBF8\uC5F0\uACB0"
     );
     addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
@@ -7518,6 +7539,20 @@ try {
     selectedPlayerColor
   );
   openCharacterSelectIfNeeded();
+  try {
+    if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
+      sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
+      if (
+        hasSpawnedCharacter &&
+        currentUserId &&
+        !isSharedWorldSyncPausedForTutorial() &&
+        isWorldServerSyncAvailable()
+      ) {
+        hasHydratedSharedWorldFromServer = false;
+        pollWorldState(true);
+      }
+    }
+  } catch (postTutorialReconnect) {}
   if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
     hasHydratedSharedWorldFromServer = true;
     setTimeout(hideAppLoadingScreen, 300);
