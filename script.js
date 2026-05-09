@@ -214,6 +214,34 @@ import {
   getHeldExtraSeedId
 } from "./src/game/held-item.js";
 
+const OVC_PAGE_ENTRY =
+  typeof window !== "undefined" && window.OVC_ENTRY === "tutorial"
+    ? "tutorial"
+    : "world";
+
+function isTutorialDocumentEntry() {
+  return OVC_PAGE_ENTRY === "tutorial";
+}
+
+function isWorldDocumentEntry() {
+  return OVC_PAGE_ENTRY !== "tutorial";
+}
+
+function ovcHtmlPageUrl(htmlFile) {
+  const u = new URL(htmlFile, window.location.href);
+  u.searchParams.set("v", "20260517e");
+  u.searchParams.set("t", String(Date.now()));
+  return u.toString();
+}
+
+function ovcWorldIndexUrl() {
+  return ovcHtmlPageUrl("index.html");
+}
+
+function ovcTutorialPageUrl() {
+  return ovcHtmlPageUrl("tutorial.html");
+}
+
 let playerX = 100;
 let playerDepth = 0;
 let jumpY = 0;
@@ -759,20 +787,22 @@ function layoutNpcSpeechBubble() {
   );
 }
 
-function isGameResetShortcut(event) {
-  return (
-    event.code === "KeyR" &&
-    event.altKey &&
-    !event.shiftKey &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.repeat
-  );
+/** 월드(index) 전용: 공유 맵만 초기화. 튜토리얼 저장값·tutorial.html 이동 없음. */
+function isWorldMapDevResetShortcut(event) {
+  if (event.code !== "KeyR" || event.repeat) return false;
+  if (!(event.ctrlKey || event.metaKey)) return false;
+  if (event.shiftKey && !event.altKey) return true;
+  if (event.altKey && !event.shiftKey) return true;
+  return false;
 }
 
 window.addEventListener(
   "keydown",
   function (event) {
-    if (!isGameResetShortcut(event)) return;
+    if (!isWorldMapDevResetShortcut(event)) return;
+    if (!isWorldDocumentEntry() || !hasSpawnedCharacter || isCharacterSelecting) {
+      return;
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
     resetGameForTesting();
@@ -781,11 +811,7 @@ window.addEventListener(
 );
 
 document.addEventListener("keydown", function (event) {
-  if (event.code === "KeyR" && event.shiftKey && (event.ctrlKey || event.metaKey)) {
-    return;
-  }
-
-  if (isGameResetShortcut(event)) return;
+  if (isWorldMapDevResetShortcut(event)) return;
 
   if (
     (event.ctrlKey || event.metaKey) &&
@@ -885,10 +911,6 @@ document.addEventListener("keydown", function (event) {
 });
 
 document.addEventListener("keyup", function (event) {
-  if (event.code === "KeyR" && event.shiftKey && (event.ctrlKey || event.metaKey)) {
-    return;
-  }
-
   const key = getControlKey(event);
 
   if (key in keys) {
@@ -1198,13 +1220,13 @@ function skipTutorialFromSettings() {
     sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
   } catch (e2) {}
   isReloadingForWorldReset = true;
-  window.location.reload();
+  window.location.replace(ovcWorldIndexUrl());
 }
 
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
-      "튜토리얼을 처음부터 다시 진행할까요? 페이지가 새로고침됩니다."
+      "튜토리얼을 처음부터 다시 진행할까요? 튜토리얼 화면으로 이동합니다."
     )
   ) {
     return;
@@ -1228,7 +1250,8 @@ function replayTutorialFromSettings() {
   try {
     sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
   } catch (e3) {}
-  window.location.reload();
+  isReloadingForWorldReset = true;
+  window.location.replace(ovcTutorialPageUrl());
 }
 
 settingsButton.addEventListener("click", function () {
@@ -1338,7 +1361,7 @@ seedInventory.addEventListener("click", function (event) {
 });
 
 function applyGuideTexts() {
-  // Guide copy lives in index.html so the sign and book keep the same wording.
+  // Guide copy lives in index.html / tutorial.html so the sign and book keep the same wording.
 }
 
 function getPlayerBox() {
@@ -1785,7 +1808,7 @@ function onboardingScheduleTutorialCompleteHide() {
       sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
     } catch (e2) {}
     isReloadingForWorldReset = true;
-    window.location.reload();
+    window.location.replace(ovcWorldIndexUrl());
   }, 7000);
 }
 
@@ -2277,16 +2300,17 @@ function resetGameForTesting() {
   isReloadingForWorldReset = true;
   isWorldDirty = false;
   isWorldPolling = false;
-  clearStoredKeys(appStorageKeys);
+  clearStoredKeys(appStorageKeysSharedWorldReset);
   sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
   ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
   lastWorldResetAt = Date.now();
   sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
-  applyDefaultState();
+  applyDefaultState({ sharedWorldResetOnly: true });
   persistDefaultStateAfterReset();
-  saveSharedWorldAndReload();
+  restartPlayerPositionOnly();
+  saveSharedWorldAndReload({ reloadUrl: ovcWorldIndexUrl() });
 }
 
 function persistDefaultStateAfterReset() {
@@ -3174,7 +3198,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     restartPlayerPositionOnly();
     isReloadingForWorldReset = true;
     setTimeout(function () {
-      window.location.reload();
+      window.location.replace(ovcWorldIndexUrl());
     }, 120);
     return;
   }
@@ -3432,10 +3456,13 @@ function syncWorldState(forceSave) {
   });
 }
 
-function saveSharedWorldAndReload() {
+function saveSharedWorldAndReload(options) {
+  options = options || {};
+  const reloadUrl = options.reloadUrl || "";
   if (!window.OVCOnline || typeof window.OVCOnline.saveWorldState !== "function") {
     setTimeout(function () {
-      window.location.reload();
+      if (reloadUrl) window.location.replace(reloadUrl);
+      else window.location.reload();
     }, 400);
     return;
   }
@@ -3465,7 +3492,8 @@ function saveSharedWorldAndReload() {
   }).finally(function () {
     isWorldSyncing = false;
     isReloadingForWorldReset = true;
-    window.location.reload();
+    if (reloadUrl) window.location.replace(reloadUrl);
+    else window.location.reload();
   });
 }
 
@@ -5992,6 +6020,16 @@ function finishCharacterSelect() {
 
   syncPlayerColorToServer(true);
 
+  if (
+    isWorldDocumentEntry() &&
+    currentUserId &&
+    !getStoredFlag(onboardingFlowDoneKey)
+  ) {
+    isReloadingForWorldReset = true;
+    window.location.replace(ovcTutorialPageUrl());
+    return;
+  }
+
   if (!applyTutorialWorldResetIfPending()) {
     loadOnboardingFlowState();
     setWorldPosition(player, playerX, getPlayerWorldY());
@@ -7708,50 +7746,73 @@ try {
   if (currentUserId) {
     repairOnboardingCompletionFromStoredStep();
   }
-  if (currentUserId && !getStoredFlag(onboardingFlowDoneKey)) {
-    resetTutorialProgressInStorage();
-    clearStoredKeys(appStorageKeysSharedWorldReset);
-    try {
-      sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
-    } catch (eTutorialPage) {}
+  let ovcAbortedPageInit = false;
+  if (
+    isTutorialDocumentEntry() &&
+    currentUserId &&
+    getStoredFlag(onboardingFlowDoneKey)
+  ) {
+    ovcAbortedPageInit = true;
+    window.location.replace(ovcWorldIndexUrl());
+  } else if (
+    isWorldDocumentEntry() &&
+    currentUserId &&
+    hasSpawnedCharacter &&
+    !getStoredFlag(onboardingFlowDoneKey)
+  ) {
+    ovcAbortedPageInit = true;
+    window.location.replace(ovcTutorialPageUrl());
   }
-  applyTutorialWorldResetIfPending();
-  loadWellState();
-  loadSeedState();
-  loadAppleState();
-  loadBucketState();
-  loadGuideBookState();
-  loadPlayerPosition();
-  loadButterflyCaughtCounts();
-  loadMagicPowderCount();
-  updateButterflyInventoryUi();
-  updateMagicPowderInventoryUi();
-  addNetworkDebugLog(
-    "init: configured=" +
-    Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +
-    ", user=" +
-    (currentUserId || "-") +
-    ", color=" +
-    selectedPlayerColor
-  );
-  openCharacterSelectIfNeeded();
-  try {
-    if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
-      sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
-      if (
-        hasSpawnedCharacter &&
-        currentUserId &&
-        !isSharedWorldSyncPausedForTutorial() &&
-        isWorldServerSyncAvailable()
-      ) {
-        hasHydratedSharedWorldFromServer = false;
-        pollWorldState(true);
-      }
+  if (!ovcAbortedPageInit) {
+    if (
+      currentUserId &&
+      !getStoredFlag(onboardingFlowDoneKey) &&
+      isTutorialDocumentEntry()
+    ) {
+      resetTutorialProgressInStorage();
+      clearStoredKeys(appStorageKeysSharedWorldReset);
+      try {
+        sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+      } catch (eTutorialPage) {}
     }
-  } catch (postTutorialReconnect) {}
-  if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
-    hasHydratedSharedWorldFromServer = true;
-    setTimeout(hideAppLoadingScreen, 300);
+    applyTutorialWorldResetIfPending();
+    loadWellState();
+    loadSeedState();
+    loadAppleState();
+    loadBucketState();
+    loadGuideBookState();
+    loadPlayerPosition();
+    loadButterflyCaughtCounts();
+    loadMagicPowderCount();
+    updateButterflyInventoryUi();
+    updateMagicPowderInventoryUi();
+    addNetworkDebugLog(
+      "init: configured=" +
+      Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +
+      ", user=" +
+      (currentUserId || "-") +
+      ", color=" +
+      selectedPlayerColor
+    );
+    openCharacterSelectIfNeeded();
+    try {
+      if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
+        sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
+        if (
+          hasSpawnedCharacter &&
+          currentUserId &&
+          !isSharedWorldSyncPausedForTutorial() &&
+          isWorldServerSyncAvailable()
+        ) {
+          hasHydratedSharedWorldFromServer = false;
+          pollWorldState(true);
+        }
+      }
+    } catch (postTutorialReconnect) {}
+    if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
+      hasHydratedSharedWorldFromServer = true;
+      setTimeout(hideAppLoadingScreen, 300);
+    }
   }
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
