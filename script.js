@@ -3501,16 +3501,18 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       if (canApplyMainSeedState && snapshotSavedAt) {
         lastMainSeedStateChangeAt = Math.max(lastMainSeedStateChangeAt, snapshotSavedAt);
       }
-      if (heldItem !== HELD_ITEM_SEED) {
-        if (Number.isFinite(nextSeedX)) seedX = nextSeedX;
-        if (Number.isFinite(nextSeedY)) seedY = nextSeedY;
-      }
-      if (Number.isFinite(nextSeedCreatedAt) && nextSeedCreatedAt > 0) {
-        plantRuntime.seedCreatedAt = nextSeedCreatedAt;
-        setStoredValue(seedCreatedAtKey, String(nextSeedCreatedAt));
-      }
-      if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.seed.isDry === "boolean") {
-        plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
+      if (canApplyMainSeedState) {
+        if (heldItem !== HELD_ITEM_SEED) {
+          if (Number.isFinite(nextSeedX)) seedX = nextSeedX;
+          if (Number.isFinite(nextSeedY)) seedY = nextSeedY;
+        }
+        if (Number.isFinite(nextSeedCreatedAt) && nextSeedCreatedAt > 0) {
+          plantRuntime.seedCreatedAt = nextSeedCreatedAt;
+          setStoredValue(seedCreatedAtKey, String(nextSeedCreatedAt));
+        }
+        if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.seed.isDry === "boolean") {
+          plantRuntime.isSeedDry = Boolean(snapshot.seed.isDry);
+        }
       }
     }
 
@@ -3881,9 +3883,7 @@ function updateSeedPosition() {
   // Auto-clear dry main seed after grace period even when the world sprite is hidden
   // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
   if (plantRuntime.isSeedDry && !hasHandledDryMainSeed && heldItem !== HELD_ITEM_SEED) {
-    if (onboardingShouldKeepWorldMainSeedVisible()) {
-      dryMainSeedVisibleSince = 0;
-    } else if (!dryMainSeedVisibleSince) {
+    if (!dryMainSeedVisibleSince) {
       dryMainSeedVisibleSince = now;
     } else if (now - dryMainSeedVisibleSince >= 20000) {
       hasHandledDryMainSeed = true;
