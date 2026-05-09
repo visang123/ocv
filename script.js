@@ -4542,18 +4542,28 @@ function updatePlayerPosition() {
   const previousPlayerDepth = playerDepth;
   const previousJumpY = jumpY;
   const groundMaxDepth = getMaxGroundedPlayerDepth();
-  const isInCanopy = isPlayerInTreeCanopy();
-  const isNearTrunk = isPlayerNearTreeTrunk();
-  const isInTree = !isTreeFalling && (isInCanopy || isNearTrunk);
-  const currentSpeed = isInTree ? treeMoveSpeed : speed;
+  const maxX = Math.max(0, WORLD_WIDTH - PLAYER_WIDTH);
+  const preNearTrunk = isPlayerNearTreeTrunk();
+  const preInCanopy = isPlayerInTreeCanopy();
+  const speedSide =
+    !isTreeFalling && (preNearTrunk || preInCanopy || wasPlayerInTree)
+      ? treeMoveSpeed
+      : speed;
 
   if (keys.ArrowLeft || keys.a) {
-    playerX -= currentSpeed * frameScale;
+    playerX -= speedSide * frameScale;
   }
 
   if (keys.ArrowRight || keys.d) {
-    playerX += currentSpeed * frameScale;
+    playerX += speedSide * frameScale;
   }
+
+  if (playerX < 0) playerX = 0;
+  if (playerX > maxX) playerX = maxX;
+
+  const isInCanopy = isPlayerInTreeCanopy();
+  const isNearTrunk = isPlayerNearTreeTrunk();
+  const isInTree = !isTreeFalling && (isInCanopy || isNearTrunk);
 
   const shouldTreeFall =
     playerDepth > groundMaxDepth &&
@@ -4596,11 +4606,6 @@ function updatePlayerPosition() {
     velocityY += gravity * frameScale;
     jumpY += velocityY * frameScale;
   }
-
-  const maxX = Math.max(0, WORLD_WIDTH - PLAYER_WIDTH);
-
-  if (playerX < 0) playerX = 0;
-  if (playerX > maxX) playerX = maxX;
 
   if (playerDepth < getMinGroundedPlayerDepth()) {
     playerDepth = getMinGroundedPlayerDepth();
@@ -4691,17 +4696,18 @@ function isPlayerNearTreeTrunk() {
     top: footY - 8,
     bottom: footY + 2
   };
+  const hPad = TREE_CLIMB_DISTANCE;
   const rootsRect = {
-    left: BIG_TREE_X + TREE_CSS_ROOTS_LEFT,
-    right: BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH,
+    left: BIG_TREE_X + TREE_CSS_ROOTS_LEFT - hPad,
+    right: BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH + hPad,
     top: rootsTop,
     bottom: rootsBottom
   };
   if (isOverlappingRect(feetRect, rootsRect)) return true;
   const trunkRect = {
-    left: TREE_TRUNK_X,
-    right: TREE_TRUNK_X + TREE_TRUNK_WIDTH,
-    top: TREE_TRUNK_TOP,
+    left: TREE_TRUNK_X - hPad,
+    right: TREE_TRUNK_X + TREE_TRUNK_WIDTH + hPad,
+    top: TREE_TRUNK_TOP - 22,
     bottom: rootsBottom
   };
   return isOverlappingRect(feetRect, trunkRect);
