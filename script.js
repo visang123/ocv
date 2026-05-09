@@ -1066,14 +1066,27 @@ function loadGuideBookState() {
 }
 
 function resetGameForTesting() {
+  isReloadingForWorldReset = true;
+  isWorldDirty = false;
+  isWorldPolling = false;
   clearStoredKeys(appStorageKeys);
+  sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
   ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
   lastWorldResetAt = Date.now();
   sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
   applyDefaultState();
+  persistDefaultStateAfterReset();
   saveSharedWorldAndReload();
+}
+
+function persistDefaultStateAfterReset() {
+  savePlayerPosition(true);
+  saveWellState();
+  saveSeedState();
+  saveAppleState();
+  saveBucketState();
 }
 
 function saveGameSnapshot() {
@@ -2162,7 +2175,7 @@ function isWorldServerSyncAvailable() {
 
 function syncWorldState(forceSave) {
   const now = Date.now();
-  if (isTabSessionSuperseded) return;
+  if (isTabSessionSuperseded || isReloadingForWorldReset) return;
   if (
     isWorldSyncing ||
     !window.OVCOnline ||
@@ -2195,10 +2208,7 @@ function syncWorldState(forceSave) {
 
 function saveSharedWorldAndReload() {
   if (!window.OVCOnline || typeof window.OVCOnline.saveWorldState !== "function") {
-    isWorldDirty = true;
-    syncWorldState(true);
     setTimeout(function () {
-      isReloadingForWorldReset = true;
       window.location.reload();
     }, 400);
     return;
@@ -2207,10 +2217,20 @@ function saveSharedWorldAndReload() {
   isWorldSyncing = true;
   isWorldDirty = false;
   lastWorldSaveAt = Date.now();
-  window.OVCOnline.saveWorldState(
-    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
-    getSharedWorldSnapshot()
-  ).then(function (row) {
+  const saveResetSnapshot = function () {
+    return window.OVCOnline.saveWorldState(
+      window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
+      getSharedWorldSnapshot()
+    );
+  };
+  saveResetSnapshot().then(function (row) {
+    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+    return new Promise(function (resolve) {
+      setTimeout(resolve, 350);
+    });
+  }).then(function () {
+    return saveResetSnapshot();
+  }).then(function (row) {
     if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
   }).catch(function (error) {
     addNetworkDebugLog(
@@ -2227,6 +2247,7 @@ function pollWorldState(forcePoll) {
   const now = Date.now();
   if (
     isWorldPolling ||
+    isReloadingForWorldReset ||
     isTabSessionSuperseded ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
