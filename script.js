@@ -3903,7 +3903,8 @@ function updateNpcPosition() {
   setWorldPosition(plantMaster, npcX, npcY);
 
   if (npcBubble.style.display === "block") {
-    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 13, npcY - 22);
+    // Sprite is bottom-aligned in NPC_HEIGHT; hat sits lower than legacy silhouette top.
+    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 13, npcY + 6);
   }
 
   if (playerBubble.style.display === "block") {
@@ -3937,7 +3938,7 @@ function updateNpcPrompt() {
     npcBubble.textContent =
       "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     npcBubble.style.display = "block";
-    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 24, npcY - 14);
+    setWorldPosition(npcBubble, npcX + NPC_WIDTH / 2 - 24, npcY + 8);
 
     window.clearTimeout(npcPromptHideTimeout);
     npcPromptHideTimeout = window.setTimeout(function () {

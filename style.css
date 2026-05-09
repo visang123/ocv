@@ -414,9 +414,8 @@ body::-webkit-scrollbar {
   user-select: none;
   pointer-events: none;
   image-rendering: auto;
-  /* Pop against grass / soil (same world footprint as player: 25×50). */
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45))
-    drop-shadow(0 0 2px rgba(255, 255, 255, 0.35));
+  /* PNG uses transparency; outline only (no white halo). */
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
 }
 
 #npc-bubble {
