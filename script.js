@@ -455,6 +455,7 @@ let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
 let lastBucketTraceAtByKey = {};
+let lastBucketRenderLoggedKey = "";
 let onlineDebugToastTimeout = null;
 const networkDebugLines = [];
 let networkDebugDomStale = false;
@@ -464,7 +465,8 @@ ground.appendChild(playerBucketOverlay);
 const appLoadingScreen = document.getElementById("app-loading-screen");
 const appLoadingText = document.getElementById("app-loading-text");
 let appLoadingHideTimer = null;
-const BUCKET_DEBUG_TRACE = true;
+/** 버킷 네트워크 로그 — 필요할 때만 true */
+const BUCKET_DEBUG_TRACE = false;
 const playerTintCache = new Map();
 const playerBaseImage = new Image();
 let playerBaseImageReady = false;
@@ -1608,6 +1610,19 @@ function persistOnboardingStep() {
   setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
 }
 
+/**
+ * 튜토리얼 완료 시 step 키는 "0"으로 저장되지만, done 플래그만 유실되면
+ * 초기화에서 resetTutorialProgressInStorage()가 튜토리얼을 되살린다.
+ * 공유 월드 리셋 후 재로드 등에서도 동일. 저장된 step "0"이면 완료로 복구한다.
+ */
+function repairOnboardingCompletionFromStoredStep() {
+  if (!currentUserId) return;
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (String(getStoredValue(onboardingFlowStepKey) || "") === "0") {
+    setStoredFlag(onboardingFlowDoneKey, true);
+  }
+}
+
 function resetTutorialProgressInStorage() {
   setStoredFlag(onboardingFlowDoneKey, false);
   setStoredValue(onboardingFlowStepKey, "1");
@@ -1849,6 +1864,11 @@ function loadOnboardingFlowState() {
     return;
   }
   const raw = parseInt(String(getStoredValue(onboardingFlowStepKey) || "1"), 10);
+  if (raw === 0) {
+    setStoredFlag(onboardingFlowDoneKey, true);
+    onboardingFlowStep = 0;
+    return;
+  }
   onboardingFlowStep =
     Number.isFinite(raw) && raw >= 1 && raw <= ONBOARDING_MAX_STEP ? raw : 1;
   syncOnboardingFlowProgressFromWorld();
@@ -4150,20 +4170,27 @@ function updateBucketPosition() {
 
   if (bucket.style.display === "block") {
     setWorldPosition(bucket, bucketX, bucketY);
-    addBucketTrace(
-      "render",
-      "mode=" +
-      (heldItem === HELD_ITEM_BUCKET
-        ? "local-held"
-        : isBucketHeldByRemotePlayer
-          ? "remote-held"
-          : "world") +
-      " x=" +
-      Math.round(bucketX || 0) +
-      " y=" +
-      Math.round(bucketY || 0),
-      500
-    );
+    if (BUCKET_DEBUG_TRACE) {
+      const mode =
+        heldItem === HELD_ITEM_BUCKET
+          ? "local-held"
+          : isBucketHeldByRemotePlayer
+            ? "remote-held"
+            : "world";
+      const renderKey =
+        mode + "|" + Math.round(bucketX || 0) + "|" + Math.round(bucketY || 0);
+      if (renderKey !== lastBucketRenderLoggedKey) {
+        lastBucketRenderLoggedKey = renderKey;
+        addNetworkDebugLog(
+          "[bucket:render] mode=" +
+            mode +
+            " x=" +
+            Math.round(bucketX || 0) +
+            " y=" +
+            Math.round(bucketY || 0)
+        );
+      }
+    }
   }
 }
 
@@ -6200,6 +6227,9 @@ function sendMultiplayerPresence(forceSend) {
 }
 
 function broadcastBucketState(forceSend) {
+  if (isSharedWorldSyncPausedForTutorial()) {
+    return;
+  }
   if (!multiplayerChannel || !currentSessionId) {
     addBucketTrace(
       "send-skip",
@@ -7659,6 +7689,9 @@ function setup() {
 
 try {
   setup();
+  if (currentUserId) {
+    repairOnboardingCompletionFromStoredStep();
+  }
   if (currentUserId && !getStoredFlag(onboardingFlowDoneKey)) {
     resetTutorialProgressInStorage();
     clearStoredKeys(appStorageKeysSharedWorldReset);
