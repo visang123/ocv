@@ -115,6 +115,25 @@ export function parseMainPlantFromSnapshot(mp) {
       Number(mp.powderUpgradeDurationMs) || 0
     );
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "ownerUserId")) {
+    plantedFromSnapshot.ownerUserId = mp.ownerUserId != null ? String(mp.ownerUserId) : "";
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "ownerDisplayName")) {
+    plantedFromSnapshot.ownerDisplayName =
+      mp.ownerDisplayName != null ? String(mp.ownerDisplayName) : "";
+  }
+  if (Object.prototype.hasOwnProperty.call(mp, "sproutOrdinal")) {
+    plantedFromSnapshot.sproutOrdinal = Math.max(0, Number(mp.sproutOrdinal) || 0);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(mp, "grassOrdinal") &&
+    mp.grassOrdinal != null &&
+    Number.isFinite(Number(mp.grassOrdinal))
+  ) {
+    plantedFromSnapshot.grassOrdinal = Math.max(1, Number(mp.grassOrdinal));
+  } else if (Object.prototype.hasOwnProperty.call(mp, "grassOrdinal")) {
+    plantedFromSnapshot.grassOrdinal = null;
+  }
   return plantedFromSnapshot;
 }
 
@@ -191,6 +210,21 @@ export function parseExtraPlantFromSnapshot(plant) {
       : null,
     powderUpgradeDurationMs: Object.prototype.hasOwnProperty.call(plant, "powderUpgradeDurationMs")
       ? Math.max(0, Number(plant.powderUpgradeDurationMs) || 0)
-      : 0
+      : 0,
+    ownerUserId: Object.prototype.hasOwnProperty.call(plant, "ownerUserId")
+      ? String(plant.ownerUserId || "")
+      : "",
+    ownerDisplayName: Object.prototype.hasOwnProperty.call(plant, "ownerDisplayName")
+      ? String(plant.ownerDisplayName || "")
+      : "",
+    sproutOrdinal: Object.prototype.hasOwnProperty.call(plant, "sproutOrdinal")
+      ? Math.max(0, Number(plant.sproutOrdinal) || 0)
+      : 0,
+    grassOrdinal:
+      Object.prototype.hasOwnProperty.call(plant, "grassOrdinal") &&
+      plant.grassOrdinal != null &&
+      Number.isFinite(Number(plant.grassOrdinal))
+        ? Math.max(1, Number(plant.grassOrdinal))
+        : null
   };
 }

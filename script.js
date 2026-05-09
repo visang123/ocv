@@ -133,6 +133,7 @@ import {
   playerAlert,
   waterNeeded,
   plantCard,
+  plantCardTitle,
   plantWaterText,
   plantWaterSegments,
   signBoard,
@@ -375,6 +376,8 @@ let tutorialWorldNeedsFullReset = false;
 let heldItem = null;
 let isBucketFull = false;
 const plantRuntime = createPlantState();
+let lastPlantProximityBlockMessage = "";
+let plantProximityWarnUntil = 0;
 let npcX = NPC_START_X;
 let npcY = NPC_START_Y;
 let isNpcDialogueRunning = false;
@@ -3393,7 +3396,14 @@ function getSharedWorldSnapshot() {
           waterCapacity: plant.waterCapacity || 2,
           powderUpgradeTargetTier: plant.powderUpgradeTargetTier || 0,
           powderUpgradeStartedAt: plant.powderUpgradeStartedAt || null,
-          powderUpgradeDurationMs: plant.powderUpgradeDurationMs || 0
+          powderUpgradeDurationMs: plant.powderUpgradeDurationMs || 0,
+          ownerUserId: plant.ownerUserId || "",
+          ownerDisplayName: plant.ownerDisplayName || "",
+          sproutOrdinal: plant.sproutOrdinal || 0,
+          grassOrdinal:
+            plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
+              ? plant.grassOrdinal
+              : null
         };
       })
     },
@@ -4017,6 +4027,9 @@ function updateExtraSeedsAndPlants() {
         plant.y - WATER_NEEDED_SIZE - 2
       );
     }
+    const pLabel = getPlantWorldLabel(plant);
+    plant.spotElement.title = pLabel;
+    plant.sproutElement.title = pLabel;
     if (!isSproutGrown) return;
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     setWorldPosition(
@@ -4097,6 +4110,7 @@ function normalizeExtraPlantState(plant) {
     plant.growthTier = 3;
   }
   plant.waterCapacity = plant.growthTier >= 4 ? 3 : 2;
+  ensureGrassOrdinalIfNeeded(plant);
 }
 
 function updateExtraPlantState(plant, now) {
@@ -4177,6 +4191,7 @@ function tickPowderUpgrade(plant, now) {
   if (!isPowderUpgradeInProgress(plant)) return false;
   const ratio = getPowderUpgradeRatio(plant, now);
   if (ratio === null || ratio < 1) return false;
+  const prevTier = plant.growthTier || 0;
   plant.growthTier = Math.max(plant.growthTier || 0, Number(plant.powderUpgradeTargetTier) || 0);
   plant.powderUpgradeTargetTier = 0;
   plant.powderUpgradeStartedAt = null;
@@ -4184,6 +4199,9 @@ function tickPowderUpgrade(plant, now) {
   if (plant.growthTier >= 4) {
     plant.waterCapacity = 3;
     plant.waterLevel = Math.min(getPlantWaterCapacity(plant), Math.max(1, Number(plant.waterLevel) || 1));
+    if (prevTier < 4 && (plant.grassOrdinal == null || plant.grassOrdinal <= 0)) {
+      plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
+    }
   }
   return true;
 }
@@ -4773,7 +4791,13 @@ function startPlanting() {
 
   const targetPlantSpotX = playerBox.left + playerBox.width / 2 - spotWidth / 2;
   const targetPlantSpotY = playerBox.bottom - spotHeight / 2;
-  if (!canPlantAt(targetPlantSpotX, targetPlantSpotY)) return;
+  if (!canPlantAt(targetPlantSpotX, targetPlantSpotY)) {
+    if (lastPlantProximityBlockMessage) {
+      flashPlantProximityWarning(lastPlantProximityBlockMessage);
+      updatePlayerStatus();
+    }
+    return;
+  }
 
   plantRuntime.spotX = targetPlantSpotX;
   plantRuntime.spotY = targetPlantSpotY;
@@ -4805,6 +4829,8 @@ function startPlanting() {
     plantRuntime.powderUpgradeTargetTier = 0;
     plantRuntime.powderUpgradeStartedAt = null;
     plantRuntime.powderUpgradeDurationMs = 0;
+    assignSproutIdentityToNewPlant(plantRuntime);
+    ensureGrassOrdinalIfNeeded(plantRuntime);
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
@@ -4831,7 +4857,13 @@ function startPlantingExtraSeed() {
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
 
-  if (!canPlantAt(plantX, plantY)) return;
+  if (!canPlantAt(plantX, plantY)) {
+    if (lastPlantProximityBlockMessage) {
+      flashPlantProximityWarning(lastPlantProximityBlockMessage);
+      updatePlayerStatus();
+    }
+    return;
+  }
 
   heldItem = null;
   plantRuntime.isPlanting = true;
@@ -4840,7 +4872,10 @@ function startPlantingExtraSeed() {
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
     extraSeed.planted = true;
-    appleState.extraPlants.push(createExtraPlant("plant-" + extraSeed.id, plantX, plantY));
+    const newPlant = createExtraPlant("plant-" + extraSeed.id, plantX, plantY);
+    assignSproutIdentityToNewPlant(newPlant);
+    ensureGrassOrdinalIfNeeded(newPlant);
+    appleState.extraPlants.push(newPlant);
     playerStatus.textContent = "";
     updateExtraSeedsAndPlants();
     saveAppleState();
@@ -4870,7 +4905,14 @@ function plantInventorySeed(seedId) {
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
 
-  if (!canPlantAt(plantX, plantY)) return;
+  if (!canPlantAt(plantX, plantY)) {
+    if (lastPlantProximityBlockMessage) {
+      flashPlantProximityWarning(lastPlantProximityBlockMessage);
+      updatePlayerStatus();
+    }
+    updateSeedInventory();
+    return;
+  }
 
   plantingInventorySeedId = inventorySeed.id;
   plantRuntime.isPlanting = true;
@@ -4909,6 +4951,8 @@ function plantInventorySeed(seedId) {
       plantRuntime.powderUpgradeTargetTier = 0;
       plantRuntime.powderUpgradeStartedAt = null;
       plantRuntime.powderUpgradeDurationMs = 0;
+      assignSproutIdentityToNewPlant(plantRuntime);
+      ensureGrassOrdinalIfNeeded(plantRuntime);
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -4916,7 +4960,10 @@ function plantInventorySeed(seedId) {
       saveSeedState();
       onboardingNotifyMainPlantPlanted();
     } else {
-      appleState.extraPlants.push(createExtraPlant("plant-" + inventorySeed.id, plantX, plantY));
+      const invPlant = createExtraPlant("plant-" + inventorySeed.id, plantX, plantY);
+      assignSproutIdentityToNewPlant(invPlant);
+      ensureGrassOrdinalIfNeeded(invPlant);
+      appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
     }
 
@@ -4952,8 +4999,215 @@ function createExtraPlant(id, x, y) {
     waterCapacity: 2,
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
-    powderUpgradeDurationMs: 0
+    powderUpgradeDurationMs: 0,
+    ownerUserId: "",
+    ownerDisplayName: "",
+    sproutOrdinal: 0,
+    grassOrdinal: null
   };
+}
+
+function getPlanterOwnerId() {
+  return String(currentUserId || "").trim();
+}
+
+function getPlanterDisplayName() {
+  const n = String(currentUserName || "").trim();
+  return n || "\uD50C\uB808\uC774\uC5B4";
+}
+
+function plantOwnerMatches(plant, ownerId, ownerName) {
+  const oid = String(ownerId || "").trim();
+  const oname = String(ownerName || "").trim();
+  const pid = String(plant.ownerUserId || "").trim();
+  const pname = String(plant.ownerDisplayName || "").trim();
+  if (oid && pid === oid) return true;
+  if (!oid && oname && pname === oname) return true;
+  if (!oid && !oname && !pid && !pname) return true;
+  return false;
+}
+
+function nextSproutOrdinalForOwner(ownerId, ownerName) {
+  let maxO = 0;
+  if (plantRuntime.isSeedPlanted && plantOwnerMatches(plantRuntime, ownerId, ownerName)) {
+    maxO = Math.max(maxO, Number(plantRuntime.sproutOrdinal) || 0);
+  }
+  appleState.extraPlants.forEach(function (p) {
+    if (plantOwnerMatches(p, ownerId, ownerName)) {
+      maxO = Math.max(maxO, Number(p.sproutOrdinal) || 0);
+    }
+  });
+  return maxO + 1;
+}
+
+function nextGrassOrdinalForOwner(ownerId, ownerName) {
+  let maxG = 0;
+  function consider(p) {
+    if (!plantOwnerMatches(p, ownerId, ownerName)) return;
+    if ((p.growthTier || 0) < 4) return;
+    const g = Number(p.grassOrdinal) || 0;
+    maxG = Math.max(maxG, g);
+  }
+  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
+  appleState.extraPlants.forEach(consider);
+  return maxG + 1;
+}
+
+function assignSproutIdentityToNewPlant(plant) {
+  const oid = getPlanterOwnerId();
+  const oname = getPlanterDisplayName();
+  plant.ownerUserId = oid;
+  plant.ownerDisplayName = oname;
+  plant.sproutOrdinal = nextSproutOrdinalForOwner(oid, oname);
+  plant.grassOrdinal = null;
+}
+
+function ensureGrassOrdinalIfNeeded(plant) {
+  if (!plant || (plant.growthTier || 0) < 4) return;
+  if (plant.grassOrdinal != null && plant.grassOrdinal > 0) return;
+  plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
+}
+
+function getPlantWorldLabel(plant) {
+  const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
+  const grassOrd =
+    plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
+      ? Math.max(0, Number(plant.grassOrdinal))
+      : 0;
+  if (tier >= 4 && grassOrd > 0) {
+    return name + "\uC758 \uD480" + grassOrd;
+  }
+  if (tier >= 4) {
+    return name + "\uC758 \uD480";
+  }
+  if (sproutOrd > 0) {
+    return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
+  }
+  return name + "\uC758 \uC0C8\uC2F9";
+}
+
+function plantProximityRectFromXYWH(x, y, w, h) {
+  return {
+    left: x,
+    top: y,
+    right: x + w,
+    bottom: y + h
+  };
+}
+
+function plantProximityExpandRect(r, pad) {
+  return {
+    left: r.left - pad,
+    top: r.top - pad,
+    right: r.right + pad,
+    bottom: r.bottom + pad
+  };
+}
+
+function plantSpotOverlapsExpandedRect(plantX, plantY, ox, oy, ow, oh, pad) {
+  const pr = plantProximityRectFromXYWH(plantX, plantY, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
+  const br = plantProximityExpandRect(plantProximityRectFromXYWH(ox, oy, ow, oh), pad);
+  return isOverlappingRect(pr, br);
+}
+
+function plantProximityPhraseForNoun(noun) {
+  const ch = noun.length ? noun[noun.length - 1] : "";
+  const code = ch.charCodeAt(0);
+  let hasBatchim = true;
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    hasBatchim = (code - 0xac00) % 28 !== 0;
+  }
+  const particle = hasBatchim ? "\uACFC" : "\uC640";
+  return noun + particle + " \uB108\uBB34 \uAC00\uAE4C\uC2B5\uB2C8\uB2E4!";
+}
+
+function getPlantProximityBlockMessage(plantX, plantY) {
+  if (isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY)) {
+    return plantProximityPhraseForNoun("\uB098\uBB34");
+  }
+
+  const wellPad = 30;
+  if (plantSpotOverlapsExpandedRect(plantX, plantY, wellX, wellY, WELL_SIZE, WELL_SIZE, wellPad)) {
+    return plantProximityPhraseForNoun("\uC6B0\uBB3C");
+  }
+
+  const portalPad = 10;
+  if (
+    plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      spawnPortalX,
+      spawnPortalY,
+      spawnPortalWidth,
+      spawnPortalHeight,
+      portalPad
+    )
+  ) {
+    return plantProximityPhraseForNoun("\uD3EC\uD0C8");
+  }
+
+  const bookPad = 12;
+  if (
+    guideBook &&
+    guideBook.style.display !== "none" &&
+    plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      guideBookX,
+      guideBookY,
+      GUIDE_BOOK_WIDTH,
+      GUIDE_BOOK_HEIGHT,
+      bookPad
+    )
+  ) {
+    return plantProximityPhraseForNoun("\uCC45");
+  }
+
+  if (isPlantMasterVisible()) {
+    const npcPad = 14;
+    if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
+      return plantProximityPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
+    }
+  }
+
+  if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
+    const seedPad = 8;
+    if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
+      return plantProximityPhraseForNoun("\uC528\uC557");
+    }
+  }
+
+  let blockedByLooseSeed = false;
+  appleState.extraSeeds.forEach(function (extraSeed) {
+    if (extraSeed.planted || extraSeed.inInventory) return;
+    if (!extraSeed.element || extraSeed.element.style.display === "none") return;
+    const seedPad = 8;
+    if (
+      plantSpotOverlapsExpandedRect(plantX, plantY, extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE, seedPad)
+    ) {
+      blockedByLooseSeed = true;
+    }
+  });
+  if (blockedByLooseSeed) {
+    return plantProximityPhraseForNoun("\uC528\uC557");
+  }
+
+  if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
+    const bsz = getBucketSize();
+    const bucketPad = 10;
+    if (plantSpotOverlapsExpandedRect(plantX, plantY, bucketX, bucketY, bsz.width, bsz.height, bucketPad)) {
+      return plantProximityPhraseForNoun("\uC591\uB3D9\uC774");
+    }
+  }
+
+  return "";
+}
+
+function flashPlantProximityWarning(message) {
+  plantProximityWarnUntil = Date.now() + 2800;
+  playerStatus.textContent = message || "";
 }
 
 function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
@@ -4991,7 +5245,10 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
 
 function canPlantAt(x, y) {
   pollWorldState(true);
-  if (isPlantSpotOverlappingTreeNoPlantZone(x, y)) {
+  lastPlantProximityBlockMessage = "";
+  const proximityMsg = getPlantProximityBlockMessage(x, y);
+  if (proximityMsg) {
+    lastPlantProximityBlockMessage = proximityMsg;
     return false;
   }
   const plantCenters = [];
@@ -5424,6 +5681,9 @@ function updatePlantState() {
     plantCard.style.display = "none";
     growthCard.style.display = "none";
     sprout.style.display = "none";
+    plantSpot.removeAttribute("title");
+    sprout.removeAttribute("title");
+    if (plantCardTitle) plantCardTitle.textContent = "";
     if (mainPlantGrowthMeter && mainPlantGrowthMeter.element) {
       mainPlantGrowthMeter.element.style.display = "none";
     }
@@ -5486,6 +5746,7 @@ function updatePlantState() {
     waterNeeded.style.display = "none";
   }
 
+  ensureGrassOrdinalIfNeeded(plantRuntime);
   updatePlantCard();
   updatePlantGrowth();
 }
@@ -5515,6 +5776,13 @@ function removeMainPlant() {
   plantRuntime.powderUpgradeTargetTier = 0;
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
+  plantRuntime.ownerUserId = "";
+  plantRuntime.ownerDisplayName = "";
+  plantRuntime.sproutOrdinal = 0;
+  plantRuntime.grassOrdinal = null;
+  plantSpot.removeAttribute("title");
+  sprout.removeAttribute("title");
+  if (plantCardTitle) plantCardTitle.textContent = "";
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
   sprout.style.display = "none";
@@ -5536,10 +5804,12 @@ function updatePlantCard() {
       (plant.isSproutSelfSustaining && (plant.growthTier || 0) < 4)
     ) {
       plantCard.style.display = "none";
+      if (plantCardTitle) plantCardTitle.textContent = "";
       return;
     }
 
     plantCard.style.display = "block";
+    if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     const waterCapacity = getPlantWaterCapacity(plant);
@@ -5559,10 +5829,12 @@ function updatePlantCard() {
     !wateringTarget
   ) {
     plantCard.style.display = "none";
+    if (plantCardTitle) plantCardTitle.textContent = "";
     return;
   }
 
   plantCard.style.display = "block";
+  if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plantRuntime);
   plantCard.classList.toggle("is-dry", plantRuntime.status === "dry");
   plantCard.classList.toggle("is-overwatered", plantRuntime.isOverwatered);
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -5632,11 +5904,20 @@ function updatePlantGrowth() {
   growthFill.style.width = growthRatio * 100 + "%";
   setWorldPosition(growthCard, cardX, plantRuntime.spotY - 26);
   sprout.style.display = "none";
+  updateSproutPosition();
 }
 
 function updateSproutPosition() {
+  const worldLabel = plantRuntime.isSeedPlanted ? getPlantWorldLabel(plantRuntime) : "";
+  if (worldLabel) {
+    plantSpot.title = worldLabel;
+  } else {
+    plantSpot.removeAttribute("title");
+  }
+
   if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten" || plantRuntime.status === "dry") {
     sprout.style.display = "none";
+    sprout.removeAttribute("title");
     return;
   }
 
@@ -5645,6 +5926,7 @@ function updateSproutPosition() {
   sprout.style.display = "block";
   sprout.classList.toggle("is-big", stage >= 2);
   sprout.src = getSproutImageForStage(stage);
+  if (worldLabel) sprout.title = worldLabel;
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
   setWorldPosition(
     sprout,
@@ -5698,13 +5980,6 @@ function updatePlayerBubblePosition() {
 
 function updateNpcPrompt() {
   if (isNpcDialogueRunning) return;
-  if (
-    isNpcDialogueComplete &&
-    getStoredFlag(onboardingFlowDoneKey) &&
-    plantRuntime.isSeedPlanted
-  ) {
-    return;
-  }
 
   if (isNearPlantMaster()) {
     if (npcBubble.dataset.promptShown === "true") return;
@@ -5974,6 +6249,16 @@ function applyLoadedPlantState(loadedPlant) {
     Number(loadedPlant.powderUpgradeDurationMs) || 0
   );
 
+  plantRuntime.ownerUserId =
+    loadedPlant.ownerUserId != null ? String(loadedPlant.ownerUserId) : "";
+  plantRuntime.ownerDisplayName =
+    loadedPlant.ownerDisplayName != null ? String(loadedPlant.ownerDisplayName) : "";
+  plantRuntime.sproutOrdinal = Math.max(0, Number(loadedPlant.sproutOrdinal) || 0);
+  plantRuntime.grassOrdinal =
+    loadedPlant.grassOrdinal != null && Number.isFinite(Number(loadedPlant.grassOrdinal))
+      ? Math.max(1, Number(loadedPlant.grassOrdinal))
+      : null;
+
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     plantRuntime.status = "rotten";
     if (!plantRuntime.rottenAt) plantRuntime.rottenAt = Date.now();
@@ -5989,6 +6274,7 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.growthTier = 3;
   }
   plantRuntime.waterCapacity = plantRuntime.growthTier >= 4 ? 3 : 2;
+  ensureGrassOrdinalIfNeeded(plantRuntime);
 }
 
 function getPlantStateForStorage() {
@@ -6016,6 +6302,13 @@ function getPlantStateForStorage() {
     powderUpgradeTargetTier: plantRuntime.powderUpgradeTargetTier,
     powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
     powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs,
+    ownerUserId: plantRuntime.ownerUserId || "",
+    ownerDisplayName: plantRuntime.ownerDisplayName || "",
+    sproutOrdinal: plantRuntime.sproutOrdinal || 0,
+    grassOrdinal:
+      plantRuntime.grassOrdinal != null && Number.isFinite(Number(plantRuntime.grassOrdinal))
+        ? plantRuntime.grassOrdinal
+        : null,
     npcX,
     npcY
   };
@@ -6091,11 +6384,6 @@ function updateSeedDryState() {
 }
 
 function updatePlayerStatus() {
-  if (!plantRuntime.isPlanting && !appleState.isEating) {
-    playerStatus.style.display = "none";
-    return;
-  }
-
   const playerBox = getPlayerBox();
   const textWidth = playerStatus.offsetWidth || 40;
   const halfTextWidth = textWidth / 2;
@@ -6104,14 +6392,23 @@ function updatePlayerStatus() {
     halfTextWidth,
     Math.min(targetX, window.innerWidth - halfTextWidth)
   );
+  const yWorld = toScreenY(playerBox.top + 26);
 
-  playerStatus.style.display = "block";
-  playerStatus.style.transform =
-    "translate(" +
-    clampedX +
-    "px, " +
-    toScreenY(playerBox.top + 26) +
-    "px) translate(-50%, -100%)";
+  if (plantRuntime.isPlanting || appleState.isEating) {
+    playerStatus.style.display = "block";
+    playerStatus.style.transform =
+      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
+    return;
+  }
+
+  if (Date.now() < plantProximityWarnUntil) {
+    playerStatus.style.display = "block";
+    playerStatus.style.transform =
+      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
+    return;
+  }
+
+  playerStatus.style.display = "none";
 }
 
 function updateCamera() {

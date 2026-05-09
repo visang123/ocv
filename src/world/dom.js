@@ -11,6 +11,7 @@ const playerBubble = document.getElementById("player-bubble");
 const playerAlert = document.getElementById("player-alert");
 const waterNeeded = document.getElementById("water-needed");
 const plantCard = document.getElementById("plant-card");
+const plantCardTitle = document.getElementById("plant-card-title");
 const plantWaterText = document.getElementById("plant-water-text");
 const plantWaterSegments = Array.from(
   document.querySelectorAll(".plant-water-segment")
@@ -73,6 +74,7 @@ export {
   playerAlert,
   waterNeeded,
   plantCard,
+  plantCardTitle,
   plantWaterText,
   plantWaterSegments,
   signBoard,

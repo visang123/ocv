@@ -537,7 +537,7 @@ body::-webkit-scrollbar {
   top: 0;
   display: none;
   width: 270px;
-  height: 115px;
+  min-height: 115px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -546,6 +546,13 @@ body::-webkit-scrollbar {
   user-select: none;
   pointer-events: none;
   z-index: 10;
+}
+
+.plant-card-title {
+  margin: 0 0 10px 0;
+  color: #14532d;
+  font: 700 20px/1.25 Arial, sans-serif;
+  text-align: center;
 }
 
 #plant-water-text {

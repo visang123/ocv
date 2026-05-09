@@ -104,6 +104,10 @@ export function loadSeedStateFromStorage(config) {
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
+    ownerUserId: "",
+    ownerDisplayName: "",
+    sproutOrdinal: 0,
+    grassOrdinal: null,
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -152,6 +156,26 @@ export function loadSeedStateFromStorage(config) {
         0,
         Number(savedPlantedState.powderUpgradeDurationMs) || 0
       );
+      planted.ownerUserId =
+        savedPlantedState.ownerUserId != null
+          ? String(savedPlantedState.ownerUserId)
+          : "";
+      planted.ownerDisplayName =
+        savedPlantedState.ownerDisplayName != null
+          ? String(savedPlantedState.ownerDisplayName)
+          : "";
+      planted.sproutOrdinal = Math.max(
+        0,
+        Number(savedPlantedState.sproutOrdinal) || 0
+      );
+      if (
+        savedPlantedState.grassOrdinal != null &&
+        Number.isFinite(Number(savedPlantedState.grassOrdinal))
+      ) {
+        planted.grassOrdinal = Math.max(1, Number(savedPlantedState.grassOrdinal));
+      } else {
+        planted.grassOrdinal = null;
+      }
       planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
       planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
     } catch (error) {
@@ -276,7 +300,20 @@ export function loadAppleStateFromStorage(config) {
               powderUpgradeDurationMs: Math.max(
                 0,
                 Number(plantData.powderUpgradeDurationMs) || 0
-              )
+              ),
+              ownerUserId:
+                plantData.ownerUserId != null ? String(plantData.ownerUserId) : "",
+              ownerDisplayName:
+                plantData.ownerDisplayName != null
+                  ? String(plantData.ownerDisplayName)
+                  : "",
+              sproutOrdinal: Math.max(0, Number(plantData.sproutOrdinal) || 0),
+              grassOrdinal:
+                plantData.grassOrdinal != null &&
+                Number.isFinite(Number(plantData.grassOrdinal))
+                  ? Math.max(1, Number(plantData.grassOrdinal))
+                  : null,
+              rottenAt: Number(plantData.rottenAt) || null
             };
           })
         : []
@@ -348,7 +385,15 @@ export function saveAppleStateToStorage(config) {
           waterCapacity: plant.waterCapacity,
           powderUpgradeTargetTier: plant.powderUpgradeTargetTier,
           powderUpgradeStartedAt: plant.powderUpgradeStartedAt,
-          powderUpgradeDurationMs: plant.powderUpgradeDurationMs
+          powderUpgradeDurationMs: plant.powderUpgradeDurationMs,
+          ownerUserId: plant.ownerUserId || "",
+          ownerDisplayName: plant.ownerDisplayName || "",
+          sproutOrdinal: plant.sproutOrdinal || 0,
+          grassOrdinal:
+            plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
+              ? plant.grassOrdinal
+              : null,
+          rottenAt: plant.rottenAt || null
         };
       })
     })

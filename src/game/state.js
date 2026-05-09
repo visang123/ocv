@@ -45,7 +45,11 @@ export function createPlantState() {
     waterCapacity: 2,
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
-    powderUpgradeDurationMs: 0
+    powderUpgradeDurationMs: 0,
+    ownerUserId: "",
+    ownerDisplayName: "",
+    sproutOrdinal: 0,
+    grassOrdinal: null
   };
 }
 
