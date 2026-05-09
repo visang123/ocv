@@ -75,6 +75,13 @@ export const plantDryMs = 40 * SECOND_MS;
 export const plantWaterLevelTickMs = 20 * SECOND_MS;
 export const plantGrowthMs = 3 * SECOND_MS;
 export const overwaterWindowMs = 60 * MINUTE_MS;
+/**
+ * Watering an already-wet plant within this window after the previous watering
+ * causes immediate rot. Lets players actually trigger overwatering even though
+ * the well is rate-limited (otherwise reaching waterLevel 2 + a third pour in
+ * the 20s decay window is essentially impossible).
+ */
+export const quickRewaterMs = 8 * SECOND_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";

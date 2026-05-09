@@ -74,6 +74,7 @@ import {
   plantWaterLevelTickMs,
   plantGrowthMs,
   overwaterWindowMs,
+  quickRewaterMs,
   playerPositionKey,
   wellWaterKey,
   lastWellRefillKey,
@@ -3509,6 +3510,7 @@ function waterPlant(target) {
   }
 
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
+  const previousWateredAt = plantRuntime.lastWateredAt;
 
   plantRuntime.lastWateredAt = now;
   plantRuntime.needsFirstWater = false;
@@ -3529,11 +3531,21 @@ function waterPlant(target) {
     return;
   }
 
+  // Pouring water onto an already-wet plant in quick succession overwaters it.
+  // This is the practical rot trigger because the well's refill rate makes
+  // raising waterLevel to 2 and pouring again in time effectively impossible.
+  const isRapidRewater =
+    !isFirstWater &&
+    plantRuntime.waterLevel >= 1 &&
+    previousWateredAt !== null &&
+    Number.isFinite(previousWateredAt) &&
+    now - previousWateredAt < quickRewaterMs;
+
   if (isFirstWater || plantRuntime.waterLevel <= 0) {
     plantRuntime.waterLevel = 1;
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
-  } else if (plantRuntime.waterLevel >= 2) {
+  } else if (plantRuntime.waterLevel >= 2 || isRapidRewater) {
     plantRuntime.isOverwatered = true;
     plantRuntime.status = "rotten";
     plantRuntime.growthStartedAt = null;
@@ -3584,6 +3596,7 @@ function waterExtraPlant(plant) {
   }
 
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
+  const previousWateredAt = plant.lastWateredAt;
 
   plant.lastWateredAt = now;
   plant.needsFirstWater = false;
@@ -3604,11 +3617,18 @@ function waterExtraPlant(plant) {
     return;
   }
 
+  const isRapidRewater =
+    !isFirstWater &&
+    plant.waterLevel >= 1 &&
+    previousWateredAt !== null &&
+    Number.isFinite(previousWateredAt) &&
+    now - previousWateredAt < quickRewaterMs;
+
   if (isFirstWater || plant.waterLevel <= 0) {
     plant.waterLevel = 1;
     plant.isOverwatered = false;
     plant.status = "normal";
-  } else if (plant.waterLevel >= 2) {
+  } else if (plant.waterLevel >= 2 || isRapidRewater) {
     plant.isOverwatered = true;
     plant.status = "rotten";
     plant.growthStartedAt = null;
@@ -4022,12 +4042,26 @@ function refillWellIfNeeded() {
   const elapsedRefills = Math.floor((now - wellState.lastRefillAt) / wellRefillMs);
 
   if (elapsedRefills > 0) {
+    const previousWater = wellState.water;
     wellState.water = Math.min(maxWellWater, wellState.water + elapsedRefills);
-    wellState.lastRefillAt =
-      wellState.water >= maxWellWater
-        ? now
-        : wellState.lastRefillAt + elapsedRefills * wellRefillMs;
-    saveWellState();
+    // Advance the refill anchor deterministically so every client computes the
+    // same wellState.water from the same lastRefillAt. Using "now" here would
+    // diverge across clients (clock skew) and the resulting saves would
+    // flip-flop the visible water amount as snapshots overwrote each other.
+    wellState.lastRefillAt += elapsedRefills * wellRefillMs;
+
+    if (previousWater !== wellState.water) {
+      // Auto-refill is deterministic from lastRefillAt, so we keep it local-only
+      // to avoid spamming snapshots that race with player actions on other
+      // clients. Persist only to localStorage so a tab reload sees the latest
+      // computed value without forcing a multiplayer broadcast.
+      saveWellStateToStorage({
+        wellWaterKey,
+        lastWellRefillKey,
+        wellWater: wellState.water,
+        lastWellRefillAt: wellState.lastRefillAt
+      });
+    }
   }
 
   updateWellImage();
