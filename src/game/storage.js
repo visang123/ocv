@@ -104,6 +104,7 @@ export function loadSeedStateFromStorage(config) {
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
+    plantPlantedAt: null,
     ownerUserId: "",
     ownerDisplayName: "",
     sproutOrdinal: 0,
@@ -156,6 +157,10 @@ export function loadSeedStateFromStorage(config) {
         0,
         Number(savedPlantedState.powderUpgradeDurationMs) || 0
       );
+      planted.plantPlantedAt =
+        Number(savedPlantedState.plantPlantedAt) ||
+        Number(savedPlantedState.plantedAt) ||
+        null;
       planted.ownerUserId =
         savedPlantedState.ownerUserId != null
           ? String(savedPlantedState.ownerUserId)

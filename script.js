@@ -1245,6 +1245,8 @@ magicPowderInventory.id = "magic-powder-inventory";
 magicPowderInventory.type = "button";
 magicPowderInventory.innerHTML =
   '<div class="magic-powder-icon"></div><div id="magic-powder-count">0</div>';
+magicPowderInventory.title =
+  "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \u2014 \uC7A5\uC131\uC7A5\uC774 \uD480(\uC0C8\uC2F9 4\uB2E8\uACC4)\uC5D0 \uAC00\uAE4C\uC774 \uB418\uBA74 \uD074\uB9AD\uD574 \uD55C \uB2E8\uACC4 \uB354 \uD0A4\uC6B8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
 document.body.appendChild(magicPowderInventory);
 const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-count");
 magicPowderInventory.addEventListener("click", function () {
@@ -2727,6 +2729,7 @@ function applyDefaultState(options) {
   plantRuntime.powderUpgradeTargetTier = 0;
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
+  plantRuntime.plantedAt = null;
 
   if (!sharedWorldResetOnly) {
     hasGuideBook = false;
@@ -4333,9 +4336,6 @@ function tickPowderUpgrade(plant, now) {
   }
   if (plant.growthTier >= 4) {
     plant.needsFirstWater = false;
-    if (prevTier < 4 && (plant.grassOrdinal == null || plant.grassOrdinal <= 0)) {
-      plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
-    }
   }
   return true;
 }
@@ -4961,6 +4961,7 @@ function startPlanting() {
     plantRuntime.rottenAt = null;
     plantRuntime.needsFirstWater = false;
     plantRuntime.growthStartedAt = plantedAt;
+    plantRuntime.plantedAt = plantedAt;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
     plantRuntime.sproutEvolutionMs = 0;
@@ -5101,6 +5102,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.rottenAt = null;
       plantRuntime.needsFirstWater = false;
       plantRuntime.growthStartedAt = plantedAt;
+      plantRuntime.plantedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
       plantRuntime.sproutEvolutionMs = 0;
@@ -5187,30 +5189,80 @@ function plantOwnerMatches(plant, ownerId, ownerName) {
   return false;
 }
 
-function nextSproutOrdinalForOwner(ownerId, ownerName) {
-  let maxO = 0;
-  if (plantRuntime.isSeedPlanted && plantOwnerMatches(plantRuntime, ownerId, ownerName)) {
-    maxO = Math.max(maxO, Number(plantRuntime.sproutOrdinal) || 0);
-  }
-  appleState.extraPlants.forEach(function (p) {
-    if (plantOwnerMatches(p, ownerId, ownerName)) {
-      maxO = Math.max(maxO, Number(p.sproutOrdinal) || 0);
-    }
-  });
-  return maxO + 1;
+function isPlantAliveForWorldOrdinal(plant) {
+  return (
+    plant &&
+    plant.status !== "rotten" &&
+    plant.status !== "dry" &&
+    !plant.isOverwatered
+  );
 }
 
-function nextGrassOrdinalForOwner(ownerId, ownerName) {
-  let maxG = 0;
-  function consider(p) {
-    if (!plantOwnerMatches(p, ownerId, ownerName)) return;
-    if ((p.growthTier || 0) < 4) return;
-    const g = Number(p.grassOrdinal) || 0;
-    maxG = Math.max(maxG, g);
+function plantOrdinalGroupKey(plant) {
+  return (
+    String(plant.ownerUserId || "").trim() +
+    "\u0001" +
+    String(plant.ownerDisplayName || "").trim()
+  );
+}
+
+function plantWorldOrdinalSortTime(plant) {
+  const a = Number(plant.plantedAt) || 0;
+  if (a > 0) return a;
+  return Number(plant.growthStartedAt) || 0;
+}
+
+function butterflyTooltipForColor(color) {
+  if (color === "brown") {
+    return "\uAC08\uC0C9 \uB098\uBE44";
   }
-  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
+  if (color === "yellow") {
+    return "\uB178\uB791 \uB098\uBE44";
+  }
+  if (color === "white") {
+    return "\uD558\uC580 \uB098\uBE44";
+  }
+  return "\uB098\uBE44";
+}
+
+/** 살아 있는 식물만, 심은 시각 기준: 새싹(티어 4 미만)과 풀(티어 4 이상)을 소유자별로 따로 번호 부여. */
+function refreshPlantIdentityOrdinals() {
+  const groups = Object.create(null);
+  function consider(plant) {
+    if (!plant || !isPlantAliveForWorldOrdinal(plant)) return;
+    const tier = Math.max(0, Number(plant.growthTier) || 0);
+    const k = plantOrdinalGroupKey(plant);
+    if (!groups[k]) {
+      groups[k] = { sprouts: [], grasses: [] };
+    }
+    const t = plantWorldOrdinalSortTime(plant);
+    const entry = { plant: plant, t: t };
+    if (tier < 4) {
+      groups[k].sprouts.push(entry);
+    } else {
+      groups[k].grasses.push(entry);
+    }
+  }
+  if (plantRuntime.isSeedPlanted) {
+    consider(plantRuntime);
+  }
   appleState.extraPlants.forEach(consider);
-  return maxG + 1;
+
+  Object.keys(groups).forEach(function (k) {
+    const g = groups[k];
+    g.sprouts.sort(function (a, b) {
+      return a.t - b.t;
+    });
+    g.grasses.sort(function (a, b) {
+      return a.t - b.t;
+    });
+    g.sprouts.forEach(function (e, i) {
+      e.plant.sproutOrdinal = i + 1;
+    });
+    g.grasses.forEach(function (e, i) {
+      e.plant.grassOrdinal = i + 1;
+    });
+  });
 }
 
 function assignSproutIdentityToNewPlant(plant) {
@@ -5218,14 +5270,12 @@ function assignSproutIdentityToNewPlant(plant) {
   const oname = getPlanterDisplayName();
   plant.ownerUserId = oid;
   plant.ownerDisplayName = oname;
-  plant.sproutOrdinal = nextSproutOrdinalForOwner(oid, oname);
+  plant.sproutOrdinal = 0;
   plant.grassOrdinal = null;
 }
 
 function ensureGrassOrdinalIfNeeded(plant) {
-  if (!plant || (plant.growthTier || 0) < 4) return;
-  if (plant.grassOrdinal != null && plant.grassOrdinal > 0) return;
-  plant.grassOrdinal = nextGrassOrdinalForOwner(plant.ownerUserId, plant.ownerDisplayName);
+  void plant;
 }
 
 function getPlantWorldLabel(plant) {
@@ -5288,12 +5338,12 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uB098\uBB34");
   }
 
-  const wellPad = 30;
+  const wellPad = 18;
   if (plantSpotOverlapsExpandedRect(plantX, plantY, wellX, wellY, WELL_SIZE, WELL_SIZE, wellPad)) {
     return plantProximityPhraseForNoun("\uC6B0\uBB3C");
   }
 
-  const portalPad = 10;
+  const portalPad = 5;
   if (
     plantSpotOverlapsExpandedRect(
       plantX,
@@ -5308,7 +5358,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
 
-  const bookPad = 12;
+  const bookPad = 6;
   if (
     guideBook &&
     guideBook.style.display !== "none" &&
@@ -5326,14 +5376,14 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   }
 
   if (isPlantMasterVisible()) {
-    const npcPad = 14;
+    const npcPad = 8;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
       return plantProximityPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
     }
   }
 
   if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
-    const seedPad = 8;
+    const seedPad = 4;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
       return plantProximityPhraseForNoun("\uC528\uC557");
     }
@@ -5343,7 +5393,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || extraSeed.inInventory) return;
     if (!extraSeed.element || extraSeed.element.style.display === "none") return;
-    const seedPad = 8;
+    const seedPad = 4;
     if (
       plantSpotOverlapsExpandedRect(plantX, plantY, extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE, seedPad)
     ) {
@@ -5356,7 +5406,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
 
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
     const bsz = getBucketSize();
-    const bucketPad = 10;
+    const bucketPad = 5;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, bucketX, bucketY, bsz.width, bsz.height, bucketPad)) {
       return plantProximityPhraseForNoun("\uC591\uB3D9\uC774");
     }
@@ -5970,6 +6020,7 @@ function removeMainPlant() {
   plantRuntime.ownerDisplayName = "";
   plantRuntime.sproutOrdinal = 0;
   plantRuntime.grassOrdinal = null;
+  plantRuntime.plantedAt = null;
   plantSpot.removeAttribute("title");
   sprout.removeAttribute("title");
   if (plantCardTitle) plantCardTitle.textContent = "";
@@ -6396,6 +6447,12 @@ function applyLoadedPlantState(loadedPlant) {
     : null;
   plantRuntime.needsFirstWater = loadedPlant.plantNeedsFirstWater;
   plantRuntime.growthStartedAt = loadedPlant.plantGrowthStartedAt;
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "plantPlantedAt")) {
+    plantRuntime.plantedAt =
+      loadedPlant.plantPlantedAt != null ? Number(loadedPlant.plantPlantedAt) || null : null;
+  } else {
+    plantRuntime.plantedAt = null;
+  }
   plantRuntime.isSproutGrown = loadedPlant.isSproutGrown;
   plantRuntime.sproutGrownAt =
     loadedPlant.plantSproutGrownAt ||
@@ -6464,6 +6521,12 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.needsFirstWater = false;
   }
+  if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
+    plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
+  }
+  if (!plantRuntime.isSeedPlanted) {
+    plantRuntime.plantedAt = null;
+  }
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
@@ -6486,6 +6549,8 @@ function getPlantStateForStorage() {
     plantRottenAt: plantRuntime.rottenAt,
     plantNeedsFirstWater: plantRuntime.needsFirstWater,
     plantGrowthStartedAt: plantRuntime.growthStartedAt,
+    plantPlantedAt: plantRuntime.plantedAt != null ? plantRuntime.plantedAt : null,
+    plantedAt: plantRuntime.plantedAt != null ? plantRuntime.plantedAt : null,
     isSproutGrown: plantRuntime.isSproutGrown,
     plantSproutGrownAt: plantRuntime.sproutGrownAt,
     sproutEvolutionMs: plantRuntime.sproutEvolutionMs,
@@ -8073,6 +8138,7 @@ function ensureButterflyRenderEntry(butterfly) {
   element.appendChild(sprite);
   ground.appendChild(element);
   setWorldSize(element, BUTTERFLY_SIZE, BUTTERFLY_SIZE);
+  element.title = butterflyTooltipForColor(butterfly.color);
   entry = {
     element,
     sprite,
@@ -8229,6 +8295,7 @@ function updateButterflyInventoryUi() {
   let total = 0;
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
+    slot.title = butterflyTooltipForColor(color);
     const count = butterflyState.caughtCounts[color] || 0;
     total += count;
     const countNode = slot.querySelector(".butterfly-inventory-count");
@@ -8326,6 +8393,7 @@ function updateButterflies() {
       drawX - BUTTERFLY_SIZE / 2,
       drawY - BUTTERFLY_SIZE / 2
     );
+    entry.element.title = butterflyTooltipForColor(butterfly.color);
     applyButterflySpriteFrame(
       entry,
       butterfly.color,
@@ -8471,6 +8539,7 @@ function gameLoop() {
   updateBucketPosition();
   updatePlayerStatus();
   updateSeedCard();
+  refreshPlantIdentityOrdinals();
   updatePlantState();
   updateNpcPosition();
   updateGuideCard();

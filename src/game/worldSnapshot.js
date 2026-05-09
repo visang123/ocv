@@ -134,6 +134,11 @@ export function parseMainPlantFromSnapshot(mp) {
   } else if (Object.prototype.hasOwnProperty.call(mp, "grassOrdinal")) {
     plantedFromSnapshot.grassOrdinal = null;
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "plantedAt")) {
+    plantedFromSnapshot.plantPlantedAt = Number(mp.plantedAt) || null;
+  } else if (Object.prototype.hasOwnProperty.call(mp, "plantPlantedAt")) {
+    plantedFromSnapshot.plantPlantedAt = Number(mp.plantPlantedAt) || null;
+  }
   return plantedFromSnapshot;
 }
 
