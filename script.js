@@ -4497,6 +4497,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           localApplyNow,
           getMainDryAfterEmptyMsForPlant
         );
+        normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
         npcX = Number(snapshot.mainPlant.npcX) || npcX;
         npcY = Number(snapshot.mainPlant.npcY) || npcY;
         if (plantRuntime.isSeedPlanted) {
@@ -4740,6 +4741,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         }
         stabilizeFirstWaterHintFlags(ep);
         sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
+        normalizePlantSproutFieldsWhenSoilDry(ep);
       });
       const now = Date.now();
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
@@ -5403,6 +5405,7 @@ function updateExtraPlantState(plant, now) {
   }
 
   if (plant.status === "dry") {
+    normalizePlantSproutFieldsWhenSoilDry(plant);
     return;
   }
 
@@ -5471,7 +5474,7 @@ function isPowderUpgradeInProgress(plant) {
  * wateredAtList가 [growthStartedAt] 한 번뿐이면 "첫 물 필요"로 본다.
  */
 function stabilizeFirstWaterHintFlags(plant) {
-  if (!plant || plant.status === "rotten") return;
+  if (!plant || plant.status === "rotten" || plant.status === "dry") return;
   if (!Array.isArray(plant.wateredAtList)) plant.wateredAtList = [];
   const gs = Number(plant.growthStartedAt) || 0;
   if (
@@ -5560,6 +5563,18 @@ function cancelPlantPowderUpgrade(plant) {
   plant.powderUpgradeTargetTier = 0;
   plant.powderUpgradeStartedAt = null;
   plant.powderUpgradeDurationMs = 0;
+}
+
+/** 마른 땅인데 싹/성장 타임스탬프가 남으면 물 주기·폴링 직후 잠깐 자라는 것처럼 보일 수 있음 */
+function normalizePlantSproutFieldsWhenSoilDry(plant) {
+  if (!plant || plant.status !== "dry") return;
+  cancelPlantPowderUpgrade(plant);
+  plant.isSproutGrown = false;
+  plant.sproutGrownAt = null;
+  plant.growthStartedAt = null;
+  plant.sproutEvolutionMs = 0;
+  plant.sproutEvolutionLastTickAt = null;
+  plant.isSproutSelfSustaining = false;
 }
 
 function tickPowderUpgrade(plant, now) {
@@ -7767,6 +7782,7 @@ function waterPlant(target) {
 
   const wasDrySoil = plantRuntime.status === "dry";
   if (wasDrySoil) {
+    normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
     plantRuntime.status = "normal";
     plantRuntime.becameEmptyAt = null;
   }
@@ -7826,11 +7842,6 @@ function waterPlant(target) {
   }
 
   if (wasDrySoil) {
-    plantRuntime.isSproutGrown = false;
-    plantRuntime.sproutGrownAt = null;
-    plantRuntime.sproutEvolutionMs = 0;
-    plantRuntime.sproutEvolutionLastTickAt = null;
-    plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.growthStartedAt = now;
     plantRuntime.grassAuto5EligibleAt = null;
   }
@@ -7849,6 +7860,7 @@ function waterExtraPlant(plant) {
   normalizeExtraPlantState(plant);
   const wasDrySoil = plant.status === "dry";
   if (wasDrySoil) {
+    normalizePlantSproutFieldsWhenSoilDry(plant);
     plant.status = "normal";
     plant.becameEmptyAt = null;
   }
@@ -7902,11 +7914,6 @@ function waterExtraPlant(plant) {
   }
 
   if (wasDrySoil) {
-    plant.isSproutGrown = false;
-    plant.sproutGrownAt = null;
-    plant.sproutEvolutionMs = 0;
-    plant.sproutEvolutionLastTickAt = null;
-    plant.isSproutSelfSustaining = false;
     plant.growthStartedAt = now;
     plant.grassAuto5EligibleAt = null;
   }
@@ -7977,6 +7984,7 @@ function updatePlantState() {
   }
 
   const now = Date.now();
+  normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
   updatePlantWaterLevel();
   ensureGrassAuto5EligibleForTier4Plant(plantRuntime, now);
   if (tickPowderUpgrade(plantRuntime, now)) {
@@ -8591,13 +8599,7 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.grassAuto5EligibleAt = null;
   }
   if (plantRuntime.status === "dry") {
-    cancelPlantPowderUpgrade(plantRuntime);
-    plantRuntime.isSproutGrown = false;
-    plantRuntime.sproutGrownAt = null;
-    plantRuntime.growthStartedAt = null;
-    plantRuntime.sproutEvolutionMs = 0;
-    plantRuntime.sproutEvolutionLastTickAt = null;
-    plantRuntime.isSproutSelfSustaining = false;
+    normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
   }
   if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
