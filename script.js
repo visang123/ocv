@@ -2614,9 +2614,6 @@ function updateOnboardingFlowUI() {
         "심고 싶은 위치로 이동 후, 클릭 해 씨앗을 심으세요."
       );
       if (player) player.classList.add("onboarding-highlight");
-      if (seed && !tutorialMainSeedRegenCompleted) {
-        seed.classList.add("onboarding-highlight");
-      }
       if (seedInventory && !tutorialMainSeedRegenCompleted) {
         seedInventory.classList.add("onboarding-highlight");
       }

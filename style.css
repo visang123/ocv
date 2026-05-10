@@ -748,6 +748,8 @@ body::-webkit-scrollbar {
 #guide-book.is-near {
   outline: 2px solid #ffd92f;
   outline-offset: 2px;
+  /* 월드 스프라이트가 매우 작아 큰 radius면 원처럼 보임 → 책은 사각 유지 */
+  border-radius: 2px;
 }
 
 #guide-book.is-movement-tutorial-target {
@@ -826,7 +828,7 @@ body::-webkit-scrollbar {
 #guide-book-button.onboarding-highlight-book-inv {
   outline: 5px solid #ea580c !important;
   outline-offset: 5px !important;
-  border-radius: 12px;
+  border-radius: 2px !important;
   animation: onboarding-target-glow 1s ease-in-out infinite;
 }
 
