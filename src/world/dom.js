@@ -13,6 +13,7 @@ const waterNeeded = document.getElementById("water-needed");
 const plantCard = document.getElementById("plant-card");
 const plantCardTitle = document.getElementById("plant-card-title");
 const plantWaterText = document.getElementById("plant-water-text");
+const plantWaterBar = document.getElementById("plant-water-bar");
 const plantWaterSegments = Array.from(
   document.querySelectorAll(".plant-water-segment")
 );
@@ -77,6 +78,7 @@ export {
   plantCard,
   plantCardTitle,
   plantWaterText,
+  plantWaterBar,
   plantWaterSegments,
   signBoard,
   growthCard,

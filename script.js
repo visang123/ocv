@@ -145,6 +145,7 @@ import {
   plantCard,
   plantCardTitle,
   plantWaterText,
+  plantWaterBar,
   plantWaterSegments,
   signBoard,
   growthCard,
@@ -4470,11 +4471,11 @@ function updateExtraPlantState(plant, now) {
   }
 
   if (
-    canPlantWiltFromEmptyWater(plant) &&
+    canPlantWiltFromEmptyWater(plant, now) &&
     plant.status !== "rotten" &&
     plant.status !== "dry" &&
     plant.becameEmptyAt !== null &&
-    now - plant.becameEmptyAt >= getExtraDryDelayMs(plant)
+    now - plant.becameEmptyAt >= getExtraDryDelayMs(plant, now)
   ) {
     plant.status = "dry";
     plant.needsFirstWater = true;
@@ -4537,12 +4538,15 @@ function isHighTierPlantCare(plant) {
   );
 }
 
-function canPlantWiltFromEmptyWater(plant) {
+function canPlantWiltFromEmptyWater(plant, now) {
+  const tNow = now != null ? now : Date.now();
+  if (isSproutStage3Or5IdleNoGrowth(plant, tNow)) return false;
   return !plant.isSproutSelfSustaining || isHighTierPlantCare(plant);
 }
 
-function getMainDryAfterEmptyMsForPlant(plant) {
-  if (!canPlantWiltFromEmptyWater(plant)) return mainPlantDryAfterEmptyMs;
+function getMainDryAfterEmptyMsForPlant(plant, now) {
+  const tNow = now != null ? now : Date.now();
+  if (!canPlantWiltFromEmptyWater(plant, tNow)) return mainPlantDryAfterEmptyMs;
   if (isPowderUpgradeInProgress(plant)) return mainPlantDryAfterPowderMs;
   const t = Math.max(0, Number(plant.growthTier) || 0);
   if (t >= 5) return mainPlantDryAfterEmptyTier5Ms;
@@ -4550,8 +4554,9 @@ function getMainDryAfterEmptyMsForPlant(plant) {
   return mainPlantDryAfterEmptyMs;
 }
 
-function getExtraDryDelayMs(plant) {
-  if (!canPlantWiltFromEmptyWater(plant)) return plantDryMs;
+function getExtraDryDelayMs(plant, now) {
+  const tNow = now != null ? now : Date.now();
+  if (!canPlantWiltFromEmptyWater(plant, tNow)) return plantDryMs;
   if (isPowderUpgradeInProgress(plant)) return plantDryMsDuringPowderMs;
   const t = Math.max(0, Number(plant.growthTier) || 0);
   if (t >= 5) return plantDryMsTier5Ms;
@@ -4663,6 +4668,42 @@ function getPlantSecondGrowthRatio(plant, now) {
   return Math.min(1, Math.max(0, (ev - sproutStage1Ms) / sproutStage2GrowMs));
 }
 
+/** 씨→새싹 또는 새싹 단계 진행·가루 성장 등 월드 초록 게이지가 채워지는 중 */
+function hasActiveGreenGrowthProgress(plant, now) {
+  const g1 = getPlantGrowthRatio(plant, now);
+  if (g1 !== null && g1 < 1) return true;
+  const g2 = getPlantSecondGrowthRatio(plant, now);
+  if (g2 !== null && g2 < 1) return true;
+  return false;
+}
+
+/**
+ * 3단계(완성 새싹)·5단계(완성 풀)이면서 성장 게이지가 없을 때: 물 감소·마름 멈춤, 카드에서 수분만 숨김.
+ */
+function isSproutStage3Or5IdleNoGrowth(plant, now) {
+  if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
+  const st = getSproutStageFromPlant(plant);
+  if (st !== 3 && st !== 5) return false;
+  if (hasActiveGreenGrowthProgress(plant, now)) return false;
+  return true;
+}
+
+function shouldPauseWaterDecayForPlant(plant, now) {
+  return isSproutStage3Or5IdleNoGrowth(plant, now);
+}
+
+function syncPlantCardWaterReadoutVisibility(plant, now) {
+  if (!plantWaterText || !plantWaterBar) return;
+  const hide = plant && shouldPauseWaterDecayForPlant(plant, now);
+  if (hide) {
+    plantWaterText.style.display = "none";
+    plantWaterBar.style.display = "none";
+  } else {
+    plantWaterText.style.display = "";
+    plantWaterBar.style.display = "grid";
+  }
+}
+
 function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
   if (!element || !fill) return;
   const ratio = secondRatio !== null ? secondRatio : firstRatio;
@@ -4678,6 +4719,12 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 
 function updateExtraPlantWaterLevel(plant, now) {
   if (plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") {
+    return;
+  }
+
+  if (shouldPauseWaterDecayForPlant(plant, now)) {
+    if (plant.becameEmptyAt != null) plant.becameEmptyAt = null;
+    plant.waterLevelUpdatedAt = now;
     return;
   }
 
@@ -6243,6 +6290,12 @@ function updatePlantWaterLevel() {
   }
 
   const now = Date.now();
+  if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
+    if (plantRuntime.becameEmptyAt != null) plantRuntime.becameEmptyAt = null;
+    plantRuntime.waterLevelUpdatedAt = now;
+    return;
+  }
+
   const elapsedTicks = Math.floor(
     (now - plantRuntime.waterLevelUpdatedAt) / plantWaterLevelTickMs
   );
@@ -6317,10 +6370,10 @@ function updatePlantState() {
   }
 
   if (
-    canPlantWiltFromEmptyWater(plantRuntime) &&
+    canPlantWiltFromEmptyWater(plantRuntime, now) &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
-    now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime)
+    now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
     // Keep planted ground + dry soil; preserve sprout growth so stage 2 returns after watering.
     plantRuntime.status = "dry";
@@ -6444,6 +6497,7 @@ function updatePlantCard() {
       segment.style.display = index < waterCapacity ? "block" : "none";
       segment.classList.toggle("is-filled", index < plant.waterLevel);
     });
+    syncPlantCardWaterReadoutVisibility(plant, Date.now());
     return;
   }
 
@@ -6470,6 +6524,7 @@ function updatePlantCard() {
     segment.style.display = index < waterCapacity ? "block" : "none";
     segment.classList.toggle("is-filled", index < plantRuntime.waterLevel);
   });
+  syncPlantCardWaterReadoutVisibility(plantRuntime, Date.now());
 
 }
 
