@@ -4067,7 +4067,10 @@ function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
   const bump = function (t) {
     const n = Number(t);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return n + shift;
+    const v = n + shift;
+    if (!Number.isFinite(v) || v <= 0) return null;
+    if (v > localNow) return localNow;
+    return v;
   };
   const maybe = function (key) {
     const v = bump(plant[key]);
@@ -4088,6 +4091,46 @@ function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
       const v = bump(entry);
       return v != null ? v : entry;
     });
+  }
+}
+
+/**
+ * After a remote world snapshot, local `applyPlantWaterDecay` uses this client's
+ * Date.now(). Clamp hydration timestamps so skew cannot drain all water or
+ * trigger dry soil in the same frame as apply.
+ * @param {function} getDryAfterEmptyMs (plant, now) => ms until soil dries after water hits 0
+ */
+function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfterEmptyMs) {
+  if (!plant) return;
+  if (Object.prototype.hasOwnProperty.call(plant, "isSeedPlanted") && !plant.isSeedPlanted) {
+    return;
+  }
+  if (plant.status === "rotten" || plant.status === "dry") return;
+
+  const w = Math.max(0, Number(plant.waterLevel) || 0);
+  const tickMs = getPlantWaterLevelTickMsForTier(plant.growthTier);
+  if (!Number.isFinite(tickMs) || tickMs <= 0) return;
+
+  if (w > 0) {
+    let wu = Number(plant.waterLevelUpdatedAt);
+    if (!Number.isFinite(wu) || wu <= 0 || wu > now) {
+      plant.waterLevelUpdatedAt = now;
+    } else {
+      const maxElapsed = tickMs * w + tickMs;
+      if (now - wu > maxElapsed) {
+        plant.waterLevelUpdatedAt = now;
+      }
+    }
+    plant.becameEmptyAt = null;
+    return;
+  }
+
+  const be = Number(plant.becameEmptyAt);
+  if (plant.becameEmptyAt != null && Number.isFinite(be)) {
+    const dryAfter = getDryAfterEmptyMs(plant, now);
+    if (dryAfter > 0 && now - be >= dryAfter) {
+      plant.becameEmptyAt = Math.max(1, now - dryAfter + 1);
+    }
   }
 }
 
@@ -4396,6 +4439,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (plantRuntime.isSeedPlanted && snapshotRefTime > 0) {
           rebasePlantModelTimestampsToLocalNow(plantRuntime, localApplyNow, snapshotRefTime);
         }
+        sanitizeSharedPlantHydrationAfterRemoteSnapshot(
+          plantRuntime,
+          localApplyNow,
+          getMainDryAfterEmptyMsForPlant
+        );
         npcX = Number(snapshot.mainPlant.npcX) || npcX;
         npcY = Number(snapshot.mainPlant.npcY) || npcY;
         if (plantRuntime.isSeedPlanted) {
@@ -4616,6 +4664,17 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       if (usesWorldLooseSeedMode()) {
         sanitizeWorldLooseModeExtraSeeds();
       }
+      const snapRefPlants =
+        (Number(snapshot.savedAt) > 0 ? Number(snapshot.savedAt) : 0) ||
+        (snapshotSavedAt > 0 ? snapshotSavedAt : 0);
+      const extraPlantClockNow = Date.now();
+      appleState.extraPlants.forEach(function (ep) {
+        if (!ep) return;
+        if (snapRefPlants > 0) {
+          rebasePlantModelTimestampsToLocalNow(ep, extraPlantClockNow, snapRefPlants);
+        }
+        sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
+      });
       const now = Date.now();
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
         const pickedAt = Number(localApplePickedAtById[appleId] || 0);

@@ -80,7 +80,12 @@ export function parseMainPlantFromSnapshot(mp) {
     plantWateredAtList: Array.isArray(mp.plantWateredAtList) ? mp.plantWateredAtList : [],
     plantState: mp.plantState || "normal",
     plantWaterLevel: readWaterLevel(mp.plantWaterLevel, 1),
-    plantWaterLevelUpdatedAt: Number(mp.plantWaterLevelUpdatedAt) || Date.now(),
+    plantWaterLevelUpdatedAt:
+      Object.prototype.hasOwnProperty.call(mp, "plantWaterLevelUpdatedAt") &&
+      Number.isFinite(Number(mp.plantWaterLevelUpdatedAt)) &&
+      Number(mp.plantWaterLevelUpdatedAt) > 0
+        ? Number(mp.plantWaterLevelUpdatedAt)
+        : null,
     plantBecameEmptyAt: Number(mp.plantBecameEmptyAt) || null,
     isPlantOverwatered: Boolean(mp.isPlantOverwatered),
     plantRottenAt: Number(mp.plantRottenAt) || null,
@@ -197,7 +202,12 @@ export function parseExtraPlantFromSnapshot(plant) {
     wateredAtList: Array.isArray(plant.wateredAtList) ? plant.wateredAtList.slice() : [],
     status: plant.status || "normal",
     waterLevel: readWaterLevel(plant.waterLevel, 1),
-    waterLevelUpdatedAt: Number(plant.waterLevelUpdatedAt) || Date.now(),
+    waterLevelUpdatedAt:
+      Object.prototype.hasOwnProperty.call(plant, "waterLevelUpdatedAt") &&
+      Number.isFinite(Number(plant.waterLevelUpdatedAt)) &&
+      Number(plant.waterLevelUpdatedAt) > 0
+        ? Number(plant.waterLevelUpdatedAt)
+        : null,
     becameEmptyAt: Number(plant.becameEmptyAt) || null,
     isOverwatered: Boolean(plant.isOverwatered),
     rottenAt: Number(plant.rottenAt) || null,
