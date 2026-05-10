@@ -5907,6 +5907,17 @@ function applyMagicPowderToPlant(plant) {
   return true;
 }
 
+/** 클릭 시 실제로 가루가 소비되는지(거리·티어·진행 중 등)와 동일 조건 */
+function isMagicPowderUsableNow() {
+  if (isOnboardingLinearGateActive()) return false;
+  if (magicPowderCount <= 0) return false;
+  const target = getNearestPlantForMagicPowder();
+  if (!target) return false;
+  const nextTier = getNextPowderTargetTier(target.plant);
+  if (!nextTier || isPowderUpgradeInProgress(target.plant)) return false;
+  return true;
+}
+
 function tryUseMagicPowder() {
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
@@ -8627,9 +8638,12 @@ function updateMagicPowderInventoryUi() {
   }
   magicPowderInventory.style.display = "block";
   magicPowderCountText.textContent = String(magicPowderCount);
-  const nearTarget = getNearestPlantForMagicPowder();
-  magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
-  setInstantHoverTip(magicPowderInventory, null);
+  const powderUsable = isMagicPowderUsableNow();
+  magicPowderInventory.classList.toggle("is-near", powderUsable);
+  setInstantHoverTip(
+    magicPowderInventory,
+    powderUsable ? "\uC0AC\uC6A9 click" : null
+  );
   setInstantHoverTip(magicPowderCountText, null);
 }
 
