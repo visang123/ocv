@@ -83,6 +83,10 @@ for delete
 to anon
 using (true);
 
+-- listPresence(room, updated_at >= …) 폴링 부하 완화
+create index if not exists idx_ovc_presence_room_updated_at
+  on public.ovc_presence (room, updated_at desc);
+
 create table if not exists public.ovc_world (
   room text primary key,
   state jsonb not null default '{}'::jsonb,

@@ -99,7 +99,11 @@ function readJsonBody(request, response, callback) {
 }
 
 function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  response.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store"
+  });
   response.end(JSON.stringify(payload));
 }
 
@@ -179,7 +183,8 @@ function handleApi(request, response, requestedPath) {
       const name = normalizeName(body.name);
       const password = String(body.password || "");
       const passwordHash = sha256Hex(password);
-      const account = readAccounts().find((savedAccount) => {
+      const accounts = readAccounts();
+      const account = accounts.find((savedAccount) => {
         const savedHash =
           typeof savedAccount.password_hash === "string" && savedAccount.password_hash
             ? savedAccount.password_hash
@@ -376,9 +381,12 @@ const server = http.createServer((request, response) => {
       return;
     }
 
+    const ext = path.extname(filePath);
+    const isAsset = /\.(png|jpg|jpeg|webp|ico|svg|woff2?)$/i.test(ext);
     response.writeHead(200, {
-      "Content-Type": mimeTypes[path.extname(filePath)] || "application/octet-stream",
-      "Cache-Control": "public, max-age=120"
+      "Content-Type": mimeTypes[ext] || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": isAsset ? "public, max-age=86400" : "public, max-age=120"
     });
     response.end(content);
   });

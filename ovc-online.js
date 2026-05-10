@@ -2,6 +2,60 @@
   const config = window.OVC_ONLINE_CONFIG || {};
   let client = null;
 
+  /** 네트워크 지연·일시 오류 시 클라이언트가 멈춘 것처럼 보이지 않게 */
+  var DEFAULT_FETCH_TIMEOUT_MS = 15000;
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, ms);
+    });
+  }
+
+  function isRetryableNetworkError(err) {
+    if (!err) return false;
+    if (err.name === "AbortError") return true;
+    var msg = String((err && err.message) || "");
+    if (msg.indexOf("Failed to fetch") !== -1) return true;
+    if (msg.indexOf("NetworkError") !== -1) return true;
+    if (msg.indexOf("시간이 초과") !== -1) return true;
+    if (msg.indexOf("timeout") !== -1) return true;
+    if (msg.indexOf("502") !== -1 || msg.indexOf("503") !== -1 || msg.indexOf("504") !== -1) {
+      return true;
+    }
+    return false;
+  }
+
+  async function withNetworkRetry(operation, opts) {
+    var attempts = (opts && opts.attempts) || 3;
+    var baseDelay = (opts && opts.baseDelayMs) || 280;
+    var last;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        return await operation();
+      } catch (err) {
+        last = err;
+        if (i < attempts - 1 && isRetryableNetworkError(err)) {
+          await sleep(baseDelay * Math.pow(2, i));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw last;
+  }
+
+  function fetchWithTimeout(url, options, timeoutMs) {
+    var ms = timeoutMs == null ? DEFAULT_FETCH_TIMEOUT_MS : timeoutMs;
+    var controller = new AbortController();
+    var timer = window.setTimeout(function () {
+      controller.abort();
+    }, ms);
+    var base = options || {};
+    return fetch(url, Object.assign({}, base, { signal: controller.signal })).finally(function () {
+      window.clearTimeout(timer);
+    });
+  }
+
   function resolveCreateClientFn() {
     var sb = window.supabase;
     if (sb && typeof sb.createClient === "function") {
@@ -94,7 +148,7 @@
 
     let response;
     try {
-      response = await fetch(url, {
+      response = await fetchWithTimeout(url, {
         method: "GET",
         headers: {
           apikey: config.supabaseKey,
@@ -118,7 +172,7 @@
     const sessionToken = generateSessionToken();
     try {
       const patchUrl = base + "/rest/v1/" + tableSeg + "?id=eq." + encodeURIComponent(String(data.id));
-      const patchRes = await fetch(patchUrl, {
+      const patchRes = await fetchWithTimeout(patchUrl, {
         method: "PATCH",
         headers: {
           apikey: config.supabaseKey,
@@ -183,7 +237,9 @@
     if (!supabaseClient) {
       if (canLoginViaSupabaseRest()) {
         try {
-          return await loginViaSupabaseRest(normalizedName, password);
+          return await withNetworkRetry(function () {
+            return loginViaSupabaseRest(normalizedName, password);
+          }, { attempts: 2, baseDelayMs: 400 });
         } catch (error) {
           throw normalizeOnlineError(error);
         }
@@ -272,7 +328,7 @@
         const base = config.supabaseUrl.trim().replace(/\/$/, "");
         const tableSeg = encodeURIComponent(config.accountsTable);
         const patchUrl = base + "/rest/v1/" + tableSeg + "?id=eq." + encodeURIComponent(id);
-        const patchRes = await fetch(patchUrl, {
+        const patchRes = await fetchWithTimeout(patchUrl, {
           method: "PATCH",
           headers: {
             apikey: config.supabaseKey,
@@ -298,13 +354,13 @@
     if (!valid) {
       return { ok: false };
     }
-    const { error } = await supabaseClient
-      .from(config.accountsTable)
-      .update({ tutorial_done: wantDone })
-      .eq("id", id);
-    if (error) {
-      throw normalizeOnlineError(error);
-    }
+    await withNetworkRetry(async function () {
+      const { error } = await supabaseClient
+        .from(config.accountsTable)
+        .update({ tutorial_done: wantDone })
+        .eq("id", id);
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+    }, { attempts: 2, baseDelayMs: 250 });
     return { ok: true };
   }
 
@@ -315,12 +371,14 @@
     }
 
     try {
-      const { error } = await supabaseClient
-        .from(config.accountsTable)
-        .update({ color })
-        .eq("id", userId);
+      await withNetworkRetry(async function () {
+        const { error } = await supabaseClient
+          .from(config.accountsTable)
+          .update({ color })
+          .eq("id", userId);
 
-      if (error) throw new Error(error.message);
+        if (error) throw new Error(error.message || String(error));
+      }, { attempts: 2, baseDelayMs: 200 });
     } catch (error) {
       throw normalizeOnlineError(error);
     }
@@ -420,11 +478,13 @@
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabaseClient
-      .from(config.presenceTable || "ovc_presence")
-      .upsert(payload, { onConflict: "id" });
+    await withNetworkRetry(async function () {
+      const { error } = await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .upsert(payload, { onConflict: "id" });
 
-    if (error) throw normalizeOnlineError(error);
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+    }, { attempts: 2, baseDelayMs: 120 });
   }
 
   async function listPresence(roomName) {
@@ -432,14 +492,19 @@
     if (!supabaseClient) return [];
 
     const staleCutoff = new Date(Date.now() - 70000).toISOString();
-    const { data, error } = await supabaseClient
-      .from(config.presenceTable || "ovc_presence")
-      .select("id, account_id, name, color, x, depth, jump_y, updated_at")
-      .eq("room", roomName || config.multiplayerRoom || "ovc-main-room")
-      .gte("updated_at", staleCutoff);
+    const room = roomName || config.multiplayerRoom || "ovc-main-room";
+    const data = await withNetworkRetry(async function () {
+      const { data: rows, error } = await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .select("id, account_id, name, color, x, depth, jump_y, updated_at")
+        .eq("room", room)
+        .gte("updated_at", staleCutoff);
 
-    if (error) throw normalizeOnlineError(error);
-    return (data || []).map(function (row) {
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+      return rows || [];
+    }, { attempts: 3, baseDelayMs: 250 });
+
+    return data.map(function (row) {
       return {
         id: row.id,
         userId: row.account_id,
@@ -457,12 +522,14 @@
     const supabaseClient = getClient();
     if (!supabaseClient || !sessionId) return;
 
-    const { error } = await supabaseClient
-      .from(config.presenceTable || "ovc_presence")
-      .delete()
-      .eq("id", String(sessionId));
+    await withNetworkRetry(async function () {
+      const { error } = await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .delete()
+        .eq("id", String(sessionId));
 
-    if (error) throw normalizeOnlineError(error);
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+    }, { attempts: 2, baseDelayMs: 120 });
   }
 
   async function saveWorldState(roomName, state) {
@@ -470,18 +537,20 @@
     if (!supabaseClient || !state) return null;
 
     const room = roomName || config.multiplayerRoom || "ovc-main-room";
-    const { data, error } = await supabaseClient
-      .from(config.worldTable || "ovc_world")
-      .upsert({
-        room,
-        state,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "room" })
-      .select("state, updated_at")
-      .single();
+    return await withNetworkRetry(async function () {
+      const { data, error } = await supabaseClient
+        .from(config.worldTable || "ovc_world")
+        .upsert({
+          room,
+          state,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "room" })
+        .select("state, updated_at")
+        .single();
 
-    if (error) throw normalizeOnlineError(error);
-    return data || null;
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+      return data || null;
+    }, { attempts: 3, baseDelayMs: 350 });
   }
 
   async function loadWorldState(roomName) {
@@ -489,43 +558,47 @@
     if (!supabaseClient) return null;
 
     const room = roomName || config.multiplayerRoom || "ovc-main-room";
-    const { data, error } = await supabaseClient
-      .from(config.worldTable || "ovc_world")
-      .select("state, updated_at")
-      .eq("room", room)
-      .maybeSingle();
+    return await withNetworkRetry(async function () {
+      const { data, error } = await supabaseClient
+        .from(config.worldTable || "ovc_world")
+        .select("state, updated_at")
+        .eq("room", room)
+        .maybeSingle();
 
-    if (error) throw normalizeOnlineError(error);
-    return data || null;
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+      return data || null;
+    }, { attempts: 3, baseDelayMs: 350 });
   }
 
   async function postLocalApi(url, payload) {
-    let response;
+    return await withNetworkRetry(async function () {
+      let response;
+      try {
+        response = await fetchWithTimeout(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        throw normalizeOnlineError(error);
+      }
 
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    } catch (error) {
-      throw new Error(getMissingConfigMessage());
-    }
+      const text = await response.text();
+      let data = null;
 
-    const text = await response.text();
-    let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        throw new Error(getMissingConfigMessage());
+      }
 
-    try {
-      data = JSON.parse(text);
-    } catch (error) {
-      throw new Error(getMissingConfigMessage());
-    }
+      if (!response.ok || !data.ok) {
+        var hint = !response.ok ? " (HTTP " + response.status + ")" : "";
+        throw new Error((data && data.message) || "요청에 실패했습니다." + hint);
+      }
 
-    if (!response.ok || !data.ok) {
-      throw new Error(data.message || "요청에 실패했습니다.");
-    }
-
-    return data;
+      return data;
+    }, { attempts: 2, baseDelayMs: 220 });
   }
 
   async function signUpWithLocalServer(name, password) {
@@ -537,6 +610,9 @@
   }
 
   function normalizeOnlineError(error) {
+    if (error && error.name === "AbortError") {
+      return new Error("서버 응답이 너무 느립니다. 잠시 후 다시 시도해주세요.");
+    }
     if (error && error.message === "Failed to fetch") {
       return new Error("온라인 서버에 연결하지 못했습니다. Supabase URL/키가 맞는지 확인해주세요.");
     }
