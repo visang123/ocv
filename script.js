@@ -592,6 +592,25 @@ let lastHeartbeatBroadcastAt = 0;
 let lastWaterSplashAt = 0;
 let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
+const WORLD_CHAT_LOG_CAP = 80;
+const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
+const WORLD_HEART_FX_MS = 2200;
+const WORLD_CHAT_MAX_CHARS = 120;
+let worldChatLog = [];
+let worldChatPanelOpen = false;
+let localChatBubbleText = "";
+let localChatBubbleHideAt = 0;
+let localChatBubbleTimer = null;
+const remoteChatBubbles = Object.create(null);
+const remoteChatBubbleEls = Object.create(null);
+let worldHeartBtn = null;
+let worldChatToggleBtn = null;
+let worldChatPanelEl = null;
+let worldChatLogEl = null;
+let worldChatInputEl = null;
+let worldChatSendBtn = null;
+let playerChatBubbleEl = null;
+let worldSocialUiReady = false;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
 let lastWellStateChangeAt = 0;
@@ -1091,6 +1110,13 @@ document.addEventListener("keydown", function (event) {
   }
 
   if (key === "Escape") {
+    if (worldChatPanelOpen && worldChatPanelEl) {
+      event.preventDefault();
+      worldChatPanelOpen = false;
+      worldChatPanelEl.classList.remove("is-open");
+      worldChatPanelEl.setAttribute("aria-hidden", "true");
+      return;
+    }
     if (isGuideBookOpen || guideCard.style.display === "block") {
       event.preventDefault();
       closeGuideCardFromClick();
@@ -1384,6 +1410,7 @@ controlsOverlay.innerHTML =
   '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
+ensureWorldSocialUi();
 
 function updateSettingsTutorialButtons() {
   if (!tutorialExitButton || !tutorialReplayButton) return;
@@ -7594,6 +7621,340 @@ function updatePlayerName() {
   playerName.style.transform = "translate(" + x + "px, " + y + "px)";
 }
 
+function isWorldSocialRealtimeReady() {
+  return Boolean(multiplayerChannel && currentSessionId && isMultiplayerSubscribed);
+}
+
+function sanitizeWorldChatText(raw) {
+  let s = String(raw || "")
+    .trim()
+    .replace(/[\u0000-\u001F<>]/g, "");
+  if (s.length > WORLD_CHAT_MAX_CHARS) s = s.slice(0, WORLD_CHAT_MAX_CHARS);
+  return s;
+}
+
+function appendWorldChatLine(name, text, sessionId, sentAt) {
+  const entry = {
+    name: name || "OVC",
+    text: text || "",
+    sid: sessionId || "",
+    t: Number(sentAt) || Date.now()
+  };
+  worldChatLog.push(entry);
+  if (worldChatLog.length > WORLD_CHAT_LOG_CAP) worldChatLog.shift();
+  if (!worldChatLogEl) return;
+  const row = document.createElement("div");
+  row.className = "world-chat-line";
+  const d = new Date(entry.t);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  row.textContent = "[" + hh + ":" + mm + "] " + entry.name + ": " + entry.text;
+  worldChatLogEl.appendChild(row);
+  worldChatLogEl.scrollTop = worldChatLogEl.scrollHeight;
+}
+
+function setLocalChatBubble(text, hideAt) {
+  localChatBubbleText = text;
+  localChatBubbleHideAt = hideAt;
+  if (localChatBubbleTimer) {
+    clearTimeout(localChatBubbleTimer);
+    localChatBubbleTimer = null;
+  }
+  if (!text || !playerChatBubbleEl) return;
+  playerChatBubbleEl.textContent = text;
+  playerChatBubbleEl.style.display = "block";
+  const delay = Math.max(0, hideAt - Date.now());
+  localChatBubbleTimer = setTimeout(function () {
+    localChatBubbleTimer = null;
+    localChatBubbleText = "";
+    localChatBubbleHideAt = 0;
+    if (playerChatBubbleEl) playerChatBubbleEl.style.display = "none";
+  }, delay);
+}
+
+function setRemoteChatBubble(sessionId, text, hideAt) {
+  if (!sessionId) return;
+  remoteChatBubbles[sessionId] = { text: text, hideAt: hideAt };
+  let el = remoteChatBubbleEls[sessionId];
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "world-player-chat-bubble world-remote-chat-bubble";
+    document.body.appendChild(el);
+    remoteChatBubbleEls[sessionId] = el;
+  }
+  el.textContent = text;
+  el.style.display = "block";
+}
+
+function removeRemoteChatBubbleEl(sessionId) {
+  const el = remoteChatBubbleEls[sessionId];
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  delete remoteChatBubbleEls[sessionId];
+  delete remoteChatBubbles[sessionId];
+}
+
+function broadcastWorldChat(text) {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_chat",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId || "",
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        text: text,
+        t: Date.now()
+      }
+    })
+  ).catch(function () {});
+  return true;
+}
+
+function broadcastWorldHeart() {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_heart",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId || "",
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        t: Date.now()
+      }
+    })
+  ).catch(function () {});
+  return true;
+}
+
+function handleWorldChatBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  const text = sanitizeWorldChatText(payload.text);
+  if (!text) return;
+  const name = nameForIngameUiDisplay(payload.name || "OVC");
+  const t = Number(payload.t) || Date.now();
+  appendWorldChatLine(name, text, sid, t);
+  setRemoteChatBubble(sid, text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+}
+
+function handleWorldHeartBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  const rp = remotePlayers[sid];
+  if (!rp) return;
+  const headTopWorld = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + rp.worldY;
+  const sx = toScreenX(rp.worldX + PLAYER_WIDTH) - 6;
+  const sy = toScreenY(headTopWorld) + 2;
+  spawnHeartFxAtScreen(sx, sy);
+}
+
+function spawnHeartFxAtScreen(sx, sy) {
+  const root = document.createElement("div");
+  root.className = "ovc-heart-fx-root";
+  root.style.left = Math.round(sx) + "px";
+  root.style.top = Math.round(sy) + "px";
+  const n = 9;
+  const hearts = ["\u2764", "\u2665", "\u2764\uFE0F"];
+  for (let i = 0; i < n; i++) {
+    const bit = document.createElement("span");
+    bit.className = "ovc-heart-fx-bit";
+    bit.textContent = hearts[i % hearts.length];
+    const dx = (Math.random() - 0.35) * 52;
+    const dy = -18 - Math.random() * 48;
+    bit.style.setProperty("--ovc-hx", dx + "px");
+    bit.style.setProperty("--ovc-hy", dy + "px");
+    bit.style.animationDelay = i * 0.05 + "s";
+    root.appendChild(bit);
+  }
+  document.body.appendChild(root);
+  window.setTimeout(function () {
+    if (root.parentNode) root.parentNode.removeChild(root);
+  }, WORLD_HEART_FX_MS + 200);
+}
+
+function pulseWorldHeartButton() {
+  if (!worldHeartBtn) return;
+  worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
+  void worldHeartBtn.offsetWidth;
+  worldHeartBtn.classList.add("ovc-heart-btn-pulse");
+  window.setTimeout(function () {
+    if (worldHeartBtn) worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
+  }, 600);
+}
+
+function updateWorldSocialChatUiEnabled() {
+  const ok = isWorldSocialRealtimeReady();
+  if (worldChatInputEl) {
+    worldChatInputEl.disabled = !ok;
+    worldChatInputEl.placeholder = ok ? "\uBA54\uC2DC\uC9C0..." : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
+  }
+  if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
+  if (worldHeartBtn) worldHeartBtn.disabled = !ok;
+}
+
+function updatePlayerChatBubbleOverlay() {
+  if (!playerChatBubbleEl) return;
+  const now = Date.now();
+  if (!localChatBubbleText || now >= localChatBubbleHideAt) {
+    playerChatBubbleEl.style.display = "none";
+    if (now >= localChatBubbleHideAt) localChatBubbleText = "";
+    return;
+  }
+  if (!hasSpawnedCharacter || isCharacterSelecting) {
+    playerChatBubbleEl.style.display = "none";
+    return;
+  }
+  const playerBox = getPlayerBox();
+  const bw = playerChatBubbleEl.offsetWidth || 80;
+  const bh = playerChatBubbleEl.offsetHeight || 28;
+  const sx = toScreenX(playerBox.left + playerBox.width / 2) - bw / 2;
+  const sy = toScreenY(playerBox.top) - bh - 4;
+  playerChatBubbleEl.style.display = "block";
+  playerChatBubbleEl.style.transform = "translate(" + sx + "px, " + sy + "px)";
+}
+
+function updateRemoteChatBubbleOverlays() {
+  const now = Date.now();
+  Object.keys(remoteChatBubbleEls).forEach(function (sid) {
+    const el = remoteChatBubbleEls[sid];
+    const st = remoteChatBubbles[sid];
+    const rp = remotePlayers[sid];
+    if (!el) return;
+    if (!st || now >= st.hideAt) {
+      el.style.display = "none";
+      return;
+    }
+    if (!st.text) {
+      el.style.display = "none";
+      return;
+    }
+    if (!rp) {
+      el.style.display = "none";
+      return;
+    }
+    el.textContent = st.text;
+    const headTopWorld = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + rp.worldY;
+    const bw = el.offsetWidth || 72;
+    const bh = el.offsetHeight || 26;
+    const sx = toScreenX(rp.worldX + PLAYER_WIDTH / 2) - bw / 2;
+    const sy = toScreenY(headTopWorld) - bh - 4;
+    el.style.display = "block";
+    el.style.transform = "translate(" + sx + "px, " + sy + "px)";
+  });
+}
+
+function sendWorldChatFromUi() {
+  if (!worldChatInputEl) return;
+  const text = sanitizeWorldChatText(worldChatInputEl.value);
+  worldChatInputEl.value = "";
+  if (!text) return;
+  if (!isWorldSocialRealtimeReady()) return;
+  appendWorldChatLine(
+    nameForIngameUiDisplay(accountDisplayNameForUi()),
+    text,
+    currentSessionId,
+    Date.now()
+  );
+  setLocalChatBubble(text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+  broadcastWorldChat(text);
+}
+
+function onWorldHeartClick() {
+  if (!isWorldSocialRealtimeReady()) return;
+  broadcastWorldHeart();
+  pulseWorldHeartButton();
+  const playerBox = getPlayerBox();
+  const sx = toScreenX(playerBox.right) - 4;
+  const sy = toScreenY(playerBox.top) + 4;
+  spawnHeartFxAtScreen(sx, sy);
+}
+
+function ensureWorldSocialUi() {
+  if (worldSocialUiReady) return;
+  worldHeartBtn = document.createElement("button");
+  worldHeartBtn.type = "button";
+  worldHeartBtn.id = "world-heart-button";
+  worldHeartBtn.className = "world-heart-button";
+  worldHeartBtn.setAttribute("aria-label", "\uD558\uD2B8");
+  worldHeartBtn.innerHTML = "\u2764\uFE0F";
+  document.body.appendChild(worldHeartBtn);
+
+  worldChatToggleBtn = document.createElement("button");
+  worldChatToggleBtn.type = "button";
+  worldChatToggleBtn.id = "world-chat-toggle";
+  worldChatToggleBtn.className = "world-chat-toggle";
+  worldChatToggleBtn.setAttribute("aria-label", "\uCC57");
+  worldChatToggleBtn.textContent = "\uD83D\uDCAC";
+  document.body.appendChild(worldChatToggleBtn);
+
+  worldChatPanelEl = document.createElement("div");
+  worldChatPanelEl.id = "world-chat-panel";
+  worldChatPanelEl.className = "world-chat-panel";
+  worldChatPanelEl.setAttribute("aria-hidden", "true");
+  worldChatLogEl = document.createElement("div");
+  worldChatLogEl.className = "world-chat-log";
+  const hint = document.createElement("div");
+  hint.className = "world-chat-hint";
+  hint.textContent =
+    "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uC804\uC124 \uCC57\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC5B4\uC694.";
+  worldChatLogEl.appendChild(hint);
+  const inpRow = document.createElement("div");
+  inpRow.className = "world-chat-input-row";
+  worldChatInputEl = document.createElement("input");
+  worldChatInputEl.type = "text";
+  worldChatInputEl.className = "world-chat-input";
+  worldChatInputEl.maxLength = WORLD_CHAT_MAX_CHARS;
+  worldChatInputEl.autocomplete = "off";
+  worldChatSendBtn = document.createElement("button");
+  worldChatSendBtn.type = "button";
+  worldChatSendBtn.className = "world-chat-send";
+  worldChatSendBtn.textContent = "\uC804\uC1A1";
+  inpRow.appendChild(worldChatInputEl);
+  inpRow.appendChild(worldChatSendBtn);
+  worldChatPanelEl.appendChild(worldChatLogEl);
+  worldChatPanelEl.appendChild(inpRow);
+  document.body.appendChild(worldChatPanelEl);
+
+  playerChatBubbleEl = document.createElement("div");
+  playerChatBubbleEl.id = "player-chat-bubble";
+  playerChatBubbleEl.className = "world-player-chat-bubble world-local-chat-bubble";
+  playerChatBubbleEl.style.display = "none";
+  document.body.appendChild(playerChatBubbleEl);
+
+  worldHeartBtn.addEventListener("click", function () {
+    onWorldHeartClick();
+  });
+  worldChatToggleBtn.addEventListener("click", function () {
+    worldChatPanelOpen = !worldChatPanelOpen;
+    worldChatPanelEl.classList.toggle("is-open", worldChatPanelOpen);
+    worldChatPanelEl.setAttribute("aria-hidden", worldChatPanelOpen ? "false" : "true");
+    if (worldChatPanelOpen) worldChatInputEl.focus();
+  });
+  worldChatSendBtn.addEventListener("click", function () {
+    sendWorldChatFromUi();
+  });
+  worldChatInputEl.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      sendWorldChatFromUi();
+    }
+  });
+
+  worldSocialUiReady = true;
+  updateWorldSocialChatUiEnabled();
+}
+
+function updateWorldSocialOverlaysInGameLoop() {
+  if (!worldSocialUiReady) return;
+  updateWorldSocialChatUiEnabled();
+  updatePlayerChatBubbleOverlay();
+  updateRemoteChatBubbleOverlays();
+}
+
 function setupMultiplayer() {
   if (isTabSessionSuperseded) return;
   if (!hasSpawnedCharacter) {
@@ -7678,6 +8039,14 @@ function setupMultiplayer() {
     .on("broadcast", { event: "butterfly_catch" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleRemoteButterflyCatchBroadcast(payload.payload);
+    })
+    .on("broadcast", { event: "world_chat" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleWorldChatBroadcast(payload.payload || {});
+    })
+    .on("broadcast", { event: "world_heart" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleWorldHeartBroadcast(payload.payload || {});
     })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
@@ -8015,6 +8384,7 @@ function removeRemotePlayer(remoteId) {
   if (!remotePlayer) return;
   remotePlayer.element.remove();
   delete remotePlayers[remoteId];
+  removeRemoteChatBubbleEl(remoteId);
   updateRemotePlayerCount();
 }
 
@@ -9219,6 +9589,7 @@ function gameLoop() {
   updateMagicPowderInventoryUi();
   updateCamera();
   updatePlayerName();
+  updateWorldSocialOverlaysInGameLoop();
   sendMultiplayerPresence(false);
   savePlayerPosition(false);
   requestAnimationFrame(gameLoop);
