@@ -4799,9 +4799,26 @@ function getPlantGrowthRatio(plant, now) {
   return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / plantGrowthMs));
 }
 
+/** 티어 4→5 자동 성장(가루 없음) 구간의 초록 게이지 비율; 해당 없으면 null */
+function getGrassAutoTier5GrowthRatio(plant, now) {
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier !== 4) return null;
+  if (isPowderUpgradeInProgress(plant)) return null;
+  if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
+    return null;
+  }
+  const t0 = plant.grassAuto5EligibleAt;
+  if (t0 == null || !Number.isFinite(Number(t0))) return null;
+  const elapsed = now - Number(t0);
+  if (elapsed <= 0) return 0;
+  return Math.min(1, elapsed / level5GrowMs);
+}
+
 function getPlantSecondGrowthRatio(plant, now) {
   const powderRatio = getPowderUpgradeRatio(plant, now);
   if (powderRatio !== null) return powderRatio;
+  const grass5Ratio = getGrassAutoTier5GrowthRatio(plant, now);
+  if (grass5Ratio !== null) return grass5Ratio;
   if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten") return null;
   if (plant.isSproutSelfSustaining) return null;
   const ev = plant.sproutEvolutionMs || 0;
