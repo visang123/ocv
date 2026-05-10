@@ -7750,6 +7750,9 @@ function broadcastWorldHeart() {
         id: currentSessionId,
         userId: currentUserId || "",
         name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        x: playerX,
+        depth: playerDepth,
+        jumpY: jumpY,
         t: Date.now()
       }
     })
@@ -7775,8 +7778,23 @@ function handleWorldHeartBroadcast(payload) {
   if (sid === String(currentSessionId)) return;
   const rp = remotePlayers[sid];
   if (!rp || !rp.bodyElement) return;
-  const rect = rp.bodyElement.getBoundingClientRect();
-  spawnWorldHeartFxNearBodyRect(rect);
+  const px = Number(payload.x);
+  const depth = Number(payload.depth);
+  const jy = Number(payload.jumpY);
+  if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
+    const wy = -depth + jy;
+    setWorldPosition(rp.element, px, wy);
+    rp.worldX = px;
+    rp.worldY = wy;
+    rp.depth = depth;
+    rp.jumpY = jy;
+    rp.positionKey = Math.round(px * 10) + "|" + Math.round(wy * 10);
+  }
+  window.requestAnimationFrame(function () {
+    const rpp = remotePlayers[sid];
+    if (!rpp || !rpp.bodyElement) return;
+    spawnWorldHeartFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
+  });
 }
 
 function spawnWorldHeartFxNearBodyRect(rect) {
@@ -7883,9 +7901,10 @@ function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) {
   const bw = el.offsetWidth || 40;
   const bh = el.offsetHeight || Math.round(fontPx * 1.45);
   const gap = Math.max(0.5, 1.1 * pxPerWu);
+  const nameplateLift = Math.max(10, rect.height * 0.28);
   const cx = rect.left + rect.width / 2;
   const sx = cx - bw / 2 + wdx;
-  const sy = rect.top - bh - gap + wdy;
+  const sy = rect.top - bh - gap - nameplateLift + wdy;
   el.style.display = "block";
   el.style.transform =
     "translate(" + Math.round(sx) + "px, " + Math.round(sy) + "px)";
