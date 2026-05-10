@@ -4053,6 +4053,44 @@ function applyServerWorldRowTimestamps(row) {
   lastMainSeedStateChangeAt = Math.max(lastMainSeedStateChangeAt, parsed);
 }
 
+/**
+ * Plant timestamps in snapshots use the saver's Date.now(). Another client's clock
+ * skew makes `now - waterLevelUpdatedAt` huge so decay drains all water and soil
+ * flips to dry in one frame. Shift model times so elapsed-at-save matches local now.
+ * refTime = snapshot.savedAt (preferred) or server row time.
+ */
+function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
+  if (!plant || !refTime || !Number.isFinite(refTime) || refTime <= 0) return;
+  if (!Number.isFinite(localNow)) return;
+  const shift = localNow - refTime;
+  if (shift === 0) return;
+  const bump = function (t) {
+    const n = Number(t);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n + shift;
+  };
+  const maybe = function (key) {
+    const v = bump(plant[key]);
+    if (v != null) plant[key] = v;
+  };
+  maybe("waterLevelUpdatedAt");
+  maybe("becameEmptyAt");
+  maybe("lastWateredAt");
+  maybe("growthStartedAt");
+  maybe("plantedAt");
+  maybe("sproutGrownAt");
+  maybe("sproutEvolutionLastTickAt");
+  maybe("rottenAt");
+  maybe("powderUpgradeStartedAt");
+  maybe("grassAuto5EligibleAt");
+  if (Array.isArray(plant.wateredAtList)) {
+    plant.wateredAtList = plant.wateredAtList.map(function (entry) {
+      const v = bump(entry);
+      return v != null ? v : entry;
+    });
+  }
+}
+
 function getSharedWorldSnapshot() {
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
   return {
@@ -4351,6 +4389,13 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           });
         }
         applyLoadedPlantState(incomingPlant);
+        const localApplyNow = Date.now();
+        const snapshotRefTime =
+          (Number(snapshot.savedAt) > 0 ? Number(snapshot.savedAt) : 0) ||
+          (snapshotSavedAt > 0 ? snapshotSavedAt : 0);
+        if (plantRuntime.isSeedPlanted && snapshotRefTime > 0) {
+          rebasePlantModelTimestampsToLocalNow(plantRuntime, localApplyNow, snapshotRefTime);
+        }
         npcX = Number(snapshot.mainPlant.npcX) || npcX;
         npcY = Number(snapshot.mainPlant.npcY) || npcY;
         if (plantRuntime.isSeedPlanted) {
