@@ -7168,10 +7168,16 @@ function getPlantWorldLabel(plant) {
       ? Math.max(0, Number(plant.grassOrdinal))
       : 0;
   if (tier === 0) {
-    if (sproutOrd > 0) {
-      return name + "\uC758 \uB545" + sproutOrd;
+    if (!plant.isSproutGrown) {
+      if (sproutOrd > 0) {
+        return name + "\uC758 \uB545" + sproutOrd;
+      }
+      return name + "\uC758 \uB545";
     }
-    return name + "\uC758 \uB545";
+    if (sproutOrd > 0) {
+      return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
+    }
+    return name + "\uC758 \uC0C8\uC2F9";
   }
   if (tier >= 4 && grassOrd > 0) {
     return name + "\uC758 \uD480" + grassOrd;

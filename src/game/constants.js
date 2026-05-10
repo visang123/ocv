@@ -217,13 +217,15 @@ export function isFirstSproutGrowthPhase(plant) {
 }
 
 export function getPlantWaterLevelTickMsForPlant(plant) {
-  if (isFirstSproutGrowthPhase(plant)) return firstSproutWaterLevelTickMs;
-  return getPlantWaterLevelTickMsForTier(plant.growthTier);
+  const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
+  if (tier === 0) return firstSproutWaterLevelTickMs;
+  return getPlantWaterLevelTickMsForTier(tier);
 }
 
 export function getPlantDryAfterEmptyMsForPlantPhase(plant) {
-  if (isFirstSproutGrowthPhase(plant)) return firstSproutDryAfterEmptyMs;
-  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
+  const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
+  if (tier === 0) return firstSproutDryAfterEmptyMs;
+  return getPlantDryAfterEmptyMsForTier(tier);
 }
 
 /** 첫 새싹 나오기 전 초록 게이지(또는 완료 판정)에 쓰는 지속 시간 */
