@@ -3503,6 +3503,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       appleState.seedCount += 1;
       scheduleWorldLooseRespawnAfterPickup(appleState.worldLooseSeed, now);
       saveAppleState();
+      broadcastWorldLooseSeedPickup();
       markWorldDirty();
       syncWorldState(true);
       updateExtraSeedsAndPlants();
@@ -4531,12 +4532,21 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         const wls = snapshot.apples.worldLooseSeed;
         if (wls && typeof wls === "object") {
           const incomingNext = Math.max(0, Number(wls.nextSpawnAt) || 0);
+          const nowLoose = Date.now();
+          let mergedNextSpawnAt;
+          if (hasServerRowTime) {
+            if (incomingNext > nowLoose) {
+              mergedNextSpawnAt = Math.max(incomingNext, priorWorldLooseNextSpawnAt);
+            } else {
+              mergedNextSpawnAt = incomingNext;
+            }
+          } else {
+            mergedNextSpawnAt = Math.max(incomingNext, priorWorldLooseNextSpawnAt);
+          }
           appleState.worldLooseSeed = {
             x: Number(wls.x) || WORLD_LOOSE_SEED_X,
             y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
-            nextSpawnAt: hasServerRowTime
-              ? incomingNext
-              : Math.max(incomingNext, priorWorldLooseNextSpawnAt)
+            nextSpawnAt: mergedNextSpawnAt
           };
         } else {
           ensureWorldLooseSeedShape();
@@ -9382,6 +9392,10 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemoteButterflyCatchBroadcast(payload.payload);
     })
+    .on("broadcast", { event: "world_loose_seed_pickup" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteWorldLooseSeedPickupBroadcast(payload.payload || {});
+    })
     .on("broadcast", { event: "world_chat" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleWorldChatBroadcast(payload.payload || {});
@@ -10654,6 +10668,50 @@ function finalizeButterflyRemovalEffects(now) {
   }
   lastButterflyStateChangeAt = t;
   markWorldDirty();
+}
+
+function broadcastWorldLooseSeedPickup() {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!usesWorldLooseSeedMode()) return;
+  if (!multiplayerChannel || !currentSessionId) return;
+  ensureWorldLooseSeedShape();
+  const ws = appleState.worldLooseSeed;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_loose_seed_pickup",
+      payload: {
+        from: currentSessionId,
+        at: Date.now(),
+        x: Number(ws.x) || WORLD_LOOSE_SEED_X,
+        y: Number(ws.y) || WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: Math.max(0, Number(ws.nextSpawnAt) || 0)
+      }
+    })
+  ).catch(function () {
+    // syncWorldState still persists pickup for polling clients.
+  });
+}
+
+function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!usesWorldLooseSeedMode()) return;
+  if (!payload || payload.from === currentSessionId) return;
+  const nextAt = Math.max(0, Number(payload.nextSpawnAt) || 0);
+  const now = Date.now();
+  if (nextAt <= now) return;
+  ensureWorldLooseSeedShape();
+  const cur = Math.max(0, Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
+  if (nextAt <= cur) return;
+  appleState.worldLooseSeed.nextSpawnAt = nextAt;
+  const px = Number(payload.x);
+  const py = Number(payload.y);
+  if (Number.isFinite(px)) appleState.worldLooseSeed.x = px;
+  if (Number.isFinite(py)) appleState.worldLooseSeed.y = py;
+  saveAppleState();
+  markWorldDirty();
+  updateExtraSeedsAndPlants();
+  updateSeedInventory();
 }
 
 function broadcastButterflyCatch(butterflyId) {

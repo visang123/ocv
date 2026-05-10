@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 실제 배포 도메인을 정한 뒤 아래 주석을 풀고 URL을 바꾸면 사이트맵 제출에 도움이 됩니다.
+# Sitemap: https://여기에-도메인/sitemap.xml
