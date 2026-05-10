@@ -239,125 +239,23 @@ import {
   createHeldExtraSeed,
   getHeldExtraSeedId
 } from "./src/game/held-item.js";
-
-const OVC_PAGE_ENTRY =
-  typeof window !== "undefined" && window.OVC_ENTRY === "tutorial"
-    ? "tutorial"
-    : "world";
-
-function isTutorialDocumentEntry() {
-  return OVC_PAGE_ENTRY === "tutorial";
-}
-
-function isWorldDocumentEntry() {
-  return OVC_PAGE_ENTRY !== "tutorial";
-}
-
-function ovcHtmlPageUrl(htmlFile) {
-  const u = new URL(htmlFile, window.location.href);
-  u.searchParams.set("v", "20260517e");
-  u.searchParams.set("t", String(Date.now()));
-  return u.toString();
-}
-
-function ovcWorldIndexUrl() {
-  return ovcHtmlPageUrl("index.html");
-}
-
-function ovcTutorialPageUrl() {
-  return ovcHtmlPageUrl("tutorial.html");
-}
-
-/** 설정 「튜토리얼 하기」로 연 일회성 재생 세션(탭 단위). 없으면 월드 경험 계정은 튜토리얼에 갇히지 않게 복구한다. */
-const ovcTutorialReplaySessionKey = "ovcTutorialReplaySessionV1";
-/** 튜토리얼 갇힘 탈출: `?ovc_world=1` 또는 sessionStorage 플래그 → index(월드)로 두고 온보딩 완료 저장 */
-const ovcForceWorldHubSessionKey = "ovcForceWorldHubV1";
-const ovcForceWorldHubUrlParam = "ovc_world";
-/** sessionStorage 말고도 탈출 의도를 남김(저장 실패·다른 탭 대비). 로그인 확정 시 제거. */
-const ovcPendingWorldHubGuestKey = "ovcPendingWorldHubGuestV1";
-
-function ovcPendingWorldHubUserStorageKey(userId) {
-  return "ovcPendingWorldHubUserV1:" + String(userId || "");
-}
-
-function ovcClearPendingWorldHubMarkers(userId) {
-  try {
-    sessionStorage.removeItem(ovcForceWorldHubSessionKey);
-    localStorage.removeItem(ovcPendingWorldHubGuestKey);
-    if (userId) localStorage.removeItem(ovcPendingWorldHubUserStorageKey(userId));
-  } catch (eClrMarkers) {}
-}
-
-function ovcHardNavigateToWorldIndex() {
-  try {
-    var u = new URL("index.html", window.location.href);
-    u.searchParams.set(ovcForceWorldHubUrlParam, "1");
-    u.searchParams.set("v", "20260517e");
-    u.searchParams.set("t", String(Date.now()));
-    var url = u.toString();
-    try {
-      window.top.location.replace(url);
-    } catch (eTop) {
-      window.location.replace(url);
-    }
-  } catch (eNav) {
-    try {
-      window.top.location.replace(
-        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
-      );
-    } catch (eTop2) {
-      window.location.replace(
-        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
-      );
-    }
-  }
-}
-
-function ovcUrlIndicatesForceWorldHub() {
-  try {
-    if (typeof window === "undefined" || !window.location) return false;
-    var raw = new URLSearchParams(window.location.search || "").get(
-      ovcForceWorldHubUrlParam
-    );
-    if (raw === "1" || raw === "true" || raw === "yes") return true;
-    var h = window.location.hash || "";
-    if (/ovc_world=(?:1|true|yes)/i.test(h)) return true;
-    if (/^#world(?:=|:)?(?:1|true|yes)?$/i.test(h)) return true;
-    return false;
-  } catch (e) {
-    return false;
-  }
-}
-
-function ovcForceWorldHubIsRequested() {
-  try {
-    if (ovcUrlIndicatesForceWorldHub()) return true;
-    if (sessionStorage.getItem(ovcForceWorldHubSessionKey) === "1") {
-      return true;
-    }
-    if (localStorage.getItem(ovcPendingWorldHubGuestKey) === "1") {
-      return true;
-    }
-    var uidFromLs = "";
-    try {
-      uidFromLs = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
-    } catch (eUid) {}
-    if (
-      uidFromLs &&
-      localStorage.getItem(ovcPendingWorldHubUserStorageKey(uidFromLs)) ===
-        "1"
-    ) {
-      return true;
-    }
-  } catch (e) {}
-  return false;
-}
-
-try {
-  if (ovcUrlIndicatesForceWorldHub()) {
-    sessionStorage.setItem(ovcForceWorldHubSessionKey, "1");
-  }
-} catch (eForceUrlHook) {}
+import {
+  isTutorialDocumentEntry,
+  isWorldDocumentEntry
+} from "./src/app/ovc-page-entry.js";
+import {
+  ovcTutorialReplaySessionKey,
+  ovcClearPendingWorldHubMarkers,
+  ovcTutorialPageUrl,
+  ovcWorldIndexUrl,
+  ovcHardNavigateToWorldIndex,
+  ovcForceWorldHubIsRequested
+} from "./src/app/ovc-world-hub.js";
+import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
+import {
+  storageKeyMainSeedPickedForRoom,
+  storageKeyGuideBookPickedForRoom
+} from "./src/game/room-storage-keys.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -480,9 +378,6 @@ function ovcApplyForceWorldHubBypassLoggedIn() {
   requestAccountTutorialDoneSync({ force: true });
   return true;
 }
-function nameForIngameUiDisplay(realName) {
-  return (realName || "").trim() || "OVC";
-}
 const guideBookClickPromptDismissedKey =
   guideBookClickPromptDismissedKeyBase + (currentUserId || "guest");
 let currentSessionId = "";
@@ -523,24 +418,6 @@ const characterColors = [
   "#fecdd3", "#fde68a", "#cbd5e1", "#94a3b8", "#111827",
   "#7c2d12", "#365314", "#064e3b", "#0c4a6e", "#581c87"
 ];
-
-function normalizeHexColor(value) {
-  if (!/^#[0-9a-fA-F]{6}$/.test(value || "")) return "";
-  return value.toLowerCase();
-}
-
-function getMultiplayerRoomSlug() {
-  const room = window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom;
-  return room ? String(room).replace(/[^\w\-]+/g, "_") : "offline";
-}
-
-function storageKeyMainSeedPickedForRoom() {
-  return "mainSeedPickedRoomV1:" + getMultiplayerRoomSlug();
-}
-
-function storageKeyGuideBookPickedForRoom() {
-  return "guideBookPickedRoomV1:" + getMultiplayerRoomSlug();
-}
 
 function hasPickedMainSeedInCurrentRoom() {
   if (hasPickedMainSeedThisWindow) return true;
@@ -4163,17 +4040,10 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
     plantRuntime.status !== "dry" &&
     plantRuntime.status !== "rotten"
   ) {
-    if (
-      !shouldPauseWaterDecayForPlant(plantRuntime, now) &&
-      !isPlantGrowthHeldUntilFirstWater(plantRuntime)
-    ) {
+    if (!shouldPauseWaterDecayForPlant(plantRuntime, now)) {
       applyPlantWaterDecay(plantRuntime, now);
     }
-    if (
-      !isPlantGrowthHeldUntilFirstWater(plantRuntime) &&
-      plantRuntime.waterLevel === 0 &&
-      plantRuntime.becameEmptyAt === null
-    ) {
+    if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
       plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
     }
   }
@@ -4182,7 +4052,6 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
       return;
     }
     if (shouldPauseWaterDecayForPlant(ep, now)) return;
-    if (isPlantGrowthHeldUntilFirstWater(ep)) return;
     applyPlantWaterDecay(ep, now);
     if (ep.waterLevel === 0 && ep.becameEmptyAt === null) {
       ep.becameEmptyAt = ep.waterLevelUpdatedAt;
@@ -5938,16 +5807,6 @@ function shouldPauseWaterDecayForPlant(plant, now) {
   return isSproutStage3Or5IdleNoGrowth(plant, now);
 }
 
-/** 심은 직후~첫 물 주기 전: 초록 생장 게이지·수분 감소 없음. 첫 물에서 growthStartedAt 시작. */
-function isPlantGrowthHeldUntilFirstWater(plant) {
-  if (!plant) return false;
-  if (plant.isSproutGrown) return false;
-  if (plant.growthStartedAt != null) return false;
-  if (!plant.needsFirstWater) return false;
-  if (Math.max(0, Number(plant.growthTier) || 0) !== 0) return false;
-  return true;
-}
-
 function syncPlantCardWaterReadoutVisibility(plant, now) {
   if (!plantWaterText || !plantWaterBar) return;
   const hide = plant && shouldPauseWaterDecayForPlant(plant, now);
@@ -6013,10 +5872,6 @@ function updateExtraPlantWaterLevel(plant, now) {
       plant.becameEmptyAt = plant.waterLevelUpdatedAt || now;
     }
     plant.waterLevelUpdatedAt = now;
-    return;
-  }
-
-  if (isPlantGrowthHeldUntilFirstWater(plant)) {
     return;
   }
 
@@ -7981,9 +7836,6 @@ function updatePlantWaterLevel() {
   }
 
   const now = Date.now();
-  if (isPlantGrowthHeldUntilFirstWater(plantRuntime)) {
-    return;
-  }
 
   if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
     if (plantRuntime.waterLevel > 0 && plantRuntime.becameEmptyAt != null) {
@@ -8097,6 +7949,7 @@ function updatePlantState() {
   }
 
   if (
+    plantRuntime.status !== "dry" &&
     canPlantWiltFromEmptyWater(plantRuntime, now) &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.becameEmptyAt !== null &&
