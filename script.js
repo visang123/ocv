@@ -7753,6 +7753,16 @@ function waterPlant(target) {
     plantRuntime.status = "normal";
   }
 
+  if (wasDrySoil) {
+    plantRuntime.isSproutGrown = false;
+    plantRuntime.sproutGrownAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
+    plantRuntime.growthStartedAt = now;
+    plantRuntime.grassAuto5EligibleAt = null;
+  }
+
   plantRuntime.waterLevelUpdatedAt = now;
   plantRuntime.becameEmptyAt = null;
 
@@ -7817,6 +7827,16 @@ function waterExtraPlant(plant) {
     plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
     plant.status = "normal";
+  }
+
+  if (wasDrySoil) {
+    plant.isSproutGrown = false;
+    plant.sproutGrownAt = null;
+    plant.sproutEvolutionMs = 0;
+    plant.sproutEvolutionLastTickAt = null;
+    plant.isSproutSelfSustaining = false;
+    plant.growthStartedAt = now;
+    plant.grassAuto5EligibleAt = null;
   }
 
   plant.waterLevelUpdatedAt = now;
@@ -7921,7 +7941,7 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
-    // Keep planted ground + dry soil; preserve sprout growth so stage 2 returns after watering.
+    // Keep planted ground + dry soil; sprout hides until watered, then regrows from growthStartedAt.
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
