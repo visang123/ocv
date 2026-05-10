@@ -6,6 +6,10 @@ create table if not exists public.ovc_accounts (
   created_at timestamptz not null default now()
 );
 
+-- 로그인 분기·시크릿 창: 로컬스토리지 없이도 튜토리얼 완료 여부 복원
+alter table public.ovc_accounts add column if not exists tutorial_done boolean not null default false;
+alter table public.ovc_accounts add column if not exists session_token text;
+
 alter table public.ovc_accounts enable row level security;
 
 drop policy if exists "ovc accounts readable" on public.ovc_accounts;

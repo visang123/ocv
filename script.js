@@ -461,6 +461,7 @@ function ovcApplyForceWorldHubBypassLoggedIn() {
   setStoredFlag(everBeenToWorldKey, true);
   setStoredValue(onboardingFlowStepKey, "0");
   setStoredFlag(movementTutorialCompleteKey, true);
+  requestAccountTutorialDoneSync({ force: true });
   return true;
 }
 function nameForIngameUiDisplay(realName) {
@@ -653,6 +654,9 @@ let lastLocalButterflyCatchAt = 0;
  */
 const butterflyLocalCatchTombstoneById = {};
 const BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS = 8000;
+/** 탭 전환·백그라운드 후 복귀 시 한 프레임에 긴 시간이 건너뛰면 나비 경로가 순간이동처럼 보임 → 웨이포인트 리셋 */
+let lastButterflyWallClockMs = 0;
+let gameLoopCyclesForTutorialSync = 0;
 const butterflyState = {
   list: [],
   // 0 means "never seeded yet"; the authority replaces it with a real time the
@@ -854,6 +858,22 @@ function getMultiplayerWorldSyncLoopMs() {
   if (c >= 6) return 220;
   if (c >= 3) return 180;
   return MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE;
+}
+
+function getMultiplayerPresenceDbSyncMs() {
+  const c = getActiveRemotePlayerCountForTick();
+  if (c >= 12) return 2400;
+  if (c >= 8) return 2000;
+  if (c >= 5) return 1600;
+  return MULTIPLAYER_PRESENCE_DB_SYNC_MS;
+}
+
+function getMultiplayerPresenceDbPollMs() {
+  const c = getActiveRemotePlayerCountForTick();
+  if (c >= 12) return 2800;
+  if (c >= 8) return 2400;
+  if (c >= 5) return 1900;
+  return MULTIPLAYER_PRESENCE_DB_POLL_MS;
 }
 
 const keys = createInputState();
@@ -1563,8 +1583,21 @@ function skipTutorialFromSettings() {
   try {
     sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
   } catch (e2) {}
-  isReloadingForWorldReset = true;
-  ovcHardNavigateToWorldIndex();
+  const proceedSkipToWorld = function () {
+    isReloadingForWorldReset = true;
+    ovcHardNavigateToWorldIndex();
+  };
+  let skipTok = "";
+  try {
+    skipTok = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+  } catch (eSkipTok) {}
+  if (currentUserId && skipTok && window.OVCOnline && typeof window.OVCOnline.saveTutorialDone === "function") {
+    Promise.resolve(window.OVCOnline.saveTutorialDone(currentUserId, skipTok, true))
+      .catch(function () {})
+      .finally(proceedSkipToWorld);
+    return;
+  }
+  proceedSkipToWorld();
 }
 
 function replayTutorialFromSettings() {
@@ -2075,6 +2108,42 @@ function persistOnboardingStep() {
   setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
 }
 
+let lastAccountTutorialDoneRequestAt = 0;
+
+/** 시크릿 창 등 로컬스토리지가 비어도 서버에 tutorial_done이 있으면 index로 보내기 위해 계정에 동기화 */
+function requestAccountTutorialDoneSync(options) {
+  const force = Boolean(options && options.force);
+  if (!getStoredFlag(onboardingFlowDoneKey) || !currentUserId) {
+    return;
+  }
+  try {
+    if (!force && sessionStorage.getItem("ovcAccountTutorialDoneSyncedV1") === "1") {
+      return;
+    }
+  } catch (eSkip) {}
+  let token = "";
+  try {
+    token = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+  } catch (eTok) {}
+  if (!token || !window.OVCOnline || typeof window.OVCOnline.saveTutorialDone !== "function") {
+    return;
+  }
+  const now = Date.now();
+  if (!force && now - lastAccountTutorialDoneRequestAt < 5000) {
+    return;
+  }
+  lastAccountTutorialDoneRequestAt = now;
+  Promise.resolve(window.OVCOnline.saveTutorialDone(currentUserId, token, true))
+    .then(function (result) {
+      if (result && result.ok !== false) {
+        try {
+          sessionStorage.setItem("ovcAccountTutorialDoneSyncedV1", "1");
+        } catch (eOk) {}
+      }
+    })
+    .catch(function () {});
+}
+
 /**
  * 튜토리얼을 한 번이라도 끝낸 계정은 로컬에 완료 상태가 남아야 한다(리로드·탭 종료·로그아웃/로그인 후에도 월드).
  * done 플래그만 유실된 경우 저장 스텝으로 복구한다.
@@ -2087,6 +2156,7 @@ function repairOnboardingCompletionFromStoredStep() {
   var stepStr = String(getStoredValue(onboardingFlowStepKey) || "");
   if (stepStr === "0") {
     setStoredFlag(onboardingFlowDoneKey, true);
+    requestAccountTutorialDoneSync({ force: true });
     return;
   }
   var stepNum = parseInt(stepStr, 10);
@@ -2096,6 +2166,7 @@ function repairOnboardingCompletionFromStoredStep() {
   ) {
     setStoredFlag(onboardingFlowDoneKey, true);
     setStoredValue(onboardingFlowStepKey, "0");
+    requestAccountTutorialDoneSync({ force: true });
   }
 }
 
@@ -2120,6 +2191,7 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!getStoredFlag(everBeenToWorldKey)) return;
   setStoredFlag(onboardingFlowDoneKey, true);
   setStoredValue(onboardingFlowStepKey, "0");
+  requestAccountTutorialDoneSync({ force: true });
 }
 
 function resetTutorialProgressInStorage() {
@@ -2302,8 +2374,21 @@ function onboardingScheduleTutorialCompleteHide() {
     try {
       sessionStorage.setItem("ovcPostTutorialMultiplayerReconnectV1", "1");
     } catch (e2) {}
-    isReloadingForWorldReset = true;
-    window.location.replace(ovcWorldIndexUrl());
+    const proceedFinalToWorld = function () {
+      isReloadingForWorldReset = true;
+      window.location.replace(ovcWorldIndexUrl());
+    };
+    let finalTok = "";
+    try {
+      finalTok = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+    } catch (eFinalTok) {}
+    if (currentUserId && finalTok && window.OVCOnline && typeof window.OVCOnline.saveTutorialDone === "function") {
+      Promise.resolve(window.OVCOnline.saveTutorialDone(currentUserId, finalTok, true))
+        .catch(function () {})
+        .finally(proceedFinalToWorld);
+      return;
+    }
+    proceedFinalToWorld();
   }, 7000);
 }
 
@@ -2426,12 +2511,14 @@ function loadOnboardingFlowState() {
   if (raw === 0) {
     setStoredFlag(onboardingFlowDoneKey, true);
     onboardingFlowStep = 0;
+    requestAccountTutorialDoneSync({ force: true });
     return;
   }
   if (raw === ONBOARDING_MAX_STEP) {
     setStoredFlag(onboardingFlowDoneKey, true);
     setStoredValue(onboardingFlowStepKey, "0");
     onboardingFlowStep = 0;
+    requestAccountTutorialDoneSync({ force: true });
     return;
   }
   onboardingFlowStep =
@@ -6617,6 +6704,14 @@ function setInstantHoverTip(el, text) {
 
 /** 살아 있는 식물만, 심은 시각 기준: 새싹(티어 4 미만)과 풀(티어 4 이상)을 소유자별로 따로 번호 부여. */
 function refreshPlantIdentityOrdinals() {
+  function clearOrdinals(plant) {
+    if (!plant) return;
+    plant.sproutOrdinal = 0;
+    plant.grassOrdinal = null;
+  }
+  clearOrdinals(plantRuntime);
+  appleState.extraPlants.forEach(clearOrdinals);
+
   const groups = Object.create(null);
   function consider(plant) {
     if (!plant || !isPlantAliveForWorldOrdinal(plant)) return;
@@ -6670,6 +6765,9 @@ function ensureGrassOrdinalIfNeeded(plant) {
 
 function getPlantWorldLabel(plant) {
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
+  if (!isPlantAliveForWorldOrdinal(plant)) {
+    return name + "\uC758 \uC2DD\uBB3C";
+  }
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
   const grassOrd =
@@ -9056,10 +9154,10 @@ function sendMultiplayerPresence(forceSend) {
   if (hasChanged || forceSend) {
     lastPresenceStateKey = stateKey;
   }
-  if (hasChanged || now - lastPresenceDbSyncAt >= MULTIPLAYER_PRESENCE_DB_SYNC_MS) {
+  if (hasChanged || now - lastPresenceDbSyncAt >= getMultiplayerPresenceDbSyncMs()) {
     syncPresenceToDatabase(state);
   }
-  if (now - lastPresenceDbPollAt >= MULTIPLAYER_PRESENCE_DB_POLL_MS) {
+  if (now - lastPresenceDbPollAt >= getMultiplayerPresenceDbPollMs()) {
     pollPresenceDatabase();
   }
   lastPresenceSentAt = now;
@@ -9716,6 +9814,7 @@ function logout() {
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
       sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
       sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+      sessionStorage.removeItem("ovcAccountTutorialDoneSyncedV1");
     } catch (e) {}
     localStorage.removeItem(currentUserKey);
     localStorage.removeItem(currentUserIdKey);
@@ -10251,6 +10350,9 @@ function updateMagicPowderInventoryUi() {
 
 function updateButterflies() {
   const now = Date.now();
+  const wallDelta =
+    lastButterflyWallClockMs > 0 ? Math.min(60000, now - lastButterflyWallClockMs) : 0;
+  lastButterflyWallClockMs = now;
 
   // Wait until either (a) we know there's no online sync available so this
   // client is definitely authoritative on its own world, or (b) we have
@@ -10291,7 +10393,19 @@ function updateButterflies() {
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
   /** 원격 좌표로 스냅 시 프레임당 최대 이동(월드 px) — 한 번에 점프하는 것처럼 보이는 현상 완화 */
-  const butterflyRemoteRenderMaxStepWorld = 9;
+  const butterflyRemoteRenderMaxStepWorld = 12;
+
+  if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
+    Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
+      delete butterflyAuthorityWaypointById[wid];
+    });
+  }
+  if (smoothRemoteButterflies && wallDelta > 380) {
+    butterflyState.list.forEach(function (b) {
+      b._renderX = b.x;
+      b._renderY = b.y;
+    });
+  }
 
   // Render
   const aliveIds = {};
@@ -10460,6 +10574,11 @@ function applyButterflySnapshot(snapshotButterflies) {
 
 function gameLoop() {
   if (isTabSessionSuperseded) return;
+  gameLoopCyclesForTutorialSync += 1;
+  if (gameLoopCyclesForTutorialSync >= 420) {
+    gameLoopCyclesForTutorialSync = 0;
+    requestAccountTutorialDoneSync();
+  }
   respawnApplesIfNeeded();
   refillWellIfNeeded();
   prepareMovementTutorialBeforeMove();

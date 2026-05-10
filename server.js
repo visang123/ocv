@@ -158,11 +158,18 @@ function handleApi(request, response, requestedPath) {
         name,
         password_hash: sha256Hex(password),
         color: null,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        tutorial_done: false
       };
       accounts.push(account);
       writeAccounts(accounts);
-      sendJson(response, 200, { ok: true, id: account.id, name: account.name, color: account.color });
+      sendJson(response, 200, {
+        ok: true,
+        id: account.id,
+        name: account.name,
+        color: account.color,
+        tutorial_done: false
+      });
     });
     return true;
   }
@@ -208,7 +215,36 @@ function handleApi(request, response, requestedPath) {
         }
         return nextAccount;
       }));
-      sendJson(response, 200, { ok: true, id: account.id, name: account.name, color: account.color || null, session_token: sessionToken });
+      sendJson(response, 200, {
+        ok: true,
+        id: account.id,
+        name: account.name,
+        color: account.color || null,
+        session_token: sessionToken,
+        tutorial_done: Boolean(account.tutorial_done)
+      });
+    });
+    return true;
+  }
+
+  if (requestedPath === "/api/account/tutorial-done") {
+    readJsonBody(request, response, (body) => {
+      const id = String(body.id || "");
+      const token = String(body.session_token || "");
+      if (!id || !token) {
+        sendJson(response, 400, { ok: false, message: "id와 session_token이 필요합니다." });
+        return;
+      }
+      const wantDone = body.tutorial_done !== false && body.tutorial_done !== "false";
+      const accounts = readAccounts();
+      const account = accounts.find((a) => a.id === id);
+      if (!account || account.sessionToken !== token) {
+        sendJson(response, 403, { ok: false, message: "세션이 유효하지 않습니다." });
+        return;
+      }
+      account.tutorial_done = wantDone;
+      writeAccounts(accounts);
+      sendJson(response, 200, { ok: true, tutorial_done: Boolean(account.tutorial_done) });
     });
     return true;
   }

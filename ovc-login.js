@@ -120,11 +120,11 @@ async function loginWithSupabaseRestFallback(name, password) {
   }
 
   const passwordHash = await sha256Hex(password);
-  const url =
+    const url =
     config.supabaseUrl.replace(/\/$/, "") +
     "/rest/v1/" +
     encodeURIComponent(config.accountsTable) +
-    "?select=id,name,color&name=eq." +
+    "?select=id,name,color,tutorial_done&name=eq." +
     encodeURIComponent(name) +
     "&password_hash=eq." +
     encodeURIComponent(passwordHash) +
@@ -169,7 +169,9 @@ function goToGame(account) {
   } catch (e) {}
   sessionStorage.removeItem(loginHandoffKey);
   const accountId = account && account.id != null ? String(account.id).trim() : "";
-  const onboarded = accountId ? ovcIsOnboardingDoneForUserId(accountId) : true;
+  const serverTutorialDone = Boolean(account && account.tutorial_done);
+  const onboarded =
+    !accountId || serverTutorialDone || ovcIsOnboardingDoneForUserId(accountId);
   const htmlFile = onboarded ? "index.html" : "tutorial.html";
   const targetUrl = new URL("./" + htmlFile, window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
@@ -209,6 +211,12 @@ function finalizeSuccessfulLogin(account) {
   persistColorChoiceState(account);
   if (account.session_token) {
     localStorage.setItem(currentSessionTokenKey, account.session_token);
+  }
+  if (userId && account && account.tutorial_done) {
+    try {
+      localStorage.setItem(ovcScopedUserStorageKey(userId, ovcOnboardingFlowDoneStorageKey), "true");
+      localStorage.setItem(ovcScopedUserStorageKey(userId, ovcEverBeenToWorldStorageKey), "true");
+    } catch (eHydrate) {}
   }
 }
 

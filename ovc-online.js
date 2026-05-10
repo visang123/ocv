@@ -86,7 +86,7 @@
       base +
       "/rest/v1/" +
       tableSeg +
-      "?select=id,name,color&name=eq." +
+      "?select=id,name,color,tutorial_done&name=eq." +
       encodeURIComponent(normalizedName) +
       "&password_hash=eq." +
       encodeURIComponent(passwordHash) +
@@ -164,7 +164,7 @@
           password_hash: passwordHash,
           color: null
         })
-        .select("id, name, color")
+        .select("id, name, color, tutorial_done")
         .single();
 
       if (error && (error.code === "23505" || /duplicate key/i.test(error.message || ""))) {
@@ -195,7 +195,7 @@
       const passwordHash = await sha256Hex(password);
       const { data, error } = await supabaseClient
         .from(config.accountsTable)
-        .select("id, name, color")
+        .select("id, name, color, tutorial_done")
         .eq("name", normalizedName)
         .eq("password_hash", passwordHash)
         .maybeSingle();
@@ -252,6 +252,60 @@
     } catch (error) {
       return true;
     }
+  }
+
+  async function saveTutorialDone(accountId, sessionToken, done) {
+    const id = String(accountId || "").trim();
+    const token = String(sessionToken || "").trim();
+    const wantDone = done !== false && done !== "false";
+    if (!id || !token) {
+      return { ok: false };
+    }
+
+    const supabaseClient = getClient();
+    if (!supabaseClient) {
+      if (canLoginViaSupabaseRest()) {
+        const valid = await validateSession(id, token);
+        if (!valid) {
+          return { ok: false };
+        }
+        const base = config.supabaseUrl.trim().replace(/\/$/, "");
+        const tableSeg = encodeURIComponent(config.accountsTable);
+        const patchUrl = base + "/rest/v1/" + tableSeg + "?id=eq." + encodeURIComponent(id);
+        const patchRes = await fetch(patchUrl, {
+          method: "PATCH",
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: "Bearer " + config.supabaseKey,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          },
+          body: JSON.stringify({ tutorial_done: wantDone })
+        });
+        if (!patchRes.ok) {
+          throw new Error("튜토리얼 진행 저장 실패: " + patchRes.status);
+        }
+        return { ok: true };
+      }
+      return postLocalApi("/api/account/tutorial-done", {
+        id,
+        session_token: token,
+        tutorial_done: wantDone
+      });
+    }
+
+    const valid = await validateSession(id, token);
+    if (!valid) {
+      return { ok: false };
+    }
+    const { error } = await supabaseClient
+      .from(config.accountsTable)
+      .update({ tutorial_done: wantDone })
+      .eq("id", id);
+    if (error) {
+      throw normalizeOnlineError(error);
+    }
+    return { ok: true };
   }
 
   async function savePlayerColor(userId, color) {
@@ -528,6 +582,7 @@
     resetClient,
     signUp,
     login,
+    saveTutorialDone,
     savePlayerColor,
     listAccounts,
     deleteAccount,
