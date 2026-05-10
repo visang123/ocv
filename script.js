@@ -3244,34 +3244,43 @@ function tryTalkToPlantMaster() {
     flashOnboardingOrderHint("");
     return false;
   }
-  if (isNpcDialogueComplete && plantRuntime.isSeedPlanted) {
-    return false;
-  }
 
   startPlantMasterDialogue();
   return true;
 }
 
 function startPlantMasterDialogue() {
-  const lines = [
-    { speaker: "npc", text: "\uC3FC\uB77C~\uC3FC\uB77C~" },
-    { speaker: "player", text: "\uAF50\uB77C\uAF50\uB77C~" },
-    { speaker: "npc", text: "...?" },
-    { speaker: "player", text: "?" },
-    { speaker: "npc", text: "!!" }
-  ];
-
-  var skipFirstTalkUnlockEffects = isNpcDialogueComplete;
+  const isFirstTalk = !isNpcDialogueComplete;
+  const lines = isFirstTalk
+    ? [
+        { speaker: "npc", text: "\uC790\uB124....", delayAfterMs: 1000 },
+        { speaker: "npc", text: "\uC2DD\uBB3C\uC774\uB780", delayAfterMs: 500 },
+        { speaker: "npc", text: "\uBB34\uC5C7\uC774\uB77C \uC0DD\uAC01\uD558\uB098?!", delayAfterMs: 1500 },
+        { speaker: "player", text: "\uC798 \uBAA8\uB974\uACA0\uC2B5\uB2C8\uB2E4...", delayAfterMs: 2500 },
+        { speaker: "npc", text: "\uC2DD\uBB3C\uC774\uB780...", delayAfterMs: 3500 },
+        { speaker: "npc", text: "$%#@!", delayAfterMs: 2000 },
+        { speaker: "npc", text: "\uC77C\uC138.", delayAfterMs: 3000 },
+        { speaker: "player", text: "!!!", delayAfterMs: 1200 }
+      ]
+    : [
+        {
+          speaker: "npc",
+          text: "\uAD81\uAE08\uD55C\uAC8C \uC788\uB098? \uC544\uC9C1 \uB54C\uAC00 \uC544\uB2D0\uC138..",
+          delayAfterMs: 1400
+        }
+      ];
 
   isNpcDialogueRunning = true;
   npcBubble.style.display = "none";
   playerBubble.style.display = "none";
   window.clearTimeout(npcPromptHideTimeout);
 
-  lines.forEach(function (lineInfo, index) {
+  let timelineMs = 0;
+  lines.forEach(function (lineInfo) {
     window.setTimeout(function () {
       showDialogueLine(lineInfo);
-    }, index * 650);
+    }, timelineMs);
+    timelineMs += Math.max(0, Number(lineInfo.delayAfterMs) || 650);
   });
 
   window.setTimeout(function () {
@@ -3279,7 +3288,7 @@ function startPlantMasterDialogue() {
     playerBubble.style.display = "none";
     isNpcDialogueRunning = false;
     npcBubble.dataset.promptShown = "false";
-    if (!skipFirstTalkUnlockEffects) {
+    if (isFirstTalk) {
       isNpcDialogueComplete = true;
       isGuidePlantPageUnlocked = true;
       hasGuideBook = true;
@@ -3308,7 +3317,7 @@ function startPlantMasterDialogue() {
     updateNpcPosition();
     updateGuideCard();
     updateOnboardingFlowUI();
-  }, lines.length * 650 + 250);
+  }, timelineMs + 250);
 }
 
 function showDialogueLine(lineInfo) {
