@@ -3843,9 +3843,14 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         applyLoadedPlantState(incomingPlant);
         npcX = Number(snapshot.mainPlant.npcX) || npcX;
         npcY = Number(snapshot.mainPlant.npcY) || npcY;
-        plantSpot.style.display = plantRuntime.isSeedPlanted ? "block" : "none";
         if (plantRuntime.isSeedPlanted) {
+          plantSpot.src = getPlantSoilSrc(plantRuntime);
           setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+          const mainRot = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
+          plantSpot.style.display =
+            mainRot || !shouldHideSeparateSoilUnderBigGrass(plantRuntime) ? "block" : "none";
+        } else {
+          plantSpot.style.display = "none";
         }
         if (snapshotSavedAt) {
           lastMainPlantStateChangeAt = Math.max(lastMainPlantStateChangeAt, snapshotSavedAt);
@@ -3936,16 +3941,18 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
 
 function ensureSharedPlantVisuals() {
   if (plantRuntime.isSeedPlanted) {
-    plantSpot.style.display = "block";
     plantSpot.src = getPlantSoilSrc(plantRuntime);
     setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+    const mainRot = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
+    plantSpot.style.display =
+      mainRot || !shouldHideSeparateSoilUnderBigGrass(plantRuntime) ? "block" : "none";
   }
 
   appleState.extraPlants.forEach(function (plant) {
     ensureExtraPlantElements(plant);
-    plant.spotElement.style.display = "block";
     plant.spotElement.src = getPlantSoilSrc(plant);
     setWorldPosition(plant.spotElement, plant.x, plant.y);
+    plant.spotElement.style.display = shouldHideSeparateSoilUnderBigGrass(plant) ? "none" : "block";
   });
 }
 
@@ -4312,9 +4319,9 @@ function updateExtraSeedsAndPlants() {
     if (plant.isSproutGrown && !plant.isSproutSelfSustaining) {
       tickSproutEvolution(plant, now);
     }
-    plant.spotElement.style.display = "block";
     plant.spotElement.src = getPlantSoilSrc(plant);
     setWorldPosition(plant.spotElement, plant.x, plant.y);
+    plant.spotElement.style.display = shouldHideSeparateSoilUnderBigGrass(plant) ? "none" : "block";
     updatePlantGrowthMeter(
       plant.growthMeterElement,
       plant.growthMeterFill,
@@ -4345,16 +4352,10 @@ function updateExtraSeedsAndPlants() {
         plant.y - WATER_NEEDED_SIZE - 2
       );
     }
-    const pLabel = getPlantWorldLabel(plant);
-    plant.spotElement.title = pLabel;
-    plant.sproutElement.title = pLabel;
     if (!isSproutGrown) return;
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
-    setWorldPosition(
-      plant.sproutElement,
-      plant.x + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
-      plant.y - sproutSize.height + 7
-    );
+    const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage);
+    setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
   });
   appleState.extraPlants = appleState.extraPlants.filter(function (plant) {
     if (!plant.removed) return true;
@@ -4365,6 +4366,27 @@ function updateExtraSeedsAndPlants() {
     markWorldDirty();
     return false;
   });
+}
+
+/** 저장·스냅샷의 성장 ms가 현재 constants와 다르면 맞춤(예: 가루 2분→3초로 바꾼 뒤에도 옛 duration이 남는 경우) */
+function clampPlantGrowthTimingToCurrentConstants(plant) {
+  if (!plant) return;
+  const evCap = sproutStage1Ms + sproutStage2GrowMs;
+  if (plant.isSproutGrown && !plant.isSproutSelfSustaining) {
+    const ev = Number(plant.sproutEvolutionMs) || 0;
+    if (ev > evCap) {
+      plant.sproutEvolutionMs = evCap;
+    }
+  }
+  const tgt = Number(plant.powderUpgradeTargetTier) || 0;
+  const dur = Number(plant.powderUpgradeDurationMs) || 0;
+  const started = Number(plant.powderUpgradeStartedAt) || 0;
+  if (tgt > 0 && dur > 0 && started > 0) {
+    const expected = tgt === 4 ? level4GrowMs : tgt === 5 ? level5GrowMs : 0;
+    if (expected > 0 && dur !== expected) {
+      plant.powderUpgradeDurationMs = expected;
+    }
+  }
 }
 
 function normalizeExtraPlantState(plant) {
@@ -4429,6 +4451,7 @@ function normalizeExtraPlantState(plant) {
   }
   plant.waterCapacity = plant.growthTier >= 3 ? 3 : 2;
   ensureGrassOrdinalIfNeeded(plant);
+  clampPlantGrowthTimingToCurrentConstants(plant);
 }
 
 function updateExtraPlantState(plant, now) {
@@ -4593,6 +4616,32 @@ function getSproutSizeForStage(stage) {
   return {
     width: Math.max(1, Math.round(baseWidth * growthScale)),
     height: Math.max(1, Math.round(baseHeight * growthScale))
+  };
+}
+
+/** 4·5단계 풀 PNG에 심은 흙(별도 spot)이 겹쳐 보이면 spot 레이어를 끈다. */
+function shouldHideSeparateSoilUnderBigGrass(plant) {
+  if (!plant || !plant.isSproutGrown) return false;
+  if (plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) return false;
+  return getSproutStageFromPlant(plant) >= 4;
+}
+
+/**
+ * 풀 스프라이트 발밑을 심은 칸(plantBaseY ~ +PLANT_SPOT_HEIGHT)에 맞춘다.
+ * 4·5단계는 PNG 하단 여백 때문에 world top-left 보정.
+ */
+function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stage) {
+  let footInset = 7;
+  let anchorDx = 0;
+  if (stage >= 5) {
+    footInset = 24;
+    anchorDx = 0;
+  } else if (stage >= 4) {
+    footInset = 16;
+  }
+  return {
+    x: plantBaseX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2 + anchorDx,
+    y: plantBaseY - sproutSize.height + footInset
   };
 }
 
@@ -5596,21 +5645,23 @@ function hidePlantHoverLabel() {
 }
 
 function showPlantHoverForPlant(plant) {
-  if (!plantHoverLabel || !plant || plant.spotX == null || plant.spotY == null) return;
+  if (!plantHoverLabel || !plant) return;
+  const px = plant.spotX != null ? plant.spotX : plant.x;
+  const py = plant.spotY != null ? plant.spotY : plant.y;
+  if (px == null || py == null) return;
   plantHoverLabel.textContent = getPlantWorldLabel(plant);
   plantHoverLabel.style.display = "block";
   function placeHoverLabelCentered() {
-    const cxWorld = plant.spotX + PLANT_SPOT_WIDTH / 2;
-    const cyWorld = plant.spotY + PLANT_SPOT_HEIGHT / 2;
+    const cxWorld = px + PLANT_SPOT_WIDTH / 2;
+    const cyWorld = py + PLANT_SPOT_HEIGHT / 2;
     const w = plantHoverLabel.offsetWidth || 1;
     const h = plantHoverLabel.offsetHeight || 1;
     const sx = toScreenX(cxWorld) - w / 2;
     const sy = toScreenY(cyWorld) - h / 2;
     plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
   }
-  window.requestAnimationFrame(function () {
-    window.requestAnimationFrame(placeHoverLabelCentered);
-  });
+  void plantHoverLabel.offsetWidth;
+  placeHoverLabelCentered();
 }
 
 function plantProximityRectFromXYWH(x, y, w, h) {
@@ -6313,6 +6364,11 @@ function updatePlantState() {
   ensureGrassOrdinalIfNeeded(plantRuntime);
   updatePlantCard();
   updatePlantGrowth();
+  if (!mainSoilRotten) {
+    plantSpot.style.display = shouldHideSeparateSoilUnderBigGrass(plantRuntime) ? "none" : "block";
+  } else {
+    plantSpot.style.display = "block";
+  }
 }
 
 function shouldSuppressPlantWaterCardForSelfSustaining(plant) {
@@ -6480,13 +6536,6 @@ function updatePlantGrowth() {
 }
 
 function updateSproutPosition() {
-  const worldLabel = plantRuntime.isSeedPlanted ? getPlantWorldLabel(plantRuntime) : "";
-  if (worldLabel) {
-    plantSpot.title = worldLabel;
-  } else {
-    plantSpot.removeAttribute("title");
-  }
-
   if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten" || plantRuntime.status === "dry") {
     sprout.style.display = "none";
     sprout.removeAttribute("title");
@@ -6498,13 +6547,14 @@ function updateSproutPosition() {
   sprout.style.display = "block";
   sprout.classList.toggle("is-big", stage >= 2);
   sprout.src = getSproutImageForStage(stage);
-  if (worldLabel) sprout.title = worldLabel;
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
-  setWorldPosition(
-    sprout,
-    plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
-    plantRuntime.spotY - sproutSize.height + 7
+  const sproutPos = getSproutWorldPositionForPlant(
+    plantRuntime.spotX,
+    plantRuntime.spotY,
+    sproutSize,
+    stage
   );
+  setWorldPosition(sprout, sproutPos.x, sproutPos.y);
   updateNpcPosition();
 }
 
@@ -6860,6 +6910,7 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.growthTier = 3;
   }
   plantRuntime.waterCapacity = plantRuntime.growthTier >= 3 ? 3 : 2;
+  clampPlantGrowthTimingToCurrentConstants(plantRuntime);
   ensureGrassOrdinalIfNeeded(plantRuntime);
 }
 
