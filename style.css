@@ -2214,20 +2214,6 @@ body #guide-book-button {
   text-align: center;
 }
 
-.butterfly-inventory-label {
-  flex-shrink: 0;
-  margin-right: 2px;
-  padding: 4px 6px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(30, 58, 138, 0.12) 0%, rgba(30, 64, 175, 0.08) 100%);
-  border: 1px solid rgba(30, 58, 138, 0.2);
-  color: #1e3a8a;
-  font: 900 12px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
-  letter-spacing: -0.03em;
-  user-select: none;
-  pointer-events: none;
-}
-
 #butterfly-inventory {
   position: fixed;
   left: 178px;
@@ -2236,8 +2222,8 @@ body #guide-book-button {
   align-items: center;
   gap: 5px;
   height: 50px;
-  min-width: 168px;
-  padding: 4px 28px 4px 5px;
+  min-width: 154px;
+  padding: 4px 30px 4px 5px;
   border-radius: 16px;
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 250, 252, 0.9) 100%);
   border: 1px solid rgba(15, 23, 42, 0.12);
@@ -2343,7 +2329,7 @@ body #guide-book-button {
 
 #butterfly-inventory-total {
   position: absolute;
-  right: 6px;
+  right: 1px;
   top: 50%;
   transform: translateY(-50%);
   min-width: 28px;
@@ -2364,8 +2350,9 @@ body #guide-book-button {
   cursor: pointer;
 }
 
-/* 합계 칩: 생성 가능 안내(두 줄 줄바꿈 유지) — 슬롯 툴팁과 겹치지 않게 부모가 아닌 여기에 표시 */
+/* 합계 칩: 생성 가능 안내(두 줄) — 슬롯(하얀 나비 등) 툴팁과 겹치지 않게 더 위에 */
 #butterfly-inventory-total[data-ovc-tip]:hover::after {
+  bottom: calc(100% + 30px);
   white-space: pre-line;
   width: max-content;
   max-width: min(92vw, 320px);
@@ -2400,7 +2387,7 @@ body #guide-book-button {
 #magic-powder-inventory {
   /* 나비 인벤(고정 left + min-width + 간격) 오른쪽 */
   position: fixed;
-  left: calc(178px + 168px + 2 * 2px + 14px);
+  left: calc(178px + 154px + 2 * 2px + 14px);
   bottom: 24px;
   display: none;
   width: 72px;
