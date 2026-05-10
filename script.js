@@ -596,6 +596,11 @@ const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const WORLD_HEART_FX_MS = 2200;
 const WORLD_CHAT_MAX_CHARS = 120;
+const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
+const WORLD_CHAT_NAMEPLATE_PAD_V = 1;
+const WORLD_CHAT_NAMEPLATE_PAD_H = 3;
+const WORLD_CHAT_NAMEPLATE_RADIUS_PX = 3;
+const WORLD_CHAT_BUBBLE_MAX_WORLD_PX = 200;
 let worldChatLog = [];
 let worldChatPanelOpen = false;
 let localChatBubbleText = "";
@@ -7811,6 +7816,51 @@ function worldChatBubbleWobble(sessionIdForPhase, nowMs) {
   };
 }
 
+function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) {
+  if (!el || !rect || rect.width < 2 || rect.height < 2) return false;
+  const pxPerWu = rect.width / PLAYER_WIDTH;
+  const fontPx = Math.max(
+    5,
+    Math.min(52, (WORLD_CHAT_NAMEPLATE_FONT_PX / PLAYER_WIDTH) * rect.width)
+  );
+  const padV = Math.max(
+    1,
+    Math.round((WORLD_CHAT_NAMEPLATE_PAD_V / PLAYER_WIDTH) * rect.width)
+  );
+  const padH = Math.max(
+    2,
+    Math.round((WORLD_CHAT_NAMEPLATE_PAD_H / PLAYER_WIDTH) * rect.width)
+  );
+  const radius = Math.max(
+    2,
+    Math.round((WORLD_CHAT_NAMEPLATE_RADIUS_PX / PLAYER_WIDTH) * rect.width)
+  );
+  const maxW = Math.min(
+    window.innerWidth * 0.42,
+    Math.max(48, (WORLD_CHAT_BUBBLE_MAX_WORLD_PX / PLAYER_WIDTH) * rect.width)
+  );
+  el.style.fontSize = fontPx + "px";
+  el.style.padding = padV + "px " + padH + "px";
+  el.style.borderRadius = radius + "px";
+  el.style.maxWidth = maxW + "px";
+  const borderPx = Math.max(0.55, Math.min(2.2, 0.45 * pxPerWu));
+  el.style.borderWidth = borderPx + "px";
+  el.style.borderStyle = "solid";
+  const w = worldChatBubbleWobble(sessionIdForWobble, nowMs);
+  const wdx = w.dx * pxPerWu;
+  const wdy = w.dy * pxPerWu;
+  const bw = el.offsetWidth || 40;
+  const bh = el.offsetHeight || Math.round(fontPx * 1.45);
+  const gap = Math.max(0.5, 1.1 * pxPerWu);
+  const cx = rect.left + rect.width / 2;
+  const sx = cx - bw / 2 + wdx;
+  const sy = rect.top - bh - gap + wdy;
+  el.style.display = "block";
+  el.style.transform =
+    "translate(" + Math.round(sx) + "px, " + Math.round(sy) + "px)";
+  return true;
+}
+
 function updatePlayerChatBubbleOverlay() {
   if (!playerChatBubbleEl) return;
   const now = Date.now();
@@ -7823,15 +7873,10 @@ function updatePlayerChatBubbleOverlay() {
     playerChatBubbleEl.style.display = "none";
     return;
   }
-  const playerBox = getPlayerBox();
-  const bw = playerChatBubbleEl.offsetWidth || 80;
-  const bh = playerChatBubbleEl.offsetHeight || 28;
-  const wobble = worldChatBubbleWobble(null, now);
-  const sx =
-    toScreenX(playerBox.left + playerBox.width / 2) - bw / 2 + wobble.dx;
-  const sy = toScreenY(playerBox.top) - bh - 4 + wobble.dy;
-  playerChatBubbleEl.style.display = "block";
-  playerChatBubbleEl.style.transform = "translate(" + sx + "px, " + sy + "px)";
+  const rect = player.getBoundingClientRect();
+  if (!layoutWorldChatBubbleOnScreen(playerChatBubbleEl, rect, now, null)) {
+    playerChatBubbleEl.style.display = "none";
+  }
 }
 
 function updateRemoteChatBubbleOverlays() {
@@ -7854,15 +7899,10 @@ function updateRemoteChatBubbleOverlays() {
       return;
     }
     el.textContent = st.text;
-    const headTopWorld = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + rp.worldY;
-    const bw = el.offsetWidth || 72;
-    const bh = el.offsetHeight || 26;
-    const wobble = worldChatBubbleWobble(sid, now);
-    const sx =
-      toScreenX(rp.worldX + PLAYER_WIDTH / 2) - bw / 2 + wobble.dx;
-    const sy = toScreenY(headTopWorld) - bh - 4 + wobble.dy;
-    el.style.display = "block";
-    el.style.transform = "translate(" + sx + "px, " + sy + "px)";
+    const rect = rp.bodyElement.getBoundingClientRect();
+    if (!layoutWorldChatBubbleOnScreen(el, rect, now, sid)) {
+      el.style.display = "none";
+    }
   });
 }
 
