@@ -7148,6 +7148,12 @@ function getPlantWorldLabel(plant) {
     plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
       ? Math.max(0, Number(plant.grassOrdinal))
       : 0;
+  if (tier === 0) {
+    if (sproutOrd > 0) {
+      return name + "\uC758 \uB545" + sproutOrd;
+    }
+    return name + "\uC758 \uB545";
+  }
   if (tier >= 4 && grassOrd > 0) {
     return name + "\uC758 \uD480" + grassOrd;
   }
@@ -7645,12 +7651,9 @@ function triggerWaterSplash() {
 
 function getNearestWateringTarget() {
   let nearest = null;
-  const mainPowderUpgrading = isPowderUpgradeInProgress(plantRuntime);
-  const mainTier = plantRuntime.growthTier || 0;
 
   if (
     plantRuntime.isSeedPlanted &&
-    (!plantRuntime.isSproutSelfSustaining || mainPowderUpgrading || mainTier >= 3) &&
     plantRuntime.status !== "rotten" &&
     !plantRuntime.isOverwatered
   ) {
@@ -7670,9 +7673,6 @@ function getNearestWateringTarget() {
   }
 
   appleState.extraPlants.forEach(function (plant) {
-    const powderUpgrading = isPowderUpgradeInProgress(plant);
-    const pTier = plant.growthTier || 0;
-    if (plant.isSproutSelfSustaining && !powderUpgrading && pTier < 3) return;
     if (plant.status === "rotten" || plant.isOverwatered) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
@@ -10505,6 +10505,76 @@ function createButterfly(now, options) {
   };
 }
 
+/** 스냅샷·병합 버그로 같은 id가 두 번 들어오는 경우 방지 */
+function dedupeButterfliesByIdStable(list) {
+  if (!list || list.length <= 1) return list || [];
+  const seen = Object.create(null);
+  for (let i = 0; i < list.length; i += 1) {
+    const b = list[i];
+    if (!b || b.id == null) {
+      const sNull = Object.create(null);
+      return list.filter(function (bb) {
+        if (!bb || bb.id == null) return false;
+        const id = String(bb.id);
+        if (sNull[id]) return false;
+        sNull[id] = true;
+        return true;
+      });
+    }
+    const sid = String(b.id);
+    if (seen[sid]) {
+      const out = [];
+      const s2 = Object.create(null);
+      for (let j = 0; j < list.length; j += 1) {
+        const bb = list[j];
+        if (!bb || bb.id == null) continue;
+        const id = String(bb.id);
+        if (s2[id]) continue;
+        s2[id] = true;
+        out.push(bb);
+      }
+      return out;
+    }
+    seen[sid] = true;
+  }
+  return list;
+}
+
+/** 공유 상한(butterflyMaxAlive) 초과 시 오래된 개체부터 제거 */
+function trimButterflyListToMaxCap(list) {
+  if (!list || list.length <= butterflyMaxAlive) return list || [];
+  const scored = list.map(function (b, idx) {
+    return {
+      b: b,
+      idx: idx,
+      t: Number(b.spawnedAt) || 0
+    };
+  });
+  scored.sort(function (a, b) {
+    if (b.t !== a.t) return b.t - a.t;
+    return a.idx - b.idx;
+  });
+  const keep = Object.create(null);
+  for (let i = 0; i < butterflyMaxAlive; i += 1) {
+    if (scored[i] && scored[i].b && scored[i].b.id != null) {
+      keep[String(scored[i].b.id)] = true;
+    }
+  }
+  return list.filter(function (b) {
+    return b && b.id != null && keep[String(b.id)];
+  });
+}
+
+function pruneButterflyAuthorityWaypointsToList() {
+  const alive = Object.create(null);
+  butterflyState.list.forEach(function (b) {
+    if (b && b.id != null) alive[String(b.id)] = true;
+  });
+  Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
+    if (!alive[wid]) delete butterflyAuthorityWaypointById[wid];
+  });
+}
+
 function pruneStaleMultiplayerRoomSessions(now) {
   const staleMs = 45000;
   Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
@@ -10662,6 +10732,9 @@ function authorityFillToCapInstantly(now) {
 function ensureButterflyRenderEntry(butterfly) {
   let entry = butterflyRenderById[butterfly.id];
   if (entry && entry.element && entry.element.isConnected) return entry;
+  if (entry && entry.element && entry.element.parentNode) {
+    entry.element.parentNode.removeChild(entry.element);
+  }
   const element = document.createElement("div");
   element.className = "butterfly";
   element.dataset.butterflyId = butterfly.id;
@@ -10931,7 +11004,8 @@ function updateButterflies() {
   const sharedHydrated = hasHydratedSharedWorldFromServer || !onlineAvailable;
 
   if (sharedHydrated && isButterflyAuthority()) {
-    // Authority: simulate movement, spawn fresh butterflies on cadence.
+    // Authority: spawn / persistence tick only. Movement runs for every client below
+    // so non-authority tabs are not frozen between DB snapshots.
     if (
       !hasSeededInitialButterflies &&
       butterflyState.list.length === 0 &&
@@ -10944,9 +11018,6 @@ function updateButterflies() {
       lastButterflyStateChangeAt = now;
       markWorldDirty();
     }
-    butterflyState.list.forEach(function (butterfly) {
-      simulateButterflyAuthorityStep(butterfly, now);
-    });
     if (authoritySpawnButterfliesIfNeeded(now)) {
       lastButterflyStateChangeAt = now;
       markWorldDirty();
@@ -10956,6 +11027,11 @@ function updateButterflies() {
       lastButterflyStateChangeAt = now;
       markWorldDirty();
     }
+  }
+  if (sharedHydrated && butterflyState.list.length > 0) {
+    butterflyState.list.forEach(function (butterfly) {
+      simulateButterflyAuthorityStep(butterfly, now);
+    });
   }
   // Non-authority clients just render whatever the snapshot gave us. Wing
   // frames are still animated locally for smoothness.
@@ -11038,9 +11114,14 @@ function updateButterflies() {
 }
 
 function getButterflyStateForSnapshot() {
+  const list = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(butterflyState.list));
+  if (list !== butterflyState.list) {
+    butterflyState.list = list;
+    pruneButterflyAuthorityWaypointsToList();
+  }
   return {
     lastSpawnAt: butterflyState.lastSpawnAt,
-    list: butterflyState.list.map(function (butterfly) {
+    list: list.map(function (butterfly) {
       return {
         id: butterfly.id,
         color: butterfly.color,
@@ -11141,11 +11222,18 @@ function applyButterflySnapshot(snapshotButterflies) {
     });
   }
 
-  butterflyState.list = nextList;
+  let merged = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(nextList));
+  butterflyState.list = merged;
+  pruneButterflyAuthorityWaypointsToList();
   if (!iAmAuthority) {
     butterflyState.list.forEach(function (b) {
-      b._renderX = b.x;
-      b._renderY = b.y;
+      if (b && b.id != null) {
+        delete butterflyAuthorityWaypointById[String(b.id)];
+      }
+      if (typeof b._renderX !== "number" || typeof b._renderY !== "number") {
+        b._renderX = b.x;
+        b._renderY = b.y;
+      }
     });
   }
 
@@ -11156,7 +11244,7 @@ function applyButterflySnapshot(snapshotButterflies) {
 
   if (hasValidSnapshotSpawnAt) {
     butterflyState.lastSpawnAt = parsedLast;
-  } else if (nextList.length === 0) {
+  } else if (butterflyState.list.length === 0) {
     butterflyState.lastSpawnAt = hasSeededInitialButterflies ? now : 0;
   } else {
     const prevN = Number(prevLastSpawnAt);
