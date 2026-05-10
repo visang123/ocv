@@ -1661,19 +1661,19 @@ body::-webkit-scrollbar {
 
 #network-debug-panel {
   position: fixed;
-  left: 12px;
-  top: 12px;
+  left: 118px;
+  top: 10px;
   z-index: 250;
-  width: min(360px, calc(100vw - 24px));
-  max-height: 180px;
+  width: min(148px, calc(100vw - 130px));
+  max-height: 56px;
   overflow: auto;
   display: none;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  background: rgba(5, 16, 25, 0.9);
-  color: #dbeafe;
-  font: 700 10px/1.35 Consolas, "Courier New", monospace;
+  padding: 3px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(5, 16, 25, 0.82);
+  color: #93c5fd;
+  font: 600 6px/1.2 Consolas, "Courier New", monospace;
   white-space: pre-wrap;
   cursor: text;
   user-select: text;
@@ -1872,9 +1872,9 @@ body::-webkit-scrollbar {
   padding: 0;
   border: 0;
   border-radius: 1px;
-  background: #fff;
+  background: transparent;
   cursor: pointer;
-  opacity: 0.78;
+  opacity: 0;
 }
 
 #network-debug-button {
@@ -1897,13 +1897,13 @@ body::-webkit-scrollbar {
   left: 24px;
   top: 14px;
   z-index: 261;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 4px;
   background: rgba(17, 24, 39, 0.85);
   color: #fff;
-  font: 800 10px/1 Arial, sans-serif;
+  font: 800 8px/1 Arial, sans-serif;
   cursor: pointer;
 }
 
