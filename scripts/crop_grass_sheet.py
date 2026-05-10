@@ -4,6 +4,8 @@
 
 원본은 이미지/grass-stage45-sheet.png (가로 짝수 픽셀 권장).
 상단 배너(텍스트) 제거: 높이의 TOP_TRIM_RATIO 만큼 위를 잘라냄.
+
+자른 뒤 가장자리 배경 제거: python scripts/remove_grass_dark_bg.py
 """
 from pathlib import Path
 

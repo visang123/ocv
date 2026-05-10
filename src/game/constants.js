@@ -70,8 +70,8 @@ export const sproutStage1Image = "이미지/sprout-stage1.svg";
 export const sproutStage2Image = "이미지/sprout-stage2.svg";
 export const sproutStage3Image = "이미지/sprout-stage3.svg";
 /** 4·5단계 풀 — 시트 좌/우 분할 PNG (?v 캐시 무력화) */
-export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510d";
-export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510d";
+export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510e";
+export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
 /** Draw sizes per stage (world pixels). */
 export const SPROUT_STAGE_WIDTHS = [5, 7, 11];
 export const SPROUT_STAGE_HEIGHTS = [6, 11, 19];
