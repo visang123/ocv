@@ -752,6 +752,10 @@ function ensureWorldLooseSeedShape() {
     w.y = WORLD_LOOSE_SEED_Y;
   }
   w.nextSpawnAt = Math.max(0, Number(w.nextSpawnAt) || 0);
+  if (Number(w.y) < WORLD_LOOSE_SEED_Y - 25) {
+    w.x = WORLD_LOOSE_SEED_X;
+    w.y = WORLD_LOOSE_SEED_Y;
+  }
 }
 
 function isWorldLooseSeedVisibleAt(now) {
@@ -3299,11 +3303,13 @@ function pickUpNearestItem() {
     extraSeedDistance <= pickupDistance &&
     extraSeedDistance <= bucketDistance
   ) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    const isWorldLoosePick =
+      extraSeed.seed.worldLoosePick || extraSeed.seed.id === WORLD_LOOSE_SEED_ID;
+    if (!isWorldLoosePick && isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
       flashOnboardingOrderHint("");
       return;
     }
-    if (extraSeed.seed.worldLoosePick || extraSeed.seed.id === WORLD_LOOSE_SEED_ID) {
+    if (isWorldLoosePick) {
       ensureWorldLooseSeedShape();
       appleState.seedCount += 1;
       appleState.worldLooseSeed.nextSpawnAt = Date.now() + WORLD_LOOSE_SEED_RESPAWN_MS;
@@ -5145,10 +5151,47 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
   return best;
 }
 
+function showWorldLooseSeedHoverLabel(cxWorld, cyWorld) {
+  if (!plantHoverLabel) return;
+  plantHoverLabel.textContent = "\uC2EC\uAE30 \u00B7 \uD074\uB9AD (\uC778\uBCA4)";
+  plantHoverLabel.style.display = "block";
+  const w = plantHoverLabel.offsetWidth || 1;
+  const h = plantHoverLabel.offsetHeight || 1;
+  const sx = toScreenX(cxWorld) - w / 2;
+  const sy = toScreenY(cyWorld - 6) - h;
+  plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
+}
+
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
-  const p = pickPlantForHoverFromPointerClient(clientX, clientY);
-  if (p) showPlantHoverForPlant(p);
+  const now = Date.now();
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  let looseHit = null;
+  let looseDist = Infinity;
+  if (usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(now) && pxy) {
+    ensureWorldLooseSeedShape();
+    const cx = appleState.worldLooseSeed.x + SEED_SIZE / 2;
+    const cy = appleState.worldLooseSeed.y + SEED_SIZE / 2;
+    const d = Math.hypot(pxy.x - cx, pxy.y - cy);
+    if (d <= plantHoverPickRadiusWorld) {
+      looseDist = d;
+      looseHit = { cxWorld: cx, cyWorld: cy };
+    }
+  }
+  const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
+  let plantDist = Infinity;
+  if (plant && pxy) {
+    const a = getPlantHoverAnchorWorld(plant);
+    plantDist = Math.hypot(pxy.x - a.cxWorld, pxy.y - a.cyWorld);
+  }
+  if (looseHit && (!plant || looseDist <= plantDist)) {
+    if (worldLooseSeedElement) worldLooseSeedElement.classList.add("is-loose-seed-hover");
+    void plantHoverLabel.offsetWidth;
+    showWorldLooseSeedHoverLabel(looseHit.cxWorld, looseHit.cyWorld);
+    return;
+  }
+  if (worldLooseSeedElement) worldLooseSeedElement.classList.remove("is-loose-seed-hover");
+  if (plant) showPlantHoverForPlant(plant);
   else hidePlantHoverLabel();
 }
 
@@ -5358,6 +5401,9 @@ function getPlantSoilSrc(plant) {
 function updateSeedInventory() {
   if (usesWorldLooseSeedMode()) {
     const n = appleState.seedCount;
+    if (n <= 0) {
+      hasShownFirstSeedFocus = false;
+    }
     const panel = document.getElementById("seed-count-panel");
     if (seedCountText) {
       seedCountText.textContent = String(n);
@@ -6563,6 +6609,9 @@ function extraPlantFromDomElement(el) {
 }
 
 function hidePlantHoverLabel() {
+  if (worldLooseSeedElement) {
+    worldLooseSeedElement.classList.remove("is-loose-seed-hover");
+  }
   if (plantHoverLabel) plantHoverLabel.style.display = "none";
 }
 
