@@ -4032,6 +4032,17 @@ function markWorldDirty() {
   isWorldDirty = true;
 }
 
+function applyServerWorldRowTimestamps(row) {
+  if (!row || !row.updated_at) return;
+  lastWorldUpdatedAt = row.updated_at;
+  const parsed = Date.parse(row.updated_at);
+  if (!Number.isFinite(parsed) || parsed <= 0) return;
+  lastMainPlantStateChangeAt = Math.max(lastMainPlantStateChangeAt, parsed);
+  lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, parsed);
+  lastWellStateChangeAt = Math.max(lastWellStateChangeAt, parsed);
+  lastMainSeedStateChangeAt = Math.max(lastMainSeedStateChangeAt, parsed);
+}
+
 function getSharedWorldSnapshot() {
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
   return {
@@ -4655,7 +4666,7 @@ function syncWorldState(forceSave) {
     window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     getSharedWorldSnapshot()
   ).then(function (row) {
-    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+    applyServerWorldRowTimestamps(row);
   }).catch(function (error) {
     addNetworkDebugLog(
       "world save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
@@ -4687,14 +4698,14 @@ function saveSharedWorldAndReload(options) {
     );
   };
   saveResetSnapshot().then(function (row) {
-    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+    applyServerWorldRowTimestamps(row);
     return new Promise(function (resolve) {
       setTimeout(resolve, 350);
     });
   }).then(function () {
     return saveResetSnapshot();
   }).then(function (row) {
-    if (row && row.updated_at) lastWorldUpdatedAt = row.updated_at;
+    applyServerWorldRowTimestamps(row);
   }).catch(function (error) {
     addNetworkDebugLog(
       "world reset save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")

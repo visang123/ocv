@@ -28,7 +28,8 @@ on public.ovc_accounts
 for insert
 to anon
 with check (
-  char_length(name) = 3
+  char_length(name) >= 1
+  and char_length(name) <= 3
   and char_length(password_hash) = 64
 );
 

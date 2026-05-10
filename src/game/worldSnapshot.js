@@ -14,17 +14,21 @@ export function readWaterLevel(value, fallback) {
 }
 
 export function resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt) {
-  let savedAt = Number(snapshot.savedAt || 0);
-  if (!savedAt && serverRowUpdatedAt) {
+  let serverAt = 0;
+  if (serverRowUpdatedAt != null && serverRowUpdatedAt !== "") {
     const parsed =
       typeof serverRowUpdatedAt === "string"
         ? Date.parse(serverRowUpdatedAt)
         : Number(serverRowUpdatedAt);
     if (Number.isFinite(parsed) && parsed > 0) {
-      savedAt = parsed;
+      serverAt = parsed;
     }
   }
-  return savedAt;
+  if (serverAt > 0) {
+    return serverAt;
+  }
+  const clientSavedAt = Number(snapshot && snapshot.savedAt) || 0;
+  return clientSavedAt;
 }
 
 /** Prefer inventory copy when the same seed id appears twice (world + local inv). */
