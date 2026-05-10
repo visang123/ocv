@@ -90,12 +90,9 @@ import {
   plantDryMs,
   mainPlantDryAfterEmptyMs,
   mainPlantDryAfterPowderMs,
-  mainPlantDryAfterEmptyTier4Ms,
-  mainPlantDryAfterEmptyTier5Ms,
   plantDryMsDuringPowderMs,
-  plantDryMsTier4Ms,
-  plantDryMsTier5Ms,
-  plantWaterLevelTickMs,
+  getPlantWaterLevelTickMsForTier,
+  getPlantDryAfterEmptyMsForTier,
   plantGrowthMs,
   overwaterWindowMs,
   BUTTERFLY_SIZE,
@@ -5113,20 +5110,14 @@ function getMainDryAfterEmptyMsForPlant(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (!canPlantWiltFromEmptyWater(plant, tNow)) return mainPlantDryAfterEmptyMs;
   if (isPowderUpgradeInProgress(plant)) return mainPlantDryAfterPowderMs;
-  const t = Math.max(0, Number(plant.growthTier) || 0);
-  if (t >= 5) return mainPlantDryAfterEmptyTier5Ms;
-  if (t >= 4) return mainPlantDryAfterEmptyTier4Ms;
-  return mainPlantDryAfterEmptyMs;
+  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
 }
 
 function getExtraDryDelayMs(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (!canPlantWiltFromEmptyWater(plant, tNow)) return plantDryMs;
   if (isPowderUpgradeInProgress(plant)) return plantDryMsDuringPowderMs;
-  const t = Math.max(0, Number(plant.growthTier) || 0);
-  if (t >= 5) return plantDryMsTier5Ms;
-  if (t >= 4) return plantDryMsTier4Ms;
-  return plantDryMs;
+  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
 }
 
 function tickPowderUpgrade(plant, now) {
@@ -5467,6 +5458,26 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
   setWorldPosition(element, x + PLANT_SPOT_WIDTH / 2 - 21, y - 24);
 }
 
+function applyPlantWaterDecay(plant, now) {
+  if (plant.waterLevel <= 0) {
+    return;
+  }
+  let updatedAt = plant.waterLevelUpdatedAt;
+  let guard = 0;
+  while (plant.waterLevel > 0 && guard < 2000) {
+    guard += 1;
+    const tickMs = getPlantWaterLevelTickMsForTier(plant.growthTier);
+    if (now - updatedAt < tickMs) break;
+    const previousWaterLevel = plant.waterLevel;
+    plant.waterLevel -= 1;
+    updatedAt += tickMs;
+    if (previousWaterLevel > 0 && plant.waterLevel === 0 && plant.becameEmptyAt === null) {
+      plant.becameEmptyAt = updatedAt;
+    }
+  }
+  plant.waterLevelUpdatedAt = updatedAt;
+}
+
 function updateExtraPlantWaterLevel(plant, now) {
   if (plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") {
     return;
@@ -5478,16 +5489,7 @@ function updateExtraPlantWaterLevel(plant, now) {
     return;
   }
 
-  const elapsedTicks = Math.floor((now - plant.waterLevelUpdatedAt) / plantWaterLevelTickMs);
-  if (elapsedTicks <= 0) return;
-
-  const previousWaterLevel = plant.waterLevel;
-  plant.waterLevel = Math.max(0, plant.waterLevel - elapsedTicks);
-  plant.waterLevelUpdatedAt += elapsedTicks * plantWaterLevelTickMs;
-
-  if (previousWaterLevel > 0 && plant.waterLevel === 0 && plant.becameEmptyAt === null) {
-    plant.becameEmptyAt = plant.waterLevelUpdatedAt;
-  }
+  applyPlantWaterDecay(plant, now);
 }
 
 function getPlantSoilSrc(plant) {
@@ -7335,21 +7337,9 @@ function updatePlantWaterLevel() {
     return;
   }
 
-  const elapsedTicks = Math.floor(
-    (now - plantRuntime.waterLevelUpdatedAt) / plantWaterLevelTickMs
-  );
+  applyPlantWaterDecay(plantRuntime, now);
 
-  if (elapsedTicks <= 0) return;
-
-  const previousWaterLevel = plantRuntime.waterLevel;
-  plantRuntime.waterLevel = Math.max(0, plantRuntime.waterLevel - elapsedTicks);
-  plantRuntime.waterLevelUpdatedAt += elapsedTicks * plantWaterLevelTickMs;
-
-  if (plantRuntime.waterLevel <= 0 && plantRuntime.becameEmptyAt === null) {
-    plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
-  }
-
-  if (previousWaterLevel > 0 && plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
+  if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
     plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
   }
 

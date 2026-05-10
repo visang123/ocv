@@ -62,13 +62,17 @@ export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 
-/** 테스트: 식물 성장·새싹 1·2단계·가루 4/5단계 등 성장 구간 전부 이 시간으로 통일 */
+/** 스모크용 단축 성장(필요 시만). 본편은 plantGrowthMs·sproutStage*·level*GrowMs. */
 export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 
-/** Stage 1 sprout art duration after first sprout appears (ms). */
-export const sproutStage1Ms = plantGrowthTestEveryMs;
-/** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
-export const sproutStage2GrowMs = plantGrowthTestEveryMs;
+/** 심은 뒤 첫 새싹이 나올 때까지 */
+export const plantGrowthMs = 3 * SECOND_MS;
+/** 새싹 표시 1→2 단계 */
+export const sproutStage1Ms = 30 * SECOND_MS;
+/** 새싹 표시 2→3 단계 */
+export const sproutStage2GrowMs = 60 * SECOND_MS;
+/** 구세이브 새싹 진화 진행률 마이그레이션(예전 총 6s 기준). */
+export const biggerSproutMs = 6 * SECOND_MS;
 export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260510f";
 export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260510f";
 export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260510f";
@@ -151,8 +155,6 @@ export const butterflyBoundsLeft = 24;
 export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
-/** Legacy: used only to migrate old saves into stage-3 self-sustaining sprouts. */
-export const biggerSproutMs = plantGrowthTestEveryMs;
 export const pickupDistance = 28;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 60;
@@ -164,20 +166,43 @@ export const plantHoverPickRadiusWorld = 40;
 export const maxWellWater = 3;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;
-/** 월드 첫 식물(메인)만 물 0칸 후 이 시간이 지나면 흙이 마름. 나머지 식물은 plantDryMs 사용. */
+/** 월드 첫 식물(메인): 물 감소가 멈춘 유휴(3·5단) 등에서 마름 판정에 쓰는 긴 기본값 */
 export const mainPlantDryAfterEmptyMs = 5 * MINUTE_MS;
-/** 마법 가루 적용 중(또는 4단계 이상) 메인 작물이 물이 바짝 마른 뒤 흙이 마르기까지 */
+/** 마법 가루 적용 중 메인 작물이 물 0 후 흙이 마르기까지 */
 export const mainPlantDryAfterPowderMs = 5 * MINUTE_MS;
-export const mainPlantDryAfterEmptyTier4Ms = 6 * MINUTE_MS;
-export const mainPlantDryAfterEmptyTier5Ms = 8 * MINUTE_MS;
 export const plantDryMs = 40 * SECOND_MS;
-/** 가루 진행 중·고단계 추가 식물의 마름 타이밍(1·2단계와 동일 로직, 수치만 조정) */
+/** 가루 진행 중 추가 식물 마름(티어 함수보다 우선) */
 export const plantDryMsDuringPowderMs = 45 * SECOND_MS;
-export const plantDryMsTier4Ms = 50 * SECOND_MS;
-export const plantDryMsTier5Ms = 70 * SECOND_MS;
-export const plantWaterLevelTickMs = 20 * SECOND_MS;
-export const plantGrowthMs = plantGrowthTestEveryMs;
 export const overwaterWindowMs = 60 * MINUTE_MS;
+
+/**
+ * 수분·마름 표 (1→2)…(4→5)에 맞춘 «케어 단계» 1…5.
+ * growthTier 0·1 → 1, 2→2, 3→3, 4→4, 5→5
+ */
+export function plantCareLevelFromGrowthTier(growthTier) {
+  const t = Math.max(0, Number(growthTier) || 0);
+  if (t >= 5) return 5;
+  if (t >= 4) return 4;
+  if (t >= 3) return 3;
+  if (t >= 2) return 2;
+  return 1;
+}
+
+/** 수분 한 칸 감소: 10s / 10s / 15s / 20s */
+export function getPlantWaterLevelTickMsForTier(growthTier) {
+  const L = plantCareLevelFromGrowthTier(growthTier);
+  if (L >= 4) return 20 * SECOND_MS;
+  if (L >= 3) return 15 * SECOND_MS;
+  return 10 * SECOND_MS;
+}
+
+/** 물 0 후 흙 마름: 15s / 30s / 45s / 45s / 45s */
+export function getPlantDryAfterEmptyMsForTier(growthTier) {
+  const L = plantCareLevelFromGrowthTier(growthTier);
+  if (L >= 3) return 45 * SECOND_MS;
+  if (L === 2) return 30 * SECOND_MS;
+  return 15 * SECOND_MS;
+}
 /**
  * How long the rotten soil image stays visible before the planted slot is
  * fully cleared so the player can plant a new seed there.
@@ -185,8 +210,10 @@ export const overwaterWindowMs = 60 * MINUTE_MS;
 export const plantRotClearMs = 3 * SECOND_MS;
 export const magicPowderCraftCost = 10;
 export const magicPowderCraftMs = 3 * SECOND_MS;
-export const level4GrowMs = plantGrowthTestEveryMs;
-export const level5GrowMs = plantGrowthTestEveryMs;
+/** 가루 3→4(또는 동등 성장 구간) */
+export const level4GrowMs = 90 * SECOND_MS;
+/** 4단 풀 생존 후 자동 5단 */
+export const level5GrowMs = 120 * SECOND_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";
