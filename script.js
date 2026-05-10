@@ -371,6 +371,7 @@ let movementTutorialBaseline = null;
 let onboardingFlowStep = 1;
 let onboardingJumpLatch = false;
 let onboardingFirstGuideEscHintShown = false;
+let onboardingNpcGuideEscHintShown = false;
 let onboardingEscHintTimerId = null;
 let onboardingCongratsTimerId = null;
 let onboardingTreeLeaveHintTimerId = null;
@@ -1155,6 +1156,8 @@ function closeGuideCardFromClick() {
       onboardingFlowStep = 4;
       persistOnboardingStep();
     } else if (onboardingFlowStep === 10) {
+      onboardingClearEscHintTimer();
+      onboardingNpcGuideEscHintShown = false;
       onboardingFlowStep = 11;
       persistOnboardingStep();
     }
@@ -1868,6 +1871,7 @@ function clearOnboardingHighlights() {
   [
     guideBook,
     guideBookButton,
+    guideCard,
     seed,
     plantMaster,
     player,
@@ -1884,6 +1888,9 @@ function clearOnboardingHighlights() {
   treeAppleElements.forEach(function (el) {
     el.classList.remove("onboarding-highlight");
   });
+  if (guideBookButton) {
+    guideBookButton.classList.remove("onboarding-highlight-book-inv");
+  }
 }
 
 function setOnboardingCalloutVisible(show, text) {
@@ -2079,14 +2086,26 @@ function onboardingClearAllOnboardingTimers() {
   }
 }
 
-function scheduleOnboardingFirstGuideEscHint() {
+function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
   onboardingClearEscHintTimer();
   onboardingEscHintTimerId = window.setTimeout(function () {
     onboardingEscHintTimerId = null;
-    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 3) return;
-    onboardingFirstGuideEscHintShown = true;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== expectedStep) return;
+    applyFlag();
     updateOnboardingFlowUI();
-  }, 5000);
+  }, 2000);
+}
+
+function scheduleOnboardingFirstGuideEscHint() {
+  scheduleOnboardingGuideEscHintLine(3, function () {
+    onboardingFirstGuideEscHintShown = true;
+  });
+}
+
+function scheduleOnboardingNpcGuideEscHint() {
+  scheduleOnboardingGuideEscHintLine(10, function () {
+    onboardingNpcGuideEscHintShown = true;
+  });
 }
 
 function onboardingScheduleTutorialCompleteHide() {
@@ -2168,12 +2187,12 @@ function flashOnboardingOrderHint(message) {
 }
 
 function onboardingAllowsBucketQUse() {
-  return onboardingFlowStep === 14 || onboardingFlowStep === 16;
+  return onboardingFlowStep === 13 || onboardingFlowStep === 15;
 }
 
 function onboardingAllowsGuideBookButtonToggle() {
   const s = onboardingFlowStep;
-  return s === 2 || s === 3 || s === 10 || s >= 17;
+  return s === 2 || s === 3 || s === 10 || s >= 16;
 }
 
 function syncOnboardingFlowProgressFromWorld() {
@@ -2219,6 +2238,7 @@ function syncOnboardingFlowProgressFromWorld() {
 function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
   onboardingFirstGuideEscHintShown = false;
+  onboardingNpcGuideEscHintShown = false;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
   onboardingClearAllOnboardingTimers();
@@ -2248,6 +2268,14 @@ function loadOnboardingFlowState() {
     !onboardingFirstGuideEscHintShown
   ) {
     scheduleOnboardingFirstGuideEscHint();
+  }
+  if (
+    onboardingFlowStep === 10 &&
+    guideCard &&
+    guideCard.style.display === "block" &&
+    !onboardingNpcGuideEscHintShown
+  ) {
+    scheduleOnboardingNpcGuideEscHint();
   }
 }
 
@@ -2283,13 +2311,13 @@ function onboardingAutoAdvanceSteps() {
     persistOnboardingStep();
   }
   if (
-    onboardingFlowStep === 15 &&
+    onboardingFlowStep === 14 &&
     heldItem === HELD_ITEM_BUCKET &&
     isBucketFull &&
     getNearestWateringTarget() &&
     getNearestWateringTarget().type === "main"
   ) {
-    onboardingFlowStep = 16;
+    onboardingFlowStep = 15;
     persistOnboardingStep();
   }
   if (onboardingFlowStep === 21 && isPlayerNearTutorialTreeArea()) {
@@ -2353,6 +2381,9 @@ function updateOnboardingFlowUI() {
   if (onboardingFlowStep === 3 && guideOpen && !onboardingEscHintTimerId && !onboardingFirstGuideEscHintShown) {
     scheduleOnboardingFirstGuideEscHint();
   }
+  if (onboardingFlowStep === 10 && guideOpen && !onboardingEscHintTimerId && !onboardingNpcGuideEscHintShown) {
+    scheduleOnboardingNpcGuideEscHint();
+  }
 
   switch (onboardingFlowStep) {
     case 1: {
@@ -2367,7 +2398,10 @@ function updateOnboardingFlowUI() {
     }
     case 2: {
       setOnboardingCalloutVisible(true, "왼쪽 아래 책을 눌러보세요.");
-      if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+      if (guideBookButton) {
+        guideBookButton.classList.add("onboarding-highlight");
+        guideBookButton.classList.add("onboarding-highlight-book-inv");
+      }
       break;
     }
     case 3: {
@@ -2379,6 +2413,9 @@ function updateOnboardingFlowUI() {
           onboardingFirstGuideEscHintShown ? line1 + "\n\n" + line2 : line1
         );
         if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+        if (onboardingFirstGuideEscHintShown && guideCard) {
+          guideCard.classList.add("onboarding-highlight");
+        }
       } else {
         setOnboardingCalloutVisible(false, "");
       }
@@ -2408,6 +2445,7 @@ function updateOnboardingFlowUI() {
         "심고 싶은 위치로 이동후, 클릭 해 씨앗을 심으세요."
       );
       if (player) player.classList.add("onboarding-highlight");
+      if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 8: {
@@ -2427,11 +2465,16 @@ function updateOnboardingFlowUI() {
     }
     case 10: {
       if (guideOpen) {
+        const line1 = "설명을 참고하세요.";
+        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
-          "설명을 참고하고 설명창을 esc 또는 클릭으로 닫으세요."
+          onboardingNpcGuideEscHintShown ? line1 + "\n\n" + line2 : line1
         );
         if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
+        if (onboardingNpcGuideEscHintShown && guideCard) {
+          guideCard.classList.add("onboarding-highlight");
+        }
       } else {
         setOnboardingCalloutVisible(false, "");
       }
@@ -2446,40 +2489,41 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "양동이 근처로가 양동이를 e눌러 드세요."
+        "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 13: {
-      setOnboardingCalloutVisible(true, "e를눌러 다시 내려놓으세요.");
-      if (player) player.classList.add("onboarding-highlight");
+      setOnboardingCalloutVisible(
+        true,
+        "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
+      );
+      if (well) well.classList.add("onboarding-highlight");
+      if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(
-        true,
-        "다시 양동이를 들어 우물 근처로 가서 q를 누르세요."
-      );
-      if (bucket) bucket.classList.add("onboarding-highlight");
-      if (well) well.classList.add("onboarding-highlight");
+      setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
+      if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "그대로 아까심은 씨앗으로 가세요.");
+      setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 16: {
-      setOnboardingCalloutVisible(true, "q를 다시 눌러 물을 뿌리세요.");
-      if (plantSpot) plantSpot.classList.add("onboarding-highlight");
-      break;
-    }
-    case 17: {
       setOnboardingCalloutVisible(
         true,
         "축하합니다! 식물 키우는 법을 배우셨습니다."
       );
+      break;
+    }
+    case 17: {
+      setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
+      if (bucket) bucket.classList.add("onboarding-highlight");
+      if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 18: {
@@ -2563,17 +2607,16 @@ function onboardingCheckJumpFinish() {
 }
 
 function onboardingHookWateredMainPlantFromTutorial() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
-  onboardingFlowStep = 17;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 15) return;
+  onboardingFlowStep = 16;
   persistOnboardingStep();
   if (onboardingCongratsTimerId) {
     window.clearTimeout(onboardingCongratsTimerId);
   }
   onboardingCongratsTimerId = window.setTimeout(function () {
     onboardingCongratsTimerId = null;
-    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 17) return;
-    onboardingFlowStep = 18;
-    onboardingButterflyCountBaseline = getTotalCaughtButterflies();
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
+    onboardingFlowStep = 17;
     persistOnboardingStep();
     updateOnboardingFlowUI();
   }, 5000);
@@ -2581,15 +2624,16 @@ function onboardingHookWateredMainPlantFromTutorial() {
 }
 
 function onboardingHookFilledBucketAtWell() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 14) return;
-  onboardingFlowStep = 15;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 13) return;
+  onboardingFlowStep = 14;
   persistOnboardingStep();
   updateOnboardingFlowUI();
 }
 
 function onboardingHookDroppedBucketForTutorial() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 13) return;
-  onboardingFlowStep = 14;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 17) return;
+  onboardingFlowStep = 18;
+  onboardingButterflyCountBaseline = getTotalCaughtButterflies();
   persistOnboardingStep();
   updateOnboardingFlowUI();
 }
@@ -2780,6 +2824,7 @@ function applyDefaultState(options) {
     onboardingFlowStep = 1;
     onboardingJumpLatch = false;
     onboardingFirstGuideEscHintShown = false;
+    onboardingNpcGuideEscHintShown = false;
     onboardingSeedTutorialSecondLine = false;
     onboardingButterflyCountBaseline = null;
     onboardingTutorialEnteredTree = false;
@@ -2990,6 +3035,8 @@ function startPlantMasterDialogue() {
       isGuideBookOpen = true;
       if (!getStoredFlag(onboardingFlowDoneKey)) {
         if (onboardingFlowStep === 9) {
+          onboardingClearEscHintTimer();
+          onboardingNpcGuideEscHintShown = false;
           onboardingFlowStep = 10;
         } else if (onboardingFlowStep < 2) {
           onboardingFlowStep = 2;
@@ -3074,7 +3121,7 @@ function pickUpNearestItem() {
   }
 
   if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12 && onboardingFlowStep !== 14) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -3983,7 +4030,7 @@ function pollWorldState(forcePoll) {
 
 function dropHeldItem() {
   if (isOnboardingLinearGateActive()) {
-    if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== 13) {
+    if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== 17) {
       flashOnboardingOrderHint("");
       return;
     }

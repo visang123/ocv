@@ -762,7 +762,7 @@ body::-webkit-scrollbar {
 .onboarding-callout {
   position: fixed;
   left: 50%;
-  top: 12px;
+  top: 30vh;
   bottom: auto;
   transform: translateX(-50%);
   z-index: 56;
@@ -804,14 +804,22 @@ body::-webkit-scrollbar {
 
 .onboarding-callout-text {
   margin: 0;
-  color: #78350f;
+  color: #3f1f08;
   font: 900 17px/1.45 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   text-align: center;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
   white-space: pre-line;
+  -webkit-font-smoothing: antialiased;
 }
 
 #guide-book.onboarding-highlight,
+#guide-book-button.onboarding-highlight-book-inv {
+  outline: 5px solid #ea580c !important;
+  outline-offset: 5px !important;
+  border-radius: 12px;
+  animation: onboarding-target-glow 1s ease-in-out infinite;
+}
+
 #guide-book-button.onboarding-highlight,
 #seed.onboarding-highlight,
 #plant-master.onboarding-highlight,
@@ -871,7 +879,7 @@ body::-webkit-scrollbar {
 .movement-tutorial-overlay {
   position: fixed;
   left: 50%;
-  top: 12px;
+  top: 30vh;
   transform: translateX(-50%);
   z-index: 55;
   max-width: min(96vw, 520px);
@@ -921,9 +929,10 @@ body::-webkit-scrollbar {
 
 .movement-tutorial-text {
   margin: 0;
-  color: #0f172a;
+  color: #020617;
   font: 900 18px/1.4 Arial, sans-serif;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  -webkit-font-smoothing: antialiased;
 }
 
 .movement-tutorial-text-block .movement-tutorial-text + .movement-tutorial-text {
@@ -931,7 +940,7 @@ body::-webkit-scrollbar {
 }
 
 .movement-tutorial-line-book {
-  color: #1d4ed8;
+  color: #172554;
   font-size: 19px;
   animation: movement-tutorial-book-line 1.8s ease-in-out infinite;
 }
@@ -1884,6 +1893,14 @@ body::-webkit-scrollbar {
   color: rgba(0, 0, 0, 0.96);
   font: 700 24px/1.45 Arial, sans-serif;
   z-index: 10;
+}
+
+#guide-card.onboarding-highlight {
+  z-index: 60;
+  outline: 4px solid #f59e0b;
+  outline-offset: 4px;
+  border-radius: 10px;
+  animation: onboarding-target-glow 1.1s ease-in-out infinite;
 }
 
 #guide-close-button {
