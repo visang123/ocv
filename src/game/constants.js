@@ -153,7 +153,7 @@ export const butterflyRespawnMs = 2 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */
 export const butterflyCatchDistance = 25;
 /** Authority (lowest sessionId) broadcasts butterfly positions on this cadence. */
-export const butterflyBroadcastMs = 480;
+export const butterflyBroadcastMs = 220;
 /** Bounding box (world coords) the butterflies stay within while flying. */
 export const butterflyBoundsLeft = 24;
 export const butterflyBoundsRight = 936;
@@ -167,7 +167,7 @@ export const wellUseDistance = 28;
 export const wellPourDistance = wellUseDistance;
 export const plantWaterDistance = 40;
 /** 포인터 기준 식물 호버: 월드 식물 중심과 이 거리 안이면 후보 */
-export const plantHoverPickRadiusWorld = 40;
+export const plantHoverPickRadiusWorld = 24;
 export const maxWellWater = 3;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;

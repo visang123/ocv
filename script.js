@@ -577,6 +577,7 @@ let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
+let localPlantActionLockUntil = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
 let hasHydratedSharedWorldFromServer = false;
 let pendingWorldResetToken = "";
@@ -4219,6 +4220,12 @@ function refreshUiAfterSharedWorldApply() {
   updateMagicPowderInventoryUi();
 }
 
+function holdLocalPlantStateAgainstStaleSnapshot(ms) {
+  const lockMs = Math.max(0, Number(ms) || 0);
+  if (!lockMs) return;
+  localPlantActionLockUntil = Math.max(localPlantActionLockUntil, Date.now() + lockMs);
+}
+
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
@@ -4264,6 +4271,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     return;
   }
   isApplyingWorldState = true;
+  const shouldDeferRemotePlantApply = Date.now() < localPlantActionLockUntil;
 
   try {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
@@ -4340,7 +4348,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
 
     // Snapshots here are always from other clients (savedBy !== currentSessionId).
     // Do not skip while local planting — that hid remote plants and showed wrong soil.
-    if (snapshot.mainPlant) {
+    if (snapshot.mainPlant && !shouldDeferRemotePlantApply) {
       let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
       const snapAt = snapshotSavedAt || 0;
       if (
@@ -4569,9 +4577,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           }
         }
       }
-      const incomingExtraPlants = Array.isArray(snapshot.apples.extraPlants)
-        ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
-        : [];
+      const incomingExtraPlants = shouldDeferRemotePlantApply
+        ? priorExtraPlants.slice()
+        : Array.isArray(snapshot.apples.extraPlants)
+          ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
+          : [];
       let nextExtraPlants = incomingExtraPlants;
       if (shouldMergePendingPlants) {
         const pendingLocalPlants = priorExtraPlants.filter(function (p) {
@@ -7769,6 +7779,7 @@ function waterPlant(target) {
 
   plantRuntime.waterLevelUpdatedAt = now;
   plantRuntime.becameEmptyAt = null;
+  holdLocalPlantStateAgainstStaleSnapshot(1200);
 
   saveSeedState();
   syncWorldState(true);
@@ -7831,6 +7842,7 @@ function waterExtraPlant(plant) {
 
   plant.waterLevelUpdatedAt = now;
   plant.becameEmptyAt = null;
+  holdLocalPlantStateAgainstStaleSnapshot(1200);
 
   saveAppleState();
   syncWorldState(true);
@@ -10502,12 +10514,26 @@ function pickRandomButterflySpawnPoint() {
 }
 
 function pickButterflyWaypoint(fromX, fromY) {
-  // Aim for a point at least a bit away so we don't pick the same spot.
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const target = pickRandomButterflySpawnPoint();
+  // Prefer local legs around current position to avoid "teleport-thinking"
+  // path changes on remote clients when snapshots arrive out of phase.
+  const minLeg = 42;
+  const maxLeg = 150;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const leg = minLeg + Math.random() * (maxLeg - minLeg);
+    const target = {
+      x: Math.max(
+        butterflyBoundsLeft,
+        Math.min(butterflyBoundsRight, fromX + Math.cos(angle) * leg)
+      ),
+      y: Math.max(
+        butterflyBoundsTop,
+        Math.min(butterflyBoundsBottom, fromY + Math.sin(angle) * leg)
+      )
+    };
     const dx = target.x - fromX;
     const dy = target.y - fromY;
-    if (dx * dx + dy * dy >= 60 * 60) {
+    if (dx * dx + dy * dy >= minLeg * minLeg) {
       return target;
     }
   }
@@ -11060,8 +11086,8 @@ function updateButterflies() {
   // frames are still animated locally for smoothness.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
-  /** 원격 스냅샷 추적: 너무 작으면 목표에 못 닿아 멈춘 것처럼 보임 */
-  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 32 : 22;
+  /** 원격 스냅샷 추적: 지연 환경(다른 IP)에서 따라붙도록 스텝을 더 크게 */
+  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 48 : 30;
 
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
