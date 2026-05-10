@@ -115,6 +115,7 @@ export function loadSeedStateFromStorage(config) {
     ownerDisplayName: "",
     sproutOrdinal: 0,
     grassOrdinal: null,
+    blockSproutRegrowthAfterDry: false,
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -359,7 +360,13 @@ export function loadAppleStateFromStorage(config) {
                 Number.isFinite(Number(plantData.grassOrdinal))
                   ? Math.max(1, Number(plantData.grassOrdinal))
                   : null,
-              rottenAt: Number(plantData.rottenAt) || null
+              rottenAt: Number(plantData.rottenAt) || null,
+              blockSproutRegrowthAfterDry: (function () {
+                if (Object.prototype.hasOwnProperty.call(plantData, "blockSproutRegrowthAfterDry")) {
+                  return Boolean(plantData.blockSproutRegrowthAfterDry);
+                }
+                return (plantData.status || "normal") === "dry";
+              })()
             };
           })
         : [],
@@ -460,7 +467,8 @@ export function saveAppleStateToStorage(config) {
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
               ? plant.grassOrdinal
               : null,
-          rottenAt: plant.rottenAt || null
+          rottenAt: plant.rottenAt || null,
+          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry)
         };
       }),
       worldLooseSeed: worldLooseSeedOut

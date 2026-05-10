@@ -64,7 +64,9 @@ export function createPlantState() {
     ownerUserId: "",
     ownerDisplayName: "",
     sproutOrdinal: 0,
-    grassOrdinal: null
+    grassOrdinal: null,
+    /** 마른 땅(작물 고사) 이후에는 물만으로 새싹 타이머가 다시 시작되지 않음 — 새로 심을 때만 false */
+    blockSproutRegrowthAfterDry: false
   };
 }
 

@@ -3186,6 +3186,7 @@ function applyDefaultState(options) {
   plantRuntime.powderUpgradeDurationMs = 0;
   plantRuntime.grassAuto5EligibleAt = null;
   plantRuntime.plantedAt = null;
+  plantRuntime.blockSproutRegrowthAfterDry = false;
 
   if (!sharedWorldResetOnly) {
     hasGuideBook = false;
@@ -3749,9 +3750,11 @@ function eatApple() {
   playerStatus.textContent = "\uC0AC\uACFC\uBA39\uB294\uC911...";
   saveAppleState();
   updateApples();
+  sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
     appleState.isEating = false;
+    sendMultiplayerPresence(true);
     playerStatus.textContent = "";
     createSeedFromApple();
     if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 24) {
@@ -4304,7 +4307,8 @@ function getSharedWorldSnapshot() {
           grassOrdinal:
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
               ? plant.grassOrdinal
-              : null
+              : null,
+          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry)
         };
       })
     },
@@ -5378,6 +5382,7 @@ function normalizeExtraPlantState(plant) {
     plant.isSproutSelfSustaining = false;
     plant.needsFirstWater = false;
     plant.grassAuto5EligibleAt = null;
+    plant.blockSproutRegrowthAfterDry = false;
   }
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
@@ -5406,6 +5411,7 @@ function updateExtraPlantState(plant, now) {
 
   if (plant.status === "dry") {
     normalizePlantSproutFieldsWhenSoilDry(plant);
+    plant.blockSproutRegrowthAfterDry = true;
     return;
   }
 
@@ -5418,6 +5424,7 @@ function updateExtraPlantState(plant, now) {
   ) {
     plant.status = "dry";
     plant.needsFirstWater = true;
+    plant.blockSproutRegrowthAfterDry = true;
     cancelPlantPowderUpgrade(plant);
     plant.isSproutGrown = false;
     plant.sproutGrownAt = null;
@@ -6581,10 +6588,12 @@ function startPlanting() {
   heldItem = null;
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
+  sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
     const plantedAt = Date.now();
     plantRuntime.isPlanting = false;
+    sendMultiplayerPresence(true);
     const spotX = plantRuntime.spotX;
     const spotY = plantRuntime.spotY;
 
@@ -6645,6 +6654,7 @@ function startPlanting() {
     plantRuntime.grassAuto5EligibleAt = null;
     assignSproutIdentityToNewPlant(plantRuntime);
     ensureGrassOrdinalIfNeeded(plantRuntime);
+    plantRuntime.blockSproutRegrowthAfterDry = false;
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
@@ -6681,9 +6691,11 @@ function startPlantingExtraSeed() {
   heldItem = null;
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
+  sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
+    sendMultiplayerPresence(true);
     extraSeed.planted = true;
     const newPlant = createExtraPlant("plant-" + extraSeed.id, plantX, plantY);
     assignSproutIdentityToNewPlant(newPlant);
@@ -6736,9 +6748,11 @@ function plantWorldSeedCount() {
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
   updateSeedInventory();
   saveAppleState();
+  sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
+    sendMultiplayerPresence(true);
     plantingInventorySeedId = null;
     appleState.seedCount = Math.max(0, appleState.seedCount - 1);
 
@@ -6771,6 +6785,7 @@ function plantWorldSeedCount() {
       plantRuntime.grassAuto5EligibleAt = null;
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
+      plantRuntime.blockSproutRegrowthAfterDry = false;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -6843,9 +6858,11 @@ function plantInventorySeed(seedId) {
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
   updateSeedInventory();
   saveAppleState();
+  sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
+    sendMultiplayerPresence(true);
     plantingInventorySeedId = null;
     inventorySeed.planted = true;
     inventorySeed.inInventory = false;
@@ -6879,6 +6896,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.grassAuto5EligibleAt = null;
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
+      plantRuntime.blockSproutRegrowthAfterDry = false;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -6930,7 +6948,8 @@ function createExtraPlant(id, x, y) {
     ownerUserId: "",
     ownerDisplayName: "",
     sproutOrdinal: 0,
-    grassOrdinal: null
+    grassOrdinal: null,
+    blockSproutRegrowthAfterDry: false
   };
 }
 
@@ -7806,7 +7825,11 @@ function waterPlant(target) {
   plantRuntime.lastWateredAt = now;
   plantRuntime.needsFirstWater = false;
 
-  if (plantRuntime.growthStartedAt === null && !plantRuntime.isSproutGrown) {
+  if (
+    plantRuntime.growthStartedAt === null &&
+    !plantRuntime.isSproutGrown &&
+    !plantRuntime.blockSproutRegrowthAfterDry
+  ) {
     plantRuntime.growthStartedAt = now;
   }
 
@@ -7848,7 +7871,6 @@ function waterPlant(target) {
   }
 
   if (wasDrySoil) {
-    plantRuntime.growthStartedAt = now;
     plantRuntime.grassAuto5EligibleAt = null;
   }
 
@@ -7881,7 +7903,11 @@ function waterExtraPlant(plant) {
   plant.lastWateredAt = now;
   plant.needsFirstWater = false;
 
-  if (plant.growthStartedAt === null && !plant.isSproutGrown) {
+  if (
+    plant.growthStartedAt === null &&
+    !plant.isSproutGrown &&
+    !plant.blockSproutRegrowthAfterDry
+  ) {
     plant.growthStartedAt = now;
   }
 
@@ -7920,7 +7946,6 @@ function waterExtraPlant(plant) {
   }
 
   if (wasDrySoil) {
-    plant.growthStartedAt = now;
     plant.grassAuto5EligibleAt = null;
   }
 
@@ -8031,10 +8056,11 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
-    // 마른 땅: 위 싹 상태를 비워 두어 스냅샷·로컬이 어긋나며 싹이 되살아나지 않게 함. 물 주면 wasDrySoil에서 다시 시작.
+    // 마른 땅: 싹 필드 비움. 물만으로는 다시 자라지 않음 — 새로 심으면 block 해제.
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
+    plantRuntime.blockSproutRegrowthAfterDry = true;
     cancelPlantPowderUpgrade(plantRuntime);
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -8118,6 +8144,7 @@ function removeMainPlant() {
   plantRuntime.sproutOrdinal = 0;
   plantRuntime.grassOrdinal = null;
   plantRuntime.plantedAt = null;
+  plantRuntime.blockSproutRegrowthAfterDry = false;
   plantSpot.removeAttribute("title");
   sprout.removeAttribute("title");
   hidePlantHoverLabel();
@@ -8592,6 +8619,12 @@ function applyLoadedPlantState(loadedPlant) {
       ? Math.max(1, Number(loadedPlant.grassOrdinal))
       : null;
 
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "blockSproutRegrowthAfterDry")) {
+    plantRuntime.blockSproutRegrowthAfterDry = Boolean(loadedPlant.blockSproutRegrowthAfterDry);
+  } else {
+    plantRuntime.blockSproutRegrowthAfterDry = plantRuntime.status === "dry";
+  }
+
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     plantRuntime.status = "rotten";
     if (!plantRuntime.rottenAt) plantRuntime.rottenAt = Date.now();
@@ -8603,9 +8636,11 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.needsFirstWater = false;
     plantRuntime.grassAuto5EligibleAt = null;
+    plantRuntime.blockSproutRegrowthAfterDry = false;
   }
   if (plantRuntime.status === "dry") {
     normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
+    plantRuntime.blockSproutRegrowthAfterDry = true;
   }
   if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
@@ -8660,6 +8695,7 @@ function getPlantStateForStorage() {
       plantRuntime.grassOrdinal != null && Number.isFinite(Number(plantRuntime.grassOrdinal))
         ? plantRuntime.grassOrdinal
         : null,
+    blockSproutRegrowthAfterDry: Boolean(plantRuntime.blockSproutRegrowthAfterDry),
     npcX,
     npcY
   };
@@ -9948,15 +9984,11 @@ function renderRemotePlayerState(state) {
             : "";
     remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
     remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
-  } else if (
-    remotePlayer.statusElement.textContent &&
-    Date.now() - Number(remotePlayer.lastActionAt || 0) <
-      Math.max(plantActionMs, appleEatMs, magicPowderCraftMs) + 400
-  ) {
-    remotePlayer.statusElement.style.display = "block";
   } else {
+    // 상대 클라이언트는 이미 텍스트를 뗐을 때(state/watering) — 여기서 늘리지 않음
     remotePlayer.statusElement.textContent = "";
     remotePlayer.statusElement.style.display = "none";
+    remotePlayer.lastActionAt = 0;
   }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
