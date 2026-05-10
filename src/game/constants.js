@@ -94,7 +94,7 @@ const minPlantCenterGapWorld = 4;
 
 /**
  * 기존 식물 중심까지 필요한 최소 거리(월드 px).
- * maturity 3·4·5는 고정값(4.5 / 12 / 14).
+ * maturity 3·4·5는 고정값(1.5 / 6 / 7).
  */
 export function getMinPlantCenterClearanceWorld(maturityLevel) {
   const m = Math.max(0, Number(maturityLevel) || 0);
@@ -102,9 +102,9 @@ export function getMinPlantCenterClearanceWorld(maturityLevel) {
   const w1 = SPROUT_STAGE_WIDTHS[0];
   const w2 = SPROUT_STAGE_WIDTHS[1];
 
-  if (m >= 5) return 14;
-  if (m >= 4) return 12;
-  if (m >= 3) return 4.5;
+  if (m >= 5) return 7;
+  if (m >= 4) return 6;
+  if (m >= 3) return 1.5;
   if (m === 2) return (w2 + spot) / 2 + minPlantCenterGapWorld;
   if (m === 1) return (w1 + spot) / 2 + minPlantCenterGapWorld;
   return spot + minPlantCenterGapWorld;
