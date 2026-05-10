@@ -5249,14 +5249,16 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
   return best;
 }
 
-function showWorldLooseSeedHoverLabel(cxWorld, cyWorld) {
-  if (!plantHoverLabel) return;
+function showWorldLooseSeedInventoryHoverLabel() {
+  if (!plantHoverLabel || !seedInventory) return;
   plantHoverLabel.textContent = "\uC2EC\uAE30 \u00B7 \uD074\uB9AD (\uC778\uBCA4)";
   plantHoverLabel.style.display = "block";
+  void plantHoverLabel.offsetWidth;
+  const r = seedInventory.getBoundingClientRect();
   const w = plantHoverLabel.offsetWidth || 1;
   const h = plantHoverLabel.offsetHeight || 1;
-  const sx = toScreenX(cxWorld) - w / 2;
-  const sy = toScreenY(cyWorld - 6) - h;
+  const sx = r.left + r.width / 2 - w / 2;
+  const sy = r.top - h - 6;
   plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
 }
 
@@ -5283,11 +5285,11 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
     plantDist = Math.hypot(pxy.x - a.cxWorld, pxy.y - a.cyWorld);
   }
   if (looseHit && (!plant || looseDist <= plantDist)) {
-    if (worldLooseSeedElement) worldLooseSeedElement.classList.add("is-loose-seed-hover");
-    void plantHoverLabel.offsetWidth;
-    showWorldLooseSeedHoverLabel(looseHit.cxWorld, looseHit.cyWorld);
+    if (seedInventory) seedInventory.classList.add("is-loose-seed-hover-target");
+    showWorldLooseSeedInventoryHoverLabel();
     return;
   }
+  if (seedInventory) seedInventory.classList.remove("is-loose-seed-hover-target");
   if (worldLooseSeedElement) worldLooseSeedElement.classList.remove("is-loose-seed-hover");
   if (plant) showPlantHoverForPlant(plant);
   else hidePlantHoverLabel();
@@ -5499,6 +5501,7 @@ function getPlantSoilSrc(plant) {
 function updateSeedInventory() {
   if (usesWorldLooseSeedMode()) {
     const n = appleState.seedCount;
+    const looseVisible = isWorldLooseSeedVisibleAt(Date.now());
     if (n <= 0) {
       hasShownFirstSeedFocus = false;
     }
@@ -5507,9 +5510,9 @@ function updateSeedInventory() {
       seedCountText.textContent = String(n);
     }
     if (panel) {
-      panel.hidden = n <= 0;
+      panel.hidden = n <= 0 && !looseVisible;
     }
-    seedInventory.style.display = n > 0 ? "flex" : "none";
+    seedInventory.style.display = n > 0 || looseVisible ? "flex" : "none";
     const seedTip =
       "\uC528\uC557 \uBCF4\uC720 " +
       n +
@@ -6679,6 +6682,7 @@ function extraPlantFromDomElement(el) {
 }
 
 function hidePlantHoverLabel() {
+  if (seedInventory) seedInventory.classList.remove("is-loose-seed-hover-target");
   if (worldLooseSeedElement) {
     worldLooseSeedElement.classList.remove("is-loose-seed-hover");
   }

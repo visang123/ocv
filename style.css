@@ -219,13 +219,7 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
-.extra-seed.world-loose-seed.is-loose-seed-hover {
-  filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.95))
-    drop-shadow(0 0 6px rgba(234, 179, 8, 0.65));
-  outline: 1px solid rgba(234, 179, 8, 0.85);
-  outline-offset: 1px;
-  border-radius: 2px;
-}
+/* 월드 땅 씨앗 호버: 바닥 스프라이트 대신 인벤(#seed-inventory)에 강조 */
 
 #plant-spot {
   position: absolute;
@@ -2267,6 +2261,14 @@ body #guide-book-button {
   min-height: 56px;
   z-index: 11;
   pointer-events: auto;
+}
+
+#seed-inventory.is-loose-seed-hover-target .seed-count-panel {
+  filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.95))
+    drop-shadow(0 0 6px rgba(234, 179, 8, 0.65));
+  outline: 2px solid rgba(234, 179, 8, 0.9);
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 
 /* 월드: 열매 인벤과 같은 카운트 전용 패널 */
