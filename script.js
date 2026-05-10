@@ -379,6 +379,9 @@ let onboardingFinalHideTimerId = null;
 let onboardingButterflyCountBaseline = null;
 let onboardingTutorialEnteredTree = false;
 let onboardingSeedTutorialSecondLine = false;
+/** 25단계: 0 = 열매 안내(2초), 1 = 씨앗 사용 안내 */
+let onboardingPostAppleSeedIntroPhase = 0;
+let onboardingFruitIntroTimerId = null;
 /** 16단계: 0 = 축하 문구, 1 = 이어서 안내(저장 스텝은 계속 16) */
 let onboardingPostWaterCongratsPhase = 0;
 const ONBOARDING_MAX_STEP = 27;
@@ -2086,6 +2089,10 @@ function onboardingClearAllOnboardingTimers() {
     window.clearTimeout(onboardingFinalHideTimerId);
     onboardingFinalHideTimerId = null;
   }
+  if (onboardingFruitIntroTimerId) {
+    window.clearTimeout(onboardingFruitIntroTimerId);
+    onboardingFruitIntroTimerId = null;
+  }
 }
 
 function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
@@ -2241,6 +2248,7 @@ function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
   onboardingFirstGuideEscHintShown = false;
   onboardingNpcGuideEscHintShown = false;
+  onboardingPostAppleSeedIntroPhase = 0;
   onboardingPostWaterCongratsPhase = 0;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
@@ -2264,6 +2272,9 @@ function loadOnboardingFlowState() {
   onboardingFlowStep =
     Number.isFinite(raw) && raw >= 1 && raw <= ONBOARDING_MAX_STEP ? raw : 1;
   syncOnboardingFlowProgressFromWorld();
+  if (onboardingFlowStep === 25) {
+    onboardingPostAppleSeedIntroPhase = 1;
+  }
   if (
     onboardingFlowStep === 3 &&
     guideCard &&
@@ -2445,10 +2456,11 @@ function updateOnboardingFlowUI() {
     case 7: {
       setOnboardingCalloutVisible(
         true,
-        "심고 싶은 위치로 이동후, 클릭 해 씨앗을 심으세요."
+        "심고 싶은 위치로 이동 후, 클릭 해 씨앗을 심으세요."
       );
       if (player) player.classList.add("onboarding-highlight");
       if (seed) seed.classList.add("onboarding-highlight");
+      if (seedInventory) seedInventory.classList.add("onboarding-highlight");
       break;
     }
     case 8: {
@@ -2547,7 +2559,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 21: {
-      setOnboardingCalloutVisible(true, "오른쪽 위 나무로 이동하세요.");
+      setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
@@ -2572,12 +2584,16 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 25: {
-      const lineA = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
+      const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
       const lineB = "나무밖으로 이동하세요.";
-      setOnboardingCalloutVisible(
-        true,
-        onboardingSeedTutorialSecondLine ? lineA + "\n\n" + lineB : lineA
-      );
+      if (onboardingPostAppleSeedIntroPhase === 0) {
+        setOnboardingCalloutVisible(true, "열매가 생겼습니다.");
+      } else {
+        setOnboardingCalloutVisible(
+          true,
+          onboardingSeedTutorialSecondLine ? lineSeed + "\n\n" + lineB : lineSeed
+        );
+      }
       if (seedInventory) seedInventory.classList.add("onboarding-highlight");
       break;
     }
@@ -2839,6 +2855,7 @@ function applyDefaultState(options) {
     onboardingFirstGuideEscHintShown = false;
     onboardingNpcGuideEscHintShown = false;
     onboardingSeedTutorialSecondLine = false;
+    onboardingPostAppleSeedIntroPhase = 0;
     onboardingPostWaterCongratsPhase = 0;
     onboardingButterflyCountBaseline = null;
     onboardingTutorialEnteredTree = false;
@@ -3316,7 +3333,17 @@ function eatApple() {
     if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 24) {
       onboardingFlowStep = 25;
       onboardingSeedTutorialSecondLine = false;
+      onboardingPostAppleSeedIntroPhase = 0;
       persistOnboardingStep();
+      if (onboardingFruitIntroTimerId) {
+        window.clearTimeout(onboardingFruitIntroTimerId);
+      }
+      onboardingFruitIntroTimerId = window.setTimeout(function () {
+        onboardingFruitIntroTimerId = null;
+        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 25) return;
+        onboardingPostAppleSeedIntroPhase = 1;
+        updateOnboardingFlowUI();
+      }, 2000);
       if (onboardingTreeLeaveHintTimerId) {
         window.clearTimeout(onboardingTreeLeaveHintTimerId);
       }
@@ -5366,6 +5393,19 @@ function plantWorldOrdinalSortTime(plant) {
   const a = Number(plant.plantedAt) || 0;
   if (a > 0) return a;
   return Number(plant.growthStartedAt) || 0;
+}
+
+function butterflyInventorySlotHoverTip(color) {
+  if (color === "yellow") {
+    return "\uB178\uB791 \uB098\uBE44";
+  }
+  if (color === "brown") {
+    return "\uAC08\uC0C9 \uB098\uBE44";
+  }
+  if (color === "white") {
+    return "\uD558\uC580 \uB098\uBE44";
+  }
+  return "\uB098\uBE44";
 }
 
 /** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
@@ -8481,7 +8521,7 @@ function updateButterflyInventoryUi() {
   let total = 0;
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
-    setInstantHoverTip(slot, null);
+    setInstantHoverTip(slot, butterflyInventorySlotHoverTip(color));
     const count = butterflyState.caughtCounts[color] || 0;
     total += count;
     const countNode = slot.querySelector(".butterfly-inventory-count");
