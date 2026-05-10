@@ -2359,7 +2359,9 @@ function flashOnboardingOrderHint(message) {
 }
 
 function onboardingAllowsBucketQUse() {
-  return onboardingFlowStep === 13 || onboardingFlowStep === 15;
+  // 13: 우물에서 긷기, 14~15: 메인 작물에 붓기, 16+: 나비·설정 등 이후에도 일반 물주기 가능.
+  // 예전에는 13·15만 허용해 14에서 붓기/16 이후 Q가 무반응처럼 보이는 문제가 있었음.
+  return onboardingFlowStep >= 13;
 }
 
 function onboardingAllowsGuideBookButtonToggle() {
@@ -4167,6 +4169,12 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     if (snapshot.apples) {
       const priorExtraSeeds = appleState.extraSeeds.slice();
       const priorExtraPlants = appleState.extraPlants.slice();
+      const priorWorldLooseNextSpawnAt =
+        usesWorldLooseSeedMode() &&
+        appleState.worldLooseSeed &&
+        typeof appleState.worldLooseSeed === "object"
+          ? Math.max(0, Number(appleState.worldLooseSeed.nextSpawnAt) || 0)
+          : 0;
       const snapshotAppleTime = snapshotSavedAt || 0;
       const snapshotPlantIdsEarly = Object.create(null);
       if (Array.isArray(snapshot.apples.extraPlants)) {
@@ -4224,10 +4232,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       if (usesWorldLooseSeedMode()) {
         const wls = snapshot.apples.worldLooseSeed;
         if (wls && typeof wls === "object") {
+          const incomingNext = Math.max(0, Number(wls.nextSpawnAt) || 0);
           appleState.worldLooseSeed = {
             x: Number(wls.x) || WORLD_LOOSE_SEED_X,
             y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
-            nextSpawnAt: Math.max(0, Number(wls.nextSpawnAt) || 0)
+            nextSpawnAt: Math.max(incomingNext, priorWorldLooseNextSpawnAt)
           };
         } else {
           ensureWorldLooseSeedShape();
