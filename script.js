@@ -2574,7 +2574,7 @@ function updateOnboardingFlowUI() {
         const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
-          onboardingFirstGuideEscHintShown ? line1 + "\n\n" + line2 : line1
+          onboardingFirstGuideEscHintShown ? line2 + "\n\n" + line1 : line1
         );
         if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
         if (onboardingFirstGuideEscHintShown && guideCard) {
@@ -2634,7 +2634,7 @@ function updateOnboardingFlowUI() {
         const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
-          onboardingNpcGuideEscHintShown ? line1 + "\n\n" + line2 : line1
+          onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
         );
         if (guideBookButton) guideBookButton.classList.add("onboarding-highlight");
         if (onboardingNpcGuideEscHintShown && guideCard) {
@@ -4707,9 +4707,34 @@ function updateSeedPosition() {
   setWorldPosition(seed, seedX, seedY);
 }
 
+/**
+ * 지정 땅 씨 슬롯(WORLD_LOOSE_SEED_* = SEED_START)에 겹친 extraSeeds 땅 스프라이트는 숨김.
+ * 튜토 #seed·월드 느슨 img와 legacy 슬롯이 동시에 보이는 경우 방지.
+ */
+function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) {
+  if (
+    !extraSeed ||
+    extraSeed.planted ||
+    extraSeed.inInventory ||
+    heldItem === createHeldExtraSeed(extraSeed.id)
+  ) {
+    return false;
+  }
+  const tol = 14;
+  return (
+    Math.abs(extraSeed.x - WORLD_LOOSE_SEED_X) <= tol &&
+    Math.abs(extraSeed.y - WORLD_LOOSE_SEED_Y) <= tol
+  );
+}
+
 function updateExtraSeedsAndPlants() {
   const now = Date.now();
   let didAutoRemoveDryExtraSeed = false;
+
+  if (isTutorialDocumentEntry() && worldLooseSeedElement) {
+    worldLooseSeedElement.remove();
+    worldLooseSeedElement = null;
+  }
 
   if (usesWorldLooseSeedMode() && isHeldExtraSeed(heldItem) && !getHeldExtraSeed()) {
     heldItem = null;
@@ -4784,8 +4809,9 @@ function updateExtraSeedsAndPlants() {
     ensureExtraSeedElement(extraSeed);
     const isDry = isExtraSeedDry(extraSeed, now);
     extraSeed.element.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
+    const hideGroundOverlap = shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed);
     extraSeed.element.style.display =
-      extraSeed.planted || extraSeed.inInventory ? "none" : "block";
+      extraSeed.planted || extraSeed.inInventory || hideGroundOverlap ? "none" : "block";
 
     if (heldItem === createHeldExtraSeed(extraSeed.id)) {
       if (isDry) {

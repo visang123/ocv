@@ -768,13 +768,19 @@ body::-webkit-scrollbar {
   }
 }
 
+/* tutorial.html 전용: 월드 허브 seed-count UI 없음 */
+body.ovc-page-tutorial #seed-count-panel {
+  display: none !important;
+}
+
 .onboarding-callout {
   position: fixed;
   left: 50%;
   top: 30vh;
   bottom: auto;
   transform: translateX(-50%);
-  z-index: 56;
+  /* #guide-card.onboarding-highlight(60)보다 위 — ESC 안내가 설명창에 가리지 않게 */
+  z-index: 72;
   max-width: min(92vw, 440px);
   pointer-events: none;
 }
