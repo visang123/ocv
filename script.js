@@ -57,6 +57,7 @@ import {
   WORLD_LOOSE_SEED_RESPAWN_MS,
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
+  WORLD_MAX_EXTRA_INVENTORY_SEEDS,
   getMinPlantCenterClearanceWorld,
   biggerSproutMs,
   sproutStage1Ms,
@@ -757,6 +758,51 @@ function isWorldLooseSeedVisibleAt(now) {
   if (!usesWorldLooseSeedMode()) return false;
   ensureWorldLooseSeedShape();
   return now >= (Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
+}
+
+/** 인벤 씨앗 폭주·중복 id 정리(월드 느슨 씨앗 모드 전용) */
+function sanitizeWorldLooseModeExtraSeeds() {
+  if (!usesWorldLooseSeedMode()) return false;
+  let changed = false;
+  const lenBeforeDedupe = appleState.extraSeeds.length;
+  appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
+  if (appleState.extraSeeds.length !== lenBeforeDedupe) {
+    changed = true;
+  }
+  const cap = WORLD_MAX_EXTRA_INVENTORY_SEEDS;
+  const inv = appleState.extraSeeds.filter(function (s) {
+    return s && s.inInventory && !s.planted;
+  });
+  if (inv.length > cap) {
+    const nonStarter = inv.filter(function (s) {
+      return s.id !== "starter-seed" && !s.isStarter;
+    });
+    const starters = inv.filter(function (s) {
+      return s.id === "starter-seed" || s.isStarter;
+    });
+    const room = Math.max(0, cap - starters.length);
+    if (nonStarter.length > room) {
+      nonStarter.sort(function (a, b) {
+        return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
+      });
+      const dropCount = nonStarter.length - room;
+      const dropIds = Object.create(null);
+      for (let i = 0; i < dropCount; i++) {
+        dropIds[String(nonStarter[i].id)] = true;
+      }
+      appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
+        if (!s || !dropIds[String(s.id)]) return true;
+        if (s.inventoryElement) s.inventoryElement.remove();
+        if (s.element) s.element.remove();
+        if (heldItem === createHeldExtraSeed(s.id)) {
+          heldItem = null;
+        }
+        changed = true;
+        return false;
+      });
+    }
+  }
+  return changed;
 }
 
 const defaultZoom = 3.5;
@@ -3696,6 +3742,19 @@ function loadAppleState() {
       if (s.inInventory) return true;
       return false;
     });
+    if (sanitizeWorldLooseModeExtraSeeds()) {
+      saveAppleStateToStorage({
+        appleStateKey,
+        appleCount: appleState.count,
+        apples: appleState.apples,
+        pickedAppleIds: appleState.pickedIds,
+        nextAppleSeedOffset: appleState.nextSeedOffset,
+        lastAppleSpawnAt: appleState.lastSpawnAt,
+        extraSeeds: appleState.extraSeeds,
+        extraPlants: appleState.extraPlants,
+        worldLooseSeed: appleState.worldLooseSeed
+      });
+    }
   }
 
   syncMainSeedPickedStateFromLoadedExtraSeeds();
@@ -4256,6 +4315,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       appleState.extraSeeds = dedupeExtraSeedsPreferInventory(
         pruneGroundExtraSeedsShadowedByPlants(appleState.extraSeeds, appleState.extraPlants)
       );
+      if (usesWorldLooseSeedMode()) {
+        sanitizeWorldLooseModeExtraSeeds();
+      }
       const now = Date.now();
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
         const pickedAt = Number(localApplePickedAtById[appleId] || 0);
@@ -4625,6 +4687,10 @@ function updateExtraSeedsAndPlants() {
   const now = Date.now();
   let didAutoRemoveDryExtraSeed = false;
 
+  if (usesWorldLooseSeedMode() && isHeldExtraSeed(heldItem) && !getHeldExtraSeed()) {
+    heldItem = null;
+  }
+
   if (usesWorldLooseSeedMode()) {
     ensureWorldLooseSeedShape();
     if (!worldLooseSeedElement) {
@@ -4650,14 +4716,23 @@ function updateExtraSeedsAndPlants() {
   }
 
   if (usesWorldLooseSeedMode()) {
+    const heldExtraId = getHeldExtraSeedId(heldItem);
     const beforeStrip = appleState.extraSeeds.length;
     appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
       if (!s) return false;
       if (s.planted) return true;
       if (s.inInventory) return true;
+      if (plantingInventorySeedId && String(s.id) === String(plantingInventorySeedId)) {
+        return true;
+      }
+      if (heldExtraId && String(s.id) === String(heldExtraId)) {
+        return true;
+      }
       return false;
     });
-    if (appleState.extraSeeds.length !== beforeStrip) {
+    if (sanitizeWorldLooseModeExtraSeeds()) {
+      saveAppleState();
+    } else if (appleState.extraSeeds.length !== beforeStrip) {
       saveAppleState();
     }
   }

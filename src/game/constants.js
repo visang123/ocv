@@ -94,6 +94,8 @@ export const WORLD_LOOSE_SEED_ID = "world-loose-seed";
 export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
 export const WORLD_LOOSE_SEED_X = BIG_TREE_X + 54;
 export const WORLD_LOOSE_SEED_Y = BIG_TREE_Y + 88;
+/** 월드 모드 인벤 씨앗 상한(버그·동기화 꼬임 시 저장·스냅샷 폭주 방지) */
+export const WORLD_MAX_EXTRA_INVENTORY_SEEDS = 32;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 
