@@ -6850,13 +6850,15 @@ function ensureGrassOrdinalIfNeeded(plant) {
 }
 
 function getPlantWorldLabel(plant) {
-  if (plant && plant.status === "dry") {
+  if (
+    !plant ||
+    plant.status === "dry" ||
+    plant.status === "rotten" ||
+    plant.isOverwatered
+  ) {
     return "";
   }
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
-  if (!isPlantAliveForWorldOrdinal(plant)) {
-    return name + "\uC758 \uC2DD\uBB3C";
-  }
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
   const grassOrd =
@@ -7760,6 +7762,7 @@ function updatePlantCard() {
     if (
       plant.status === "dry" ||
       plant.status === "rotten" ||
+      plant.isOverwatered ||
       shouldSuppressPlantWaterCardForSelfSustaining(plant)
     ) {
       plantCard.style.display = "none";
@@ -7785,6 +7788,7 @@ function updatePlantCard() {
     !plantRuntime.isSeedPlanted ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
+    plantRuntime.isOverwatered ||
     shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime) ||
     !wateringTarget
   ) {
