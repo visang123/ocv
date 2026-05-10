@@ -2263,8 +2263,8 @@ body #guide-book-button {
   pointer-events: auto;
 }
 
-/* filter 금지: 패널에 filter를 주면 씨앗 아이콘까지 렌더가 달라져 '바뀐 것처럼' 보임 */
-#seed-inventory.is-loose-seed-hover-target {
+/* 인벤 씨앗 호버 힌트(땅 씨앗에는 호버 없음) */
+#seed-inventory.is-seed-inventory-hover-hint {
   outline: 2px solid rgba(234, 179, 8, 0.9);
   outline-offset: 2px;
   border-radius: 12px;

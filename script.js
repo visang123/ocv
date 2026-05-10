@@ -1362,13 +1362,10 @@ seed.addEventListener("mouseleave", function () {
   isHoveringMainSeed = false;
 });
 
-if (ground && plantHoverLabel) {
-  ground.addEventListener("pointermove", function (e) {
-    syncPlantHoverFromPointerClient(e.clientX, e.clientY);
-  });
+/* 인벤(#seed-inventory)은 ground 밖에 있어 document에서 호버 동기화 */
+if (plantHoverLabel) {
   document.addEventListener("pointermove", function (e) {
-    if (!ground || !plantHoverLabel) return;
-    if (!groundClientToWorldXY(e.clientX, e.clientY)) hidePlantHoverLabel();
+    syncPlantHoverFromPointerClient(e.clientX, e.clientY);
   });
 }
 
@@ -5249,9 +5246,22 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
   return best;
 }
 
-function showWorldLooseSeedInventoryHoverLabel() {
+function seedInventoryHasPlantableSeedsForHoverHint() {
+  if (usesWorldLooseSeedMode()) {
+    return appleState.seedCount > 0;
+  }
+  return appleState.extraSeeds.some(function (extraSeed) {
+    return (
+      extraSeed.inInventory &&
+      !extraSeed.planted &&
+      extraSeed.id !== plantingInventorySeedId
+    );
+  });
+}
+
+function showSeedInventoryPlantHintLabel() {
   if (!plantHoverLabel || !seedInventory) return;
-  plantHoverLabel.textContent = "\uC2EC\uAE30 \u00B7 \uD074\uB9AD (\uC778\uBCA4)";
+  plantHoverLabel.textContent = "\uC2EC\uAE30 click";
   plantHoverLabel.style.display = "block";
   void plantHoverLabel.offsetWidth;
   const r = seedInventory.getBoundingClientRect();
@@ -5264,33 +5274,31 @@ function showWorldLooseSeedInventoryHoverLabel() {
 
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
-  const now = Date.now();
-  const pxy = groundClientToWorldXY(clientX, clientY);
-  let looseHit = null;
-  let looseDist = Infinity;
-  if (usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(now) && pxy) {
-    ensureWorldLooseSeedShape();
-    const cx = appleState.worldLooseSeed.x + SEED_SIZE / 2;
-    const cy = appleState.worldLooseSeed.y + SEED_SIZE / 2;
-    const d = Math.hypot(pxy.x - cx, pxy.y - cy);
-    if (d <= plantHoverPickRadiusWorld) {
-      looseDist = d;
-      looseHit = { cxWorld: cx, cyWorld: cy };
+
+  if (seedInventory && seedInventory.style.display !== "none") {
+    const sr = seedInventory.getBoundingClientRect();
+    const overInv =
+      clientX >= sr.left &&
+      clientX <= sr.right &&
+      clientY >= sr.top &&
+      clientY <= sr.bottom;
+    if (overInv) {
+      const panel = document.getElementById("seed-count-panel");
+      const panelOk = !panel || !panel.hidden;
+      if (panelOk && seedInventoryHasPlantableSeedsForHoverHint()) {
+        seedInventory.classList.add("is-seed-inventory-hover-hint");
+        showSeedInventoryPlantHintLabel();
+      } else {
+        seedInventory.classList.remove("is-seed-inventory-hover-hint");
+        plantHoverLabel.style.display = "none";
+      }
+      return;
     }
   }
+
+  if (seedInventory) seedInventory.classList.remove("is-seed-inventory-hover-hint");
+
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
-  let plantDist = Infinity;
-  if (plant && pxy) {
-    const a = getPlantHoverAnchorWorld(plant);
-    plantDist = Math.hypot(pxy.x - a.cxWorld, pxy.y - a.cyWorld);
-  }
-  if (looseHit && (!plant || looseDist <= plantDist)) {
-    if (seedInventory) seedInventory.classList.add("is-loose-seed-hover-target");
-    showWorldLooseSeedInventoryHoverLabel();
-    return;
-  }
-  if (seedInventory) seedInventory.classList.remove("is-loose-seed-hover-target");
-  if (worldLooseSeedElement) worldLooseSeedElement.classList.remove("is-loose-seed-hover");
   if (plant) showPlantHoverForPlant(plant);
   else hidePlantHoverLabel();
 }
@@ -6682,10 +6690,7 @@ function extraPlantFromDomElement(el) {
 }
 
 function hidePlantHoverLabel() {
-  if (seedInventory) seedInventory.classList.remove("is-loose-seed-hover-target");
-  if (worldLooseSeedElement) {
-    worldLooseSeedElement.classList.remove("is-loose-seed-hover");
-  }
+  if (seedInventory) seedInventory.classList.remove("is-seed-inventory-hover-hint");
   if (plantHoverLabel) plantHoverLabel.style.display = "none";
 }
 
