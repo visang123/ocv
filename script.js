@@ -53,6 +53,10 @@ import {
   appleEatMs,
   plantActionMs,
   appleRespawnMs,
+  WORLD_LOOSE_SEED_ID,
+  WORLD_LOOSE_SEED_RESPAWN_MS,
+  WORLD_LOOSE_SEED_X,
+  WORLD_LOOSE_SEED_Y,
   getMinPlantCenterClearanceWorld,
   biggerSproutMs,
   sproutStage1Ms,
@@ -724,6 +728,37 @@ const appleState = createAppleState([
   { id: "apple-4", x: BIG_TREE_X + 54, y: BIG_TREE_Y + 82, size: 10 },
   { id: "apple-5", x: BIG_TREE_X + 96, y: BIG_TREE_Y + 83, size: 10 }
 ]);
+let worldLooseSeedElement = null;
+
+function usesWorldLooseSeedMode() {
+  return isWorldDocumentEntry() && getStoredFlag(onboardingFlowDoneKey);
+}
+
+function ensureWorldLooseSeedShape() {
+  if (!appleState.worldLooseSeed || typeof appleState.worldLooseSeed !== "object") {
+    appleState.worldLooseSeed = {
+      x: WORLD_LOOSE_SEED_X,
+      y: WORLD_LOOSE_SEED_Y,
+      nextSpawnAt: 0
+    };
+    return;
+  }
+  const w = appleState.worldLooseSeed;
+  if (!Number.isFinite(Number(w.x))) {
+    w.x = WORLD_LOOSE_SEED_X;
+  }
+  if (!Number.isFinite(Number(w.y))) {
+    w.y = WORLD_LOOSE_SEED_Y;
+  }
+  w.nextSpawnAt = Math.max(0, Number(w.nextSpawnAt) || 0);
+}
+
+function isWorldLooseSeedVisibleAt(now) {
+  if (!usesWorldLooseSeedMode()) return false;
+  ensureWorldLooseSeedShape();
+  return now >= (Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
+}
+
 const defaultZoom = 3.5;
 const maxZoom = 5;
 const zoomStep = 0.25;
@@ -2994,6 +3029,12 @@ function applyDefaultState(options) {
   clearExtraSeedAndPlantElements();
   appleState.extraSeeds = [];
   appleState.extraPlants = [];
+  appleState.worldLooseSeed = {
+    x: WORLD_LOOSE_SEED_X,
+    y: WORLD_LOOSE_SEED_Y,
+    nextSpawnAt: 0
+  };
+  worldLooseSeedElement = null;
   localApplePickedAtById = {};
 
   // Reset butterflies: drop any visible butterflies and zero out the player's
@@ -3243,6 +3284,31 @@ function pickUpNearestItem() {
       flashOnboardingOrderHint("");
       return;
     }
+    if (extraSeed.seed.worldLoosePick || extraSeed.seed.id === WORLD_LOOSE_SEED_ID) {
+      ensureWorldLooseSeedShape();
+      const seedNumber = getNextSeedNumber();
+      const newSeed = {
+        id: "apple-seed-" + Date.now() + "-" + seedNumber,
+        x: appleState.worldLooseSeed.x,
+        y: appleState.worldLooseSeed.y,
+        createdAt: Date.now(),
+        planted: false,
+        inInventory: true,
+        label: "\uC528\uC557" + seedNumber,
+        isStarter: false
+      };
+      assignExtraSeedInventoryOwner(newSeed);
+      appleState.extraSeeds.push(newSeed);
+      appleState.nextSeedOffset += 2;
+      appleState.worldLooseSeed.nextSpawnAt = Date.now() + WORLD_LOOSE_SEED_RESPAWN_MS;
+      saveAppleState();
+      markWorldDirty();
+      syncWorldState(true);
+      updateExtraSeedsAndPlants();
+      updateSeedInventory();
+      triggerFirstSeedFocus();
+      return;
+    }
     extraSeed.seed.inInventory = true;
     assignExtraSeedInventoryOwner(extraSeed.seed);
     saveAppleState();
@@ -3311,9 +3377,28 @@ function canPickUpSharedBucket() {
 
 function getNearestPickableExtraSeed() {
   let nearest = null;
+  const now = Date.now();
+
+  if (usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(now)) {
+    ensureWorldLooseSeedShape();
+    const ws = appleState.worldLooseSeed;
+    const distance = getCenterDistance(ws.x, ws.y, SEED_SIZE, SEED_SIZE);
+    nearest = {
+      seed: {
+        id: WORLD_LOOSE_SEED_ID,
+        x: ws.x,
+        y: ws.y,
+        worldLoosePick: true
+      },
+      distance
+    };
+  }
 
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || isExtraSeedDry(extraSeed)) return;
+    if (usesWorldLooseSeedMode() && !extraSeed.inInventory) {
+      return;
+    }
 
     const distance = getCenterDistance(extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE);
     if (!nearest || distance < nearest.distance) {
@@ -3592,6 +3677,26 @@ function loadAppleState() {
   appleState.lastSpawnAt = loaded.lastAppleSpawnAt;
   appleState.extraSeeds = loaded.extraSeeds;
   appleState.extraPlants = loaded.extraPlants;
+  appleState.worldLooseSeed = loaded.worldLooseSeed
+    ? {
+        x: Number(loaded.worldLooseSeed.x) || WORLD_LOOSE_SEED_X,
+        y: Number(loaded.worldLooseSeed.y) || WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: Math.max(0, Number(loaded.worldLooseSeed.nextSpawnAt) || 0)
+      }
+    : {
+        x: WORLD_LOOSE_SEED_X,
+        y: WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: 0
+      };
+  ensureWorldLooseSeedShape();
+  if (usesWorldLooseSeedMode()) {
+    appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
+      if (!s) return false;
+      if (s.planted) return true;
+      if (s.inInventory) return true;
+      return false;
+    });
+  }
 
   syncMainSeedPickedStateFromLoadedExtraSeeds();
 
@@ -3606,6 +3711,7 @@ function loadAppleState() {
 
 function saveAppleState() {
   lastAppleStateChangeAt = Date.now();
+  ensureWorldLooseSeedShape();
   saveAppleStateToStorage({
     appleStateKey,
     appleCount: appleState.count,
@@ -3614,7 +3720,8 @@ function saveAppleState() {
     nextAppleSeedOffset: appleState.nextSeedOffset,
     lastAppleSpawnAt: appleState.lastSpawnAt,
     extraSeeds: appleState.extraSeeds,
-    extraPlants: appleState.extraPlants
+    extraPlants: appleState.extraPlants,
+    worldLooseSeed: appleState.worldLooseSeed
   });
   markWorldDirty();
 }
@@ -3701,23 +3808,54 @@ function getSharedWorldSnapshot() {
           size: apple.size
         };
       }),
-      // Inventory seeds are local-only and must not be shared.
-      extraSeeds: appleState.extraSeeds.filter(function (extraSeed) {
-        return !extraSeed.inInventory;
-      }).map(function (extraSeed) {
-        return {
-          id: extraSeed.id,
-          x: extraSeed.x,
-          y: extraSeed.y,
-          createdAt: extraSeed.createdAt,
-          planted: Boolean(extraSeed.planted),
-          inInventory: Boolean(extraSeed.inInventory),
-          label: extraSeed.label,
-          isStarter: Boolean(extraSeed.isStarter),
-          ownerUserId: extraSeed.ownerUserId != null ? String(extraSeed.ownerUserId) : "",
-          ownerSessionId: extraSeed.ownerSessionId != null ? String(extraSeed.ownerSessionId) : ""
-        };
-      }),
+      // 월드(온보딩 완료): 땅 씨앗은 worldLooseSeed 1슬롯만 공유. 심은 씨앗(stub)만 extraSeeds.
+      extraSeeds: usesWorldLooseSeedMode()
+        ? appleState.extraSeeds
+            .filter(function (extraSeed) {
+              return !extraSeed.inInventory && extraSeed.planted;
+            })
+            .map(function (extraSeed) {
+              return {
+                id: extraSeed.id,
+                x: extraSeed.x,
+                y: extraSeed.y,
+                createdAt: extraSeed.createdAt,
+                planted: Boolean(extraSeed.planted),
+                inInventory: Boolean(extraSeed.inInventory),
+                label: extraSeed.label,
+                isStarter: Boolean(extraSeed.isStarter),
+                ownerUserId: extraSeed.ownerUserId != null ? String(extraSeed.ownerUserId) : "",
+                ownerSessionId: extraSeed.ownerSessionId != null ? String(extraSeed.ownerSessionId) : ""
+              };
+            })
+        : appleState.extraSeeds
+            .filter(function (extraSeed) {
+              return !extraSeed.inInventory;
+            })
+            .map(function (extraSeed) {
+              return {
+                id: extraSeed.id,
+                x: extraSeed.x,
+                y: extraSeed.y,
+                createdAt: extraSeed.createdAt,
+                planted: Boolean(extraSeed.planted),
+                inInventory: Boolean(extraSeed.inInventory),
+                label: extraSeed.label,
+                isStarter: Boolean(extraSeed.isStarter),
+                ownerUserId: extraSeed.ownerUserId != null ? String(extraSeed.ownerUserId) : "",
+                ownerSessionId: extraSeed.ownerSessionId != null ? String(extraSeed.ownerSessionId) : ""
+              };
+            }),
+      worldLooseSeed: usesWorldLooseSeedMode()
+        ? (function () {
+            ensureWorldLooseSeedShape();
+            return {
+              x: appleState.worldLooseSeed.x,
+              y: appleState.worldLooseSeed.y,
+              nextSpawnAt: appleState.worldLooseSeed.nextSpawnAt
+            };
+          })()
+        : undefined,
       extraPlants: appleState.extraPlants.map(function (plant) {
         return {
           id: plant.id,
@@ -3928,14 +4066,6 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     if (snapshot.apples) {
       const priorExtraSeeds = appleState.extraSeeds.slice();
       const priorExtraPlants = appleState.extraPlants.slice();
-      const snapshotExtraSeedIds = Object.create(null);
-      if (Array.isArray(snapshot.apples.extraSeeds)) {
-        snapshot.apples.extraSeeds.forEach(function (extraSeed) {
-          if (extraSeed && extraSeed.id != null) {
-            snapshotExtraSeedIds[String(extraSeed.id)] = true;
-          }
-        });
-      }
       const snapshotAppleTime = snapshotSavedAt || 0;
       const snapshotPlantIdsEarly = Object.create(null);
       if (Array.isArray(snapshot.apples.extraPlants)) {
@@ -3946,8 +4076,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       const seedPendingFromRecentLocalEdit =
         !snapshotAppleTime ||
         lastAppleStateChangeAt + 2000 > snapshotAppleTime;
-      let shouldMergePendingSeeds = seedPendingFromRecentLocalEdit;
-      let shouldMergePendingPlants = shouldMergePendingSeeds;
+      let shouldMergePendingPlants = seedPendingFromRecentLocalEdit;
       if (!shouldMergePendingPlants) {
         const snapMissingLocalPlant = priorExtraPlants.some(function (p) {
           if (!p || p.id == null || p.removed) return false;
@@ -3955,17 +4084,6 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         });
         if (snapMissingLocalPlant) {
           shouldMergePendingPlants = true;
-        }
-      }
-      if (!shouldMergePendingSeeds) {
-        const snapMissingLocalOwnedGroundSeed = priorExtraSeeds.some(function (s) {
-          if (!s || s.id == null) return false;
-          if (Boolean(s.inInventory) || Boolean(s.planted)) return false;
-          if (!isExtraSeedSessionOwnedByLocal(s)) return false;
-          return !snapshotExtraSeedIds[String(s.id)];
-        });
-        if (snapMissingLocalOwnedGroundSeed) {
-          shouldMergePendingSeeds = true;
         }
       }
       const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
@@ -4002,41 +4120,92 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       appleState.apples = Array.isArray(snapshot.apples.apples)
         ? snapshot.apples.apples.map(parseTreeAppleFromSnapshot)
         : appleState.apples;
-      appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
-        ? snapshot.apples.extraSeeds
-            .filter(function (extraSeed) {
-              // Stale snapshots can still list a seed on the ground after this client
-              // already picked it into inventory (inventory is not in shared extraSeeds).
-              // Merging both would duplicate ids: one hidden (inventory) and one visible ghost.
-              return !localInventorySeedIds[String(extraSeed.id)];
-            })
-            .map(parseSharedGroundSeedFromSnapshot)
-        : [];
-      if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
-        // Ignore stale world seeds from snapshot, but never drop inventory-only seeds.
-        appleState.extraSeeds = localInventorySeeds.slice();
-      } else if (localInventorySeeds.length > 0) {
-        appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
-      }
-      appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
-      if (shouldMergePendingSeeds) {
-        const pendingExtraSeeds = priorExtraSeeds.filter(function (s) {
-          if (!s || s.id == null) return false;
-          if (Boolean(s.inInventory)) return false;
-          if (Boolean(s.planted)) return false;
-          const sid = String(s.id);
-          if (plantingInventorySeedId && sid === String(plantingInventorySeedId)) return false;
-          if (extraSeedHasCorrespondingExtraPlant(sid, priorExtraPlants)) return false;
-          if (snapshotExtraSeedIds[sid]) return false;
-          if (localInventorySeedIds[sid]) return false;
-          if (!seedPendingFromRecentLocalEdit && !isExtraSeedSessionOwnedByLocal(s)) {
-            return false;
+      if (usesWorldLooseSeedMode()) {
+        const wls = snapshot.apples.worldLooseSeed;
+        if (wls && typeof wls === "object") {
+          appleState.worldLooseSeed = {
+            x: Number(wls.x) || WORLD_LOOSE_SEED_X,
+            y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
+            nextSpawnAt: Math.max(0, Number(wls.nextSpawnAt) || 0)
+          };
+        } else {
+          ensureWorldLooseSeedShape();
+        }
+        const plantedById = Object.create(null);
+        priorExtraSeeds.forEach(function (s) {
+          if (s && s.planted && s.id != null) {
+            plantedById[String(s.id)] = s;
           }
-          return true;
         });
-        if (pendingExtraSeeds.length > 0) {
-          appleState.extraSeeds = appleState.extraSeeds.concat(pendingExtraSeeds);
-          appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
+        if (Array.isArray(snapshot.apples.extraSeeds)) {
+          snapshot.apples.extraSeeds.forEach(function (raw) {
+            if (!raw || !raw.planted || raw.id == null) return;
+            plantedById[String(raw.id)] = parseSharedGroundSeedFromSnapshot(raw);
+          });
+        }
+        const mergedPlanted = Object.keys(plantedById).map(function (k) {
+          return plantedById[k];
+        });
+        if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
+          appleState.extraSeeds = localInventorySeeds.slice();
+        } else {
+          appleState.extraSeeds = dedupeExtraSeedsPreferInventory(
+            localInventorySeeds.concat(mergedPlanted)
+          );
+        }
+      } else {
+        const snapshotExtraSeedIds = Object.create(null);
+        if (Array.isArray(snapshot.apples.extraSeeds)) {
+          snapshot.apples.extraSeeds.forEach(function (extraSeed) {
+            if (extraSeed && extraSeed.id != null) {
+              snapshotExtraSeedIds[String(extraSeed.id)] = true;
+            }
+          });
+        }
+        let shouldMergePendingSeeds = seedPendingFromRecentLocalEdit;
+        if (!shouldMergePendingSeeds) {
+          const snapMissingLocalOwnedGroundSeed = priorExtraSeeds.some(function (s) {
+            if (!s || s.id == null) return false;
+            if (Boolean(s.inInventory) || Boolean(s.planted)) return false;
+            if (!isExtraSeedSessionOwnedByLocal(s)) return false;
+            return !snapshotExtraSeedIds[String(s.id)];
+          });
+          if (snapMissingLocalOwnedGroundSeed) {
+            shouldMergePendingSeeds = true;
+          }
+        }
+        appleState.extraSeeds = Array.isArray(snapshot.apples.extraSeeds)
+          ? snapshot.apples.extraSeeds
+              .filter(function (extraSeed) {
+                return !localInventorySeedIds[String(extraSeed.id)];
+              })
+              .map(parseSharedGroundSeedFromSnapshot)
+          : [];
+        if (Date.now() < ignoreSnapshotInventorySeedsUntil) {
+          appleState.extraSeeds = localInventorySeeds.slice();
+        } else if (localInventorySeeds.length > 0) {
+          appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
+        }
+        appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
+        if (shouldMergePendingSeeds) {
+          const pendingExtraSeeds = priorExtraSeeds.filter(function (s) {
+            if (!s || s.id == null) return false;
+            if (Boolean(s.inInventory)) return false;
+            if (Boolean(s.planted)) return false;
+            const sid = String(s.id);
+            if (plantingInventorySeedId && sid === String(plantingInventorySeedId)) return false;
+            if (extraSeedHasCorrespondingExtraPlant(sid, priorExtraPlants)) return false;
+            if (snapshotExtraSeedIds[sid]) return false;
+            if (localInventorySeedIds[sid]) return false;
+            if (!seedPendingFromRecentLocalEdit && !isExtraSeedSessionOwnedByLocal(s)) {
+              return false;
+            }
+            return true;
+          });
+          if (pendingExtraSeeds.length > 0) {
+            appleState.extraSeeds = appleState.extraSeeds.concat(pendingExtraSeeds);
+            appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
+          }
         }
       }
       const incomingExtraPlants = Array.isArray(snapshot.apples.extraPlants)
@@ -4337,6 +4506,22 @@ function dropExtraSeed() {
     return;
   }
 
+  if (usesWorldLooseSeedMode()) {
+    const seedIndex = appleState.extraSeeds.indexOf(extraSeed);
+    if (seedIndex >= 0) {
+      appleState.extraSeeds.splice(seedIndex, 1);
+    }
+    heldItem = null;
+    ensureWorldLooseSeedShape();
+    appleState.worldLooseSeed.nextSpawnAt = 0;
+    saveAppleState();
+    markWorldDirty();
+    syncWorldState(true);
+    updateExtraSeedsAndPlants();
+    updateSeedInventory();
+    return;
+  }
+
   const playerBox = getPlayerBox();
   extraSeed.x = playerBox.left + playerBox.width / 2 - SEED_SIZE / 2;
   extraSeed.y = playerBox.bottom - SEED_SIZE;
@@ -4439,6 +4624,43 @@ function updateSeedPosition() {
 function updateExtraSeedsAndPlants() {
   const now = Date.now();
   let didAutoRemoveDryExtraSeed = false;
+
+  if (usesWorldLooseSeedMode()) {
+    ensureWorldLooseSeedShape();
+    if (!worldLooseSeedElement) {
+      worldLooseSeedElement = document.createElement("img");
+      worldLooseSeedElement.className = "extra-seed world-loose-seed";
+      worldLooseSeedElement.alt = "world loose seed";
+      setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
+      ground.appendChild(worldLooseSeedElement);
+    }
+    const vis = isWorldLooseSeedVisibleAt(now);
+    worldLooseSeedElement.style.display = vis ? "block" : "none";
+    if (vis) {
+      worldLooseSeedElement.src = "이미지/seed.png";
+      setWorldPosition(
+        worldLooseSeedElement,
+        appleState.worldLooseSeed.x,
+        appleState.worldLooseSeed.y
+      );
+    }
+  } else if (worldLooseSeedElement) {
+    worldLooseSeedElement.remove();
+    worldLooseSeedElement = null;
+  }
+
+  if (usesWorldLooseSeedMode()) {
+    const beforeStrip = appleState.extraSeeds.length;
+    appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
+      if (!s) return false;
+      if (s.planted) return true;
+      if (s.inInventory) return true;
+      return false;
+    });
+    if (appleState.extraSeeds.length !== beforeStrip) {
+      saveAppleState();
+    }
+  }
 
   appleState.extraSeeds = appleState.extraSeeds.filter(function (extraSeed) {
     const createdAt = Number(extraSeed.createdAt);
@@ -5257,6 +5479,7 @@ function clearExtraSeedAndPlantElements() {
       element.remove();
     }
   );
+  worldLooseSeedElement = null;
 }
 
 function invalidateGroundSeedElementRefsOnly(seeds) {
@@ -5269,7 +5492,7 @@ function invalidateGroundSeedElementRefsOnly(seeds) {
 
 /** 공유 스냅샷: 땅 씨앗 노드만 제거(식물/게이지는 유지·재연결로 깜빡임 방지) */
 function clearGroundExtraSeedElementsOnly() {
-  document.querySelectorAll(".extra-seed").forEach(function (element) {
+  document.querySelectorAll(".extra-seed:not(.world-loose-seed)").forEach(function (element) {
     element.remove();
   });
 }
@@ -6287,8 +6510,25 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   }
 
   let blockedByLooseSeed = false;
+  const nowLoose = Date.now();
+  if (
+    usesWorldLooseSeedMode() &&
+    isWorldLooseSeedVisibleAt(nowLoose) &&
+    plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      appleState.worldLooseSeed.x,
+      appleState.worldLooseSeed.y,
+      SEED_SIZE,
+      SEED_SIZE,
+      0
+    )
+  ) {
+    blockedByLooseSeed = true;
+  }
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || extraSeed.inInventory) return;
+    if (usesWorldLooseSeedMode()) return;
     if (!extraSeed.element || extraSeed.element.style.display === "none") return;
     const seedPad = 0;
     if (

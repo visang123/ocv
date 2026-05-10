@@ -5,17 +5,55 @@ const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
-const APP_VERSION = "20260509a";
+const APP_VERSION = "20260510v";
 const loginHandoffKey = "ovcLoginHandoffV1";
-/** script.js `onboardingFlowDoneKey` 와 동일 — 로그인 직후 진입 문서 선택용 */
+/** script.js 저장 키와 동일 — 로그인 직후 tutorial vs index 분기 */
 const ovcOnboardingFlowDoneStorageKey = "onboardingFlowDoneV2";
+const ovcOnboardingFlowStepStorageKey = "onboardingFlowStepV2";
+const ovcEverBeenToWorldStorageKey = "ovcEverBeenToWorldV1";
+
+function ovcScopedUserStorageKey(userId, suffix) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return "";
+  return "ovc-user-" + uid + ":" + suffix;
+}
+
+/** userId 없이(또는 초기화 순서 문제로) 비스코프 키에만 남은 온보딩 진행 → 계정 스코프로 옮김 */
+function ovcMigrateUnscopedTutorialFlagsToUserScope(userId) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return;
+  const keys = [
+    ovcOnboardingFlowDoneStorageKey,
+    ovcOnboardingFlowStepStorageKey,
+    ovcEverBeenToWorldStorageKey
+  ];
+  try {
+    keys.forEach(function (key) {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return;
+      const scoped = ovcScopedUserStorageKey(uid, key);
+      if (!scoped) return;
+      if (localStorage.getItem(scoped) === null) {
+        localStorage.setItem(scoped, raw);
+      }
+    });
+  } catch (e) {}
+}
 
 function ovcIsOnboardingDoneForUserId(userId) {
-  if (!userId) return true;
-  const scoped =
-    "ovc-user-" + String(userId).trim() + ":" + ovcOnboardingFlowDoneStorageKey;
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return true;
   try {
-    return localStorage.getItem(scoped) === "true";
+    if (localStorage.getItem(ovcScopedUserStorageKey(uid, ovcOnboardingFlowDoneStorageKey)) === "true") {
+      return true;
+    }
+    if (localStorage.getItem(ovcScopedUserStorageKey(uid, ovcOnboardingFlowStepStorageKey)) === "0") {
+      return true;
+    }
+    if (localStorage.getItem(ovcScopedUserStorageKey(uid, ovcEverBeenToWorldStorageKey)) === "true") {
+      return true;
+    }
+    return false;
   } catch (e) {
     return true;
   }
@@ -130,8 +168,8 @@ function goToGame(account) {
     );
   } catch (e) {}
   sessionStorage.removeItem(loginHandoffKey);
-  const onboarded =
-    account && account.id ? ovcIsOnboardingDoneForUserId(account.id) : true;
+  const accountId = account && account.id != null ? String(account.id).trim() : "";
+  const onboarded = accountId ? ovcIsOnboardingDoneForUserId(accountId) : true;
   const htmlFile = onboarded ? "index.html" : "tutorial.html";
   const targetUrl = new URL("./" + htmlFile, window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
@@ -154,8 +192,10 @@ function isRetryableLoginError(error) {
 }
 
 function finalizeSuccessfulLogin(account) {
+  const userId = account && account.id != null ? String(account.id).trim() : "";
   localStorage.setItem(currentUserKey, account.name);
-  localStorage.setItem(currentUserIdKey, account.id);
+  localStorage.setItem(currentUserIdKey, userId);
+  ovcMigrateUnscopedTutorialFlagsToUserScope(userId);
   const accountColor = normalizeHexColor(account.color);
   const scopedKey = "ovcUserColorV1:" + account.id;
   const finalColor = accountColor || "#ffffff";

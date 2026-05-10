@@ -89,6 +89,11 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
+/** index + 온보딩 완료: 월드 공용 땅 씨앗 1슬롯 — 줍은 뒤 같은 좌표에서 리스폰 */
+export const WORLD_LOOSE_SEED_ID = "world-loose-seed";
+export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
+export const WORLD_LOOSE_SEED_X = BIG_TREE_X + 54;
+export const WORLD_LOOSE_SEED_Y = BIG_TREE_Y + 88;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 

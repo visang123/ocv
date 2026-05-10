@@ -1,3 +1,8 @@
+import {
+  WORLD_LOOSE_SEED_X,
+  WORLD_LOOSE_SEED_Y
+} from "./constants.js";
+
 export function createWellState(maxWellWaterValue) {
   return {
     water: maxWellWaterValue,
@@ -14,7 +19,12 @@ export function createAppleState(initialApples) {
     extraSeeds: [],
     extraPlants: [],
     lastSpawnAt: Date.now(),
-    apples: initialApples
+    apples: initialApples,
+    worldLooseSeed: {
+      x: WORLD_LOOSE_SEED_X,
+      y: WORLD_LOOSE_SEED_Y,
+      nextSpawnAt: 0
+    }
   };
 }
 

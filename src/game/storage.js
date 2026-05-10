@@ -1,3 +1,8 @@
+import {
+  WORLD_LOOSE_SEED_X,
+  WORLD_LOOSE_SEED_Y
+} from "./constants.js";
+
 let storagePrefix = "";
 
 export function setStoragePrefix(prefix) {
@@ -224,7 +229,12 @@ export function loadAppleStateFromStorage(config) {
       nextAppleSeedOffset: 0,
       lastAppleSpawnAt: config.now,
       extraSeeds: [],
-      extraPlants: []
+      extraPlants: [],
+      worldLooseSeed: {
+        x: WORLD_LOOSE_SEED_X,
+        y: WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: 0
+      }
     };
   }
 
@@ -252,6 +262,20 @@ export function loadAppleStateFromStorage(config) {
           });
         })
       : [];
+
+    const worldLooseSeedRaw = saved.worldLooseSeed;
+    const worldLooseSeed =
+      worldLooseSeedRaw && typeof worldLooseSeedRaw === "object"
+        ? {
+            x: Number(worldLooseSeedRaw.x) || WORLD_LOOSE_SEED_X,
+            y: Number(worldLooseSeedRaw.y) || WORLD_LOOSE_SEED_Y,
+            nextSpawnAt: Math.max(0, Number(worldLooseSeedRaw.nextSpawnAt) || 0)
+          }
+        : {
+            x: WORLD_LOOSE_SEED_X,
+            y: WORLD_LOOSE_SEED_Y,
+            nextSpawnAt: 0
+          };
 
     return {
       hasSavedState: true,
@@ -336,7 +360,8 @@ export function loadAppleStateFromStorage(config) {
               rottenAt: Number(plantData.rottenAt) || null
             };
           })
-        : []
+        : [],
+      worldLooseSeed
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
@@ -349,12 +374,29 @@ export function loadAppleStateFromStorage(config) {
       nextAppleSeedOffset: 0,
       lastAppleSpawnAt: config.now,
       extraSeeds: [],
-      extraPlants: []
+      extraPlants: [],
+      worldLooseSeed: {
+        x: WORLD_LOOSE_SEED_X,
+        y: WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: 0
+      }
     };
   }
 }
 
 export function saveAppleStateToStorage(config) {
+  const worldLooseSeedOut =
+    config.worldLooseSeed && typeof config.worldLooseSeed === "object"
+      ? {
+          x: Number(config.worldLooseSeed.x) || WORLD_LOOSE_SEED_X,
+          y: Number(config.worldLooseSeed.y) || WORLD_LOOSE_SEED_Y,
+          nextSpawnAt: Math.max(0, Number(config.worldLooseSeed.nextSpawnAt) || 0)
+        }
+      : {
+          x: WORLD_LOOSE_SEED_X,
+          y: WORLD_LOOSE_SEED_Y,
+          nextSpawnAt: 0
+        };
   setStoredValue(
     config.appleStateKey,
     JSON.stringify({
@@ -416,7 +458,8 @@ export function saveAppleStateToStorage(config) {
               : null,
           rottenAt: plant.rottenAt || null
         };
-      })
+      }),
+      worldLooseSeed: worldLooseSeedOut
     })
   );
 }
