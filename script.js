@@ -402,6 +402,8 @@ const ONBOARDING_MAX_STEP = 27;
 /** tutorial.html: 땅의 튜토리얼 씨앗이 사라진 뒤 다시 놓기까지(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
 let tutorialMainSeedRespawnTimerId = null;
+/** 땅 씨 리스폰 이후에는 인벤·씨앗 온보딩 테두리 강조 생략(첫 사이클만). */
+let tutorialMainSeedRegenCompleted = false;
 let onboardingStep26OpenedSettingsWithEsc = false;
 let tutorialWorldNeedsFullReset = false;
 let heldItem = null;
@@ -1693,15 +1695,17 @@ seedInventory.addEventListener("click", function (event) {
     plantWorldSeedCount();
     return;
   }
-  const seedItem = event.target.closest(".inventory-seed");
-  if (!seedItem) return;
+  if (!event.target.closest("#seed-count-panel")) return;
   event.preventDefault();
-  const seedId = seedItem.dataset.seedId;
-  const targetSeed = appleState.extraSeeds.find(function (extraSeed) {
-    return extraSeed.id === seedId;
+  const firstInv = appleState.extraSeeds.find(function (extraSeed) {
+    return (
+      extraSeed.inInventory &&
+      !extraSeed.planted &&
+      extraSeed.id !== plantingInventorySeedId
+    );
   });
-  if (!targetSeed) return;
-  plantInventorySeed(seedId);
+  if (!firstInv) return;
+  plantInventorySeed(firstInv.id);
 });
 
 function applyGuideTexts() {
@@ -1816,6 +1820,7 @@ function recoverWorldMainSeedIfOnboardingStuck() {
 }
 
 function tutorialRespawnMainSeedOnGround() {
+  tutorialMainSeedRegenCompleted = true;
   clearMainSeedPickedForCurrentRoom();
   appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
     var isStarter = s.id === "starter-seed" || s.isStarter;
@@ -2609,8 +2614,12 @@ function updateOnboardingFlowUI() {
         "심고 싶은 위치로 이동 후, 클릭 해 씨앗을 심으세요."
       );
       if (player) player.classList.add("onboarding-highlight");
-      if (seed) seed.classList.add("onboarding-highlight");
-      if (seedInventory) seedInventory.classList.add("onboarding-highlight");
+      if (seed && !tutorialMainSeedRegenCompleted) {
+        seed.classList.add("onboarding-highlight");
+      }
+      if (seedInventory && !tutorialMainSeedRegenCompleted) {
+        seedInventory.classList.add("onboarding-highlight");
+      }
       break;
     }
     case 8: {
@@ -2927,6 +2936,7 @@ function settlePlayerBeforeBackground() {
 
 function applyDefaultState(options) {
   clearTutorialMainSeedRespawnTimer();
+  tutorialMainSeedRegenCompleted = false;
   const sharedWorldResetOnly =
     Boolean(options && options.sharedWorldResetOnly);
   if (sharedWorldResetOnly) {
@@ -4657,8 +4667,15 @@ function updateSeedPosition() {
     (!hasPickedMainSeedInCurrentRoom() &&
       !plantRuntime.isPlanting &&
       !(plantRuntime.isSeedDry && hasHandledDryMainSeed));
+  const tutorialDecorMainSeedOnGround =
+    !usesWorldLooseSeedMode() &&
+    !getStoredFlag(onboardingFlowDoneKey) &&
+    onboardingFlowStep >= 7 &&
+    !plantRuntime.isSeedPlanted &&
+    heldItem !== HELD_ITEM_SEED;
   const shouldShowMainSeedOnGround =
-    !usesWorldLooseSeedMode() && baseShouldShowMainSeedOnGround;
+    !usesWorldLooseSeedMode() &&
+    (baseShouldShowMainSeedOnGround || tutorialDecorMainSeedOnGround);
   // Auto-clear dry main seed after grace period even when the world sprite is hidden
   // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
   if (plantRuntime.isSeedDry && !hasHandledDryMainSeed && heldItem !== HELD_ITEM_SEED) {
@@ -5491,41 +5508,31 @@ function updateSeedInventory() {
     return;
   }
 
-  const countPanel = document.getElementById("seed-count-panel");
-  if (countPanel) {
-    countPanel.hidden = true;
-  }
+  appleState.extraSeeds.forEach(function (extraSeed) {
+    if (extraSeed.inventoryElement) {
+      extraSeed.inventoryElement.remove();
+      extraSeed.inventoryElement = undefined;
+      extraSeed.inventoryImage = undefined;
+    }
+  });
 
-  const now = Date.now();
   const inventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
     return extraSeed.inInventory && !extraSeed.planted && extraSeed.id !== plantingInventorySeedId;
   });
-
-  seedInventory.style.display = inventorySeeds.length > 0 ? "flex" : "none";
-
-  inventorySeeds.forEach(function (extraSeed, index) {
-    ensureSeedInventoryElement(extraSeed);
-    extraSeed.inventoryElement.dataset.label = "\uC528\uC557" + (index + 1);
-    extraSeed.inventoryElement.dataset.time = "";
-    extraSeed.inventoryElement.dataset.action = "plant";
-    extraSeed.inventoryElement.dataset.actionText = "\uC2EC\uAE30 click";
-    extraSeed.inventoryElement.classList.remove("is-dry");
-    extraSeed.inventoryImage.src = "이미지/seed.png";
-    const invLabel = extraSeed.inventoryElement.dataset.label;
-    extraSeed.inventoryElement.title =
-      invLabel + " \u2014 \uD074\uB9AD\uD558\uC5EC \uC774 \uC790\uB9AC\uC5D0 \uC2EC\uC2B5\uB2C8\uB2E4.";
-    extraSeed.inventoryImage.alt = invLabel;
-    extraSeed.inventoryElement.style.display = "block";
-  });
-
-  appleState.extraSeeds.forEach(function (extraSeed) {
-    if (
-      extraSeed.inventoryElement &&
-      (extraSeed.planted || !extraSeed.inInventory)
-    ) {
-      extraSeed.inventoryElement.style.display = "none";
-    }
-  });
+  const n = inventorySeeds.length;
+  const panel = document.getElementById("seed-count-panel");
+  if (seedCountText) {
+    seedCountText.textContent = String(n);
+  }
+  if (panel) {
+    panel.hidden = n <= 0;
+  }
+  seedInventory.style.display = n > 0 ? "flex" : "none";
+  const seedTipHub =
+    "\uC528\uC557 \uBCF4\uC720 " +
+    n +
+    "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uC774 \uC790\uB9AC\uC5D0 \uC2EC\uC2B5\uB2C8\uB2E4.";
+  seedInventory.title = n > 0 ? seedTipHub : "";
 }
 
 function discardInventorySeed(seedId) {
@@ -5560,24 +5567,6 @@ function discardInventorySeed(seedId) {
   appleState.extraSeeds.splice(seedIndex, 1);
   saveAppleState();
   updateSeedInventory();
-}
-
-function ensureSeedInventoryElement(extraSeed) {
-  if (extraSeed.inventoryElement) return;
-
-  const element = document.createElement("button");
-  element.type = "button";
-  element.className = "inventory-seed";
-  element.dataset.seedId = extraSeed.id;
-
-  const image = document.createElement("img");
-  image.alt = extraSeed.label || "seed";
-  image.src = "이미지/seed.png";
-  element.appendChild(image);
-  seedInventory.appendChild(element);
-
-  extraSeed.inventoryElement = element;
-  extraSeed.inventoryImage = image;
 }
 
 function ensureExtraSeedElement(extraSeed) {

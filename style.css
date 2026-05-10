@@ -768,11 +768,6 @@ body::-webkit-scrollbar {
   }
 }
 
-/* tutorial.html 전용: 월드 허브 seed-count UI 없음 */
-body.ovc-page-tutorial #seed-count-panel {
-  display: none !important;
-}
-
 .onboarding-callout {
   position: fixed;
   left: 50%;
