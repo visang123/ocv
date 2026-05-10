@@ -3921,6 +3921,19 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     }
 
     if (snapshot.apples) {
+      const priorExtraSeeds = appleState.extraSeeds.slice();
+      const snapshotExtraSeedIds = Object.create(null);
+      if (Array.isArray(snapshot.apples.extraSeeds)) {
+        snapshot.apples.extraSeeds.forEach(function (extraSeed) {
+          if (extraSeed && extraSeed.id != null) {
+            snapshotExtraSeedIds[String(extraSeed.id)] = true;
+          }
+        });
+      }
+      const snapshotAppleTime = snapshotSavedAt || 0;
+      const shouldMergePendingAppleDelta =
+        !snapshotAppleTime ||
+        lastAppleStateChangeAt + 2000 > snapshotAppleTime;
       const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
         return Boolean(extraSeed.inInventory) && !extraSeed.planted;
       }).map(function (extraSeed) {
@@ -3963,9 +3976,37 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
       }
       appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
-      appleState.extraPlants = Array.isArray(snapshot.apples.extraPlants)
+      if (shouldMergePendingAppleDelta) {
+        const pendingExtraSeeds = priorExtraSeeds.filter(function (s) {
+          if (!s || s.id == null) return false;
+          const sid = String(s.id);
+          if (snapshotExtraSeedIds[sid]) return false;
+          if (localInventorySeedIds[sid]) return false;
+          return true;
+        });
+        if (pendingExtraSeeds.length > 0) {
+          appleState.extraSeeds = appleState.extraSeeds.concat(pendingExtraSeeds);
+          appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
+        }
+      }
+      const incomingExtraPlants = Array.isArray(snapshot.apples.extraPlants)
         ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
         : [];
+      const incomingPlantIds = Object.create(null);
+      incomingExtraPlants.forEach(function (p) {
+        if (p && p.id != null) incomingPlantIds[String(p.id)] = true;
+      });
+      let nextExtraPlants = incomingExtraPlants;
+      if (shouldMergePendingAppleDelta) {
+        const pendingLocalPlants = appleState.extraPlants.filter(function (p) {
+          if (!p || p.id == null) return false;
+          return !incomingPlantIds[String(p.id)];
+        });
+        if (pendingLocalPlants.length > 0) {
+          nextExtraPlants = incomingExtraPlants.concat(pendingLocalPlants);
+        }
+      }
+      appleState.extraPlants = nextExtraPlants;
       const now = Date.now();
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
         const pickedAt = Number(localApplePickedAtById[appleId] || 0);
