@@ -1937,6 +1937,41 @@ function isNearWellForPouring() {
   return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellPourDistance;
 }
 
+/** 손에 든 양동이 중심이 우물에 더 가까운데 플레이어 발만으로는 거리 밖으로 나가는 경우 */
+function isNearWellIncludingBucketReach() {
+  if (isNearWell()) return true;
+  if (heldItem !== HELD_ITEM_BUCKET) return false;
+  const wellSize = getWellSize();
+  const bucketSize = getBucketSize();
+  const bucketBox = {
+    left: bucketX,
+    top: bucketY,
+    width: bucketSize.width,
+    height: bucketSize.height
+  };
+  return (
+    getCenterDistanceUtil(bucketBox, wellX, wellY, wellSize.width, wellSize.height) <
+    wellUseDistance + 14
+  );
+}
+
+function isNearWellForPouringIncludingBucketReach() {
+  if (isNearWellForPouring()) return true;
+  if (heldItem !== HELD_ITEM_BUCKET) return false;
+  const wellSize = getWellSize();
+  const bucketSize = getBucketSize();
+  const bucketBox = {
+    left: bucketX,
+    top: bucketY,
+    width: bucketSize.width,
+    height: bucketSize.height
+  };
+  return (
+    getCenterDistanceUtil(bucketBox, wellX, wellY, wellSize.width, wellSize.height) <
+    wellPourDistance + 14
+  );
+}
+
 function isNearSignBoard() {
   if (!signBoard) {
     return false;
@@ -4216,6 +4251,15 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
       const snapAt = snapshotSavedAt || 0;
       if (
+        incomingPlant &&
+        snapAt > 0 &&
+        lastMainPlantStateChangeAt > 0 &&
+        snapAt < lastMainPlantStateChangeAt - 1200
+      ) {
+        incomingPlant = null;
+      }
+      if (
+        incomingPlant &&
         snapAt > 0 &&
         snapAt < lastMainPlantStateChangeAt - 2000 &&
         plantRuntime.isSeedPlanted &&
@@ -7096,52 +7140,64 @@ function useHeldItem() {
 function useBucket() {
   refillWellIfNeeded();
 
-  if (isBucketFull) {
-    const wellSize = getWellSize();
-    const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
-    const wateringTarget = getNearestWateringTarget();
-    const nearWellPour = isNearWellForPouring();
-    // 우물·작물 거리가 겹칠 때 항상 우물 우선이면 "계속 붓기만" 하는 느낌이 남.
-    // 우물에 되붓기: 우물 반경 안이고 우물 물이 덜 찼으며, 작물 급수 대상이 없거나 플레이어가 우물 쪽이 더 가까울 때만.
-    if (
-      nearWellPour &&
-      wellState.water < maxWellWater &&
-      (!wateringTarget || wellDist < wateringTarget.distance)
-    ) {
-      wellState.water += 1;
+  if (!isBucketFull) {
+    if (isNearWellIncludingBucketReach() && wellState.water > 0) {
+      isBucketFull = true;
+      wellState.water -= 1;
       wellState.lastRefillAt = Date.now();
       saveWellState();
       syncWorldState(true);
       updateWellImage();
       updateWellCard();
-      triggerWaterSplash();
-      isBucketFull = false;
-      return;
+      onboardingHookFilledBucketAtWell();
+    } else if (isNearWellIncludingBucketReach() && wellState.water <= 0) {
+      flashPlantProximityWarning(
+        "\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uAE30\uB2E4\uB824 \uC8FC\uC138\uC694."
+      );
+      updatePlayerStatus();
     }
-
-    if (wateringTarget) {
-      waterPlant(wateringTarget);
-      triggerWaterSplash();
-    } else {
-      triggerWaterSplash();
-    }
-
-    isBucketFull = false;
     return;
   }
 
-  if (!isBucketFull && isNearWell() && wellState.water > 0) {
-    isBucketFull = true;
-    wellState.water -= 1;
+  const wellSize = getWellSize();
+  const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
+  const wateringTarget = getNearestWateringTarget();
+  const nearWellPour = isNearWellForPouringIncludingBucketReach();
+  // 우물·작물 거리가 겹칠 때: 우물에 되붓기는 우물에 여유가 있고, 급수 대상이 없거나 우물이 더 가까울 때만.
+  if (
+    nearWellPour &&
+    wellState.water < maxWellWater &&
+    (!wateringTarget || wellDist < wateringTarget.distance)
+  ) {
+    wellState.water += 1;
     wellState.lastRefillAt = Date.now();
     saveWellState();
     syncWorldState(true);
     updateWellImage();
     updateWellCard();
-    onboardingHookFilledBucketAtWell();
+    triggerWaterSplash();
+    isBucketFull = false;
     return;
   }
 
+  if (wateringTarget) {
+    waterPlant(wateringTarget);
+    triggerWaterSplash();
+    isBucketFull = false;
+    return;
+  }
+
+  // 찬 양동이인데 급수할 식물이 없음: 우물이 이미 가득이면 스플래시만 내고 물이 증발하는 것처럼 보임 → 막음.
+  if (nearWellPour && wellState.water >= maxWellWater) {
+    flashPlantProximityWarning(
+      "\uC6B0\uBB3C\uC774 \uAC00\uB4DD\uC785\uB2C8\uB2E4. \uC2DD\uBB3C \uAC00\uAE4C\uC5D0\uC11C \uBB3C\uC744 \uBD93\uC73C\uC138\uC694."
+    );
+    updatePlayerStatus();
+    return;
+  }
+
+  triggerWaterSplash();
+  isBucketFull = false;
 }
 
 function getNearestPlantForMagicPowder() {
@@ -9109,13 +9165,15 @@ function sendMultiplayerPresence(forceSend) {
     id: currentSessionId,
     userId: currentUserId,
     name: nameForIngameUiDisplay(accountDisplayNameForUi()),
-    action: plantRuntime.isPlanting
-      ? "planting"
-      : appleState.isEating
-        ? "eating"
-        : isWateringNow
-          ? "watering"
-          : "state",
+    action: isCraftingMagicPowder
+      ? "magic_powder"
+      : plantRuntime.isPlanting
+        ? "planting"
+        : appleState.isEating
+          ? "eating"
+          : isWateringNow
+            ? "watering"
+            : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
@@ -9130,7 +9188,8 @@ function sendMultiplayerPresence(forceSend) {
     state.color,
     Math.round(state.x),
     Math.round(state.depth),
-    Math.round(state.jumpY)
+    Math.round(state.jumpY),
+    state.action
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
 
@@ -9406,16 +9465,21 @@ function renderRemotePlayerState(state) {
   );
   if (hasAction) {
     remotePlayer.statusElement.textContent =
-      state.action === "planting"
-        ? "\uC528\uC557 \uC2EC\uB294\uC911..."
-        : state.action === "eating"
-          ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
-          : "";
+      state.action === "magic_powder"
+        ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911..."
+        : state.action === "planting"
+          ? "\uC528\uC557 \uC2EC\uB294\uC911..."
+          : state.action === "eating"
+            ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
+            : state.action === "watering"
+              ? "\uBB3C \uC8FC\uB294 \uC911..."
+              : "";
     remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
     remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
   } else if (
     remotePlayer.statusElement.textContent &&
-    Date.now() - Number(remotePlayer.lastActionAt || 0) < Math.max(plantActionMs, appleEatMs) + 400
+    Date.now() - Number(remotePlayer.lastActionAt || 0) <
+      Math.max(plantActionMs, appleEatMs, magicPowderCraftMs) + 400
   ) {
     remotePlayer.statusElement.style.display = "block";
   } else {
@@ -9965,7 +10029,7 @@ function tryCraftMagicPowder() {
 
   isCraftingMagicPowder = true;
   plantRuntime.isPlanting = true;
-  playerStatus.textContent = "마법의 가루 생성중...";
+  playerStatus.textContent = "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911...";
   clearTimeout(magicPowderCraftTimer);
   magicPowderCraftTimer = window.setTimeout(function () {
     removeRandomButterfliesFromInventory(magicPowderCraftCost);
@@ -9977,8 +10041,10 @@ function tryCraftMagicPowder() {
     playerStatus.textContent = "";
     updateButterflyInventoryUi();
     updateMagicPowderInventoryUi();
+    sendMultiplayerPresence(true);
   }, magicPowderCraftMs);
   updateButterflyInventoryUi();
+  sendMultiplayerPresence(true);
   return true;
 }
 
@@ -10500,9 +10566,16 @@ function applyButterflySnapshot(snapshotButterflies) {
       delete butterflyLocalCatchTombstoneById[id];
     }
   });
-  const incomingList = Array.isArray(snapshotButterflies.list)
-    ? snapshotButterflies.list
-    : [];
+  const incomingRaw = Array.isArray(snapshotButterflies.list) ? snapshotButterflies.list : [];
+  const incomingSeen = Object.create(null);
+  const incomingList = [];
+  incomingRaw.forEach(function (raw) {
+    if (!raw || !raw.id) return;
+    const sid = String(raw.id);
+    if (incomingSeen[sid]) return;
+    incomingSeen[sid] = true;
+    incomingList.push(raw);
+  });
   if (incomingList.length > 0) {
     hasSeededInitialButterflies = true;
   }
@@ -10573,6 +10646,12 @@ function applyButterflySnapshot(snapshotButterflies) {
   }
 
   butterflyState.list = nextList;
+  if (!iAmAuthority) {
+    butterflyState.list.forEach(function (b) {
+      b._renderX = b.x;
+      b._renderY = b.y;
+    });
+  }
 
   const rawLast = snapshotButterflies.lastSpawnAt;
   const parsedLast = Number(rawLast);
