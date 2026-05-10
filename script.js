@@ -4350,7 +4350,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       const nextSeedX = Number(snapshot.seed.x);
       const nextSeedY = Number(snapshot.seed.y);
       const canApplyMainSeedState =
-        !snapshotSavedAt || snapshotSavedAt >= lastMainSeedStateChangeAt;
+        hasServerRowTime ||
+        !snapshotSavedAt ||
+        snapshotSavedAt >= lastMainSeedStateChangeAt;
       // Per-account tutorial seed uses room-scoped storage; do not mirror shared snapshot here.
       if (canApplyMainSeedState && typeof snapshot.seed.isDryHandled === "boolean") {
         hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
@@ -4478,8 +4480,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         });
       }
       const seedPendingFromRecentLocalEdit =
-        !snapshotAppleTime ||
-        lastAppleStateChangeAt + 2000 > snapshotAppleTime;
+        !hasServerRowTime &&
+        (!snapshotAppleTime ||
+          lastAppleStateChangeAt + 2000 > snapshotAppleTime);
       let shouldMergePendingPlants = seedPendingFromRecentLocalEdit;
       if (!shouldMergePendingPlants) {
         const snapMissingLocalPlant = priorExtraPlants.some(function (p) {
@@ -4531,7 +4534,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           appleState.worldLooseSeed = {
             x: Number(wls.x) || WORLD_LOOSE_SEED_X,
             y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
-            nextSpawnAt: Math.max(incomingNext, priorWorldLooseNextSpawnAt)
+            nextSpawnAt: hasServerRowTime
+              ? incomingNext
+              : Math.max(incomingNext, priorWorldLooseNextSpawnAt)
           };
         } else {
           ensureWorldLooseSeedShape();
@@ -5792,7 +5797,8 @@ function applyPlantWaterDecay(plant, now) {
     return;
   }
   let updatedAt = Number(plant.waterLevelUpdatedAt);
-  if (!Number.isFinite(updatedAt)) {
+  // Number(null) === 0 — would drain all water in one frame after snapshot parse.
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
     updatedAt = now;
     plant.waterLevelUpdatedAt = updatedAt;
   }
@@ -8282,7 +8288,9 @@ function applyLoadedPlantState(loadedPlant) {
   plantRuntime.wateredAtList = loadedPlant.plantWateredAtList;
   plantRuntime.status = loadedPlant.plantState;
   plantRuntime.waterLevel = loadedPlant.plantWaterLevel;
-  plantRuntime.waterLevelUpdatedAt = loadedPlant.plantWaterLevelUpdatedAt;
+  const wlu = loadedPlant.plantWaterLevelUpdatedAt;
+  plantRuntime.waterLevelUpdatedAt =
+    wlu != null && Number.isFinite(Number(wlu)) && Number(wlu) > 0 ? Number(wlu) : Date.now();
   plantRuntime.becameEmptyAt = loadedPlant.plantBecameEmptyAt;
   plantRuntime.isOverwatered = loadedPlant.isPlantOverwatered;
   plantRuntime.rottenAt = Object.prototype.hasOwnProperty.call(loadedPlant, "plantRottenAt")
@@ -10584,7 +10592,6 @@ function finalizeButterflyRemovalEffects(now) {
   }
   lastButterflyStateChangeAt = t;
   markWorldDirty();
-  syncWorldState(true);
 }
 
 function broadcastButterflyCatch(butterflyId) {

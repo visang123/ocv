@@ -149,7 +149,7 @@ export const butterflyRespawnMs = 2 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */
 export const butterflyCatchDistance = 25;
 /** Authority (lowest sessionId) broadcasts butterfly positions on this cadence. */
-export const butterflyBroadcastMs = 250;
+export const butterflyBroadcastMs = 480;
 /** Bounding box (world coords) the butterflies stay within while flying. */
 export const butterflyBoundsLeft = 24;
 export const butterflyBoundsRight = 936;
