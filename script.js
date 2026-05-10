@@ -2763,7 +2763,7 @@ function updateOnboardingFlowUI() {
       const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
       const lineB = "나무밖으로 이동하세요.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "열매가 생겼습니다.");
+        setOnboardingCalloutVisible(true, "씨앗을 얻었습니다.");
       } else {
         setOnboardingCalloutVisible(
           true,

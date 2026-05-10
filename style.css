@@ -2227,8 +2227,11 @@ body #guide-book-button {
   outline-offset: 4px;
 }
 
+/* fixed 유지: relative로 덮으면 body 맨 아래로 흘러가 화면 밖/끝에 붙는 버그 */
 #guide-book-button.is-click-prompt {
-  position: relative;
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
   outline: none;
   background: rgba(154, 219, 245, 0.22);
   border-radius: 10px;
