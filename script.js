@@ -1972,6 +1972,30 @@ function isNearWellForPouringIncludingBucketReach() {
   );
 }
 
+/**
+ * 양동이 사각형과 우물 사각형이 실제로 겹치는지(여유 px). 중심거리만 쓰면 손·통이 우물 안쪽으로 들어간
+ * 프레임에서도 '멀다'고 나와 퍼기 실패 → 같은 프레임에 Q가 뿌리기(찬 통) 분기로 가는 문제가 생김.
+ */
+function isBucketOverlappingWellForInteraction(padPx) {
+  if (heldItem !== HELD_ITEM_BUCKET) return false;
+  const pad = Number.isFinite(Number(padPx)) ? Math.max(0, Number(padPx)) : 12;
+  const wellSize = getWellSize();
+  const bucketSize = getBucketSize();
+  const wellRect = {
+    left: wellX - pad,
+    top: wellY - pad,
+    right: wellX + wellSize.width + pad,
+    bottom: wellY + wellSize.height + pad
+  };
+  const bucketRect = {
+    left: bucketX,
+    top: bucketY,
+    right: bucketX + bucketSize.width,
+    bottom: bucketY + bucketSize.height
+  };
+  return isOverlappingRect(bucketRect, wellRect);
+}
+
 function isNearSignBoard() {
   if (!signBoard) {
     return false;
@@ -7139,9 +7163,22 @@ function useHeldItem() {
 
 function useBucket() {
   refillWellIfNeeded();
+  // 키 입력은 보통 다음 updateBucketPosition보다 먼저 옴 → 통 좌표가 플레이어 한 프레임 늦으면
+  // 우물 '닿음' 판정이 어긋나 빈 통인데 찬 통 분기(뿌리기)로 들어가기 쉬움.
+  if (heldItem === HELD_ITEM_BUCKET) {
+    const bucketSize = getBucketSize();
+    const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
+    bucketX = handPosition.x;
+    bucketY = handPosition.y;
+  }
+
+  const wellReachForScoop =
+    isNearWellIncludingBucketReach() || isBucketOverlappingWellForInteraction(14);
+  const wellReachForPour =
+    isNearWellForPouringIncludingBucketReach() || isBucketOverlappingWellForInteraction(14);
 
   if (!isBucketFull) {
-    if (isNearWellIncludingBucketReach() && wellState.water > 0) {
+    if (wellReachForScoop && wellState.water > 0) {
       isBucketFull = true;
       wellState.water -= 1;
       wellState.lastRefillAt = Date.now();
@@ -7150,7 +7187,7 @@ function useBucket() {
       updateWellImage();
       updateWellCard();
       onboardingHookFilledBucketAtWell();
-    } else if (isNearWellIncludingBucketReach() && wellState.water <= 0) {
+    } else if (wellReachForScoop && wellState.water <= 0) {
       flashPlantProximityWarning(
         "\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uAE30\uB2E4\uB824 \uC8FC\uC138\uC694."
       );
@@ -7162,7 +7199,7 @@ function useBucket() {
   const wellSize = getWellSize();
   const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
   const wateringTarget = getNearestWateringTarget();
-  const nearWellPour = isNearWellForPouringIncludingBucketReach();
+  const nearWellPour = wellReachForPour;
   // 우물·작물 거리가 겹칠 때: 우물에 되붓기는 우물에 여유가 있고, 급수 대상이 없거나 우물이 더 가까울 때만.
   if (
     nearWellPour &&
