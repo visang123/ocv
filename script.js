@@ -8540,8 +8540,10 @@ function updateButterflyInventoryUi() {
   const craftHoverTip = "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5";
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
-    const colorTip = butterflyInventorySlotHoverTip(color);
-    setInstantHoverTip(slot, canCraft ? colorTip + "\n\n" + craftHoverTip : colorTip);
+    setInstantHoverTip(
+      slot,
+      canCraft ? craftHoverTip : butterflyInventorySlotHoverTip(color)
+    );
   });
   setInstantHoverTip(butterflyInventory, canCraft ? craftHoverTip : null);
   if (butterflyInventoryTotal) {
