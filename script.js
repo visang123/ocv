@@ -8528,7 +8528,6 @@ function updateButterflyInventoryUi() {
   let total = 0;
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
-    setInstantHoverTip(slot, butterflyInventorySlotHoverTip(color));
     const count = butterflyState.caughtCounts[color] || 0;
     total += count;
     const countNode = slot.querySelector(".butterfly-inventory-count");
@@ -8538,10 +8537,13 @@ function updateButterflyInventoryUi() {
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
-  setInstantHoverTip(
-    butterflyInventory,
-    canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5" : null
-  );
+  const craftHoverTip = "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5";
+  butterflyInventorySlots.forEach(function (slot) {
+    const color = slot.dataset.color;
+    const colorTip = butterflyInventorySlotHoverTip(color);
+    setInstantHoverTip(slot, canCraft ? colorTip + "\n\n" + craftHoverTip : colorTip);
+  });
+  setInstantHoverTip(butterflyInventory, canCraft ? craftHoverTip : null);
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
     setInstantHoverTip(butterflyInventoryTotal, null);

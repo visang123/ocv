@@ -2371,9 +2371,9 @@ body #guide-book-button {
 }
 
 .butterfly-inventory-slot[data-ovc-tip]:hover::after {
-  white-space: nowrap;
+  white-space: pre-line;
   width: max-content;
-  max-width: none;
+  max-width: min(92vw, 280px);
   padding: 7px 11px;
   border-radius: 10px;
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(254, 252, 232, 0.98) 100%);
@@ -2381,7 +2381,12 @@ body #guide-book-button {
   color: #431407;
   font: 800 12px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
-  word-break: normal;
+  word-break: keep-all;
+  text-align: center;
+}
+
+#butterfly-inventory.is-craftable .butterfly-inventory-slot[data-ovc-tip]:hover::after {
+  bottom: calc(100% + 32px);
 }
 
 #magic-powder-inventory {
