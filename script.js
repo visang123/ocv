@@ -7097,21 +7097,28 @@ function useBucket() {
   refillWellIfNeeded();
 
   if (isBucketFull) {
-    if (isNearWellForPouring()) {
-      if (wellState.water < maxWellWater) {
-        wellState.water += 1;
-        wellState.lastRefillAt = Date.now();
-        saveWellState();
-        syncWorldState(true);
-        updateWellImage();
-        updateWellCard();
-        triggerWaterSplash();
-        isBucketFull = false;
-      }
+    const wellSize = getWellSize();
+    const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
+    const wateringTarget = getNearestWateringTarget();
+    const nearWellPour = isNearWellForPouring();
+    // 우물·작물 거리가 겹칠 때 항상 우물 우선이면 "계속 붓기만" 하는 느낌이 남.
+    // 우물에 되붓기: 우물 반경 안이고 우물 물이 덜 찼으며, 작물 급수 대상이 없거나 플레이어가 우물 쪽이 더 가까울 때만.
+    if (
+      nearWellPour &&
+      wellState.water < maxWellWater &&
+      (!wateringTarget || wellDist < wateringTarget.distance)
+    ) {
+      wellState.water += 1;
+      wellState.lastRefillAt = Date.now();
+      saveWellState();
+      syncWorldState(true);
+      updateWellImage();
+      updateWellCard();
+      triggerWaterSplash();
+      isBucketFull = false;
       return;
     }
 
-    const wateringTarget = getNearestWateringTarget();
     if (wateringTarget) {
       waterPlant(wateringTarget);
       triggerWaterSplash();
@@ -9207,6 +9214,11 @@ function broadcastBucketState(forceSend) {
 function handleRemoteBucketBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.id || payload.id === currentSessionId) return;
+  // 내가 양동이를 들고 있을 때는 로컬이 찬/빈 상태의 유일한 기준 — 타 클라이언트 브로드캐스트가
+  // isBucketFull·좌표를 덮으면 Q가 퍼기/붓기 없이 스플래시만 반복되는 것처럼 보임.
+  if (heldItem === HELD_ITEM_BUCKET) {
+    return;
+  }
   const remoteId = String(payload.id);
   const nextUpdatedAt = Number(payload.updatedAt || 0);
   const prevUpdatedAt = Number(remoteBucketUpdateAtById[remoteId] || 0);
