@@ -379,6 +379,8 @@ let onboardingFinalHideTimerId = null;
 let onboardingButterflyCountBaseline = null;
 let onboardingTutorialEnteredTree = false;
 let onboardingSeedTutorialSecondLine = false;
+/** 16단계: 0 = 축하 문구, 1 = 이어서 안내(저장 스텝은 계속 16) */
+let onboardingPostWaterCongratsPhase = 0;
 const ONBOARDING_MAX_STEP = 27;
 /** tutorial.html: 땅의 튜토리얼 씨앗이 사라진 뒤 다시 놓기까지(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
@@ -2239,6 +2241,7 @@ function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
   onboardingFirstGuideEscHintShown = false;
   onboardingNpcGuideEscHintShown = false;
+  onboardingPostWaterCongratsPhase = 0;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
   onboardingClearAllOnboardingTimers();
@@ -2516,7 +2519,9 @@ function updateOnboardingFlowUI() {
     case 16: {
       setOnboardingCalloutVisible(
         true,
-        "축하합니다! 식물 키우는 법을 배우셨습니다."
+        onboardingPostWaterCongratsPhase === 0
+          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
+          : "아직 남았습니다 끝까지 진행해주세요."
       );
       break;
     }
@@ -2561,7 +2566,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 24: {
-      setOnboardingCalloutVisible(true, "열매를 클릭해 먹으세요.");
+      setOnboardingCalloutVisible(true, "왼쪽 아래 열매를 클릭해 먹으세요.");
       if (appleInventory) appleInventory.classList.add("onboarding-highlight");
       if (inventoryApple) inventoryApple.classList.add("onboarding-highlight");
       break;
@@ -2609,6 +2614,7 @@ function onboardingCheckJumpFinish() {
 function onboardingHookWateredMainPlantFromTutorial() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 15) return;
   onboardingFlowStep = 16;
+  onboardingPostWaterCongratsPhase = 0;
   persistOnboardingStep();
   if (onboardingCongratsTimerId) {
     window.clearTimeout(onboardingCongratsTimerId);
@@ -2616,10 +2622,17 @@ function onboardingHookWateredMainPlantFromTutorial() {
   onboardingCongratsTimerId = window.setTimeout(function () {
     onboardingCongratsTimerId = null;
     if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
-    onboardingFlowStep = 17;
-    persistOnboardingStep();
+    onboardingPostWaterCongratsPhase = 1;
     updateOnboardingFlowUI();
-  }, 5000);
+    onboardingCongratsTimerId = window.setTimeout(function () {
+      onboardingCongratsTimerId = null;
+      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
+      onboardingPostWaterCongratsPhase = 0;
+      onboardingFlowStep = 17;
+      persistOnboardingStep();
+      updateOnboardingFlowUI();
+    }, 2000);
+  }, 1500);
   updateOnboardingFlowUI();
 }
 
@@ -2826,6 +2839,7 @@ function applyDefaultState(options) {
     onboardingFirstGuideEscHintShown = false;
     onboardingNpcGuideEscHintShown = false;
     onboardingSeedTutorialSecondLine = false;
+    onboardingPostWaterCongratsPhase = 0;
     onboardingButterflyCountBaseline = null;
     onboardingTutorialEnteredTree = false;
     onboardingClearAllOnboardingTimers();
@@ -5352,19 +5366,6 @@ function plantWorldOrdinalSortTime(plant) {
   const a = Number(plant.plantedAt) || 0;
   if (a > 0) return a;
   return Number(plant.growthStartedAt) || 0;
-}
-
-function butterflyTooltipForColor(color) {
-  if (color === "brown") {
-    return "\uAC08\uC0C9 \uB098\uBE44";
-  }
-  if (color === "yellow") {
-    return "\uB178\uB791 \uB098\uBE44";
-  }
-  if (color === "white") {
-    return "\uD558\uC580 \uB098\uBE44";
-  }
-  return "\uB098\uBE44";
 }
 
 /** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
@@ -8323,7 +8324,7 @@ function ensureButterflyRenderEntry(butterfly) {
   element.appendChild(sprite);
   ground.appendChild(element);
   setWorldSize(element, BUTTERFLY_SIZE, BUTTERFLY_SIZE);
-  setInstantHoverTip(element, butterflyTooltipForColor(butterfly.color));
+  setInstantHoverTip(element, null);
   entry = {
     element,
     sprite,
@@ -8480,7 +8481,7 @@ function updateButterflyInventoryUi() {
   let total = 0;
   butterflyInventorySlots.forEach(function (slot) {
     const color = slot.dataset.color;
-    setInstantHoverTip(slot, butterflyTooltipForColor(color));
+    setInstantHoverTip(slot, null);
     const count = butterflyState.caughtCounts[color] || 0;
     total += count;
     const countNode = slot.querySelector(".butterfly-inventory-count");
@@ -8489,30 +8490,15 @@ function updateButterflyInventoryUi() {
   });
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
-    setInstantHoverTip(
-      butterflyInventoryTotal,
-      "\uC7A1\uC740 \uB098\uBE44 \uD569\uACC4 (" + total + "\uB9C8\uB9AC)"
-    );
+    setInstantHoverTip(butterflyInventoryTotal, null);
   }
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
-  if (total > 0) {
-    setInstantHoverTip(
-      butterflyInventory,
-      canCraft
-        ? "\uB098\uBE44 " +
-            magicPowderCraftCost +
-            "\uB9C8\uB9AC \uC774\uC0C1 \u2014 \uD074\uB9AD\uD558\uBA74 \uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8\uB97C \uB9CC\uB4ED\uB2C8\uB2E4."
-        : "\uB098\uBE44 \uD569\uACC4 " +
-            total +
-            "/" +
-            magicPowderCraftCost +
-            " \u2014 \uB354 \uC7A1\uC73C\uBA74 \uAC00\uB8E8\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
-    );
-  } else {
-    setInstantHoverTip(butterflyInventory, null);
-  }
+  setInstantHoverTip(
+    butterflyInventory,
+    canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uAC00\uB2A5" : null
+  );
 }
 
 function updateMagicPowderInventoryUi() {
@@ -8609,7 +8595,6 @@ function updateButterflies() {
       drawX - BUTTERFLY_SIZE / 2,
       drawY - BUTTERFLY_SIZE / 2
     );
-    setInstantHoverTip(entry.element, butterflyTooltipForColor(butterfly.color));
     applyButterflySpriteFrame(
       entry,
       butterfly.color,
