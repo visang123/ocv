@@ -90,11 +90,11 @@ export const appleEatMs = 3 * SECOND_MS;
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
 /**
- * 기존 식물 중심까지 필요한 최소 거리(월드 px). growthTier 3·4·5일수록 넓어져 씨앗 심기 제한.
- * 티어 0–2는 작은 새싹 전 단계로 좁게 유지.
+ * 기존 식물 중심까지 필요한 최소 거리(월드 px).
+ * `maturityLevel` 0–2: 씨·작은 새싹, 3: 큰 새싹, 4·5: 풀 — 값이 클수록 주변 심기 금지 반경이 넓어짐.
  */
-export function getMinPlantCenterClearanceWorld(growthTier) {
-  const t = Math.max(0, Number(growthTier) || 0);
+export function getMinPlantCenterClearanceWorld(maturityLevel) {
+  const t = Math.max(0, Number(maturityLevel) || 0);
   if (t >= 5) return 64;
   if (t >= 4) return 52;
   if (t >= 3) return 40;

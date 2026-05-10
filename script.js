@@ -6031,6 +6031,17 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   return false;
 }
 
+/**
+ * growthTier만 쓰면 새싹이 커도 오랫동안 0이라 반경이 안 넓어짐 → 시각 단계(getSproutStage)와 같이 씀.
+ * 제거된 식물은 후보에서 빼고, maturity는 0–5로 캡.
+ */
+function getPlantMaturityLevelForPlantingSpacing(plant) {
+  if (!plant || plant.removed) return null;
+  const gt = Math.max(0, Number(plant.growthTier) || 0);
+  const stage = plant.isSproutGrown ? getSproutStageFromPlant(plant) : 0;
+  return Math.min(5, Math.max(gt, stage));
+}
+
 function canPlantAt(x, y) {
   pollWorldState(true);
   lastPlantProximityBlockMessage = "";
@@ -6042,18 +6053,23 @@ function canPlantAt(x, y) {
   const plantCenters = [];
 
   if (plantRuntime.isSeedPlanted) {
-    plantCenters.push({
-      x: plantRuntime.spotX + PLANT_SPOT_WIDTH / 2,
-      y: plantRuntime.spotY + PLANT_SPOT_HEIGHT / 2,
-      tier: Math.max(0, Number(plantRuntime.growthTier) || 0)
-    });
+    const maturity = getPlantMaturityLevelForPlantingSpacing(plantRuntime);
+    if (maturity != null) {
+      plantCenters.push({
+        x: plantRuntime.spotX + PLANT_SPOT_WIDTH / 2,
+        y: plantRuntime.spotY + PLANT_SPOT_HEIGHT / 2,
+        maturity: maturity
+      });
+    }
   }
 
   appleState.extraPlants.forEach(function (plant) {
+    const maturity = getPlantMaturityLevelForPlantingSpacing(plant);
+    if (maturity == null) return;
     plantCenters.push({
       x: plant.x + PLANT_SPOT_WIDTH / 2,
       y: plant.y + PLANT_SPOT_HEIGHT / 2,
-      tier: Math.max(0, Number(plant.growthTier) || 0)
+      maturity: maturity
     });
   });
 
@@ -6061,7 +6077,7 @@ function canPlantAt(x, y) {
   const targetY = y + PLANT_SPOT_HEIGHT / 2;
 
   const tooClose = plantCenters.some(function (center) {
-    const need = getMinPlantCenterClearanceWorld(center.tier);
+    const need = getMinPlantCenterClearanceWorld(center.maturity);
     return Math.hypot(center.x - targetX, center.y - targetY) < need;
   });
   if (tooClose) {
