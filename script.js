@@ -2077,6 +2077,13 @@ function isSharedWorldSyncPausedForTutorial() {
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
+/** index 월드 + 온보딩 완료 + 서버 동기화: 메인 슬롯이 이미 있으면 들고 심기는 extraPlants로만 추가 */
+function isSharedWorldMultiPlantMode() {
+  if (!isWorldDocumentEntry()) return false;
+  if (!getStoredFlag(onboardingFlowDoneKey)) return false;
+  return isWorldServerSyncAvailable();
+}
+
 function teardownMultiplayerForTutorial() {
   clearMultiplayerReconnectTimeout();
   Object.keys(remotePlayers).forEach(function (remoteId) {
@@ -5477,6 +5484,39 @@ function startPlanting() {
   window.setTimeout(function () {
     const plantedAt = Date.now();
     plantRuntime.isPlanting = false;
+    const spotX = plantRuntime.spotX;
+    const spotY = plantRuntime.spotY;
+
+    if (isSharedWorldMultiPlantMode() && plantRuntime.isSeedPlanted) {
+      const ownerKey = String(currentUserId || currentSessionId || "guest");
+      const newPlant = createExtraPlant(
+        "plant-ground-" + ownerKey + "-" + plantedAt,
+        spotX,
+        spotY
+      );
+      newPlant.plantedAt = plantedAt;
+      newPlant.lastWateredAt = plantedAt;
+      newPlant.wateredAtList = [plantedAt];
+      newPlant.waterLevelUpdatedAt = plantedAt;
+      newPlant.growthStartedAt = plantedAt;
+      newPlant.ownerUserId = getPlanterOwnerId();
+      newPlant.ownerDisplayName = getPlanterDisplayName();
+      assignSproutIdentityToNewPlant(newPlant);
+      ensureGrassOrdinalIfNeeded(newPlant);
+      appleState.extraPlants.push(newPlant);
+      playerStatus.textContent = "";
+      seedCard.style.display = "none";
+      updateExtraSeedsAndPlants();
+      updatePlantState();
+      updateNpcPosition();
+      saveSeedState();
+      saveAppleState();
+      markWorldDirty();
+      syncWorldState(true);
+      onboardingNotifyMainPlantPlanted();
+      return;
+    }
+
     plantRuntime.isSeedPlanted = true;
     plantRuntime.lastWateredAt = plantedAt;
     plantRuntime.wateredAtList = [plantedAt];
