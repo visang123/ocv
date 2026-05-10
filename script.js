@@ -10117,6 +10117,12 @@ function simulateButterflyAuthorityStep(butterfly, now) {
 function authoritySpawnButterfliesIfNeeded(now) {
   if (butterflyState.list.length >= butterflyMaxAlive) return false;
   if (!butterflyState.lastSpawnAt) {
+    // 최초 입장(아직 나비를 채운 적 없음)만 즉시 cap까지 채움. 이미 월드가 돌았는데
+    // lastSpawnAt만 0이면(스냅샷 누락·병합) 여기서 5마리를 한꺼번에 넣어 리스폰 주기가 무시됨.
+    if (hasSeededInitialButterflies) {
+      butterflyState.lastSpawnAt = now;
+      return false;
+    }
     return authorityFillToCapInstantly(now);
   }
   const elapsedCycles = Math.floor(
@@ -10576,7 +10582,7 @@ function applyButterflySnapshot(snapshotButterflies) {
   if (hasValidSnapshotSpawnAt) {
     butterflyState.lastSpawnAt = parsedLast;
   } else if (nextList.length === 0) {
-    butterflyState.lastSpawnAt = 0;
+    butterflyState.lastSpawnAt = hasSeededInitialButterflies ? now : 0;
   } else {
     const prevN = Number(prevLastSpawnAt);
     butterflyState.lastSpawnAt =
