@@ -92,11 +92,9 @@ export const appleRespawnMs = 90 * SECOND_MS;
 /** index + 온보딩 완료: 월드 공용 땅 씨앗 1슬롯 — 줍은 뒤 같은 좌표에서 10초 뒤 리스폰 */
 export const WORLD_LOOSE_SEED_ID = "world-loose-seed";
 export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
-/** 나무 줄기 왼쪽 잔디(줄기·뿌리 스프라이트와 겹치지 않게). 리스폰도 이 좌표 유지 */
-export const WORLD_TREE_ROOTS_BOTTOM_EXTEND = 2;
-export const WORLD_LOOSE_SEED_X = TREE_TRUNK_X - SEED_SIZE - 18;
-export const WORLD_LOOSE_SEED_Y =
-  BIG_TREE_Y + BIG_TREE_HEIGHT + WORLD_TREE_ROOTS_BOTTOM_EXTEND - SEED_SIZE + 10;
+/** 튜토 메인 씨와 동일 위치(책·안내판 옆) — 월드도 여기서만 줍기·seedCount */
+export const WORLD_LOOSE_SEED_X = SEED_START_X;
+export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 

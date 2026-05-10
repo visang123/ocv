@@ -752,9 +752,9 @@ function ensureWorldLooseSeedShape() {
     w.y = WORLD_LOOSE_SEED_Y;
   }
   w.nextSpawnAt = Math.max(0, Number(w.nextSpawnAt) || 0);
-  const migrateHighOldCanopy = Number(w.y) < WORLD_LOOSE_SEED_Y - 25;
-  const migrateOnTrunkColumn = Number(w.x) >= TREE_TRUNK_X - 20;
-  if (migrateHighOldCanopy || migrateOnTrunkColumn) {
+  const dx = Number(w.x) - WORLD_LOOSE_SEED_X;
+  const dy = Number(w.y) - WORLD_LOOSE_SEED_Y;
+  if (dx * dx + dy * dy > 55 * 55) {
     w.x = WORLD_LOOSE_SEED_X;
     w.y = WORLD_LOOSE_SEED_Y;
   }
@@ -3277,9 +3277,10 @@ function toggleSeed() {
 function pickUpNearestItem() {
   const seedSize = getSeedSize();
   const bucketSize = getBucketSize();
-  const seedDistance = canPickUpSeed()
-    ? getCenterDistance(seedX, seedY, seedSize.width, seedSize.height)
-    : Infinity;
+  const seedDistance =
+    !usesWorldLooseSeedMode() && canPickUpSeed()
+      ? getCenterDistance(seedX, seedY, seedSize.width, seedSize.height)
+      : Infinity;
   const extraSeed = getNearestPickableExtraSeed();
   const extraSeedDistance = extraSeed ? extraSeed.distance : Infinity;
   const bucketDistance = getCenterDistance(bucketX, bucketY, bucketSize.width, bucketSize.height);
