@@ -11,6 +11,7 @@ const loginHandoffKey = "ovcLoginHandoffV1";
 const ovcOnboardingFlowDoneStorageKey = "onboardingFlowDoneV2";
 const ovcOnboardingFlowStepStorageKey = "onboardingFlowStepV2";
 const ovcEverBeenToWorldStorageKey = "ovcEverBeenToWorldV1";
+const ovcTutorialDoneUserSessionKey = "ovcTutorialDoneUserSessionV1";
 
 function ovcScopedUserStorageKey(userId, suffix) {
   const uid = String(userId == null ? "" : userId).trim();
@@ -57,6 +58,32 @@ function ovcIsOnboardingDoneForUserId(userId) {
   } catch (e) {
     return true;
   }
+}
+
+function accountTutorialDoneTruthy(account) {
+  if (!account) return false;
+  const v = account.tutorial_done;
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+
+function sessionClaimsTutorialCompleteForUser(userId) {
+  const uid = String(userId || "").trim();
+  if (!uid) return false;
+  try {
+    return sessionStorage.getItem(ovcTutorialDoneUserSessionKey) === uid;
+  } catch (e) {
+    return false;
+  }
+}
+
+function hydrateScopedTutorialProgressForUser(userId) {
+  const uid = String(userId || "").trim();
+  if (!uid) return;
+  try {
+    localStorage.setItem(ovcScopedUserStorageKey(uid, ovcOnboardingFlowDoneStorageKey), "true");
+    localStorage.setItem(ovcScopedUserStorageKey(uid, ovcEverBeenToWorldStorageKey), "true");
+    localStorage.setItem(ovcScopedUserStorageKey(uid, ovcOnboardingFlowStepStorageKey), "0");
+  } catch (e) {}
 }
 
 const loginForm = document.getElementById("login-form");
@@ -169,9 +196,35 @@ function goToGame(account) {
   } catch (e) {}
   sessionStorage.removeItem(loginHandoffKey);
   const accountId = account && account.id != null ? String(account.id).trim() : "";
-  const serverTutorialDone = Boolean(account && account.tutorial_done);
+  const serverTutorialDone = accountTutorialDoneTruthy(account);
+  const sessionHint = sessionClaimsTutorialCompleteForUser(accountId);
   const onboarded =
-    !accountId || serverTutorialDone || ovcIsOnboardingDoneForUserId(accountId);
+    !accountId ||
+    serverTutorialDone ||
+    sessionHint ||
+    ovcIsOnboardingDoneForUserId(accountId);
+
+  if (accountId && (serverTutorialDone || sessionHint)) {
+    hydrateScopedTutorialProgressForUser(accountId);
+  }
+  if (
+    accountId &&
+    sessionHint &&
+    !serverTutorialDone &&
+    account &&
+    account.session_token &&
+    window.OVCOnline &&
+    typeof window.OVCOnline.saveTutorialDone === "function"
+  ) {
+    Promise.resolve(
+      window.OVCOnline.saveTutorialDone(
+        accountId,
+        String(account.session_token || "").trim(),
+        true
+      )
+    ).catch(function () {});
+  }
+
   const htmlFile = onboarded ? "index.html" : "tutorial.html";
   const targetUrl = new URL("./" + htmlFile, window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
@@ -212,11 +265,8 @@ function finalizeSuccessfulLogin(account) {
   if (account.session_token) {
     localStorage.setItem(currentSessionTokenKey, account.session_token);
   }
-  if (userId && account && account.tutorial_done) {
-    try {
-      localStorage.setItem(ovcScopedUserStorageKey(userId, ovcOnboardingFlowDoneStorageKey), "true");
-      localStorage.setItem(ovcScopedUserStorageKey(userId, ovcEverBeenToWorldStorageKey), "true");
-    } catch (eHydrate) {}
+  if (userId && account && accountTutorialDoneTruthy(account)) {
+    hydrateScopedTutorialProgressForUser(userId);
   }
 }
 

@@ -215,13 +215,19 @@ function handleApi(request, response, requestedPath) {
         }
         return nextAccount;
       }));
+      const tutorialDoneForResponse =
+        account.tutorial_done === true
+          ? true
+          : account.tutorial_done === false
+          ? false
+          : true;
       sendJson(response, 200, {
         ok: true,
         id: account.id,
         name: account.name,
         color: account.color || null,
         session_token: sessionToken,
-        tutorial_done: Boolean(account.tutorial_done)
+        tutorial_done: tutorialDoneForResponse
       });
     });
     return true;

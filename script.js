@@ -449,6 +449,20 @@ const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
 const currentUserName = (getStoredValue(currentUserKey) || "").trim();
 const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
+const ovcTutorialDoneUserSessionKey = "ovcTutorialDoneUserSessionV1";
+
+function setOnboardingFlowDoneStored(done) {
+  setStoredFlag(onboardingFlowDoneKey, Boolean(done));
+  try {
+    if (done && currentUserId) {
+      sessionStorage.setItem(ovcTutorialDoneUserSessionKey, String(currentUserId).trim());
+    }
+    if (!done) {
+      sessionStorage.removeItem(ovcTutorialDoneUserSessionKey);
+    }
+  } catch (eHint) {}
+}
+
 function ovcApplyForceWorldHubBypassLoggedIn() {
   if (!currentUserId) return false;
   if (!ovcForceWorldHubIsRequested()) return false;
@@ -457,7 +471,7 @@ function ovcApplyForceWorldHubBypassLoggedIn() {
     sessionStorage.removeItem(ovcTutorialReplaySessionKey);
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (eClr) {}
-  setStoredFlag(onboardingFlowDoneKey, true);
+  setOnboardingFlowDoneStored(true);
   setStoredFlag(everBeenToWorldKey, true);
   setStoredValue(onboardingFlowStepKey, "0");
   setStoredFlag(movementTutorialCompleteKey, true);
@@ -1550,7 +1564,7 @@ function skipTutorialFromSettings() {
   } catch (eReplay) {}
   onboardingClearAllOnboardingTimers();
   onboardingStep26OpenedSettingsWithEsc = false;
-  setStoredFlag(onboardingFlowDoneKey, true);
+  setOnboardingFlowDoneStored(true);
   setStoredFlag(everBeenToWorldKey, true);
   onboardingFlowStep = 0;
   setStoredValue(onboardingFlowStepKey, "0");
@@ -2214,7 +2228,7 @@ function repairOnboardingCompletionFromStoredStep() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   var stepStr = String(getStoredValue(onboardingFlowStepKey) || "");
   if (stepStr === "0") {
-    setStoredFlag(onboardingFlowDoneKey, true);
+    setOnboardingFlowDoneStored(true);
     requestAccountTutorialDoneSync({ force: true });
     return;
   }
@@ -2223,7 +2237,7 @@ function repairOnboardingCompletionFromStoredStep() {
     Number.isFinite(stepNum) &&
     stepNum >= ONBOARDING_MAX_STEP - 1
   ) {
-    setStoredFlag(onboardingFlowDoneKey, true);
+    setOnboardingFlowDoneStored(true);
     setStoredValue(onboardingFlowStepKey, "0");
     requestAccountTutorialDoneSync({ force: true });
   }
@@ -2248,14 +2262,14 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
   } catch (e) {}
   if (replay === "1") return;
   if (!getStoredFlag(everBeenToWorldKey)) return;
-  setStoredFlag(onboardingFlowDoneKey, true);
+  setOnboardingFlowDoneStored(true);
   setStoredValue(onboardingFlowStepKey, "0");
   requestAccountTutorialDoneSync({ force: true });
 }
 
 function resetTutorialProgressInStorage() {
   clearTutorialMainSeedRespawnTimer();
-  setStoredFlag(onboardingFlowDoneKey, false);
+  setOnboardingFlowDoneStored(false);
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
@@ -2419,7 +2433,7 @@ function onboardingScheduleTutorialCompleteHide() {
     onboardingFinalHideTimerId = null;
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
-    setStoredFlag(onboardingFlowDoneKey, true);
+    setOnboardingFlowDoneStored(true);
     setStoredFlag(everBeenToWorldKey, true);
     onboardingFlowStep = 0;
     setStoredValue(onboardingFlowStepKey, "0");
@@ -2568,13 +2582,13 @@ function loadOnboardingFlowState() {
   }
   const raw = parseInt(String(getStoredValue(onboardingFlowStepKey) || "1"), 10);
   if (raw === 0) {
-    setStoredFlag(onboardingFlowDoneKey, true);
+    setOnboardingFlowDoneStored(true);
     onboardingFlowStep = 0;
     requestAccountTutorialDoneSync({ force: true });
     return;
   }
   if (raw === ONBOARDING_MAX_STEP) {
-    setStoredFlag(onboardingFlowDoneKey, true);
+    setOnboardingFlowDoneStored(true);
     setStoredValue(onboardingFlowStepKey, "0");
     onboardingFlowStep = 0;
     requestAccountTutorialDoneSync({ force: true });
@@ -3179,7 +3193,7 @@ function applyDefaultState(options) {
     onboardingButterflyCountBaseline = null;
     onboardingTutorialEnteredTree = false;
     onboardingClearAllOnboardingTimers();
-    setStoredFlag(onboardingFlowDoneKey, false);
+    setOnboardingFlowDoneStored(false);
     setStoredValue(onboardingFlowStepKey, "1");
     isGuideDismissedAtSign = false;
     hasHandledDryMainSeed = false;
