@@ -86,7 +86,8 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
-export const minPlantSpacing = 1;
+/** 다른 식물 중심과 이 거리(px) 미만이면 심기 불가. 작을수록 붙여 심기 가능 */
+export const minPlantSpacing = 0.5;
 
 // --- Butterflies ---
 /** World size (w = h). Half of original 20px tuning; matches setWorldSize + .butterfly CSS. */

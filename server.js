@@ -17,6 +17,41 @@ const mimeTypes = {
   ".ico": "image/x-icon"
 };
 
+/** 정적 파일 mtime 캐시 — 다수 접속 시 디스크 read 완화 */
+const staticFileCache = new Map();
+const STATIC_CACHE_MAX = 400;
+
+function rememberStaticCache(filePath, mtimeMs, content) {
+  if (staticFileCache.size >= STATIC_CACHE_MAX) {
+    const firstKey = staticFileCache.keys().next().value;
+    staticFileCache.delete(firstKey);
+  }
+  staticFileCache.set(filePath, { mtimeMs, content });
+}
+
+function readStaticFileCached(filePath, callback) {
+  fs.stat(filePath, (statErr, st) => {
+    if (statErr) {
+      callback(statErr, null);
+      return;
+    }
+    const mtimeMs = Number(st.mtimeMs) || 0;
+    const hit = staticFileCache.get(filePath);
+    if (hit && hit.mtimeMs === mtimeMs) {
+      callback(null, hit.content);
+      return;
+    }
+    fs.readFile(filePath, (readErr, content) => {
+      if (readErr) {
+        callback(readErr, null);
+        return;
+      }
+      rememberStaticCache(filePath, mtimeMs, content);
+      callback(null, content);
+    });
+  });
+}
+
 function ensureDataStore() {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -292,7 +327,7 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  fs.readFile(filePath, (error, content) => {
+  readStaticFileCached(filePath, (error, content) => {
     if (error) {
       response.writeHead(404);
       response.end("Not found");
@@ -300,7 +335,8 @@ const server = http.createServer((request, response) => {
     }
 
     response.writeHead(200, {
-      "Content-Type": mimeTypes[path.extname(filePath)] || "application/octet-stream"
+      "Content-Type": mimeTypes[path.extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "public, max-age=120"
     });
     response.end(content);
   });

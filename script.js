@@ -751,8 +751,37 @@ const MULTIPLAYER_BROADCAST_MIN_MS = 80;
 const MULTIPLAYER_HEARTBEAT_MS = 500;
 const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
 const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
-const MULTIPLAYER_WORLD_SYNC_LOOP_MS = 150;
-const MULTIPLAYER_WORLD_POLL_MIN_MS = 150;
+const MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE = 150;
+const MULTIPLAYER_WORLD_POLL_MIN_MS_BASE = 150;
+
+function getActiveRemotePlayerCountForTick() {
+  const now = Date.now();
+  let n = 0;
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const remote = remotePlayers[remoteId];
+    if (!remote) return;
+    if (remote.lastSeenAt && now - remote.lastSeenAt > 30000) return;
+    n += 1;
+  });
+  return n;
+}
+
+/** 원격 인원이 많을수록 폴링·저장 간격을 약간 늘려 DB·클라이언트 부하를 줄임 */
+function getMultiplayerWorldPollMinMs() {
+  const c = getActiveRemotePlayerCountForTick();
+  if (c >= 10) return 280;
+  if (c >= 6) return 220;
+  if (c >= 3) return 180;
+  return MULTIPLAYER_WORLD_POLL_MIN_MS_BASE;
+}
+
+function getMultiplayerWorldSyncLoopMs() {
+  const c = getActiveRemotePlayerCountForTick();
+  if (c >= 10) return 280;
+  if (c >= 6) return 220;
+  if (c >= 3) return 180;
+  return MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE;
+}
 
 const keys = createInputState();
 
@@ -4091,7 +4120,7 @@ function pollWorldState(forcePoll) {
     isSharedWorldSyncPausedForTutorial() ||
     !window.OVCOnline ||
     typeof window.OVCOnline.loadWorldState !== "function" ||
-    (!forcePoll && now - lastWorldPollAt < MULTIPLAYER_WORLD_POLL_MIN_MS)
+    (!forcePoll && now - lastWorldPollAt < getMultiplayerWorldPollMinMs())
   ) {
     return;
   }
@@ -5751,12 +5780,12 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uB098\uBB34");
   }
 
-  const wellPad = 3;
+  const wellPad = 1;
   if (plantSpotOverlapsExpandedRect(plantX, plantY, wellX, wellY, WELL_SIZE, WELL_SIZE, wellPad)) {
     return plantProximityPhraseForNoun("\uC6B0\uBB3C");
   }
 
-  const portalPad = 1;
+  const portalPad = 0;
   if (
     plantSpotOverlapsExpandedRect(
       plantX,
@@ -5771,7 +5800,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
 
-  const bookPad = 1;
+  const bookPad = 0;
   if (
     guideBook &&
     guideBook.style.display !== "none" &&
@@ -5789,14 +5818,14 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   }
 
   if (isPlantMasterVisible()) {
-    const npcPad = 1;
+    const npcPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
       return plantProximityPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
     }
   }
 
   if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
-    const seedPad = 1;
+    const seedPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
       return plantProximityPhraseForNoun("\uC528\uC557");
     }
@@ -5806,7 +5835,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || extraSeed.inInventory) return;
     if (!extraSeed.element || extraSeed.element.style.display === "none") return;
-    const seedPad = 1;
+    const seedPad = 0;
     if (
       plantSpotOverlapsExpandedRect(plantX, plantY, extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE, seedPad)
     ) {
@@ -5819,7 +5848,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
 
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
     const bsz = getBucketSize();
-    const bucketPad = 1;
+    const bucketPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, bucketX, bucketY, bsz.width, bsz.height, bucketPad)) {
       return plantProximityPhraseForNoun("\uC591\uB3D9\uC774");
     }
@@ -5845,7 +5874,7 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
     return left < ax2 && right > ax1 && top < ay2 && bottom > ay1;
   }
 
-  const canopyInset = 12;
+  const canopyInset = 6;
   if (
     overlap(
       TREE_CANOPY_LEFT + canopyInset,
@@ -5857,12 +5886,13 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
     return true;
   }
 
-  const trunkInset = 5;
+  const trunkInset = 3;
   const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE + trunkInset;
   const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE - trunkInset;
-  const trunkTop = TREE_TRUNK_TOP - 10;
-  const trunkBottom = GROUND_WORLD_HEIGHT;
-  if (overlap(trunkLeft, trunkTop, trunkRight, trunkBottom)) {
+  /** 줄기·뿌리가 그려진 높이만 막음(이전엔 trunkBottom이 지면 끝까지 가서 같은 x열 전체 y에서 심기 불가였음) */
+  const trunkVisualTop = TREE_TRUNK_TOP - 22;
+  const trunkFeetBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  if (overlap(trunkLeft, trunkVisualTop, trunkRight, trunkFeetBottom)) {
     return true;
   }
   return false;
@@ -8822,8 +8852,8 @@ function updateButterflies() {
   // frames are still animated locally for smoothness.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
-  /** Higher = follow network snapshots faster (less “pause” between 250ms updates). */
-  const butterflyRenderLerp = 0.92;
+  /** 원격 좌표로 스냅 시 프레임당 최대 이동(월드 px) — 한 번에 점프하는 것처럼 보이는 현상 완화 */
+  const butterflyRemoteRenderMaxStepWorld = 9;
 
   // Render
   const aliveIds = {};
@@ -8838,8 +8868,16 @@ function updateButterflies() {
         butterfly._renderX = drawX;
         butterfly._renderY = drawY;
       }
-      butterfly._renderX += (drawX - butterfly._renderX) * butterflyRenderLerp;
-      butterfly._renderY += (drawY - butterfly._renderY) * butterflyRenderLerp;
+      let rdx = drawX - butterfly._renderX;
+      let rdy = drawY - butterfly._renderY;
+      const rdist = Math.hypot(rdx, rdy);
+      if (rdist > butterflyRemoteRenderMaxStepWorld && rdist > 0.0001) {
+        const s = butterflyRemoteRenderMaxStepWorld / rdist;
+        rdx *= s;
+        rdy *= s;
+      }
+      butterfly._renderX += rdx;
+      butterfly._renderY += rdy;
       drawX = butterfly._renderX;
       drawY = butterfly._renderY;
     } else {
@@ -9227,11 +9265,13 @@ setInterval(function () {
   if (isTabSessionSuperseded) return;
   sendMultiplayerPresence(true);
 }, 1000);
-setInterval(function () {
+function runMultiplayerWorldSyncTick() {
   if (isTabSessionSuperseded) return;
   pollWorldState(false);
   syncWorldState(false);
-}, MULTIPLAYER_WORLD_SYNC_LOOP_MS);
+  window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
+}
+window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
 setInterval(function () {
   if (isTabSessionSuperseded) return;
   validateCurrentAccount();
