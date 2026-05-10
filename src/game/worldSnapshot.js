@@ -157,6 +157,19 @@ export function parseMainPlantFromSnapshot(mp) {
   } else if (Object.prototype.hasOwnProperty.call(mp, "plantPlantedAt")) {
     plantedFromSnapshot.plantPlantedAt = Number(mp.plantPlantedAt) || null;
   }
+  // 마른 땅은 UI·스냅샷 불일치로 싹이 잠깐 살아나는 것을 막음
+  if (plantedFromSnapshot.plantState === "dry") {
+    plantedFromSnapshot.isSproutGrown = false;
+    plantedFromSnapshot.plantSproutGrownAt = null;
+    plantedFromSnapshot.plantGrowthStartedAt = null;
+    plantedFromSnapshot.isSproutSelfSustaining = false;
+    if (Object.prototype.hasOwnProperty.call(plantedFromSnapshot, "sproutEvolutionMs")) {
+      plantedFromSnapshot.sproutEvolutionMs = 0;
+    }
+    if (Object.prototype.hasOwnProperty.call(plantedFromSnapshot, "sproutEvolutionLastTickAt")) {
+      plantedFromSnapshot.sproutEvolutionLastTickAt = null;
+    }
+  }
   return plantedFromSnapshot;
 }
 
@@ -193,7 +206,7 @@ export function parseSharedGroundSeedFromSnapshot(extraSeed) {
 }
 
 export function parseExtraPlantFromSnapshot(plant) {
-  return {
+  const out = {
     id: String(plant.id),
     x: Number(plant.x) || 0,
     y: Number(plant.y) || 0,
@@ -267,4 +280,13 @@ export function parseExtraPlantFromSnapshot(plant) {
         ? Math.max(1, Number(plant.grassOrdinal))
         : null
   };
+  if (out.status === "dry") {
+    out.isSproutGrown = false;
+    out.sproutGrownAt = null;
+    out.growthStartedAt = null;
+    out.isSproutSelfSustaining = false;
+    out.sproutEvolutionMs = 0;
+    out.sproutEvolutionLastTickAt = null;
+  }
+  return out;
 }

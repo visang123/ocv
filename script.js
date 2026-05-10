@@ -1974,7 +1974,7 @@ function isNearWellIncludingBucketReach() {
   };
   return (
     getCenterDistanceUtil(bucketBox, wellX, wellY, wellSize.width, wellSize.height) <
-    wellUseDistance + 14
+    wellUseDistance + 6
   );
 }
 
@@ -1991,7 +1991,7 @@ function isNearWellForPouringIncludingBucketReach() {
   };
   return (
     getCenterDistanceUtil(bucketBox, wellX, wellY, wellSize.width, wellSize.height) <
-    wellPourDistance + 14
+    wellPourDistance + 6
   );
 }
 
@@ -3345,10 +3345,8 @@ function isPlantMasterVisible() {
   if (!plantRuntime.isSeedPlanted) {
     return true;
   }
-  return (
-    plantRuntime.status !== "rotten" &&
-    plantRuntime.status !== "dry"
-  );
+  /** 마른 땅에서도 달인이 사라졌다 나타났다 하지 않게(스냅샷·UI 일치) */
+  return plantRuntime.status !== "rotten";
 }
 
 function isNearPlantMaster() {
@@ -5418,6 +5416,12 @@ function updateExtraPlantState(plant, now) {
     plant.status = "dry";
     plant.needsFirstWater = true;
     cancelPlantPowderUpgrade(plant);
+    plant.isSproutGrown = false;
+    plant.sproutGrownAt = null;
+    plant.growthStartedAt = null;
+    plant.sproutEvolutionMs = 0;
+    plant.sproutEvolutionLastTickAt = null;
+    plant.isSproutSelfSustaining = false;
     return;
   }
 
@@ -7490,9 +7494,9 @@ function useBucket() {
   }
 
   const wellReachForScoop =
-    isNearWellIncludingBucketReach() || isBucketOverlappingWellForInteraction(14);
+    isNearWellIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
   const wellReachForPour =
-    isNearWellForPouringIncludingBucketReach() || isBucketOverlappingWellForInteraction(14);
+    isNearWellForPouringIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
 
   if (!isBucketFull) {
     if (wellReachForScoop && wellState.water > 0) {
@@ -7645,7 +7649,17 @@ function triggerWaterSplash() {
   lastWaterSplashAt = Date.now();
   lastWaterSplashX = splashX;
   lastWaterSplashY = splashY;
-  createWaterSplashAt(splashX, splashY);
+  let refEl = null;
+  if (
+    heldItem === HELD_ITEM_BUCKET &&
+    playerBucketOverlay &&
+    playerBucketOverlay.style.display !== "none"
+  ) {
+    refEl = playerBucketOverlay;
+  } else if (bucket && bucket.style.display !== "none") {
+    refEl = bucket;
+  }
+  createWaterSplashAt(splashX, splashY, refEl);
   sendMultiplayerPresence(true);
 }
 
@@ -7687,60 +7701,59 @@ function getNearestWateringTarget() {
   return nearest;
 }
 
-function createWaterSplashAt(startX, startY) {
+function createWaterSplashAt(startX, startY, refElement) {
   const viewport = document.querySelector(".viewport");
-  const zs =
-    typeof zoomLevel === "number" && Number.isFinite(zoomLevel) && zoomLevel > 0 ? zoomLevel : 1;
+  if (!viewport) {
+    return;
+  }
+
+  let baseLeft;
+  let baseTop;
+  if (refElement && typeof refElement.getBoundingClientRect === "function") {
+    const br = refElement.getBoundingClientRect();
+    if (br.width > 1 && br.height > 1) {
+      baseLeft = br.left + br.width * 0.52;
+      baseTop = br.top + br.height * 0.66;
+    }
+  }
+  if (baseLeft == null || baseTop == null) {
+    const anchor = document.createElement("div");
+    anchor.style.cssText =
+      "position:absolute;left:0;top:0;width:8px;height:8px;margin:0;padding:0;border:0;pointer-events:none;opacity:0";
+    ground.appendChild(anchor);
+    setWorldPosition(anchor, startX, startY);
+    const r = anchor.getBoundingClientRect();
+    anchor.remove();
+    baseLeft = r.left + r.width / 2;
+    baseTop = r.top + r.height / 2;
+  }
 
   for (let index = 0; index < 8; index += 1) {
-    const offsetX = (index - 3.5) * 3;
-    const fallX = (index - 3.5) * 5;
-    const fallY = 18 + (index % 3) * 5;
+    const spread = (index - 3.5) * 8;
+    const fallX = (index - 3.5) * 11;
+    const fallY = 32 + (index % 3) * 12;
 
     const holder = document.createElement("div");
-    holder.style.pointerEvents = "none";
     holder.className = "water-splash-holder";
-
-    if (viewport) {
-      const anchor = document.createElement("div");
-      anchor.style.cssText =
-        "position:absolute;left:0;top:0;width:0;height:0;margin:0;padding:0;border:0;pointer-events:none;visibility:hidden";
-      ground.appendChild(anchor);
-      setWorldPosition(anchor, startX + offsetX, startY);
-      const r = anchor.getBoundingClientRect();
-      anchor.remove();
-      holder.style.position = "fixed";
-      holder.style.left = r.left + "px";
-      holder.style.top = r.top + "px";
-      holder.style.zIndex = "450";
-      viewport.appendChild(holder);
-    } else {
-      holder.style.position = "absolute";
-      holder.style.left = "0";
-      holder.style.bottom = "0";
-      holder.style.zIndex = "450";
-      setWorldPosition(holder, startX + offsetX, startY);
-      ground.appendChild(holder);
-    }
+    holder.style.cssText =
+      "position:fixed;left:" +
+      (baseLeft + spread) +
+      "px;top:" +
+      baseTop +
+      "px;pointer-events:none;z-index:450;";
 
     const drop = document.createElement("div");
     drop.className = "water-drop";
-    if (viewport) {
-      const dx = toScreenX(fallX) * zs;
-      const dy = toScreenY(fallY) * zs;
-      drop.style.setProperty("--drop-x", dx + "px");
-      drop.style.setProperty("--drop-y", dy + "px");
-    } else {
-      drop.style.setProperty("--drop-x", toScreenX(fallX) + "px");
-      drop.style.setProperty("--drop-y", toScreenY(fallY) + "px");
-    }
+    drop.style.setProperty("--drop-x", fallX + "px");
+    drop.style.setProperty("--drop-y", fallY + "px");
     holder.appendChild(drop);
+    viewport.appendChild(holder);
 
     window.setTimeout(function () {
       if (holder.parentNode) {
         holder.parentNode.removeChild(holder);
       }
-    }, 600);
+    }, 720);
   }
 }
 
@@ -8004,11 +8017,17 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
-    // Keep planted ground + dry soil; sprout hides until watered, then regrows from growthStartedAt.
+    // 마른 땅: 위 싹 상태를 비워 두어 스냅샷·로컬이 어긋나며 싹이 되살아나지 않게 함. 물 주면 wasDrySoil에서 다시 시작.
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
     cancelPlantPowderUpgrade(plantRuntime);
+    plantRuntime.isSproutGrown = false;
+    plantRuntime.sproutGrownAt = null;
+    plantRuntime.growthStartedAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
     saveSeedState();
   }
 
@@ -8573,6 +8592,12 @@ function applyLoadedPlantState(loadedPlant) {
   }
   if (plantRuntime.status === "dry") {
     cancelPlantPowderUpgrade(plantRuntime);
+    plantRuntime.isSproutGrown = false;
+    plantRuntime.sproutGrownAt = null;
+    plantRuntime.growthStartedAt = null;
+    plantRuntime.sproutEvolutionMs = 0;
+    plantRuntime.sproutEvolutionLastTickAt = null;
+    plantRuntime.isSproutSelfSustaining = false;
   }
   if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
