@@ -173,7 +173,13 @@ export function parseSharedGroundSeedFromSnapshot(extraSeed) {
     planted: Boolean(extraSeed.planted),
     inInventory: false,
     label: extraSeed.label || DEFAULT_SEED_LABEL,
-    isStarter: Boolean(extraSeed.isStarter)
+    isStarter: Boolean(extraSeed.isStarter),
+    ownerUserId: Object.prototype.hasOwnProperty.call(extraSeed, "ownerUserId")
+      ? String(extraSeed.ownerUserId || "")
+      : "",
+    ownerSessionId: Object.prototype.hasOwnProperty.call(extraSeed, "ownerSessionId")
+      ? String(extraSeed.ownerSessionId || "")
+      : ""
   };
 }
 

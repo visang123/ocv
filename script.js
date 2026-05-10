@@ -3713,7 +3713,9 @@ function getSharedWorldSnapshot() {
           planted: Boolean(extraSeed.planted),
           inInventory: Boolean(extraSeed.inInventory),
           label: extraSeed.label,
-          isStarter: Boolean(extraSeed.isStarter)
+          isStarter: Boolean(extraSeed.isStarter),
+          ownerUserId: extraSeed.ownerUserId != null ? String(extraSeed.ownerUserId) : "",
+          ownerSessionId: extraSeed.ownerSessionId != null ? String(extraSeed.ownerSessionId) : ""
         };
       }),
       extraPlants: appleState.extraPlants.map(function (plant) {
@@ -3941,21 +3943,29 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           if (p && p.id != null) snapshotPlantIdsEarly[String(p.id)] = true;
         });
       }
-      let shouldMergePendingAppleDelta =
+      const seedPendingFromRecentLocalEdit =
         !snapshotAppleTime ||
         lastAppleStateChangeAt + 2000 > snapshotAppleTime;
-      if (!shouldMergePendingAppleDelta) {
-        const snapMissingLocalGroundSeed = priorExtraSeeds.some(function (s) {
-          if (!s || s.id == null) return false;
-          if (Boolean(s.inInventory) || Boolean(s.planted)) return false;
-          return !snapshotExtraSeedIds[String(s.id)];
-        });
+      let shouldMergePendingSeeds = seedPendingFromRecentLocalEdit;
+      let shouldMergePendingPlants = shouldMergePendingSeeds;
+      if (!shouldMergePendingPlants) {
         const snapMissingLocalPlant = priorExtraPlants.some(function (p) {
           if (!p || p.id == null || p.removed) return false;
           return !snapshotPlantIdsEarly[String(p.id)];
         });
-        if (snapMissingLocalGroundSeed || snapMissingLocalPlant) {
-          shouldMergePendingAppleDelta = true;
+        if (snapMissingLocalPlant) {
+          shouldMergePendingPlants = true;
+        }
+      }
+      if (!shouldMergePendingSeeds) {
+        const snapMissingLocalOwnedGroundSeed = priorExtraSeeds.some(function (s) {
+          if (!s || s.id == null) return false;
+          if (Boolean(s.inInventory) || Boolean(s.planted)) return false;
+          if (!isExtraSeedSessionOwnedByLocal(s)) return false;
+          return !snapshotExtraSeedIds[String(s.id)];
+        });
+        if (snapMissingLocalOwnedGroundSeed) {
+          shouldMergePendingSeeds = true;
         }
       }
       const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
@@ -4009,7 +4019,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         appleState.extraSeeds = appleState.extraSeeds.concat(localInventorySeeds);
       }
       appleState.extraSeeds = dedupeExtraSeedsPreferInventory(appleState.extraSeeds);
-      if (shouldMergePendingAppleDelta) {
+      if (shouldMergePendingSeeds) {
         const pendingExtraSeeds = priorExtraSeeds.filter(function (s) {
           if (!s || s.id == null) return false;
           if (Boolean(s.inInventory)) return false;
@@ -4019,6 +4029,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           if (extraSeedHasCorrespondingExtraPlant(sid, priorExtraPlants)) return false;
           if (snapshotExtraSeedIds[sid]) return false;
           if (localInventorySeedIds[sid]) return false;
+          if (!seedPendingFromRecentLocalEdit && !isExtraSeedSessionOwnedByLocal(s)) {
+            return false;
+          }
           return true;
         });
         if (pendingExtraSeeds.length > 0) {
@@ -4030,7 +4043,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
         : [];
       let nextExtraPlants = incomingExtraPlants;
-      if (shouldMergePendingAppleDelta) {
+      if (shouldMergePendingPlants) {
         const pendingLocalPlants = priorExtraPlants.filter(function (p) {
           if (!p || p.id == null) return false;
           return !snapshotPlantIdsEarly[String(p.id)];
@@ -4328,6 +4341,7 @@ function dropExtraSeed() {
   extraSeed.x = playerBox.left + playerBox.width / 2 - SEED_SIZE / 2;
   extraSeed.y = playerBox.bottom - SEED_SIZE;
   extraSeed.inInventory = false;
+  assignExtraSeedInventoryOwner(extraSeed);
   heldItem = null;
   saveAppleState();
 }
@@ -5952,6 +5966,18 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
   if (oUid && uid) return oUid === uid;
   if (oSid && sid) return oSid === sid;
   if (oUid && !uid && oSid && sid) return oSid === sid;
+  return false;
+}
+
+/** 스냅샷 병합: 소유자 비어 있으면 false(전원 로컬로 취급하지 않음) → 원격 제거와 충돌 시 유령 씨앗 억제 */
+function isExtraSeedSessionOwnedByLocal(seed) {
+  if (!seed) return false;
+  const uid = getLocalExtraSeedOwnerUserId();
+  const sid = getLocalExtraSeedOwnerSessionId();
+  const oUid = String(seed.ownerUserId != null ? seed.ownerUserId : "").trim();
+  const oSid = String(seed.ownerSessionId != null ? seed.ownerSessionId : "").trim();
+  if (oSid && sid && oSid === sid) return true;
+  if (oUid && uid && oUid === uid) return true;
   return false;
 }
 
