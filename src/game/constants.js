@@ -76,8 +76,8 @@ export const sproutStage5Image = "이미지/grass-stage5-front.png";
 export const SPROUT_STAGE_WIDTHS = [5, 7, 11];
 export const SPROUT_STAGE_HEIGHTS = [6, 11, 19];
 /** 4·5단계 풀 — 3단계 베이스(인덱스 2)에 곱해 월드에서 더 크게 그림 */
-export const grassStage4WorldScale = 2.35;
-export const grassStage5WorldScale = 2.85;
+export const grassStage4WorldScale = 2.95;
+export const grassStage5WorldScale = 3.55;
 
 export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */

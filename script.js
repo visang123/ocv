@@ -4306,9 +4306,15 @@ function updateExtraSeedsAndPlants() {
         plant.y - WATER_NEEDED_SIZE - 2
       );
     }
-    const pLabel = getPlantWorldLabel(plant);
-    plant.spotElement.title = pLabel;
-    plant.sproutElement.title = pLabel;
+    const tierE = Math.max(0, Number(plant.growthTier) || 0);
+    const pLabel = tierE >= 4 ? "" : getPlantWorldLabel(plant);
+    if (pLabel) {
+      plant.spotElement.title = pLabel;
+      plant.sproutElement.title = pLabel;
+    } else {
+      plant.spotElement.removeAttribute("title");
+      plant.sproutElement.removeAttribute("title");
+    }
     if (!isSproutGrown) return;
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     setWorldPosition(
@@ -5475,18 +5481,7 @@ function ensureGrassOrdinalIfNeeded(plant) {
 
 function getPlantWorldLabel(plant) {
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
-  const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
-  const grassOrd =
-    plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
-      ? Math.max(0, Number(plant.grassOrdinal))
-      : 0;
-  if (tier >= 4 && grassOrd > 0) {
-    return name + "\uC758 \uD480" + grassOrd;
-  }
-  if (tier >= 4) {
-    return name + "\uC758 \uD480";
-  }
   if (sproutOrd > 0) {
     return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
   }
@@ -5508,6 +5503,11 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant || plant.spotX == null || plant.spotY == null) return;
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier >= 4) {
+    hidePlantHoverLabel();
+    return;
+  }
   plantHoverLabel.textContent = getPlantWorldLabel(plant);
   plantHoverLabel.style.display = "block";
   setWorldPosition(
@@ -6272,7 +6272,10 @@ function updatePlantCard() {
     }
 
     plantCard.style.display = "block";
-    if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
+    if (plantCardTitle) {
+      const tierP = Math.max(0, Number(plant.growthTier) || 0);
+      plantCardTitle.textContent = tierP >= 4 ? "" : getPlantWorldLabel(plant);
+    }
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     const waterCapacity = getPlantWaterCapacity(plant);
@@ -6297,7 +6300,10 @@ function updatePlantCard() {
   }
 
   plantCard.style.display = "block";
-  if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plantRuntime);
+  if (plantCardTitle) {
+    const tierM = Math.max(0, Number(plantRuntime.growthTier) || 0);
+    plantCardTitle.textContent = tierM >= 4 ? "" : getPlantWorldLabel(plantRuntime);
+  }
   plantCard.classList.toggle("is-dry", plantRuntime.status === "dry");
   plantCard.classList.toggle("is-overwatered", plantRuntime.isOverwatered);
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -6373,7 +6379,9 @@ function updatePlantGrowth() {
 }
 
 function updateSproutPosition() {
-  const worldLabel = plantRuntime.isSeedPlanted ? getPlantWorldLabel(plantRuntime) : "";
+  const tierS = Math.max(0, Number(plantRuntime.growthTier) || 0);
+  const worldLabel =
+    plantRuntime.isSeedPlanted && tierS < 4 ? getPlantWorldLabel(plantRuntime) : "";
   if (worldLabel) {
     plantSpot.title = worldLabel;
   } else {
@@ -6392,6 +6400,7 @@ function updateSproutPosition() {
   sprout.classList.toggle("is-big", stage >= 2);
   sprout.src = getSproutImageForStage(stage);
   if (worldLabel) sprout.title = worldLabel;
+  else sprout.removeAttribute("title");
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
   setWorldPosition(
     sprout,
@@ -8543,8 +8552,6 @@ function updateButterflyInventoryUi() {
 
 function updateMagicPowderInventoryUi() {
   if (!magicPowderInventory || !magicPowderCountText) return;
-  const powderTitleBase =
-    "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \u2014 \uC7A5\uC131\uC7A5\uC774 \uD480(\uC0C8\uC2F9 4\uB2E8\uACC4)\uC5D0 \uAC00\uAE4C\uC774 \uB418\uBA74 \uD074\uB9AD\uD574 \uD55C \uB2E8\uACC4 \uB354 \uD0A4\uC6B8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
   if (magicPowderCount <= 0) {
     magicPowderInventory.style.display = "none";
     magicPowderInventory.classList.remove("is-near");
@@ -8554,14 +8561,12 @@ function updateMagicPowderInventoryUi() {
   }
   magicPowderInventory.style.display = "block";
   magicPowderCountText.textContent = String(magicPowderCount);
-  let powderTip = powderTitleBase + " (\uBCF4\uC720 " + magicPowderCount + "\uAC1C)";
   const nearTarget = getNearestPlantForMagicPowder();
   magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
-  if (nearTarget) {
-    powderTip +=
-      "\n\u2014 \uC7A5\uC131\uC7A5(\uD480) \uADFC\uCC98\uC5D0\uC11C \uD074\uB9AD\uD558\uBA74 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.";
-  }
-  setInstantHoverTip(magicPowderInventory, powderTip);
+  setInstantHoverTip(
+    magicPowderInventory,
+    nearTarget ? "\uC0AC\uC6A9 click" : null
+  );
   setInstantHoverTip(magicPowderCountText, null);
 }
 
