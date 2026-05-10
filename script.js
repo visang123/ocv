@@ -1807,6 +1807,7 @@ function createStarterSeedInventoryItem() {
     label: "\uC528\uC5571",
     isStarter: true
   };
+  assignExtraSeedInventoryOwner(starterSeed);
   appleState.extraSeeds.unshift(starterSeed);
   isMainSeedAvailable = false;
   lastMainSeedStateChangeAt = Date.now();
@@ -3243,6 +3244,7 @@ function pickUpNearestItem() {
       return;
     }
     extraSeed.seed.inInventory = true;
+    assignExtraSeedInventoryOwner(extraSeed.seed);
     saveAppleState();
     updateExtraSeedsAndPlants();
     updateSeedInventory();
@@ -3474,6 +3476,7 @@ function createSeedFromApple() {
     label: "\uC528\uC557" + seedNumber,
     isStarter: false
   };
+  assignExtraSeedInventoryOwner(newSeed);
 
   appleState.extraSeeds.push(newSeed);
 
@@ -3935,7 +3938,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         !snapshotAppleTime ||
         lastAppleStateChangeAt + 2000 > snapshotAppleTime;
       const localInventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
-        return Boolean(extraSeed.inInventory) && !extraSeed.planted;
+        return (
+          Boolean(extraSeed.inInventory) &&
+          !extraSeed.planted &&
+          isExtraSeedOwnedByLocalPlayer(extraSeed)
+        );
       }).map(function (extraSeed) {
         return {
           id: extraSeed.id,
@@ -3945,7 +3952,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           planted: false,
           inInventory: true,
           label: extraSeed.label || "\uC528\uC557",
-          isStarter: Boolean(extraSeed.isStarter)
+          isStarter: Boolean(extraSeed.isStarter),
+          ownerUserId:
+            extraSeed.ownerUserId != null ? String(extraSeed.ownerUserId) : "",
+          ownerSessionId:
+            extraSeed.ownerSessionId != null ? String(extraSeed.ownerSessionId) : ""
         };
       });
       const localInventorySeedIds = {};
@@ -3979,6 +3990,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       if (shouldMergePendingAppleDelta) {
         const pendingExtraSeeds = priorExtraSeeds.filter(function (s) {
           if (!s || s.id == null) return false;
+          if (Boolean(s.inInventory)) return false;
           const sid = String(s.id);
           if (snapshotExtraSeedIds[sid]) return false;
           if (localInventorySeedIds[sid]) return false;
@@ -5787,6 +5799,32 @@ function getPlanterOwnerId() {
 function getPlanterDisplayName() {
   const n = String(currentUserName || "").trim();
   return n || "\uD50C\uB808\uC774\uC5B4";
+}
+
+function getLocalExtraSeedOwnerUserId() {
+  return String(currentUserId || "").trim();
+}
+
+function getLocalExtraSeedOwnerSessionId() {
+  return String(currentSessionId || "").trim();
+}
+
+function assignExtraSeedInventoryOwner(seed) {
+  if (!seed) return;
+  seed.ownerUserId = getLocalExtraSeedOwnerUserId();
+  seed.ownerSessionId = getLocalExtraSeedOwnerSessionId();
+}
+
+function isExtraSeedOwnedByLocalPlayer(seed) {
+  const uid = getLocalExtraSeedOwnerUserId();
+  const sid = getLocalExtraSeedOwnerSessionId();
+  const oUid = String(seed && seed.ownerUserId != null ? seed.ownerUserId : "").trim();
+  const oSid = String(seed && seed.ownerSessionId != null ? seed.ownerSessionId : "").trim();
+  if (!oUid && !oSid) return true;
+  if (oUid && uid) return oUid === uid;
+  if (oSid && sid) return oSid === sid;
+  if (oUid && !uid && oSid && sid) return oSid === sid;
+  return false;
 }
 
 function plantOwnerMatches(plant, ownerId, ownerName) {
