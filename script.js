@@ -1249,6 +1249,17 @@ inventoryApple.addEventListener("click", function () {
 butterflyInventory.addEventListener("click", function () {
   tryCraftMagicPowder();
 });
+butterflyInventory.addEventListener("mousemove", function (ev) {
+  if (butterflyInventory.style.display === "none") return;
+  butterflyInventoryLastPointerClientX = ev.clientX;
+  butterflyInventoryLastPointerClientY = ev.clientY;
+  syncButterflyInventoryBarHoverTip();
+});
+butterflyInventory.addEventListener("mouseleave", function () {
+  if (!butterflyInventory.classList.contains("is-craftable")) {
+    setInstantHoverTip(butterflyInventory, null);
+  }
+});
 
 characterSelectButton.addEventListener("click", function () {
   finishCharacterSelect();
@@ -5408,6 +5419,56 @@ function butterflyInventorySlotHoverTip(color) {
   return "\uB098\uBE44";
 }
 
+const butterflyInventoryCraftHoverTip =
+  "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5";
+
+let butterflyInventoryLastPointerClientX = 0;
+let butterflyInventoryLastPointerClientY = 0;
+
+function butterflyInventoryHoverTipAtClient(clientX, clientY) {
+  if (!butterflyInventory || butterflyInventory.style.display === "none") {
+    return null;
+  }
+  const inv = butterflyInventory.getBoundingClientRect();
+  if (
+    clientX < inv.left ||
+    clientX > inv.right ||
+    clientY < inv.top ||
+    clientY > inv.bottom
+  ) {
+    return null;
+  }
+  if (butterflyInventory.classList.contains("is-craftable")) {
+    return butterflyInventoryCraftHoverTip;
+  }
+  const hit = document.elementFromPoint(clientX, clientY);
+  const slot = hit && hit.closest && hit.closest(".butterfly-inventory-slot");
+  if (slot && butterflyInventory.contains(slot)) {
+    return butterflyInventorySlotHoverTip(slot.dataset.color);
+  }
+  let bestColor = null;
+  let bestDist = Infinity;
+  butterflyInventorySlots.forEach(function (s) {
+    const r = s.getBoundingClientRect();
+    const mid = (r.left + r.right) / 2;
+    const d = Math.abs(clientX - mid);
+    if (d < bestDist) {
+      bestDist = d;
+      bestColor = s.dataset.color;
+    }
+  });
+  return bestColor ? butterflyInventorySlotHoverTip(bestColor) : null;
+}
+
+function syncButterflyInventoryBarHoverTip() {
+  if (!butterflyInventory) return;
+  const tip = butterflyInventoryHoverTipAtClient(
+    butterflyInventoryLastPointerClientX,
+    butterflyInventoryLastPointerClientY
+  );
+  setInstantHoverTip(butterflyInventory, tip);
+}
+
 /** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
 function setInstantHoverTip(el, text) {
   if (!el) return;
@@ -8537,12 +8598,16 @@ function updateButterflyInventoryUi() {
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
-  const craftHoverTip = "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5";
   butterflyInventorySlots.forEach(function (slot) {
-    const color = slot.dataset.color;
-    setInstantHoverTip(slot, canCraft ? null : butterflyInventorySlotHoverTip(color));
+    setInstantHoverTip(slot, null);
   });
-  setInstantHoverTip(butterflyInventory, canCraft ? craftHoverTip : null);
+  if (canCraft) {
+    setInstantHoverTip(butterflyInventory, butterflyInventoryCraftHoverTip);
+  } else if (butterflyInventory.matches(":hover")) {
+    syncButterflyInventoryBarHoverTip();
+  } else {
+    setInstantHoverTip(butterflyInventory, null);
+  }
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
     setInstantHoverTip(butterflyInventoryTotal, null);
