@@ -69,9 +69,9 @@ export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 export const sproutStage1Ms = plantGrowthTestEveryMs;
 /** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
 export const sproutStage2GrowMs = plantGrowthTestEveryMs;
-export const sproutStage1Image = "이미지/sprout-stage1.svg";
-export const sproutStage2Image = "이미지/sprout-stage2.svg";
-export const sproutStage3Image = "이미지/sprout-stage3.svg";
+export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260510g";
+export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260510g";
+export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260510g";
 /** 4·5단계 풀 — 시트 좌/우 분할 PNG (?v 캐시 무력화) */
 export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510e";
 export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
