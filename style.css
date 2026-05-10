@@ -110,7 +110,7 @@ body::-webkit-scrollbar {
   opacity: 0.88;
 }
 
-/* data-ovc-tip: native title 대신 지연 없이 표시 (나비 종류·가루 설명 등) */
+/* data-ovc-tip: native title 대신 지연 없이 표시 (나비 종류 등) */
 [data-ovc-tip]:hover::after {
   content: attr(data-ovc-tip);
   position: absolute;
@@ -2359,9 +2359,14 @@ body #guide-book-button {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* 나비 인벤 툴팁: 짧은 한글 한 줄(글자마다 줄바꿈 방지) */
-#butterfly-inventory[data-ovc-tip]:hover::after {
-  white-space: nowrap;
+#butterfly-inventory.is-craftable #butterfly-inventory-total {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 합계 칩: 생성 가능 안내(두 줄 줄바꿈 유지) — 슬롯 툴팁과 겹치지 않게 부모가 아닌 여기에 표시 */
+#butterfly-inventory-total[data-ovc-tip]:hover::after {
+  white-space: pre-line;
   width: max-content;
   max-width: min(92vw, 320px);
   padding: 10px 16px;
@@ -2373,8 +2378,9 @@ body #guide-book-button {
   box-shadow:
     0 8px 22px rgba(15, 23, 42, 0.14),
     0 0 0 1px rgba(255, 255, 255, 0.65) inset;
-  word-break: normal;
+  word-break: keep-all;
   overflow-wrap: normal;
+  text-align: center;
 }
 
 .butterfly-inventory-slot[data-ovc-tip]:hover::after {
@@ -2433,19 +2439,6 @@ body #guide-book-button {
     filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.85));
     transform: scale(1.12);
   }
-}
-
-#magic-powder-inventory[data-ovc-tip]:hover::after {
-  white-space: nowrap;
-  width: max-content;
-  max-width: min(90vw, 240px);
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: linear-gradient(165deg, #ecfdf5 0%, #d1fae5 100%);
-  border: 2px solid rgba(16, 185, 129, 0.45);
-  color: #064e3b;
-  font: 900 13px/1.3 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
 }
 
 .magic-powder-icon {

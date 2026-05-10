@@ -8535,17 +8535,17 @@ function updateButterflyInventoryUi() {
     if (countNode) countNode.textContent = String(count);
     slot.classList.toggle("is-empty", count === 0);
   });
-  if (butterflyInventoryTotal) {
-    butterflyInventoryTotal.textContent = String(total);
-    setInstantHoverTip(butterflyInventoryTotal, null);
-  }
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
-  setInstantHoverTip(
-    butterflyInventory,
-    canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uAC00\uB2A5" : null
-  );
+  setInstantHoverTip(butterflyInventory, null);
+  if (butterflyInventoryTotal) {
+    butterflyInventoryTotal.textContent = String(total);
+    setInstantHoverTip(
+      butterflyInventoryTotal,
+      canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5" : null
+    );
+  }
 }
 
 function updateMagicPowderInventoryUi() {
@@ -8561,10 +8561,7 @@ function updateMagicPowderInventoryUi() {
   magicPowderCountText.textContent = String(magicPowderCount);
   const nearTarget = getNearestPlantForMagicPowder();
   magicPowderInventory.classList.toggle("is-near", Boolean(nearTarget));
-  setInstantHoverTip(
-    magicPowderInventory,
-    nearTarget ? "\uC0AC\uC6A9 click" : null
-  );
+  setInstantHoverTip(magicPowderInventory, null);
   setInstantHoverTip(magicPowderCountText, null);
 }
 
