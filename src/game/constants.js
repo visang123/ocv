@@ -69,18 +69,21 @@ export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 export const sproutStage1Ms = plantGrowthTestEveryMs;
 /** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
 export const sproutStage2GrowMs = plantGrowthTestEveryMs;
-export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260510g";
-export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260510g";
-export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260510g";
+export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260518h";
+export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260518h";
+export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260518h";
 /** 4·5단계 풀 — 시트 좌/우 분할 PNG (?v 캐시 무력화) */
 export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510e";
 export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
 /** Draw sizes per stage (world pixels). */
-export const SPROUT_STAGE_WIDTHS = [5, 7, 11];
-export const SPROUT_STAGE_HEIGHTS = [6, 11, 19];
+/** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
+export const SPROUT_STAGE_WIDTHS = [7, 10, 15];
+export const SPROUT_STAGE_HEIGHTS = [8, 15, 26];
 /** 4·5단계 풀 — 3단계 베이스(인덱스 2)에 곱해 월드에서 더 크게 그림 */
 export const grassStage4WorldScale = 2.95;
 export const grassStage5WorldScale = 3.55;
+/** 5단계 풀 PNG가 좌측으로 치우쳐 보일 때 월드 x 보정(양수=오른쪽) */
+export const grassStage5AnchorDxWorld = 7;
 
 export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */

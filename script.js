@@ -66,6 +66,7 @@ import {
   SPROUT_STAGE_HEIGHTS,
   grassStage4WorldScale,
   grassStage5WorldScale,
+  grassStage5AnchorDxWorld,
   pickupDistance,
   guideInteractDistance,
   npcInteractDistance,
@@ -1289,6 +1290,17 @@ if (ground && plantHoverLabel) {
       return;
     }
     hidePlantHoverLabel();
+  });
+  ground.addEventListener("pointermove", function (e) {
+    const t = e.target;
+    if (t === plantSpot || t === sprout) {
+      if (plantRuntime.isSeedPlanted) showPlantHoverForPlant(plantRuntime);
+      return;
+    }
+    if (t.classList && (t.classList.contains("extra-plant-spot") || t.classList.contains("extra-sprout"))) {
+      const ep = extraPlantFromDomElement(t);
+      if (ep) showPlantHoverForPlant(ep);
+    }
   });
 }
 
@@ -4366,7 +4378,6 @@ function updateExtraSeedsAndPlants() {
     const stage = getSproutStageFromPlant(plant);
     const sproutSize = getSproutSizeForStage(stage);
     plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
-    plant.sproutElement.src = getSproutImageForStage(stage);
     plant.sproutElement.classList.toggle("is-big", stage >= 2);
     plant.waterNeededElement.style.display =
       plant.needsFirstWater &&
@@ -4383,6 +4394,7 @@ function updateExtraSeedsAndPlants() {
       );
     }
     if (!isSproutGrown) return;
+    plant.sproutElement.src = getSproutImageForStage(stage);
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage);
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
@@ -4528,10 +4540,16 @@ function updateExtraPlantState(plant, now) {
 }
 
 function getSproutStageFromPlant(plant) {
-  if (!plant.isSproutGrown) return 0;
+  if (!plant || !plant.isSproutGrown) return 0;
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier >= 5) return 5;
   if (tier >= 4) return 4;
+  /** 가루 승격 중에는 목표 티어(4·5) 이미지·크기로 통일 — 승격 직전 큰 새싹이 잠깐 보이는 현상 방지 */
+  if (isPowderUpgradeInProgress(plant)) {
+    const tgt = Number(plant.powderUpgradeTargetTier) || 0;
+    if (tgt === 5) return 5;
+    if (tgt === 4) return 4;
+  }
   if (plant.isSproutSelfSustaining) return 3;
   const ev = plant.sproutEvolutionMs || 0;
   if (ev < sproutStage1Ms) return 1;
@@ -4669,13 +4687,31 @@ function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stag
   let anchorDx = 0;
   if (stage >= 5) {
     footInset = 24;
-    anchorDx = 0;
+    anchorDx = grassStage5AnchorDxWorld;
   } else if (stage >= 4) {
     footInset = 16;
   }
   return {
     x: plantBaseX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2 + anchorDx,
     y: plantBaseY - sproutSize.height + footInset
+  };
+}
+
+/** 호버 라벨: 흙 칸 중심이 아니라 실제 새싹/풀 스프라이트 기준(큰 풀에서 위치 어긋남 방지) */
+function getPlantHoverAnchorWorld(plant) {
+  const px = plant.spotX != null ? plant.spotX : plant.x;
+  const py = plant.spotY != null ? plant.spotY : plant.y;
+  const sproutVisible =
+    plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry" && !plant.isOverwatered;
+  if (!sproutVisible) {
+    return { cxWorld: px + PLANT_SPOT_WIDTH / 2, cyWorld: py + PLANT_SPOT_HEIGHT / 2 };
+  }
+  const st = getSproutStageFromPlant(plant);
+  const sz = getSproutSizeForStage(st);
+  const pos = getSproutWorldPositionForPlant(px, py, sz, st);
+  return {
+    cxWorld: pos.x + sz.width / 2,
+    cyWorld: pos.y + Math.min(sz.height * 0.22, 10)
   };
 }
 
@@ -5728,12 +5764,11 @@ function showPlantHoverForPlant(plant) {
   plantHoverLabel.textContent = getPlantWorldLabel(plant);
   plantHoverLabel.style.display = "block";
   function placeHoverLabelCentered() {
-    const cxWorld = px + PLANT_SPOT_WIDTH / 2;
-    const cyWorld = py + PLANT_SPOT_HEIGHT / 2;
+    const anchor = getPlantHoverAnchorWorld(plant);
     const w = plantHoverLabel.offsetWidth || 1;
     const h = plantHoverLabel.offsetHeight || 1;
-    const sx = toScreenX(cxWorld) - w / 2;
-    const sy = toScreenY(cyWorld) - h / 2;
+    const sx = toScreenX(anchor.cxWorld) - w / 2;
+    const sy = toScreenY(anchor.cyWorld) - h / 2;
     plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
   }
   void plantHoverLabel.offsetWidth;

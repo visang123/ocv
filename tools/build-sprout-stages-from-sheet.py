@@ -1,5 +1,6 @@
 """
-Split a 3-across sprout reference sheet into stage1/2/3 PNGs and key black to transparent.
+Split a 3-across sprout reference sheet into stage1/2/3 PNGs, key black/dark to transparent,
+upscale for in-game clarity, then save to ../이미지/
 """
 from __future__ import annotations
 
@@ -13,8 +14,8 @@ except ImportError:
     sys.exit(1)
 
 
-def black_to_transparent(im: Image.Image, thr: int = 22, edge: int = 55) -> Image.Image:
-    """Pixels near black become transparent; soft edge in (thr, edge) by max channel."""
+def black_to_transparent(im: Image.Image, thr: int = 32, edge: int = 78) -> Image.Image:
+    """Near-black → transparent; slightly wider edge blend to remove leftover matte."""
     im = im.convert("RGBA")
     px = im.load()
     w, h = im.size
@@ -25,7 +26,6 @@ def black_to_transparent(im: Image.Image, thr: int = 22, edge: int = 55) -> Imag
             if m <= thr:
                 px[x, y] = (r, g, b, 0)
             elif m < edge:
-                # soften fringe on black-to-content boundary
                 factor = (m - thr) / max(1, edge - thr)
                 px[x, y] = (r, g, b, int(round(a * factor)))
     return im
@@ -56,12 +56,22 @@ def split_three_columns(im: Image.Image) -> list[Image.Image]:
 
 
 def crop_horizontal_center_fraction(im: Image.Image, frac: float = 0.82) -> Image.Image:
-    """Trim decorative arrows at column edges (growth sheet layout)."""
     w, h = im.size
     margin = (1.0 - frac) / 2.0
     x0 = int(round(w * margin))
     x1 = int(round(w * (1.0 - margin)))
     return im.crop((x0, 0, x1, h))
+
+
+def upscale_if_small(im: Image.Image, min_short_edge: int = 420) -> Image.Image:
+    w, h = im.size
+    short = min(w, h)
+    if short >= min_short_edge:
+        return im
+    scale = min_short_edge / float(short)
+    nw = max(1, int(round(w * scale)))
+    nh = max(1, int(round(h * scale)))
+    return im.resize((nw, nh), Image.Resampling.LANCZOS)
 
 
 def main() -> None:
@@ -87,9 +97,10 @@ def main() -> None:
         col = crop_horizontal_center_fraction(col, 0.82)
         keyed = black_to_transparent(col)
         trimmed = trim_alpha_bbox(keyed)
+        scaled = upscale_if_small(trimmed)
         dest = out_dir / name
-        trimmed.save(dest, "PNG", optimize=True)
-        print("Wrote", dest, trimmed.size)
+        scaled.save(dest, "PNG", optimize=True)
+        print("Wrote", dest, scaled.size)
 
 
 if __name__ == "__main__":

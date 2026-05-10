@@ -258,7 +258,7 @@ body::-webkit-scrollbar {
 }
 
 #sprout.is-big {
-  width: 30px;
+  /* 너비는 setWorldSize만 사용 — CSS 고정 너비가 풀 스케일과 한 프레임 충돌해 깜빡임 유발 */
   filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.2));
 }
 
@@ -276,7 +276,6 @@ body::-webkit-scrollbar {
 }
 
 .extra-sprout.is-big {
-  width: 30px;
   filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.2));
 }
 
