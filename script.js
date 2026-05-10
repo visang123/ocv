@@ -7750,26 +7750,33 @@ function handleWorldHeartBroadcast(payload) {
   const sid = String(payload.id);
   if (sid === String(currentSessionId)) return;
   const rp = remotePlayers[sid];
-  if (!rp) return;
-  const headTopWorld = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + rp.worldY;
-  const sx = toScreenX(rp.worldX + PLAYER_WIDTH) - 6;
-  const sy = toScreenY(headTopWorld) + 2;
-  spawnHeartFxAtScreen(sx, sy);
+  if (!rp || !rp.bodyElement) return;
+  const rect = rp.bodyElement.getBoundingClientRect();
+  spawnWorldHeartFxNearBodyRect(rect);
 }
 
-function spawnHeartFxAtScreen(sx, sy) {
+function spawnWorldHeartFxNearBodyRect(rect) {
+  if (!rect || rect.width < 2 || rect.height < 2) return;
   const root = document.createElement("div");
   root.className = "ovc-heart-fx-root";
+  const inset = Math.max(1, 0.14 * rect.width);
+  const sx = rect.right - inset;
+  const sy = rect.top + Math.max(1, 0.12 * rect.height);
   root.style.left = Math.round(sx) + "px";
   root.style.top = Math.round(sy) + "px";
+  const spreadX = Math.max(18, rect.width * 0.95);
+  const rise = Math.max(14, rect.height * 0.28);
+  const spreadY = Math.max(20, rect.height * 0.72);
+  const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
   const n = 9;
   const hearts = ["\u2764", "\u2665", "\u2764\uFE0F"];
   for (let i = 0; i < n; i++) {
     const bit = document.createElement("span");
     bit.className = "ovc-heart-fx-bit";
     bit.textContent = hearts[i % hearts.length];
-    const dx = (Math.random() - 0.35) * 52;
-    const dy = -18 - Math.random() * 48;
+    bit.style.fontSize = fontPx + "px";
+    const dx = (Math.random() - 0.35) * spreadX;
+    const dy = -rise - Math.random() * spreadY;
     bit.style.setProperty("--ovc-hx", dx + "px");
     bit.style.setProperty("--ovc-hy", dy + "px");
     bit.style.animationDelay = i * 0.05 + "s";
@@ -7926,10 +7933,9 @@ function onWorldHeartClick() {
   if (!isWorldSocialRealtimeReady()) return;
   broadcastWorldHeart();
   pulseWorldHeartButton();
-  const playerBox = getPlayerBox();
-  const sx = toScreenX(playerBox.right) - 4;
-  const sy = toScreenY(playerBox.top) + 4;
-  spawnHeartFxAtScreen(sx, sy);
+  if (!player) return;
+  const rect = player.getBoundingClientRect();
+  spawnWorldHeartFxNearBodyRect(rect);
 }
 
 function ensureWorldSocialUi() {
