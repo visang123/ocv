@@ -219,6 +219,12 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+.world-loose-seed {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  image-rendering: auto;
+}
+
 /* 월드 땅 씨앗 호버: 바닥 스프라이트 대신 인벤(#seed-inventory)에 강조 */
 
 #plant-spot {
@@ -1030,16 +1036,23 @@ body::-webkit-scrollbar {
   color: #111;
 }
 
+.water-splash-holder {
+  z-index: 78;
+  pointer-events: none;
+}
+
 .water-drop {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 4px;
-  height: 7px;
+  width: 9px;
+  height: 14px;
   border-radius: 999px;
-  background: #35a7ff;
-  box-shadow: 0 0 2px rgba(53, 167, 255, 0.9);
-  opacity: 0.95;
+  background: radial-gradient(ellipse at 30% 25%, #a8dcff 0%, #35a7ff 45%, #1e7fc4 100%);
+  box-shadow:
+    0 0 6px rgba(53, 167, 255, 0.95),
+    0 0 12px rgba(120, 200, 255, 0.55);
+  opacity: 0.98;
   pointer-events: none;
   animation: water-drop-fall 520ms ease-out forwards;
 }
@@ -1047,11 +1060,11 @@ body::-webkit-scrollbar {
 @keyframes water-drop-fall {
   0% {
     transform: translate(0, 0) scale(1);
-    opacity: 0.95;
+    opacity: 0.98;
   }
 
   100% {
-    transform: translate(var(--drop-x), var(--drop-y)) scale(0.65);
+    transform: translate(var(--drop-x), var(--drop-y)) scale(0.55);
     opacity: 0;
   }
 }

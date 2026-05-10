@@ -65,8 +65,12 @@ export const MINUTE_MS = 60 * SECOND_MS;
 /** 스모크용 단축 성장(필요 시만). 본편은 plantGrowthMs·sproutStage*·level*GrowMs. */
 export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 
-/** 심은 뒤 첫 새싹이 나올 때까지 */
+/** 심은 뒤 첫 새싹이 나올 때까지(티어0·첫 새싹 전용이 아닌 구간·레거시 폴백) */
 export const plantGrowthMs = 3 * SECOND_MS;
+/** 빈 땅(씨만)·티어0 → 첫 새싹 표시까지: 수분 1칸 / 물0 후 마름 / 초록 성장 */
+export const firstSproutWaterLevelTickMs = 7 * SECOND_MS;
+export const firstSproutDryAfterEmptyMs = 10 * SECOND_MS;
+export const firstSproutGrowthMs = 20 * SECOND_MS;
 /** 새싹 표시 1→2 단계 */
 export const sproutStage1Ms = 30 * SECOND_MS;
 /** 새싹 표시 2→3 단계 */
@@ -202,6 +206,29 @@ export function getPlantDryAfterEmptyMsForTier(growthTier) {
   if (L >= 3) return 45 * SECOND_MS;
   if (L === 2) return 30 * SECOND_MS;
   return 15 * SECOND_MS;
+}
+
+/** 티어0이고 아직 첫 새싹이 안 난 구간(빈 땅→1레벨 새싹) */
+export function isFirstSproutGrowthPhase(plant) {
+  if (!plant || plant.isSproutGrown) return false;
+  if (Math.max(0, Number(plant.growthTier) || 0) !== 0) return false;
+  return true;
+}
+
+export function getPlantWaterLevelTickMsForPlant(plant) {
+  if (isFirstSproutGrowthPhase(plant)) return firstSproutWaterLevelTickMs;
+  return getPlantWaterLevelTickMsForTier(plant.growthTier);
+}
+
+export function getPlantDryAfterEmptyMsForPlantPhase(plant) {
+  if (isFirstSproutGrowthPhase(plant)) return firstSproutDryAfterEmptyMs;
+  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
+}
+
+/** 첫 새싹 나오기 전 초록 게이지(또는 완료 판정)에 쓰는 지속 시간 */
+export function getPlantFirstGrowthDurationMs(plant) {
+  if (isFirstSproutGrowthPhase(plant)) return firstSproutGrowthMs;
+  return plantGrowthMs;
 }
 /**
  * How long the rotten soil image stays visible before the planted slot is

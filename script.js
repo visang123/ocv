@@ -91,9 +91,9 @@ import {
   mainPlantDryAfterEmptyMs,
   mainPlantDryAfterPowderMs,
   plantDryMsDuringPowderMs,
-  getPlantWaterLevelTickMsForTier,
-  getPlantDryAfterEmptyMsForTier,
-  plantGrowthMs,
+  getPlantWaterLevelTickMsForPlant,
+  getPlantDryAfterEmptyMsForPlantPhase,
+  getPlantFirstGrowthDurationMs,
   overwaterWindowMs,
   BUTTERFLY_SIZE,
   magicPowderCraftCost,
@@ -2791,7 +2791,7 @@ function updateOnboardingFlowUI() {
     case 7: {
       setOnboardingCalloutVisible(
         true,
-        "심고 싶은 위치로 이동 후, 클릭 해 씨앗을 심으세요."
+        "\uC2EC\uC744 \uC704\uCE58\uB85C \uC774\uB3D9\uD6C4, \uCC45 \uC704\uC5D0 \uC528\uC557\uC744 \uD074\uB9AD\uD574 \uC2EC\uC73C\uC138\uC694."
       );
       if (player) player.classList.add("onboarding-highlight");
       if (seedInventory && !tutorialMainSeedRegenCompleted) {
@@ -4109,7 +4109,7 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
   if (plant.status === "rotten" || plant.status === "dry") return;
 
   const w = Math.max(0, Number(plant.waterLevel) || 0);
-  const tickMs = getPlantWaterLevelTickMsForTier(plant.growthTier);
+  const tickMs = getPlantWaterLevelTickMsForPlant(plant);
   if (!Number.isFinite(tickMs) || tickMs <= 0) return;
 
   if (w > 0) {
@@ -4158,10 +4158,17 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
     plantRuntime.status !== "dry" &&
     plantRuntime.status !== "rotten"
   ) {
-    if (!shouldPauseWaterDecayForPlant(plantRuntime, now)) {
+    if (
+      !shouldPauseWaterDecayForPlant(plantRuntime, now) &&
+      !isPlantGrowthHeldUntilFirstWater(plantRuntime)
+    ) {
       applyPlantWaterDecay(plantRuntime, now);
     }
-    if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
+    if (
+      !isPlantGrowthHeldUntilFirstWater(plantRuntime) &&
+      plantRuntime.waterLevel === 0 &&
+      plantRuntime.becameEmptyAt === null
+    ) {
       plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
     }
   }
@@ -4170,6 +4177,7 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
       return;
     }
     if (shouldPauseWaterDecayForPlant(ep, now)) return;
+    if (isPlantGrowthHeldUntilFirstWater(ep)) return;
     applyPlantWaterDecay(ep, now);
     if (ep.waterLevel === 0 && ep.becameEmptyAt === null) {
       ep.becameEmptyAt = ep.waterLevelUpdatedAt;
@@ -5149,18 +5157,22 @@ function updateExtraSeedsAndPlants() {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
       worldLooseSeedElement.alt = "world loose seed";
+      worldLooseSeedElement.src = "이미지/seed.png";
       setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
       ground.appendChild(worldLooseSeedElement);
     }
     const vis = isWorldLooseSeedVisibleAt(now);
-    worldLooseSeedElement.style.display = vis ? "block" : "none";
     if (vis) {
-      worldLooseSeedElement.src = "이미지/seed.png";
+      if (worldLooseSeedElement.style.display !== "block") {
+        worldLooseSeedElement.style.display = "block";
+      }
       setWorldPosition(
         worldLooseSeedElement,
         appleState.worldLooseSeed.x,
         appleState.worldLooseSeed.y
       );
+    } else if (worldLooseSeedElement.style.display !== "none") {
+      worldLooseSeedElement.style.display = "none";
     }
   } else if (worldLooseSeedElement) {
     worldLooseSeedElement.remove();
@@ -5415,7 +5427,7 @@ function updateExtraPlantState(plant, now) {
     plant.status !== "rotten" &&
     !plant.isOverwatered &&
     !plant.isSproutGrown &&
-    now - plant.growthStartedAt >= plantGrowthMs
+    now - plant.growthStartedAt >= getPlantFirstGrowthDurationMs(plant)
   ) {
     plant.isSproutGrown = true;
     plant.sproutGrownAt = now;
@@ -5529,14 +5541,14 @@ function getMainDryAfterEmptyMsForPlant(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (!canPlantWiltFromEmptyWater(plant, tNow)) return mainPlantDryAfterEmptyMs;
   if (isPowderUpgradeInProgress(plant)) return mainPlantDryAfterPowderMs;
-  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
+  return getPlantDryAfterEmptyMsForPlantPhase(plant);
 }
 
 function getExtraDryDelayMs(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (!canPlantWiltFromEmptyWater(plant, tNow)) return plantDryMs;
   if (isPowderUpgradeInProgress(plant)) return plantDryMsDuringPowderMs;
-  return getPlantDryAfterEmptyMsForTier(plant.growthTier);
+  return getPlantDryAfterEmptyMsForPlantPhase(plant);
 }
 
 function cancelPlantPowderUpgrade(plant) {
@@ -5808,7 +5820,7 @@ function getPlantHoverAnchorWorld(plant) {
 function getPlantGrowthRatio(plant, now) {
   if (!plant.growthStartedAt || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return null;
   if (plant.isSproutGrown) return 1;
-  return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / plantGrowthMs));
+  return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / getPlantFirstGrowthDurationMs(plant)));
 }
 
 /** 티어 4→5 자동 성장(가루 없음) 구간의 초록 게이지 비율; 해당 없으면 null */
@@ -5864,6 +5876,16 @@ function shouldPauseWaterDecayForPlant(plant, now) {
   return isSproutStage3Or5IdleNoGrowth(plant, now);
 }
 
+/** 심은 직후~첫 물 주기 전: 초록 생장 게이지·수분 감소 없음. 첫 물에서 growthStartedAt 시작. */
+function isPlantGrowthHeldUntilFirstWater(plant) {
+  if (!plant) return false;
+  if (plant.isSproutGrown) return false;
+  if (plant.growthStartedAt != null) return false;
+  if (!plant.needsFirstWater) return false;
+  if (Math.max(0, Number(plant.growthTier) || 0) !== 0) return false;
+  return true;
+}
+
 function syncPlantCardWaterReadoutVisibility(plant, now) {
   if (!plantWaterText || !plantWaterBar) return;
   const hide = plant && shouldPauseWaterDecayForPlant(plant, now);
@@ -5903,7 +5925,7 @@ function applyPlantWaterDecay(plant, now) {
   let guard = 0;
   while (plant.waterLevel > 0 && guard < 2000) {
     guard += 1;
-    const tickMs = getPlantWaterLevelTickMsForTier(plant.growthTier);
+    const tickMs = getPlantWaterLevelTickMsForPlant(plant);
     if (!Number.isFinite(tickMs) || tickMs <= 0) break;
     if (now - updatedAt < tickMs) break;
     const previousWaterLevel = plant.waterLevel;
@@ -5929,6 +5951,10 @@ function updateExtraPlantWaterLevel(plant, now) {
       plant.becameEmptyAt = plant.waterLevelUpdatedAt || now;
     }
     plant.waterLevelUpdatedAt = now;
+    return;
+  }
+
+  if (isPlantGrowthHeldUntilFirstWater(plant)) {
     return;
   }
 
@@ -6551,10 +6577,12 @@ function startPlanting() {
         spotY
       );
       newPlant.plantedAt = plantedAt;
-      newPlant.lastWateredAt = plantedAt;
-      newPlant.wateredAtList = [plantedAt];
+      newPlant.lastWateredAt = null;
+      newPlant.wateredAtList = [];
+      newPlant.waterLevel = 0;
       newPlant.waterLevelUpdatedAt = plantedAt;
-      newPlant.growthStartedAt = plantedAt;
+      newPlant.needsFirstWater = true;
+      newPlant.growthStartedAt = null;
       newPlant.ownerUserId = getPlanterOwnerId();
       newPlant.ownerDisplayName = getPlanterDisplayName();
       assignSproutIdentityToNewPlant(newPlant);
@@ -6574,16 +6602,16 @@ function startPlanting() {
     }
 
     plantRuntime.isSeedPlanted = true;
-    plantRuntime.lastWateredAt = plantedAt;
-    plantRuntime.wateredAtList = [plantedAt];
+    plantRuntime.lastWateredAt = null;
+    plantRuntime.wateredAtList = [];
     plantRuntime.status = "normal";
-    plantRuntime.waterLevel = 1;
+    plantRuntime.waterLevel = 0;
     plantRuntime.waterLevelUpdatedAt = plantedAt;
     plantRuntime.becameEmptyAt = null;
     plantRuntime.isOverwatered = false;
     plantRuntime.rottenAt = null;
-    plantRuntime.needsFirstWater = false;
-    plantRuntime.growthStartedAt = plantedAt;
+    plantRuntime.needsFirstWater = true;
+    plantRuntime.growthStartedAt = null;
     plantRuntime.plantedAt = plantedAt;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -6700,16 +6728,16 @@ function plantWorldSeedCount() {
       plantRuntime.spotX = plantX;
       plantRuntime.spotY = plantY;
       plantRuntime.isSeedPlanted = true;
-      plantRuntime.lastWateredAt = plantedAt;
-      plantRuntime.wateredAtList = [plantedAt];
+      plantRuntime.lastWateredAt = null;
+      plantRuntime.wateredAtList = [];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 1;
+      plantRuntime.waterLevel = 0;
       plantRuntime.waterLevelUpdatedAt = plantedAt;
       plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
       plantRuntime.rottenAt = null;
-      plantRuntime.needsFirstWater = false;
-      plantRuntime.growthStartedAt = plantedAt;
+      plantRuntime.needsFirstWater = true;
+      plantRuntime.growthStartedAt = null;
       plantRuntime.plantedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
@@ -6808,16 +6836,16 @@ function plantInventorySeed(seedId) {
       plantRuntime.spotX = plantX;
       plantRuntime.spotY = plantY;
       plantRuntime.isSeedPlanted = true;
-      plantRuntime.lastWateredAt = plantedAt;
-      plantRuntime.wateredAtList = [plantedAt];
+      plantRuntime.lastWateredAt = null;
+      plantRuntime.wateredAtList = [];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 1;
+      plantRuntime.waterLevel = 0;
       plantRuntime.waterLevelUpdatedAt = plantedAt;
       plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
       plantRuntime.rottenAt = null;
-      plantRuntime.needsFirstWater = false;
-      plantRuntime.growthStartedAt = plantedAt;
+      plantRuntime.needsFirstWater = true;
+      plantRuntime.growthStartedAt = null;
       plantRuntime.plantedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
@@ -6859,16 +6887,16 @@ function createExtraPlant(id, x, y) {
     x,
     y,
     plantedAt: now,
-    lastWateredAt: now,
-    wateredAtList: [now],
+    lastWateredAt: null,
+    wateredAtList: [],
     status: "normal",
-    waterLevel: 1,
+    waterLevel: 0,
     waterLevelUpdatedAt: now,
     becameEmptyAt: null,
     isOverwatered: false,
     rottenAt: null,
-    needsFirstWater: false,
-    growthStartedAt: now,
+    needsFirstWater: true,
+    growthStartedAt: null,
     isSproutGrown: false,
     sproutGrownAt: null,
     sproutEvolutionMs: 0,
@@ -7505,10 +7533,11 @@ function useBucket() {
     return;
   }
 
-  // 찬 양동이인데 급수할 식물이 없음: 우물이 이미 가득이면 스플래시만 내고 물이 증발하는 것처럼 보임 → 막음.
+  // 찬 양동이인데 급수할 식물이 없고 우물이 가득: 되붓기 불가 안내 + 스플래시로 피드백.
   if (nearWellPour && wellState.water >= maxWellWater) {
+    triggerWaterSplash();
     flashPlantProximityWarning(
-      "\uC6B0\uBB3C\uC774 \uAC00\uB4DD\uC785\uB2C8\uB2E4. \uC2DD\uBB3C \uAC00\uAE4C\uC5D0\uC11C \uBB3C\uC744 \uBD93\uC73C\uC138\uC694."
+      "\uC6B0\uBB3C\uC774 \uAC00\uB4DD\uCC28\uC2B5\uB2C8\uB2E4."
     );
     updatePlayerStatus();
     return;
@@ -7669,7 +7698,7 @@ function createWaterSplashAt(startX, startY) {
     holder.style.left = "0";
     holder.style.bottom = "0";
     holder.style.pointerEvents = "none";
-    holder.style.zIndex = "25";
+    holder.className = "water-splash-holder";
     setWorldPosition(holder, startX + offsetX, startY);
 
     const drop = document.createElement("div");
@@ -7858,6 +7887,10 @@ function updatePlantWaterLevel() {
   }
 
   const now = Date.now();
+  if (isPlantGrowthHeldUntilFirstWater(plantRuntime)) {
+    return;
+  }
+
   if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
     if (plantRuntime.waterLevel > 0 && plantRuntime.becameEmptyAt != null) {
       plantRuntime.becameEmptyAt = null;
@@ -7922,7 +7955,7 @@ function updatePlantState() {
     plantRuntime.status !== "rotten" &&
     !plantRuntime.isOverwatered &&
     !plantRuntime.isSproutGrown &&
-    now - plantRuntime.growthStartedAt >= plantGrowthMs
+    now - plantRuntime.growthStartedAt >= getPlantFirstGrowthDurationMs(plantRuntime)
   ) {
     plantRuntime.isSproutGrown = true;
     plantRuntime.sproutGrownAt = now;
@@ -8119,7 +8152,7 @@ function updatePlantGrowth() {
   const elapsed = plantRuntime.growthStartedAt === null ? 0 : now - plantRuntime.growthStartedAt;
   const growthRatio = plantRuntime.growthStartedAt === null
     ? 1
-    : Math.min(1, elapsed / plantGrowthMs);
+    : Math.min(1, elapsed / getPlantFirstGrowthDurationMs(plantRuntime));
   const secondGrowthRatio = getPlantSecondGrowthRatio(plantRuntime, now);
   updatePlantGrowthMeter(
     mainPlantGrowthMeter.element,
