@@ -230,6 +230,7 @@ export function loadAppleStateFromStorage(config) {
       lastAppleSpawnAt: config.now,
       extraSeeds: [],
       extraPlants: [],
+      seedCount: 0,
       worldLooseSeed: {
         x: WORLD_LOOSE_SEED_X,
         y: WORLD_LOOSE_SEED_Y,
@@ -281,6 +282,7 @@ export function loadAppleStateFromStorage(config) {
       hasSavedState: true,
       parseFailed: false,
       appleCount: Math.max(0, Number(saved.appleCount) || 0),
+      seedCount: Math.max(0, Number(saved.seedCount) || 0),
       apples,
       pickedAppleIds,
       nextAppleSeedOffset: Math.max(0, Number(saved.nextAppleSeedOffset) || 0),
@@ -369,6 +371,7 @@ export function loadAppleStateFromStorage(config) {
       hasSavedState: false,
       parseFailed: true,
       appleCount: 0,
+      seedCount: 0,
       apples: config.createRandomApples(5),
       pickedAppleIds: [],
       nextAppleSeedOffset: 0,
@@ -401,6 +404,7 @@ export function saveAppleStateToStorage(config) {
     config.appleStateKey,
     JSON.stringify({
       appleCount: config.appleCount,
+      seedCount: Math.max(0, Number(config.seedCount) || 0),
       apples: config.apples.map(function (apple) {
         return {
           id: apple.id,

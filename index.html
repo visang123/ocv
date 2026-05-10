@@ -19,7 +19,7 @@
     })();
   </script>
   <title>&#49885;&#47932; &#53412;&#50864;&#44592;</title>
-  <link rel="stylesheet" href="style.css?v=20260510l">
+  <link rel="stylesheet" href="style.css?v=20260510m">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -65,7 +65,7 @@
         <img id="well" src="이미지/well.png" alt="well">
         <img id="bucket" src="이미지/bucket-empty.png" alt="bucket">
         <img id="seed" src="이미지/seed.png" alt="seed">
-        <div id="seed-world-text">3분후에 마름!</div>
+        <div id="seed-world-text" style="display: none" aria-hidden="true"></div>
         <div id="plant-hover-label" aria-hidden="true"></div>
         <div id="player-status" aria-live="polite"></div>
         <div id="player-name"></div>
@@ -152,7 +152,7 @@
   </div>
   <div id="seed-card">
     <div id="seed-dry-gauge"></div>
-    <div id="seed-dry-text">3&#48516; &#46244; &#47568;&#46972;&#50836;!</div>
+    <div id="seed-dry-text"></div>
   </div>
   <div id="plant-card">
     <div id="plant-card-title" class="plant-card-title"></div>
@@ -169,7 +169,7 @@
       <p>아직 내용이 없습니다!</p>
     </div>
     <div class="guide-page" data-page="1">
-      <p>씨앗: 심고 물주면 새싹 생성, 3분 방치하면 말라서 사용못함.</p>
+      <p>씨앗: 심고 물주면 새싹이 나옵니다.</p>
       <p>우물: 물 15초에 한칸 추가, 최대 3칸.</p>
       <p>새싹: 수분 관리 필요, 수분 2칸시 물 X / 수분 0칸시 물 O.</p>
       <p>사과: 맵 어딘가에 있음. 먹으면 신기한 일 일어남!!</p>
@@ -181,7 +181,12 @@
     </div>
   </div>
   <button id="guide-book-button" type="button">&#52293;</button>
-  <div id="seed-inventory"></div>
+  <div id="seed-inventory">
+    <div id="seed-count-panel" class="seed-count-panel" hidden>
+      <div class="inventory-seed-icon" aria-hidden="true"></div>
+      <div id="seed-count">0</div>
+    </div>
+  </div>
   <div id="apple-inventory">
     <div class="inventory-apple"></div>
     <div id="apple-count">0</div>
@@ -239,7 +244,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260509a"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260510x"></script>
+  <script type="module" src="src/main.js?v=20260510m"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

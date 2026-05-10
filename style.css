@@ -2247,6 +2247,32 @@ body #guide-book-button {
   pointer-events: auto;
 }
 
+/* 월드: 열매 인벤과 같은 카운트 전용 패널 */
+.seed-count-panel {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  width: 58px;
+  height: 48px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.seed-count-panel .inventory-seed-icon {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  margin-left: 4px;
+  background: url("이미지/seed.png") center / contain no-repeat;
+}
+
+#seed-count {
+  font: 900 18px/1.1 Arial, sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  min-width: 1.2em;
+}
+
 #seed-inventory.is-first-seed-focus::before {
   content: "새 씨앗!";
   position: absolute;

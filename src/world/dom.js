@@ -44,6 +44,7 @@ const seedDryText = document.getElementById("seed-dry-text");
 const seedWorldText = document.getElementById("seed-world-text");
 const plantHoverLabel = document.getElementById("plant-hover-label");
 const seedInventory = document.getElementById("seed-inventory");
+const seedCountText = document.getElementById("seed-count");
 const appleInventory = document.getElementById("apple-inventory");
 const appleCountText = document.getElementById("apple-count");
 const treeAppleElements = Array.from(document.querySelectorAll(".tree-apple"));
@@ -107,6 +108,7 @@ export {
   seedWorldText,
   plantHoverLabel,
   seedInventory,
+  seedCountText,
   appleInventory,
   appleCountText,
   treeAppleElements,
