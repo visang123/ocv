@@ -2263,14 +2263,31 @@ body #guide-book-button {
   pointer-events: auto;
 }
 
-/* 인벤 씨앗 호버 힌트(땅 씨앗에는 호버 없음) */
+/* 인벤 씨앗 호버: 주황 테두리 즉시·강하게 */
 #seed-inventory.is-seed-inventory-hover-hint {
-  outline: 2px solid rgba(234, 179, 8, 0.9);
-  outline-offset: 2px;
-  border-radius: 12px;
+  outline: 4px solid #ea580c;
+  outline-offset: 3px;
+  border-radius: 14px;
   box-shadow:
-    0 0 0 1px rgba(255, 251, 235, 0.35),
-    0 0 14px rgba(250, 204, 21, 0.42);
+    0 0 0 2px rgba(255, 237, 213, 0.95),
+    0 0 24px rgba(234, 88, 12, 0.55),
+    0 0 48px rgba(251, 146, 60, 0.35);
+}
+
+/* 인벤 씨앗 전용 큰 힌트 라벨(식물 호버 5px 폰트와 구분) */
+#plant-hover-label.is-seed-inventory-hint {
+  min-width: 0;
+  padding: 10px 16px 12px;
+  border-radius: 14px;
+  border: 3px solid #ea580c;
+  background: linear-gradient(180deg, #fffbeb 0%, #ffedd5 100%);
+  color: #9a3412;
+  font: 900 17px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  letter-spacing: -0.02em;
+  box-shadow:
+    0 4px 18px rgba(154, 52, 18, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+  z-index: 85;
 }
 
 /* 월드: 열매 인벤과 같은 카운트 전용 패널 */

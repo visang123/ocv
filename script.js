@@ -5262,13 +5262,14 @@ function seedInventoryHasPlantableSeedsForHoverHint() {
 function showSeedInventoryPlantHintLabel() {
   if (!plantHoverLabel || !seedInventory) return;
   plantHoverLabel.textContent = "\uC2EC\uAE30 click";
+  plantHoverLabel.classList.add("is-seed-inventory-hint");
   plantHoverLabel.style.display = "block";
   void plantHoverLabel.offsetWidth;
   const r = seedInventory.getBoundingClientRect();
   const w = plantHoverLabel.offsetWidth || 1;
   const h = plantHoverLabel.offsetHeight || 1;
   const sx = r.left + r.width / 2 - w / 2;
-  const sy = r.top - h - 6;
+  const sy = r.top - h - 4;
   plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
 }
 
@@ -5277,11 +5278,12 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
 
   if (seedInventory && seedInventory.style.display !== "none") {
     const sr = seedInventory.getBoundingClientRect();
+    const pad = 16;
     const overInv =
-      clientX >= sr.left &&
-      clientX <= sr.right &&
-      clientY >= sr.top &&
-      clientY <= sr.bottom;
+      clientX >= sr.left - pad &&
+      clientX <= sr.right + pad &&
+      clientY >= sr.top - pad &&
+      clientY <= sr.bottom + pad;
     if (overInv) {
       const panel = document.getElementById("seed-count-panel");
       const panelOk = !panel || !panel.hidden;
@@ -5290,6 +5292,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
         showSeedInventoryPlantHintLabel();
       } else {
         seedInventory.classList.remove("is-seed-inventory-hover-hint");
+        plantHoverLabel.classList.remove("is-seed-inventory-hint");
         plantHoverLabel.style.display = "none";
       }
       return;
@@ -6691,11 +6694,15 @@ function extraPlantFromDomElement(el) {
 
 function hidePlantHoverLabel() {
   if (seedInventory) seedInventory.classList.remove("is-seed-inventory-hover-hint");
-  if (plantHoverLabel) plantHoverLabel.style.display = "none";
+  if (plantHoverLabel) {
+    plantHoverLabel.classList.remove("is-seed-inventory-hint");
+    plantHoverLabel.style.display = "none";
+  }
 }
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
+  plantHoverLabel.classList.remove("is-seed-inventory-hint");
   const px = plant.spotX != null ? plant.spotX : plant.x;
   const py = plant.spotY != null ? plant.spotY : plant.y;
   if (px == null || py == null) return;
