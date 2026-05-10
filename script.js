@@ -4135,7 +4135,50 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
   }
 }
 
+/** 우물 패시브 리필 틱과 맞춰 다른 클라와 lastRefillAt 해석이 어긋나 덮어쓰기가 반복되는 것을 줄임 */
+function snapWellRefillToGrid(nowMs) {
+  const t = Number(nowMs);
+  if (!Number.isFinite(t) || t <= 0) {
+    return Math.floor(Date.now() / wellRefillMs) * wellRefillMs;
+  }
+  return Math.floor(t / wellRefillMs) * wellRefillMs;
+}
+
+/**
+ * 공유 월드 저장 직전: 패시브 물 감소·우물 리필을 현재 시각까지 반영해
+ * 오래된 수분/우물 값이 스냅샷에 실리지 않게 함 (멀티에서 게이지가 들쭉날쭉한 원인).
+ */
+function flushPassiveSimulationBeforeSharedSnapshot() {
+  if (!isSharedWorldMergeActive()) return;
+  const now = Date.now();
+  refillWellIfNeeded();
+  if (
+    plantRuntime.isSeedPlanted &&
+    !plantRuntime.isOverwatered &&
+    plantRuntime.status !== "dry" &&
+    plantRuntime.status !== "rotten"
+  ) {
+    if (!shouldPauseWaterDecayForPlant(plantRuntime, now)) {
+      applyPlantWaterDecay(plantRuntime, now);
+    }
+    if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
+      plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
+    }
+  }
+  appleState.extraPlants.forEach(function (ep) {
+    if (!ep || ep.isOverwatered || ep.status === "dry" || ep.status === "rotten") {
+      return;
+    }
+    if (shouldPauseWaterDecayForPlant(ep, now)) return;
+    applyPlantWaterDecay(ep, now);
+    if (ep.waterLevel === 0 && ep.becameEmptyAt === null) {
+      ep.becameEmptyAt = ep.waterLevelUpdatedAt;
+    }
+  });
+}
+
 function getSharedWorldSnapshot() {
+  flushPassiveSimulationBeforeSharedSnapshot();
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
   return {
     savedAt: Date.now(),
@@ -4393,6 +4436,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     if (snapshot.well) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
       wellState.lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
+      refillWellIfNeeded();
       if (snapshotSavedAt) {
         lastWellStateChangeAt = Math.max(lastWellStateChangeAt, snapshotSavedAt);
       }
@@ -7420,7 +7464,7 @@ function useBucket() {
     if (wellReachForScoop && wellState.water > 0) {
       isBucketFull = true;
       wellState.water -= 1;
-      wellState.lastRefillAt = Date.now();
+      wellState.lastRefillAt = snapWellRefillToGrid(Date.now());
       saveWellState();
       syncWorldState(true);
       updateWellImage();
@@ -7444,7 +7488,7 @@ function useBucket() {
     (!wateringTarget || wellDist < wateringTarget.distance)
   ) {
     wellState.water += 1;
-    wellState.lastRefillAt = Date.now();
+    wellState.lastRefillAt = snapWellRefillToGrid(Date.now());
     saveWellState();
     syncWorldState(true);
     updateWellImage();
