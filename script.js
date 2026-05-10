@@ -94,6 +94,8 @@ import {
   getPlantWaterLevelTickMsForPlant,
   getPlantDryAfterEmptyMsForPlantPhase,
   getPlantFirstGrowthDurationMs,
+  plantDrySoilClearMs,
+  plantRotClearMs,
   overwaterWindowMs,
   BUTTERFLY_SIZE,
   magicPowderCraftCost,
@@ -3187,6 +3189,7 @@ function applyDefaultState(options) {
   plantRuntime.grassAuto5EligibleAt = null;
   plantRuntime.plantedAt = null;
   plantRuntime.blockSproutRegrowthAfterDry = false;
+  plantRuntime.drySoilAt = null;
 
   if (!sharedWorldResetOnly) {
     hasGuideBook = false;
@@ -4088,6 +4091,7 @@ function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
   maybe("rottenAt");
   maybe("powderUpgradeStartedAt");
   maybe("grassAuto5EligibleAt");
+  maybe("drySoilAt");
   if (Array.isArray(plant.wateredAtList)) {
     plant.wateredAtList = plant.wateredAtList.map(function (entry) {
       const v = bump(entry);
@@ -4308,7 +4312,11 @@ function getSharedWorldSnapshot() {
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
               ? plant.grassOrdinal
               : null,
-          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry)
+          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),
+          drySoilAt:
+            plant.drySoilAt != null && Number.isFinite(Number(plant.drySoilAt))
+              ? Number(plant.drySoilAt)
+              : null
         };
       })
     },
@@ -5254,10 +5262,28 @@ function updateExtraSeedsAndPlants() {
 
   updateSeedInventory();
 
+  let didRemoveDrySoilExtraPlant = false;
   appleState.extraPlants.forEach(function (plant) {
     ensureExtraPlantElements(plant);
     normalizeExtraPlantState(plant);
     updateExtraPlantState(plant, now);
+    if (
+      plant.status === "dry" &&
+      plant.drySoilAt != null &&
+      Number.isFinite(Number(plant.drySoilAt)) &&
+      now - Number(plant.drySoilAt) >= plantDrySoilClearMs
+    ) {
+      plant.removed = true;
+      didRemoveDrySoilExtraPlant = true;
+    } else if (
+      (plant.status === "rotten" || plant.isOverwatered) &&
+      plant.rottenAt != null &&
+      Number.isFinite(Number(plant.rottenAt)) &&
+      now - Number(plant.rottenAt) >= plantRotClearMs
+    ) {
+      plant.removed = true;
+      didRemoveDrySoilExtraPlant = true;
+    }
     if (plant.isSproutGrown && !plant.isSproutSelfSustaining) {
       tickSproutEvolution(plant, now);
     }
@@ -5293,6 +5319,11 @@ function updateExtraSeedsAndPlants() {
     const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage);
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
   });
+  if (didRemoveDrySoilExtraPlant) {
+    saveAppleState();
+    markWorldDirty();
+    syncWorldState(true);
+  }
   appleState.extraPlants = appleState.extraPlants.filter(function (plant) {
     if (!plant.removed) return true;
     if (plant.spotElement) plant.spotElement.remove();
@@ -5383,6 +5414,7 @@ function normalizeExtraPlantState(plant) {
     plant.needsFirstWater = false;
     plant.grassAuto5EligibleAt = null;
     plant.blockSproutRegrowthAfterDry = false;
+    plant.drySoilAt = null;
   }
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
@@ -5412,6 +5444,9 @@ function updateExtraPlantState(plant, now) {
   if (plant.status === "dry") {
     normalizePlantSproutFieldsWhenSoilDry(plant);
     plant.blockSproutRegrowthAfterDry = true;
+    if (plant.drySoilAt == null || !Number.isFinite(Number(plant.drySoilAt))) {
+      plant.drySoilAt = now;
+    }
     return;
   }
 
@@ -5425,6 +5460,7 @@ function updateExtraPlantState(plant, now) {
     plant.status = "dry";
     plant.needsFirstWater = true;
     plant.blockSproutRegrowthAfterDry = true;
+    plant.drySoilAt = now;
     cancelPlantPowderUpgrade(plant);
     plant.isSproutGrown = false;
     plant.sproutGrownAt = null;
@@ -6655,6 +6691,7 @@ function startPlanting() {
     assignSproutIdentityToNewPlant(plantRuntime);
     ensureGrassOrdinalIfNeeded(plantRuntime);
     plantRuntime.blockSproutRegrowthAfterDry = false;
+    plantRuntime.drySoilAt = null;
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
@@ -6786,6 +6823,7 @@ function plantWorldSeedCount() {
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
+      plantRuntime.drySoilAt = null;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -6897,6 +6935,7 @@ function plantInventorySeed(seedId) {
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
+      plantRuntime.drySoilAt = null;
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -6949,7 +6988,8 @@ function createExtraPlant(id, x, y) {
     ownerDisplayName: "",
     sproutOrdinal: 0,
     grassOrdinal: null,
-    blockSproutRegrowthAfterDry: false
+    blockSproutRegrowthAfterDry: false,
+    drySoilAt: null
   };
 }
 
@@ -7709,6 +7749,7 @@ function getNearestWateringTarget() {
   if (
     plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "rotten" &&
+    plantRuntime.status !== "dry" &&
     !plantRuntime.isOverwatered
   ) {
     const distance = getCenterDistance(
@@ -7727,7 +7768,7 @@ function getNearestWateringTarget() {
   }
 
   appleState.extraPlants.forEach(function (plant) {
-    if (plant.status === "rotten" || plant.isOverwatered) return;
+    if (plant.status === "rotten" || plant.isOverwatered || plant.status === "dry") return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
       nearest = {
@@ -7805,18 +7846,7 @@ function waterPlant(target) {
 
   const now = Date.now();
 
-  const wasDrySoil = plantRuntime.status === "dry";
-  if (wasDrySoil) {
-    normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
-    plantRuntime.status = "normal";
-    plantRuntime.becameEmptyAt = null;
-  }
-
   updatePlantWaterLevel();
-
-  if (wasDrySoil) {
-    plantRuntime.becameEmptyAt = null;
-  }
 
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
 
@@ -7870,10 +7900,6 @@ function waterPlant(target) {
     plantRuntime.status = "normal";
   }
 
-  if (wasDrySoil) {
-    plantRuntime.grassAuto5EligibleAt = null;
-  }
-
   plantRuntime.waterLevelUpdatedAt = now;
   plantRuntime.becameEmptyAt = null;
 
@@ -7886,16 +7912,7 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
-  const wasDrySoil = plant.status === "dry";
-  if (wasDrySoil) {
-    normalizePlantSproutFieldsWhenSoilDry(plant);
-    plant.status = "normal";
-    plant.becameEmptyAt = null;
-  }
   updateExtraPlantWaterLevel(plant, now);
-  if (wasDrySoil) {
-    plant.becameEmptyAt = null;
-  }
   const waterCapacity = getPlantWaterCapacity(plant);
 
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
@@ -7943,10 +7960,6 @@ function waterExtraPlant(plant) {
     plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
     plant.status = "normal";
-  }
-
-  if (wasDrySoil) {
-    plant.grassAuto5EligibleAt = null;
   }
 
   plant.waterLevelUpdatedAt = now;
@@ -8015,6 +8028,39 @@ function updatePlantState() {
   }
 
   const now = Date.now();
+
+  if (
+    (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) &&
+    plantRuntime.rottenAt != null
+  ) {
+    const rotAt = Number(plantRuntime.rottenAt);
+    if (Number.isFinite(rotAt) && now - rotAt >= plantRotClearMs) {
+      removeMainPlant();
+      saveSeedState();
+      syncWorldState(true);
+      return;
+    }
+  }
+
+  if (plantRuntime.status === "dry" && plantRuntime.drySoilAt != null) {
+    const dryAt = Number(plantRuntime.drySoilAt);
+    if (Number.isFinite(dryAt) && now - dryAt >= plantDrySoilClearMs) {
+      removeMainPlant();
+      saveSeedState();
+      syncWorldState(true);
+      return;
+    }
+  } else if (plantRuntime.status !== "dry") {
+    plantRuntime.drySoilAt = null;
+  }
+
+  if (
+    plantRuntime.status === "dry" &&
+    (plantRuntime.drySoilAt == null || !Number.isFinite(Number(plantRuntime.drySoilAt)))
+  ) {
+    plantRuntime.drySoilAt = now;
+  }
+
   normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
   updatePlantWaterLevel();
   ensureGrassAuto5EligibleForTier4Plant(plantRuntime, now);
@@ -8056,11 +8102,12 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
-    // 마른 땅: 싹 필드 비움. 물만으로는 다시 자라지 않음 — 새로 심으면 block 해제.
+    // 마른 땅(말라 죽은 작물): 싹 비움 · 물 주기 불가 · plantDrySoilClearMs 후 칸 제거
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
     plantRuntime.blockSproutRegrowthAfterDry = true;
+    plantRuntime.drySoilAt = now;
     cancelPlantPowderUpgrade(plantRuntime);
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -8145,6 +8192,7 @@ function removeMainPlant() {
   plantRuntime.grassOrdinal = null;
   plantRuntime.plantedAt = null;
   plantRuntime.blockSproutRegrowthAfterDry = false;
+  plantRuntime.drySoilAt = null;
   plantSpot.removeAttribute("title");
   sprout.removeAttribute("title");
   hidePlantHoverLabel();
@@ -8624,6 +8672,13 @@ function applyLoadedPlantState(loadedPlant) {
   } else {
     plantRuntime.blockSproutRegrowthAfterDry = plantRuntime.status === "dry";
   }
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "drySoilAt")) {
+    const da = Number(loadedPlant.drySoilAt);
+    plantRuntime.drySoilAt =
+      Number.isFinite(da) && da > 0 ? da : null;
+  } else {
+    plantRuntime.drySoilAt = null;
+  }
 
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     plantRuntime.status = "rotten";
@@ -8637,10 +8692,14 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.needsFirstWater = false;
     plantRuntime.grassAuto5EligibleAt = null;
     plantRuntime.blockSproutRegrowthAfterDry = false;
+    plantRuntime.drySoilAt = null;
   }
   if (plantRuntime.status === "dry") {
     normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
     plantRuntime.blockSproutRegrowthAfterDry = true;
+    if (plantRuntime.drySoilAt == null) {
+      plantRuntime.drySoilAt = Date.now();
+    }
   }
   if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
@@ -8696,6 +8755,10 @@ function getPlantStateForStorage() {
         ? plantRuntime.grassOrdinal
         : null,
     blockSproutRegrowthAfterDry: Boolean(plantRuntime.blockSproutRegrowthAfterDry),
+    drySoilAt:
+      plantRuntime.drySoilAt != null && Number.isFinite(Number(plantRuntime.drySoilAt))
+        ? Number(plantRuntime.drySoilAt)
+        : null,
     npcX,
     npcY
   };

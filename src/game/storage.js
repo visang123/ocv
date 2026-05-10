@@ -116,6 +116,7 @@ export function loadSeedStateFromStorage(config) {
     sproutOrdinal: 0,
     grassOrdinal: null,
     blockSproutRegrowthAfterDry: false,
+    drySoilAt: null,
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -196,6 +197,12 @@ export function loadSeedStateFromStorage(config) {
         planted.grassOrdinal = Math.max(1, Number(savedPlantedState.grassOrdinal));
       } else {
         planted.grassOrdinal = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(savedPlantedState, "drySoilAt")) {
+        const da = Number(savedPlantedState.drySoilAt);
+        planted.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
+      } else {
+        planted.drySoilAt = null;
       }
       planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
       planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
@@ -366,6 +373,13 @@ export function loadAppleStateFromStorage(config) {
                   return Boolean(plantData.blockSproutRegrowthAfterDry);
                 }
                 return (plantData.status || "normal") === "dry";
+              })(),
+              drySoilAt: (function () {
+                if (Object.prototype.hasOwnProperty.call(plantData, "drySoilAt")) {
+                  const da = Number(plantData.drySoilAt);
+                  return Number.isFinite(da) && da > 0 ? da : null;
+                }
+                return null;
               })()
             };
           })
@@ -468,7 +482,11 @@ export function saveAppleStateToStorage(config) {
               ? plant.grassOrdinal
               : null,
           rottenAt: plant.rottenAt || null,
-          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry)
+          blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),
+          drySoilAt:
+            plant.drySoilAt != null && Number.isFinite(Number(plant.drySoilAt))
+              ? Number(plant.drySoilAt)
+              : null
         };
       }),
       worldLooseSeed: worldLooseSeedOut

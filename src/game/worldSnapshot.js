@@ -157,6 +157,12 @@ export function parseMainPlantFromSnapshot(mp) {
   } else if (Object.prototype.hasOwnProperty.call(mp, "plantPlantedAt")) {
     plantedFromSnapshot.plantPlantedAt = Number(mp.plantPlantedAt) || null;
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "drySoilAt")) {
+    const da = Number(mp.drySoilAt);
+    plantedFromSnapshot.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
+  } else {
+    plantedFromSnapshot.drySoilAt = null;
+  }
   // 마른 땅은 UI·스냅샷 불일치로 싹이 잠깐 살아나는 것을 막음
   if (Object.prototype.hasOwnProperty.call(mp, "blockSproutRegrowthAfterDry")) {
     plantedFromSnapshot.blockSproutRegrowthAfterDry = Boolean(mp.blockSproutRegrowthAfterDry);
@@ -286,6 +292,12 @@ export function parseExtraPlantFromSnapshot(plant) {
         ? Math.max(1, Number(plant.grassOrdinal))
         : null
   };
+  if (Object.prototype.hasOwnProperty.call(plant, "drySoilAt")) {
+    const da = Number(plant.drySoilAt);
+    out.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
+  } else {
+    out.drySoilAt = null;
+  }
   if (Object.prototype.hasOwnProperty.call(plant, "blockSproutRegrowthAfterDry")) {
     out.blockSproutRegrowthAfterDry = Boolean(plant.blockSproutRegrowthAfterDry);
   } else {

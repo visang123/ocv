@@ -233,11 +233,10 @@ export function getPlantFirstGrowthDurationMs(plant) {
   if (isFirstSproutGrowthPhase(plant)) return firstSproutGrowthMs;
   return plantGrowthMs;
 }
-/**
- * How long the rotten soil image stays visible before the planted slot is
- * fully cleared so the player can plant a new seed there.
- */
-export const plantRotClearMs = 3 * SECOND_MS;
+/** 작물이 말라 죽은 흙(soil-dry) 표시 후 심는 칸이 비워지기까지 */
+export const plantDrySoilClearMs = 15 * SECOND_MS;
+/** 썩은 흙(soil-rotten) 표시 후 심는 칸이 비워지기까지 — 마른 땅과 동일 */
+export const plantRotClearMs = plantDrySoilClearMs;
 export const magicPowderCraftCost = 10;
 export const magicPowderCraftMs = 3 * SECOND_MS;
 /** 가루 3→4(또는 동등 성장 구간) */
