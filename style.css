@@ -2263,12 +2263,14 @@ body #guide-book-button {
   pointer-events: auto;
 }
 
-#seed-inventory.is-loose-seed-hover-target .seed-count-panel {
-  filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.95))
-    drop-shadow(0 0 6px rgba(234, 179, 8, 0.65));
+/* filter 금지: 패널에 filter를 주면 씨앗 아이콘까지 렌더가 달라져 '바뀐 것처럼' 보임 */
+#seed-inventory.is-loose-seed-hover-target {
   outline: 2px solid rgba(234, 179, 8, 0.9);
   outline-offset: 2px;
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(255, 251, 235, 0.35),
+    0 0 14px rgba(250, 204, 21, 0.42);
 }
 
 /* 월드: 열매 인벤과 같은 카운트 전용 패널 */
