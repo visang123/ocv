@@ -5459,14 +5459,20 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 }
 
 function applyPlantWaterDecay(plant, now) {
+  plant.waterLevel = Math.max(0, Number(plant.waterLevel) || 0);
   if (plant.waterLevel <= 0) {
     return;
   }
-  let updatedAt = plant.waterLevelUpdatedAt;
+  let updatedAt = Number(plant.waterLevelUpdatedAt);
+  if (!Number.isFinite(updatedAt)) {
+    updatedAt = now;
+    plant.waterLevelUpdatedAt = updatedAt;
+  }
   let guard = 0;
   while (plant.waterLevel > 0 && guard < 2000) {
     guard += 1;
     const tickMs = getPlantWaterLevelTickMsForTier(plant.growthTier);
+    if (!Number.isFinite(tickMs) || tickMs <= 0) break;
     if (now - updatedAt < tickMs) break;
     const previousWaterLevel = plant.waterLevel;
     plant.waterLevel -= 1;
@@ -7192,12 +7198,16 @@ function waterPlant(target) {
 
   const now = Date.now();
 
+  const wasDrySoil = plantRuntime.status === "dry";
+  if (wasDrySoil) {
+    plantRuntime.status = "normal";
+    plantRuntime.becameEmptyAt = null;
+  }
+
   updatePlantWaterLevel();
 
-  if (plantRuntime.status === "dry") {
-    // Dry soil is terminal by design; watering cannot recover it.
-    updatePlantState();
-    return;
+  if (wasDrySoil) {
+    plantRuntime.becameEmptyAt = null;
   }
 
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -7260,14 +7270,16 @@ function waterPlant(target) {
 function waterExtraPlant(plant) {
   const now = Date.now();
   normalizeExtraPlantState(plant);
-  updateExtraPlantWaterLevel(plant, now);
-  const waterCapacity = getPlantWaterCapacity(plant);
-
-  if (plant.status === "dry") {
-    // Dry soil is terminal by design; watering cannot recover it.
-    updateExtraSeedsAndPlants();
-    return;
+  const wasDrySoil = plant.status === "dry";
+  if (wasDrySoil) {
+    plant.status = "normal";
+    plant.becameEmptyAt = null;
   }
+  updateExtraPlantWaterLevel(plant, now);
+  if (wasDrySoil) {
+    plant.becameEmptyAt = null;
+  }
+  const waterCapacity = getPlantWaterCapacity(plant);
 
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
 
