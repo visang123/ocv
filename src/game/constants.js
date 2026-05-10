@@ -89,8 +89,17 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
-/** 다른 식물 중심과 이 거리(px) 미만이면 심기 불가. 작을수록 붙여 심기 가능 */
-export const minPlantSpacing = 0.5;
+/**
+ * 기존 식물 중심까지 필요한 최소 거리(월드 px). growthTier 3·4·5일수록 넓어져 씨앗 심기 제한.
+ * 티어 0–2는 작은 새싹 전 단계로 좁게 유지.
+ */
+export function getMinPlantCenterClearanceWorld(growthTier) {
+  const t = Math.max(0, Number(growthTier) || 0);
+  if (t >= 5) return 64;
+  if (t >= 4) return 52;
+  if (t >= 3) return 40;
+  return 20;
+}
 
 // --- Butterflies ---
 /** World size (w = h). Half of original 20px tuning; matches setWorldSize + .butterfly CSS. */

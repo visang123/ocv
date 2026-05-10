@@ -53,7 +53,7 @@ import {
   appleEatMs,
   plantActionMs,
   appleRespawnMs,
-  minPlantSpacing,
+  getMinPlantCenterClearanceWorld,
   biggerSproutMs,
   sproutStage1Ms,
   sproutStage2GrowMs,
@@ -6044,23 +6044,31 @@ function canPlantAt(x, y) {
   if (plantRuntime.isSeedPlanted) {
     plantCenters.push({
       x: plantRuntime.spotX + PLANT_SPOT_WIDTH / 2,
-      y: plantRuntime.spotY + PLANT_SPOT_HEIGHT / 2
+      y: plantRuntime.spotY + PLANT_SPOT_HEIGHT / 2,
+      tier: Math.max(0, Number(plantRuntime.growthTier) || 0)
     });
   }
 
   appleState.extraPlants.forEach(function (plant) {
     plantCenters.push({
       x: plant.x + PLANT_SPOT_WIDTH / 2,
-      y: plant.y + PLANT_SPOT_HEIGHT / 2
+      y: plant.y + PLANT_SPOT_HEIGHT / 2,
+      tier: Math.max(0, Number(plant.growthTier) || 0)
     });
   });
 
   const targetX = x + PLANT_SPOT_WIDTH / 2;
   const targetY = y + PLANT_SPOT_HEIGHT / 2;
 
-  return !plantCenters.some(function (center) {
-    return Math.hypot(center.x - targetX, center.y - targetY) < minPlantSpacing;
+  const tooClose = plantCenters.some(function (center) {
+    const need = getMinPlantCenterClearanceWorld(center.tier);
+    return Math.hypot(center.x - targetX, center.y - targetY) < need;
   });
+  if (tooClose) {
+    lastPlantProximityBlockMessage = plantProximityPhraseForNoun("\uC2DD\uBB3C");
+    return false;
+  }
+  return true;
 }
 
 function getHeldExtraSeed() {
