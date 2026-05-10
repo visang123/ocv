@@ -752,7 +752,9 @@ function ensureWorldLooseSeedShape() {
     w.y = WORLD_LOOSE_SEED_Y;
   }
   w.nextSpawnAt = Math.max(0, Number(w.nextSpawnAt) || 0);
-  if (Number(w.y) < WORLD_LOOSE_SEED_Y - 25) {
+  const migrateHighOldCanopy = Number(w.y) < WORLD_LOOSE_SEED_Y - 25;
+  const migrateOnTrunkColumn = Number(w.x) >= TREE_TRUNK_X - 20;
+  if (migrateHighOldCanopy || migrateOnTrunkColumn) {
     w.x = WORLD_LOOSE_SEED_X;
     w.y = WORLD_LOOSE_SEED_Y;
   }
@@ -4618,11 +4620,13 @@ function updateSeedPosition() {
     }
   }
   const now = Date.now();
-  const shouldShowMainSeed =
+  const baseShouldShowMainSeedOnGround =
     onboardingShouldKeepWorldMainSeedVisible() ||
     (!hasPickedMainSeedInCurrentRoom() &&
       !plantRuntime.isPlanting &&
       !(plantRuntime.isSeedDry && hasHandledDryMainSeed));
+  const shouldShowMainSeedOnGround =
+    !usesWorldLooseSeedMode() && baseShouldShowMainSeedOnGround;
   // Auto-clear dry main seed after grace period even when the world sprite is hidden
   // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
   if (plantRuntime.isSeedDry && !hasHandledDryMainSeed && heldItem !== HELD_ITEM_SEED) {
@@ -4643,13 +4647,15 @@ function updateSeedPosition() {
     dryMainSeedVisibleSince = 0;
   }
   // Main seed is a fixed world object (next to the book), not a roaming synced item.
-  if (shouldShowMainSeed && heldItem !== HELD_ITEM_SEED) {
+  // 월드 느슨 씨 모드: 땅 씨앗은 worldLooseSeed 한 개만 — 튜토용 #seed는 숨김(손에 든 경우만 표시).
+  if (shouldShowMainSeedOnGround && heldItem !== HELD_ITEM_SEED) {
     seedX = SEED_START_X;
     seedY = SEED_START_Y;
   }
-  seed.style.display =
-    shouldShowMainSeed ? "block" : "none";
-  if (!shouldShowMainSeed) {
+  const showMainSeedSprite =
+    shouldShowMainSeedOnGround || heldItem === HELD_ITEM_SEED;
+  seed.style.display = showMainSeedSprite ? "block" : "none";
+  if (!showMainSeedSprite) {
     isHoveringMainSeed = false;
   }
   seed.src = plantRuntime.isSeedDry ? "이미지/seed-dry.png" : "이미지/seed.png";
