@@ -1288,6 +1288,10 @@ guideBookButton.addEventListener("click", function () {
     dismissGuideBookClickPrompt();
   }
   updateGuideCard();
+  if (wasOpen) {
+    maybeAdvanceOnboardingAfterGuideBookClosed();
+    updateOnboardingFlowUI();
+  }
 });
 
 signBoard.addEventListener("click", function () {
@@ -1306,6 +1310,21 @@ function dismissGuideBookClickPrompt() {
   setStoredFlag(guideBookClickPromptDismissedKey, true);
 }
 
+function maybeAdvanceOnboardingAfterGuideBookClosed() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep === 3) {
+    onboardingClearEscHintTimer();
+    onboardingFirstGuideEscHintShown = false;
+    onboardingFlowStep = 4;
+    persistOnboardingStep();
+  } else if (onboardingFlowStep === 10) {
+    onboardingClearEscHintTimer();
+    onboardingNpcGuideEscHintShown = false;
+    onboardingFlowStep = 11;
+    persistOnboardingStep();
+  }
+}
+
 function closeGuideCardFromClick() {
   isGuideBookOpen = false;
   if (isNearSignBoard()) {
@@ -1313,19 +1332,8 @@ function closeGuideCardFromClick() {
   }
   dismissGuideBookClickPrompt();
   updateGuideCard();
-  if (!getStoredFlag(onboardingFlowDoneKey)) {
-    if (onboardingFlowStep === 3) {
-      onboardingClearEscHintTimer();
-      onboardingFirstGuideEscHintShown = false;
-      onboardingFlowStep = 4;
-      persistOnboardingStep();
-    } else if (onboardingFlowStep === 10) {
-      onboardingClearEscHintTimer();
-      onboardingNpcGuideEscHintShown = false;
-      onboardingFlowStep = 11;
-      persistOnboardingStep();
-    }
-  }
+  maybeAdvanceOnboardingAfterGuideBookClosed();
+  updateOnboardingFlowUI();
 }
 
 guideCard.addEventListener("pointerdown", function (event) {
@@ -2046,6 +2054,12 @@ function clearOnboardingHighlights() {
   if (guideBookButton) {
     guideBookButton.classList.remove("onboarding-highlight-book-inv");
   }
+  Object.keys(butterflyRenderById).forEach(function (id) {
+    const entry = butterflyRenderById[id];
+    if (entry && entry.element) {
+      entry.element.classList.remove("onboarding-highlight");
+    }
+  });
 }
 
 function setOnboardingCalloutVisible(show, text) {
@@ -2702,8 +2716,14 @@ function updateOnboardingFlowUI() {
     case 18: {
       setOnboardingCalloutVisible(
         true,
-        "하늘에 날아다니는 나비를 e또는 q로 잡으세요"
+        "날아다니는 나비에 근접하여 e,q로 잡으세요"
       );
+      Object.keys(butterflyRenderById).forEach(function (id) {
+        const entry = butterflyRenderById[id];
+        if (entry && entry.element) {
+          entry.element.classList.add("onboarding-highlight");
+        }
+      });
       break;
     }
     case 19: {
