@@ -89,16 +89,29 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
+/** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — 풀끼리는 스프라이트 폭 기준으로만 맞춤 */
+const minPlantCenterGapWorld = 4;
+
 /**
  * 기존 식물 중심까지 필요한 최소 거리(월드 px).
- * `maturityLevel` 0–2: 씨·작은 새싹, 3: 큰 새싹, 4·5: 풀 — 값이 클수록 주변 심기 금지 반경이 넓어짐.
+ * 풀(4·5단)은 실제 그리기 너비 + 작은 여백만큼만 요구해 과한 빈 공간을 줄임.
  */
 export function getMinPlantCenterClearanceWorld(maturityLevel) {
-  const t = Math.max(0, Number(maturityLevel) || 0);
-  if (t >= 5) return 64;
-  if (t >= 4) return 52;
-  if (t >= 3) return 40;
-  return 20;
+  const m = Math.max(0, Number(maturityLevel) || 0);
+  const spot = PLANT_SPOT_WIDTH;
+  const w1 = SPROUT_STAGE_WIDTHS[0];
+  const w2 = SPROUT_STAGE_WIDTHS[1];
+  const w3 = SPROUT_STAGE_WIDTHS[2];
+  const w4 = Math.round(w3 * grassStage4WorldScale);
+  const w5 = Math.round(w3 * grassStage5WorldScale);
+  const g = minPlantCenterGapWorld;
+
+  if (m >= 5) return w5 + g;
+  if (m >= 4) return w4 + g;
+  if (m >= 3) return (w3 + spot) / 2 + g;
+  if (m === 2) return (w2 + spot) / 2 + g;
+  if (m === 1) return (w1 + spot) / 2 + g;
+  return spot + g;
 }
 
 // --- Butterflies ---
