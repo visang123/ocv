@@ -62,10 +62,13 @@ export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 
+/** 테스트: 식물 성장·새싹 1·2단계·가루 4/5단계 등 성장 구간 전부 이 시간으로 통일 */
+export const plantGrowthTestEveryMs = 3 * SECOND_MS;
+
 /** Stage 1 sprout art duration after first sprout appears (ms). */
-export const sproutStage1Ms = 30 * SECOND_MS;
+export const sproutStage1Ms = plantGrowthTestEveryMs;
 /** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
-export const sproutStage2GrowMs = 1 * MINUTE_MS;
+export const sproutStage2GrowMs = plantGrowthTestEveryMs;
 export const sproutStage1Image = "이미지/sprout-stage1.svg";
 export const sproutStage2Image = "이미지/sprout-stage2.svg";
 export const sproutStage3Image = "이미지/sprout-stage3.svg";
@@ -118,7 +121,7 @@ export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
 /** Legacy: used only to migrate old saves into stage-3 self-sustaining sprouts. */
-export const biggerSproutMs = 30 * SECOND_MS;
+export const biggerSproutMs = plantGrowthTestEveryMs;
 export const pickupDistance = 28;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 60;
@@ -140,7 +143,7 @@ export const plantDryMsDuringPowderMs = 45 * SECOND_MS;
 export const plantDryMsTier4Ms = 50 * SECOND_MS;
 export const plantDryMsTier5Ms = 70 * SECOND_MS;
 export const plantWaterLevelTickMs = 20 * SECOND_MS;
-export const plantGrowthMs = 3 * SECOND_MS;
+export const plantGrowthMs = plantGrowthTestEveryMs;
 export const overwaterWindowMs = 60 * MINUTE_MS;
 /**
  * How long the rotten soil image stays visible before the planted slot is
@@ -149,8 +152,8 @@ export const overwaterWindowMs = 60 * MINUTE_MS;
 export const plantRotClearMs = 3 * SECOND_MS;
 export const magicPowderCraftCost = 10;
 export const magicPowderCraftMs = 3 * SECOND_MS;
-export const level4GrowMs = 2 * MINUTE_MS;
-export const level5GrowMs = 3 * MINUTE_MS;
+export const level4GrowMs = plantGrowthTestEveryMs;
+export const level5GrowMs = plantGrowthTestEveryMs;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";
