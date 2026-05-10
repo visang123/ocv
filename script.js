@@ -513,12 +513,48 @@ function storageKeyGuideBookPickedForRoom() {
 }
 
 function hasPickedMainSeedInCurrentRoom() {
-  return hasPickedMainSeedThisWindow;
+  if (hasPickedMainSeedThisWindow) return true;
+  try {
+    if (sessionStorage.getItem(storageKeyMainSeedPickedForRoom()) === "true") {
+      hasPickedMainSeedThisWindow = true;
+      return true;
+    }
+  } catch (eSs) {}
+  if (getStoredFlag(storageKeyMainSeedPickedForRoom())) {
+    hasPickedMainSeedThisWindow = true;
+    return true;
+  }
+  return false;
 }
 
 function setMainSeedPickedForCurrentRoom() {
   hasPickedMainSeedThisWindow = true;
-  sessionStorage.setItem(storageKeyMainSeedPickedForRoom(), "true");
+  try {
+    sessionStorage.setItem(storageKeyMainSeedPickedForRoom(), "true");
+  } catch (eSs) {}
+  setStoredFlag(storageKeyMainSeedPickedForRoom(), true);
+}
+
+function clearMainSeedPickedForCurrentRoom() {
+  hasPickedMainSeedThisWindow = false;
+  try {
+    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  } catch (eRm) {}
+  setStoredFlag(storageKeyMainSeedPickedForRoom(), false);
+}
+
+/** 저장된 인벤에 스타터 씨앗이 있으면 월드 메인 씨앗과 동기(리로드 후 중복 방지) */
+function syncMainSeedPickedStateFromLoadedExtraSeeds() {
+  var found = false;
+  appleState.extraSeeds.forEach(function (s) {
+    if (s.id !== "starter-seed" && !s.isStarter) return;
+    if (s.inInventory || s.planted) found = true;
+  });
+  if (found) {
+    setMainSeedPickedForCurrentRoom();
+    isMainSeedAvailable = false;
+    lastMainSeedStateChangeAt = Date.now();
+  }
 }
 
 function hasPickedGuideBookInCurrentRoom() {
@@ -1668,10 +1704,7 @@ function recoverWorldMainSeedIfOnboardingStuck() {
   // 마른 메인 씨앗 자동 제거(updateSeedPosition)가 picked만 켜고 스타터를 안 남김.
   // 여기서 플래그를 지우면 씨앗이 되살아나 타이머가 영원히 끝나지 않음.
   if (hasHandledDryMainSeed) return;
-  try {
-    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-  } catch (eRm) {}
-  hasPickedMainSeedThisWindow = false;
+  clearMainSeedPickedForCurrentRoom();
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
   plantRuntime.isSeedDry = false;
@@ -1681,10 +1714,7 @@ function recoverWorldMainSeedIfOnboardingStuck() {
 }
 
 function tutorialRespawnMainSeedOnGround() {
-  try {
-    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-  } catch (eRm) {}
-  hasPickedMainSeedThisWindow = false;
+  clearMainSeedPickedForCurrentRoom();
   appleState.extraSeeds = appleState.extraSeeds.filter(function (s) {
     var isStarter = s.id === "starter-seed" || s.isStarter;
     if (!isStarter) return true;
@@ -1985,9 +2015,7 @@ function resetTutorialProgressInStorage() {
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
-  try {
-    sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-  } catch (e) {}
+  clearMainSeedPickedForCurrentRoom();
   tutorialWorldNeedsFullReset = true;
 }
 
@@ -2729,7 +2757,7 @@ function resetGameForTesting() {
   isWorldDirty = false;
   isWorldPolling = false;
   clearStoredKeys(appStorageKeysSharedWorldReset);
-  sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  clearMainSeedPickedForCurrentRoom();
   ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
@@ -2817,8 +2845,7 @@ function applyDefaultState(options) {
   plantRuntime.isSeedDry = false;
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
-  hasPickedMainSeedThisWindow = false;
-  sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
+  clearMainSeedPickedForCurrentRoom();
   if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
   }
@@ -3502,12 +3529,15 @@ function loadAppleState() {
   appleState.extraSeeds = loaded.extraSeeds;
   appleState.extraPlants = loaded.extraPlants;
 
+  syncMainSeedPickedStateFromLoadedExtraSeeds();
+
   if (loaded.parseFailed) {
     clearExtraSeedAndPlantElements();
   }
 
   updateApples();
   updateExtraSeedsAndPlants();
+  updateSeedPosition();
 }
 
 function saveAppleState() {
@@ -3664,6 +3694,7 @@ function getSharedWorldSnapshot() {
 
 /** Re-run DOM / UI that depends on world state after `applySharedWorldSnapshot` mutates models. */
 function refreshUiAfterSharedWorldApply() {
+  syncMainSeedPickedStateFromLoadedExtraSeeds();
   updateWellImage();
   updateWellCard();
   updateSeedPosition();
@@ -3749,11 +3780,8 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
       if (canApplyMainSeedState && typeof snapshot.seed.isMainSeedAvailable === "boolean") {
         if (snapshot.seed.isMainSeedAvailable) {
-          hasPickedMainSeedThisWindow = false;
+          clearMainSeedPickedForCurrentRoom();
           isMainSeedAvailable = true;
-          try {
-            sessionStorage.removeItem(storageKeyMainSeedPickedForRoom());
-          } catch (eRmPick) {}
         } else {
           setMainSeedPickedForCurrentRoom();
           isMainSeedAvailable = false;
