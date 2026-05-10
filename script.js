@@ -5461,6 +5461,9 @@ function isHighTierPlantCare(plant) {
 
 function canPlantWiltFromEmptyWater(plant, now) {
   const tNow = now != null ? now : Date.now();
+  if (isTutorialDocumentEntry() && Math.max(0, Number(plant && plant.growthTier) || 0) === 0) {
+    return false;
+  }
   if (isSproutStage3Or5IdleNoGrowth(plant, tNow)) return false;
   return !plant.isSproutSelfSustaining || isHighTierPlantCare(plant);
 }
