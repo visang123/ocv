@@ -14,7 +14,7 @@ except ImportError:
     sys.exit(1)
 
 
-def black_to_transparent(im: Image.Image, thr: int = 32, edge: int = 78) -> Image.Image:
+def black_to_transparent(im: Image.Image, thr: int = 40, edge: int = 102) -> Image.Image:
     """Near-black → transparent; slightly wider edge blend to remove leftover matte."""
     im = im.convert("RGBA")
     px = im.load()

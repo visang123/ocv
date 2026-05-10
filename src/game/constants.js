@@ -69,9 +69,9 @@ export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 export const sproutStage1Ms = plantGrowthTestEveryMs;
 /** Active survival time in stage 2 before auto-advancing to stage 3 (ms). */
 export const sproutStage2GrowMs = plantGrowthTestEveryMs;
-export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260518h";
-export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260518h";
-export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260518h";
+export const sproutStage1Image = "이미지/sprout-stage1.png?v=20260510f";
+export const sproutStage2Image = "이미지/sprout-stage2.png?v=20260510f";
+export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260510f";
 /** 4·5단계 풀 — 시트 좌/우 분할 PNG (?v 캐시 무력화) */
 export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510e";
 export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
@@ -132,6 +132,8 @@ export const npcInteractDistance = 60;
 export const wellUseDistance = 35;
 export const wellPourDistance = wellUseDistance;
 export const plantWaterDistance = 40;
+/** 포인터 기준 식물 호버: 월드 식물 중심과 이 거리 안이면 후보 */
+export const plantHoverPickRadiusWorld = 40;
 export const maxWellWater = 3;
 export const wellRefillMs = 15 * SECOND_MS;
 export const seedDryMs = 3 * MINUTE_MS;

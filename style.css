@@ -255,11 +255,12 @@ body::-webkit-scrollbar {
   cursor: default;
   object-fit: contain;
   z-index: 3;
+  filter: brightness(1.14);
 }
 
 #sprout.is-big {
   /* 너비는 setWorldSize만 사용 — CSS 고정 너비가 풀 스케일과 한 프레임 충돌해 깜빡임 유발 */
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.2));
+  filter: brightness(1.14) drop-shadow(0 2px 1px rgba(0, 0, 0, 0.18));
 }
 
 .extra-sprout {
@@ -273,10 +274,11 @@ body::-webkit-scrollbar {
   object-fit: contain;
   z-index: 3;
   transform-origin: 50% 100%;
+  filter: brightness(1.14);
 }
 
 .extra-sprout.is-big {
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.2));
+  filter: brightness(1.14) drop-shadow(0 2px 1px rgba(0, 0, 0, 0.18));
 }
 
 .extra-water-needed {
@@ -2369,14 +2371,14 @@ body #guide-book-button {
 }
 
 #magic-powder-inventory {
-  /* 나비 인벤(고정 left + min-width + 간격) 오른쪽 */
+  /* 나비 인벤(고정 left + min-width + 간격) 오른쪽 — z-index는 나비 바(12)보다 위 */
   position: fixed;
   left: calc(178px + 154px + 2 * 2px + 14px + 10px);
   bottom: 24px;
   display: none;
   width: 72px;
   height: 72px;
-  z-index: 11;
+  z-index: 20;
   pointer-events: auto;
   cursor: default;
   margin: 0;

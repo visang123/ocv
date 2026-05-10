@@ -104,6 +104,7 @@ export function loadSeedStateFromStorage(config) {
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
+    grassAuto5EligibleAt: null,
     plantPlantedAt: null,
     ownerUserId: "",
     ownerDisplayName: "",
@@ -157,6 +158,15 @@ export function loadSeedStateFromStorage(config) {
         0,
         Number(savedPlantedState.powderUpgradeDurationMs) || 0
       );
+      if (
+        Object.prototype.hasOwnProperty.call(savedPlantedState, "grassAuto5EligibleAt") &&
+        savedPlantedState.grassAuto5EligibleAt != null &&
+        Number.isFinite(Number(savedPlantedState.grassAuto5EligibleAt))
+      ) {
+        planted.grassAuto5EligibleAt = Number(savedPlantedState.grassAuto5EligibleAt);
+      } else {
+        planted.grassAuto5EligibleAt = null;
+      }
       planted.plantPlantedAt =
         Number(savedPlantedState.plantPlantedAt) ||
         Number(savedPlantedState.plantedAt) ||
@@ -306,6 +316,11 @@ export function loadAppleStateFromStorage(config) {
                 0,
                 Number(plantData.powderUpgradeDurationMs) || 0
               ),
+              grassAuto5EligibleAt:
+                plantData.grassAuto5EligibleAt != null &&
+                Number.isFinite(Number(plantData.grassAuto5EligibleAt))
+                  ? Number(plantData.grassAuto5EligibleAt)
+                  : null,
               ownerUserId:
                 plantData.ownerUserId != null ? String(plantData.ownerUserId) : "",
               ownerDisplayName:
@@ -391,6 +406,7 @@ export function saveAppleStateToStorage(config) {
           powderUpgradeTargetTier: plant.powderUpgradeTargetTier,
           powderUpgradeStartedAt: plant.powderUpgradeStartedAt,
           powderUpgradeDurationMs: plant.powderUpgradeDurationMs,
+          grassAuto5EligibleAt: plant.grassAuto5EligibleAt != null ? plant.grassAuto5EligibleAt : null,
           ownerUserId: plant.ownerUserId || "",
           ownerDisplayName: plant.ownerDisplayName || "",
           sproutOrdinal: plant.sproutOrdinal || 0,

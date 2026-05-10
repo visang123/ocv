@@ -46,6 +46,7 @@ export function createPlantState() {
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
+    grassAuto5EligibleAt: null,
     /** 심은 시각(ms). 살아 있는 새싹/풀 번호 정렬에 사용( rotten/dry 등은 제외). */
     plantedAt: null,
     ownerUserId: "",

@@ -115,6 +115,15 @@ export function parseMainPlantFromSnapshot(mp) {
       Number(mp.powderUpgradeDurationMs) || 0
     );
   }
+  if (
+    Object.prototype.hasOwnProperty.call(mp, "grassAuto5EligibleAt") &&
+    mp.grassAuto5EligibleAt != null &&
+    Number.isFinite(Number(mp.grassAuto5EligibleAt))
+  ) {
+    plantedFromSnapshot.grassAuto5EligibleAt = Number(mp.grassAuto5EligibleAt);
+  } else if (Object.prototype.hasOwnProperty.call(mp, "grassAuto5EligibleAt")) {
+    plantedFromSnapshot.grassAuto5EligibleAt = null;
+  }
   if (Object.prototype.hasOwnProperty.call(mp, "ownerUserId")) {
     plantedFromSnapshot.ownerUserId = mp.ownerUserId != null ? String(mp.ownerUserId) : "";
   }
@@ -216,6 +225,12 @@ export function parseExtraPlantFromSnapshot(plant) {
     powderUpgradeDurationMs: Object.prototype.hasOwnProperty.call(plant, "powderUpgradeDurationMs")
       ? Math.max(0, Number(plant.powderUpgradeDurationMs) || 0)
       : 0,
+    grassAuto5EligibleAt:
+      Object.prototype.hasOwnProperty.call(plant, "grassAuto5EligibleAt") &&
+      plant.grassAuto5EligibleAt != null &&
+      Number.isFinite(Number(plant.grassAuto5EligibleAt))
+        ? Number(plant.grassAuto5EligibleAt)
+        : null,
     ownerUserId: Object.prototype.hasOwnProperty.call(plant, "ownerUserId")
       ? String(plant.ownerUserId || "")
       : "",

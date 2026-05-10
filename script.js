@@ -73,6 +73,7 @@ import {
   wellUseDistance,
   wellPourDistance,
   plantWaterDistance,
+  plantHoverPickRadiusWorld,
   maxWellWater,
   wellRefillMs,
   seedDryMs,
@@ -1263,44 +1264,12 @@ seed.addEventListener("mouseleave", function () {
 });
 
 if (ground && plantHoverLabel) {
-  ground.addEventListener("pointerover", function (e) {
-    const t = e.target;
-    if (t === plantSpot || t === sprout) {
-      if (plantRuntime.isSeedPlanted) showPlantHoverForPlant(plantRuntime);
-      return;
-    }
-    if (t.classList && (t.classList.contains("extra-plant-spot") || t.classList.contains("extra-sprout"))) {
-      const ep = extraPlantFromDomElement(t);
-      if (ep) showPlantHoverForPlant(ep);
-    }
-  });
-  ground.addEventListener("pointerout", function (e) {
-    const t = e.target;
-    if (t !== plantSpot && t !== sprout && (!t.classList || (!t.classList.contains("extra-plant-spot") && !t.classList.contains("extra-sprout")))) {
-      return;
-    }
-    const rel = e.relatedTarget;
-    if (
-      rel &&
-      (rel === plantSpot ||
-        rel === sprout ||
-        (rel.classList &&
-          (rel.classList.contains("extra-plant-spot") || rel.classList.contains("extra-sprout"))))
-    ) {
-      return;
-    }
-    hidePlantHoverLabel();
-  });
   ground.addEventListener("pointermove", function (e) {
-    const t = e.target;
-    if (t === plantSpot || t === sprout) {
-      if (plantRuntime.isSeedPlanted) showPlantHoverForPlant(plantRuntime);
-      return;
-    }
-    if (t.classList && (t.classList.contains("extra-plant-spot") || t.classList.contains("extra-sprout"))) {
-      const ep = extraPlantFromDomElement(t);
-      if (ep) showPlantHoverForPlant(ep);
-    }
+    syncPlantHoverFromPointerClient(e.clientX, e.clientY);
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (!ground || !plantHoverLabel) return;
+    if (!groundClientToWorldXY(e.clientX, e.clientY)) hidePlantHoverLabel();
   });
 }
 
@@ -2922,6 +2891,7 @@ function applyDefaultState(options) {
   plantRuntime.powderUpgradeTargetTier = 0;
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
+  plantRuntime.grassAuto5EligibleAt = null;
   plantRuntime.plantedAt = null;
 
   if (!sharedWorldResetOnly) {
@@ -3720,6 +3690,7 @@ function getSharedWorldSnapshot() {
           powderUpgradeTargetTier: plant.powderUpgradeTargetTier || 0,
           powderUpgradeStartedAt: plant.powderUpgradeStartedAt || null,
           powderUpgradeDurationMs: plant.powderUpgradeDurationMs || 0,
+          grassAuto5EligibleAt: plant.grassAuto5EligibleAt != null ? plant.grassAuto5EligibleAt : null,
           ownerUserId: plant.ownerUserId || "",
           ownerDisplayName: plant.ownerDisplayName || "",
           sproutOrdinal: plant.sproutOrdinal || 0,
@@ -3999,36 +3970,28 @@ function ensureSharedPlantVisuals() {
 }
 
 function refreshSharedWaterIndicators() {
-  if (
-    plantRuntime.isSeedPlanted &&
-    plantRuntime.needsFirstWater &&
-    plantRuntime.status !== "dry" &&
-    plantRuntime.status !== "rotten" &&
-    !plantRuntime.isOverwatered &&
-    !isPowderUpgradeInProgress(plantRuntime)
-  ) {
+  if (plantRuntime.isSeedPlanted && shouldShowFirstWaterNeededDroplet(plantRuntime)) {
     waterNeeded.style.display = "block";
     setWorldPosition(
       waterNeeded,
       plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
       plantRuntime.spotY - WATER_NEEDED_SIZE - 2
     );
+  } else {
+    waterNeeded.style.display = "none";
   }
 
   appleState.extraPlants.forEach(function (plant) {
     if (!plant.waterNeededElement) return;
-    if (
-      plant.needsFirstWater &&
-      plant.status !== "dry" &&
-      plant.status !== "rotten" &&
-      !isPowderUpgradeInProgress(plant)
-    ) {
+    if (shouldShowFirstWaterNeededDroplet(plant)) {
       plant.waterNeededElement.style.display = "block";
       setWorldPosition(
         plant.waterNeededElement,
         plant.x + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
         plant.y - WATER_NEEDED_SIZE - 2
       );
+    } else {
+      plant.waterNeededElement.style.display = "none";
     }
   });
 }
@@ -4379,13 +4342,7 @@ function updateExtraSeedsAndPlants() {
     const sproutSize = getSproutSizeForStage(stage);
     plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
     plant.sproutElement.classList.toggle("is-big", stage >= 2);
-    plant.waterNeededElement.style.display =
-      plant.needsFirstWater &&
-      plant.status !== "dry" &&
-      plant.status !== "rotten" &&
-      !isPowderUpgradeInProgress(plant)
-        ? "block"
-        : "none";
+    plant.waterNeededElement.style.display = shouldShowFirstWaterNeededDroplet(plant) ? "block" : "none";
     if (plant.waterNeededElement.style.display === "block") {
       setWorldPosition(
         plant.waterNeededElement,
@@ -4487,18 +4444,25 @@ function normalizeExtraPlantState(plant) {
     plant.sproutEvolutionLastTickAt = null;
     plant.isSproutSelfSustaining = false;
     plant.needsFirstWater = false;
+    plant.grassAuto5EligibleAt = null;
   }
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
   }
   plant.waterCapacity = plant.growthTier >= 3 ? 3 : 2;
+  migrateLegacyPowderTier5ToAutoGrass(plant, now);
   ensureGrassOrdinalIfNeeded(plant);
   clampPlantGrowthTimingToCurrentConstants(plant);
 }
 
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
+  ensureGrassAuto5EligibleForTier4Plant(plant, now);
   if (tickPowderUpgrade(plant, now)) {
+    saveAppleState();
+    syncWorldState(true);
+  }
+  if (tickGrassAutoAdvanceToTier5(plant, now)) {
     saveAppleState();
     syncWorldState(true);
   }
@@ -4544,12 +4508,6 @@ function getSproutStageFromPlant(plant) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier >= 5) return 5;
   if (tier >= 4) return 4;
-  /** 가루 승격 중에는 목표 티어(4·5) 이미지·크기로 통일 — 승격 직전 큰 새싹이 잠깐 보이는 현상 방지 */
-  if (isPowderUpgradeInProgress(plant)) {
-    const tgt = Number(plant.powderUpgradeTargetTier) || 0;
-    if (tgt === 5) return 5;
-    if (tgt === 4) return 4;
-  }
   if (plant.isSproutSelfSustaining) return 3;
   const ev = plant.sproutEvolutionMs || 0;
   if (ev < sproutStage1Ms) return 1;
@@ -4568,6 +4526,17 @@ function isPowderUpgradeInProgress(plant) {
     Number(plant.powderUpgradeDurationMs) > 0 &&
     Number(plant.powderUpgradeStartedAt) > 0
   );
+}
+
+/** 4·5단 풀에서는 첫 물 물방울 UI 숨김(스프라이트 정중앙에 겹쳐 보이던 문제) */
+function shouldShowFirstWaterNeededDroplet(plant) {
+  if (!plant || !plant.needsFirstWater) return false;
+  if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
+  if (isPowderUpgradeInProgress(plant)) return false;
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier >= 4) return false;
+  if (plant.isSproutGrown && getSproutStageFromPlant(plant) >= 4) return false;
+  return true;
 }
 
 function getPowderUpgradeRatio(plant, now) {
@@ -4623,7 +4592,116 @@ function tickPowderUpgrade(plant, now) {
     plant.waterCapacity = 3;
     plant.waterLevel = Math.min(3, Math.max(1, Number(plant.waterLevel) || 1));
   }
+  if (Math.max(0, Number(plant.growthTier) || 0) === 4) {
+    plant.grassAuto5EligibleAt = now;
+  } else {
+    plant.grassAuto5EligibleAt = null;
+  }
   return true;
+}
+
+/** 4단 풀 생존 시 가루 없이 level5GrowMs 후 자동 5단 (가루는 3→4만) */
+function tickGrassAutoAdvanceToTier5(plant, now) {
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier !== 4) {
+    plant.grassAuto5EligibleAt = null;
+    return false;
+  }
+  if (isPowderUpgradeInProgress(plant)) return false;
+  if (!plant.isSproutGrown || plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) {
+    plant.grassAuto5EligibleAt = null;
+    return false;
+  }
+  let t0 = plant.grassAuto5EligibleAt;
+  if (t0 == null || !Number.isFinite(Number(t0))) {
+    plant.grassAuto5EligibleAt = now;
+    return false;
+  }
+  if (now - Number(t0) < level5GrowMs) return false;
+  plant.growthTier = 5;
+  plant.grassAuto5EligibleAt = null;
+  plant.becameEmptyAt = null;
+  return true;
+}
+
+/** 구세이브: 가루 4→5 제거 — 진행 중이면 자동 5단 타이머로 이관 */
+function migrateLegacyPowderTier5ToAutoGrass(plant, now) {
+  const tgt = Number(plant.powderUpgradeTargetTier) || 0;
+  if (tgt !== 5) return;
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  const started = Number(plant.powderUpgradeStartedAt) || null;
+  plant.powderUpgradeTargetTier = 0;
+  plant.powderUpgradeStartedAt = null;
+  plant.powderUpgradeDurationMs = 0;
+  if (
+    tier === 4 &&
+    plant.grassAuto5EligibleAt == null &&
+    plant.isSproutGrown &&
+    plant.status !== "rotten" &&
+    plant.status !== "dry" &&
+    !plant.isOverwatered
+  ) {
+    plant.grassAuto5EligibleAt = started != null && Number.isFinite(started) ? started : now;
+  }
+}
+
+/** 티어 4·생존·가루 진행 없음이면 자동 5단 타이머 시작(또는 유지) */
+function ensureGrassAuto5EligibleForTier4Plant(plant, now) {
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier !== 4) {
+    plant.grassAuto5EligibleAt = null;
+    return;
+  }
+  if (isPowderUpgradeInProgress(plant)) return;
+  if (!plant.isSproutGrown || plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) {
+    plant.grassAuto5EligibleAt = null;
+    return;
+  }
+  if (plant.grassAuto5EligibleAt == null || !Number.isFinite(Number(plant.grassAuto5EligibleAt))) {
+    plant.grassAuto5EligibleAt = now;
+  }
+}
+
+function groundClientToWorldXY(clientX, clientY) {
+  if (!ground) return null;
+  const r = ground.getBoundingClientRect();
+  const w = r.width || 1;
+  const h = r.height || 1;
+  if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return null;
+  return {
+    x: ((clientX - r.left) / w) * WORLD_WIDTH,
+    y: ((clientY - r.top) / h) * GROUND_WORLD_HEIGHT
+  };
+}
+
+/** 식물 중심(호버 앵커)과 가장 가까운 식물 — 겹침 시 포인터에 가까운 쪽 */
+function pickPlantForHoverFromPointerClient(clientX, clientY) {
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  if (!pxy) return null;
+  let best = null;
+  let bestD = Infinity;
+  const rMax = plantHoverPickRadiusWorld;
+  function consider(plant) {
+    if (!plant) return;
+    const a = getPlantHoverAnchorWorld(plant);
+    const d = Math.hypot(pxy.x - a.cxWorld, pxy.y - a.cyWorld);
+    if (d <= rMax && d < bestD) {
+      bestD = d;
+      best = plant;
+    }
+  }
+  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
+  for (let i = 0; i < appleState.extraPlants.length; i++) {
+    consider(appleState.extraPlants[i]);
+  }
+  return best;
+}
+
+function syncPlantHoverFromPointerClient(clientX, clientY) {
+  if (!plantHoverLabel) return;
+  const p = pickPlantForHoverFromPointerClient(clientX, clientY);
+  if (p) showPlantHoverForPlant(p);
+  else hidePlantHoverLabel();
 }
 
 function tickSproutEvolution(plant, now) {
@@ -5355,6 +5433,7 @@ function startPlanting() {
     plantRuntime.powderUpgradeTargetTier = 0;
     plantRuntime.powderUpgradeStartedAt = null;
     plantRuntime.powderUpgradeDurationMs = 0;
+    plantRuntime.grassAuto5EligibleAt = null;
     assignSproutIdentityToNewPlant(plantRuntime);
     ensureGrassOrdinalIfNeeded(plantRuntime);
     playerStatus.textContent = "";
@@ -5496,6 +5575,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.powderUpgradeTargetTier = 0;
       plantRuntime.powderUpgradeStartedAt = null;
       plantRuntime.powderUpgradeDurationMs = 0;
+      plantRuntime.grassAuto5EligibleAt = null;
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantSpot.style.display = "block";
@@ -5545,6 +5625,7 @@ function createExtraPlant(id, x, y) {
     powderUpgradeTargetTier: 0,
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
+    grassAuto5EligibleAt: null,
     ownerUserId: "",
     ownerDisplayName: "",
     sproutOrdinal: 0,
@@ -6057,18 +6138,21 @@ function getNearestPlantForMagicPowder() {
     plantRuntime.status !== "dry" &&
     plantRuntime.status !== "rotten"
   ) {
-    const distance = getCenterDistance(
-      plantRuntime.spotX,
-      plantRuntime.spotY,
-      PLANT_SPOT_WIDTH,
-      PLANT_SPOT_HEIGHT
-    );
-    if (distance <= plantWaterDistance) {
-      nearest = { type: "main", plant: plantRuntime, distance };
+    if (getNextPowderTargetTier(plantRuntime) && !isPowderUpgradeInProgress(plantRuntime)) {
+      const distance = getCenterDistance(
+        plantRuntime.spotX,
+        plantRuntime.spotY,
+        PLANT_SPOT_WIDTH,
+        PLANT_SPOT_HEIGHT
+      );
+      if (distance <= plantWaterDistance) {
+        nearest = { type: "main", plant: plantRuntime, distance };
+      }
     }
   }
   appleState.extraPlants.forEach(function (plant) {
     if (!plant || plant.status === "dry" || plant.status === "rotten") return;
+    if (!getNextPowderTargetTier(plant) || isPowderUpgradeInProgress(plant)) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (distance > plantWaterDistance) return;
     if (!nearest || distance < nearest.distance) {
@@ -6080,10 +6164,8 @@ function getNearestPlantForMagicPowder() {
 
 function getNextPowderTargetTier(plant) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
-  if (tier < 3) return 0;
-  if (tier === 3) return 4;
-  if (tier === 4) return 5;
-  return 0;
+  if (tier !== 3) return 0;
+  return 4;
 }
 
 function applyMagicPowderToPlant(plant) {
@@ -6092,9 +6174,10 @@ function applyMagicPowderToPlant(plant) {
   const now = Date.now();
   plant.powderUpgradeTargetTier = nextTier;
   plant.powderUpgradeStartedAt = now;
-  plant.powderUpgradeDurationMs = nextTier === 4 ? level4GrowMs : level5GrowMs;
+  plant.powderUpgradeDurationMs = level4GrowMs;
   plant.needsFirstWater = true;
   plant.becameEmptyAt = null;
+  plant.grassAuto5EligibleAt = null;
   return true;
 }
 
@@ -6406,7 +6489,12 @@ function updatePlantState() {
 
   const now = Date.now();
   updatePlantWaterLevel();
+  ensureGrassAuto5EligibleForTier4Plant(plantRuntime, now);
   if (tickPowderUpgrade(plantRuntime, now)) {
+    saveSeedState();
+    syncWorldState(true);
+  }
+  if (tickGrassAutoAdvanceToTier5(plantRuntime, now)) {
     saveSeedState();
     syncWorldState(true);
   }
@@ -6464,11 +6552,7 @@ function updatePlantState() {
     plantCard.style.display = "none";
     growthCard.style.display = "none";
     sprout.style.display = "none";
-  } else if (
-    plantRuntime.needsFirstWater &&
-    plantRuntime.status !== "dry" &&
-    !isPowderUpgradeInProgress(plantRuntime)
-  ) {
+  } else if (shouldShowFirstWaterNeededDroplet(plantRuntime)) {
     waterNeeded.style.display = "block";
     setWorldPosition(
       waterNeeded,
@@ -6518,6 +6602,7 @@ function removeMainPlant() {
   plantRuntime.powderUpgradeTargetTier = 0;
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
+  plantRuntime.grassAuto5EligibleAt = null;
   plantRuntime.ownerUserId = "";
   plantRuntime.ownerDisplayName = "";
   plantRuntime.sproutOrdinal = 0;
@@ -6998,6 +7083,16 @@ function applyLoadedPlantState(loadedPlant) {
     0,
     Number(loadedPlant.powderUpgradeDurationMs) || 0
   );
+  if (
+    Object.prototype.hasOwnProperty.call(loadedPlant, "grassAuto5EligibleAt") &&
+    loadedPlant.grassAuto5EligibleAt != null &&
+    Number.isFinite(Number(loadedPlant.grassAuto5EligibleAt))
+  ) {
+    plantRuntime.grassAuto5EligibleAt = Number(loadedPlant.grassAuto5EligibleAt);
+  } else {
+    plantRuntime.grassAuto5EligibleAt = null;
+  }
+  migrateLegacyPowderTier5ToAutoGrass(plantRuntime, Date.now());
 
   plantRuntime.ownerUserId =
     loadedPlant.ownerUserId != null ? String(loadedPlant.ownerUserId) : "";
@@ -7019,6 +7114,7 @@ function applyLoadedPlantState(loadedPlant) {
     plantRuntime.sproutEvolutionLastTickAt = null;
     plantRuntime.isSproutSelfSustaining = false;
     plantRuntime.needsFirstWater = false;
+    plantRuntime.grassAuto5EligibleAt = null;
   }
   if (plantRuntime.plantedAt == null && plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = Number(loadedPlant.plantGrowthStartedAt) || null;
@@ -7032,6 +7128,7 @@ function applyLoadedPlantState(loadedPlant) {
   plantRuntime.waterCapacity = plantRuntime.growthTier >= 3 ? 3 : 2;
   clampPlantGrowthTimingToCurrentConstants(plantRuntime);
   ensureGrassOrdinalIfNeeded(plantRuntime);
+  ensureGrassAuto5EligibleForTier4Plant(plantRuntime, Date.now());
 }
 
 function getPlantStateForStorage() {
@@ -7061,6 +7158,7 @@ function getPlantStateForStorage() {
     powderUpgradeTargetTier: plantRuntime.powderUpgradeTargetTier,
     powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
     powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs,
+    grassAuto5EligibleAt: plantRuntime.grassAuto5EligibleAt,
     ownerUserId: plantRuntime.ownerUserId || "",
     ownerDisplayName: plantRuntime.ownerDisplayName || "",
     sproutOrdinal: plantRuntime.sproutOrdinal || 0,
