@@ -92,7 +92,10 @@ export const appleRespawnMs = 90 * SECOND_MS;
 /** index + 온보딩 완료: 월드 공용 땅 씨앗 1슬롯 — 줍은 뒤 같은 좌표에서 10초 뒤 리스폰 */
 export const WORLD_LOOSE_SEED_ID = "world-loose-seed";
 export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
-/** 튜토 메인 씨와 동일 위치(책·안내판 옆) — 월드도 여기서만 줍기·seedCount */
+/**
+ * 월드 허브 느슨 씨 슬롯 좌표 = 튜토 땅 씨(SEED_START)와 동일.
+ * 동작 차이는 src/game/groundSeed.js · script pickUp 분기 참고.
+ */
 export const WORLD_LOOSE_SEED_X = SEED_START_X;
 export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */

@@ -13,7 +13,7 @@ export function createWellState(maxWellWaterValue) {
 export function createAppleState(initialApples) {
   return {
     count: 0,
-    /** 월드(온보딩 완료): 사과·줍기·사과먹기로 쌓이는 씨앗 수(열매 count와 동일 패턴, 로컬만) */
+    /** 월드 허브 땅 씨 줍기 누적 — 튜토 extraSeeds와 별개(groundSeed.js). */
     seedCount: 0,
     pickedIds: [],
     isEating: false,

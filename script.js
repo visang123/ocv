@@ -9,6 +9,13 @@ import {
   isOverlappingRect
 } from "./src/world/collision.js";
 import {
+  createDefaultWorldLooseSeedRecord,
+  isWorldLooseSpawnReady,
+  isWorldLooseSyntheticPickupCandidate,
+  normalizeWorldLooseSeedRecord,
+  scheduleWorldLooseRespawnAfterPickup
+} from "./src/game/groundSeed.js";
+import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   GROUND_WORLD_HEIGHT,
@@ -54,7 +61,6 @@ import {
   plantActionMs,
   appleRespawnMs,
   WORLD_LOOSE_SEED_ID,
-  WORLD_LOOSE_SEED_RESPAWN_MS,
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
   getMinPlantCenterClearanceWorld,
@@ -731,39 +737,23 @@ const appleState = createAppleState([
 ]);
 let worldLooseSeedElement = null;
 
+/** index 월드 + 온보딩 완료: 땅 씨앗은 worldLooseSeed·seedCount 정책 (src/game/groundSeed.js 참고). */
 function usesWorldLooseSeedMode() {
   return isWorldDocumentEntry() && getStoredFlag(onboardingFlowDoneKey);
 }
 
 function ensureWorldLooseSeedShape() {
   if (!appleState.worldLooseSeed || typeof appleState.worldLooseSeed !== "object") {
-    appleState.worldLooseSeed = {
-      x: WORLD_LOOSE_SEED_X,
-      y: WORLD_LOOSE_SEED_Y,
-      nextSpawnAt: 0
-    };
+    appleState.worldLooseSeed = createDefaultWorldLooseSeedRecord();
     return;
   }
-  const w = appleState.worldLooseSeed;
-  if (!Number.isFinite(Number(w.x))) {
-    w.x = WORLD_LOOSE_SEED_X;
-  }
-  if (!Number.isFinite(Number(w.y))) {
-    w.y = WORLD_LOOSE_SEED_Y;
-  }
-  w.nextSpawnAt = Math.max(0, Number(w.nextSpawnAt) || 0);
-  const dx = Number(w.x) - WORLD_LOOSE_SEED_X;
-  const dy = Number(w.y) - WORLD_LOOSE_SEED_Y;
-  if (dx * dx + dy * dy > 55 * 55) {
-    w.x = WORLD_LOOSE_SEED_X;
-    w.y = WORLD_LOOSE_SEED_Y;
-  }
+  normalizeWorldLooseSeedRecord(appleState.worldLooseSeed);
 }
 
 function isWorldLooseSeedVisibleAt(now) {
   if (!usesWorldLooseSeedMode()) return false;
   ensureWorldLooseSeedShape();
-  return now >= (Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
+  return isWorldLooseSpawnReady(now, appleState.worldLooseSeed.nextSpawnAt);
 }
 
 /** 월드 느슨 씨앗 모드: 중복 id·과도한 seedCount 정리 */
@@ -1853,6 +1843,7 @@ function tutorialRespawnMainSeedOnGround() {
   syncWorldState(true);
 }
 
+/** Tutorial 전용: 땅 #seed → extraSeeds 스타터. 월드 허브에서는 호출되면 안 됨 (groundSeed.js). */
 function createStarterSeedInventoryItem() {
   if (hasPickedMainSeedInCurrentRoom()) return null;
 
@@ -3274,21 +3265,87 @@ function toggleSeed() {
   pickUpNearestItem();
 }
 
-function pickUpNearestItem() {
-  const seedSize = getSeedSize();
+function tryPickSharedBucket(bucketDistance) {
   const bucketSize = getBucketSize();
-  const seedDistance =
-    !usesWorldLooseSeedMode() && canPickUpSeed()
-      ? getCenterDistance(seedX, seedY, seedSize.width, seedSize.height)
-      : Infinity;
-  const extraSeed = getNearestPickableExtraSeed();
-  const extraSeedDistance = extraSeed ? extraSeed.distance : Infinity;
-  const bucketDistance = getCenterDistance(bucketX, bucketY, bucketSize.width, bucketSize.height);
+  if (bucketDistance > pickupDistance || !canPickUpSharedBucket()) {
+    return false;
+  }
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12) {
+    flashOnboardingOrderHint("");
+    return true;
+  }
+  const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
+  bucketX = handPosition.x;
+  bucketY = handPosition.y;
+  heldItem = HELD_ITEM_BUCKET;
+  lastBucketPickupAt = Date.now();
+  window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
+  markWorldDirty();
+  broadcastBucketState(true);
+  syncWorldState(true);
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
+      onboardingFlowStep = 13;
+      persistOnboardingStep();
+      updateOnboardingFlowUI();
+    }
+  }
+  return true;
+}
+
+/**
+ * World hub: tutorial 땅 #seed 줍기는 없음. worldLooseSeed(합성 후보) + extraSeeds + 양동이만.
+ */
+function pickUpNearestItemWorldHub(bucketDistance) {
+  const nearest = getNearestPickableExtraSeed();
+  const extraDist = nearest ? nearest.distance : Infinity;
+  if (
+    nearest &&
+    extraDist <= pickupDistance &&
+    extraDist <= bucketDistance
+  ) {
+    if (isWorldLooseSyntheticPickupCandidate(nearest.seed)) {
+      ensureWorldLooseSeedShape();
+      const now = Date.now();
+      appleState.seedCount += 1;
+      scheduleWorldLooseRespawnAfterPickup(appleState.worldLooseSeed, now);
+      saveAppleState();
+      markWorldDirty();
+      syncWorldState(true);
+      updateExtraSeedsAndPlants();
+      updateSeedInventory();
+      triggerFirstSeedFocus();
+      return;
+    }
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+    nearest.seed.inInventory = true;
+    assignExtraSeedInventoryOwner(nearest.seed);
+    saveAppleState();
+    updateExtraSeedsAndPlants();
+    updateSeedInventory();
+    triggerFirstSeedFocus();
+    return;
+  }
+  tryPickSharedBucket(bucketDistance);
+}
+
+/**
+ * Tutorial / 온보딩 중 index: 땅 #seed(튜토 메인) → 스타터, 그 외 extraSeeds, 양동이.
+ */
+function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
+  const tutorialMainDist = canPickUpSeed()
+    ? getCenterDistance(seedX, seedY, seedSize.width, seedSize.height)
+    : Infinity;
+  const nearest = getNearestPickableExtraSeed();
+  const extraDist = nearest ? nearest.distance : Infinity;
 
   if (
-    seedDistance <= pickupDistance &&
-    seedDistance <= bucketDistance &&
-    seedDistance <= extraSeedDistance
+    tutorialMainDist <= pickupDistance &&
+    tutorialMainDist <= bucketDistance &&
+    tutorialMainDist <= extraDist
   ) {
     if (isOnboardingLinearGateActive() && onboardingFlowStep !== 6) {
       flashOnboardingOrderHint("");
@@ -3301,31 +3358,13 @@ function pickUpNearestItem() {
     return;
   }
 
-  if (
-    extraSeed &&
-    extraSeedDistance <= pickupDistance &&
-    extraSeedDistance <= bucketDistance
-  ) {
-    const isWorldLoosePick =
-      extraSeed.seed.worldLoosePick || extraSeed.seed.id === WORLD_LOOSE_SEED_ID;
-    if (!isWorldLoosePick && isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+  if (nearest && extraDist <= pickupDistance && extraDist <= bucketDistance) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
       flashOnboardingOrderHint("");
       return;
     }
-    if (isWorldLoosePick) {
-      ensureWorldLooseSeedShape();
-      appleState.seedCount += 1;
-      appleState.worldLooseSeed.nextSpawnAt = Date.now() + WORLD_LOOSE_SEED_RESPAWN_MS;
-      saveAppleState();
-      markWorldDirty();
-      syncWorldState(true);
-      updateExtraSeedsAndPlants();
-      updateSeedInventory();
-      triggerFirstSeedFocus();
-      return;
-    }
-    extraSeed.seed.inInventory = true;
-    assignExtraSeedInventoryOwner(extraSeed.seed);
+    nearest.seed.inInventory = true;
+    assignExtraSeedInventoryOwner(nearest.seed);
     saveAppleState();
     updateExtraSeedsAndPlants();
     updateSeedInventory();
@@ -3333,27 +3372,18 @@ function pickUpNearestItem() {
     return;
   }
 
-  if (bucketDistance <= pickupDistance && canPickUpSharedBucket()) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12) {
-      flashOnboardingOrderHint("");
-      return;
-    }
-    const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
-    bucketX = handPosition.x;
-    bucketY = handPosition.y;
-    heldItem = HELD_ITEM_BUCKET;
-    lastBucketPickupAt = Date.now();
-    window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
-    markWorldDirty();
-    broadcastBucketState(true);
-    syncWorldState(true);
-    if (!getStoredFlag(onboardingFlowDoneKey)) {
-      if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
-        onboardingFlowStep = 13;
-        persistOnboardingStep();
-        updateOnboardingFlowUI();
-      }
-    }
+  tryPickSharedBucket(bucketDistance);
+}
+
+function pickUpNearestItem() {
+  const seedSize = getSeedSize();
+  const bucketSize = getBucketSize();
+  const bucketDistance = getCenterDistance(bucketX, bucketY, bucketSize.width, bucketSize.height);
+
+  if (usesWorldLooseSeedMode()) {
+    pickUpNearestItemWorldHub(bucketDistance);
+  } else {
+    pickUpNearestItemTutorialFlow(seedSize, bucketDistance);
   }
 }
 
@@ -3390,6 +3420,7 @@ function canPickUpSharedBucket() {
   return false;
 }
 
+/** Tutorial: extraSeeds만. World hub: 보이는 동안 합성 worldLoose 후보가 우선(같은 좌표 정책은 groundSeed.js). */
 function getNearestPickableExtraSeed() {
   let nearest = null;
   const now = Date.now();
