@@ -4678,6 +4678,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (snapRefPlants > 0) {
           rebasePlantModelTimestampsToLocalNow(ep, extraPlantClockNow, snapRefPlants);
         }
+        stabilizeFirstWaterHintFlags(ep);
         sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
       });
       const now = Date.now();
@@ -5395,15 +5396,58 @@ function isPowderUpgradeInProgress(plant) {
   );
 }
 
+/**
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
+ * wateredAtList가 [growthStartedAt] 한 번뿐이면 "첫 물 필요"로 본다.
+ */
+function stabilizeFirstWaterHintFlags(plant) {
+  if (!plant || plant.status === "rotten") return;
+  if (!Array.isArray(plant.wateredAtList)) plant.wateredAtList = [];
+  const gs = Number(plant.growthStartedAt) || 0;
+  if (
+    gs > 0 &&
+    plant.status === "normal" &&
+    (Number(plant.waterLevel) || 0) > 0 &&
+    plant.wateredAtList.length === 0
+  ) {
+    const fill = Number(plant.lastWateredAt) || gs;
+    plant.wateredAtList = [fill];
+  }
+  const wl = plant.wateredAtList;
+  if (
+    gs > 0 &&
+    plant.status === "normal" &&
+    (Number(plant.waterLevel) || 0) > 0 &&
+    wl.length === 1 &&
+    Math.abs(Number(wl[0]) - gs) < 20000
+  ) {
+    plant.needsFirstWater = false;
+  }
+}
+
+function isPlantAwaitingPlayerFirstPour(plant) {
+  if (!plant) return false;
+  if (plant.status !== "normal" || plant.isOverwatered) return false;
+  if (plant.isSproutGrown) return false;
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier !== 0) return false;
+  const gs = Number(plant.growthStartedAt) || 0;
+  if (gs <= 0) return false;
+  const wl = plant.wateredAtList;
+  if (!Array.isArray(wl) || wl.length !== 1) return false;
+  return Math.abs(Number(wl[0]) - gs) < 20000;
+}
+
 /** 4·5단 풀에서는 첫 물 물방울 UI 숨김(스프라이트 정중앙에 겹쳐 보이던 문제) */
 function shouldShowFirstWaterNeededDroplet(plant) {
-  if (!plant || !plant.needsFirstWater) return false;
+  if (!plant) return false;
   if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
   if (isPowderUpgradeInProgress(plant)) return false;
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier >= 4) return false;
   if (plant.isSproutGrown && getSproutStageFromPlant(plant) >= 4) return false;
-  return true;
+  if (plant.needsFirstWater) return true;
+  return isPlantAwaitingPlayerFirstPour(plant);
 }
 
 function getPowderUpgradeRatio(plant, now) {
@@ -7562,20 +7606,27 @@ function getNearestWateringTarget() {
 
 function createWaterSplashAt(startX, startY) {
   for (let index = 0; index < 8; index += 1) {
-    const drop = document.createElement("div");
     const offsetX = (index - 3.5) * 3;
     const fallX = (index - 3.5) * 5;
     const fallY = 18 + (index % 3) * 5;
 
+    const holder = document.createElement("div");
+    holder.style.position = "absolute";
+    holder.style.left = "0";
+    holder.style.bottom = "0";
+    holder.style.pointerEvents = "none";
+    holder.style.zIndex = "25";
+    setWorldPosition(holder, startX + offsetX, startY);
+
+    const drop = document.createElement("div");
     drop.className = "water-drop";
-    drop.style.left = toScreenX(startX + offsetX) + "px";
-    drop.style.top = toScreenY(startY) + "px";
     drop.style.setProperty("--drop-x", toScreenX(fallX) + "px");
     drop.style.setProperty("--drop-y", toScreenY(fallY) + "px");
-    ground.appendChild(drop);
+    holder.appendChild(drop);
+    ground.appendChild(holder);
 
     window.setTimeout(function () {
-      drop.remove();
+      holder.remove();
     }, 600);
   }
 }
@@ -8399,6 +8450,9 @@ function applyLoadedPlantState(loadedPlant) {
   clampPlantGrowthTimingToCurrentConstants(plantRuntime);
   ensureGrassOrdinalIfNeeded(plantRuntime);
   ensureGrassAuto5EligibleForTier4Plant(plantRuntime, Date.now());
+  if (isApplyingWorldState && plantRuntime.isSeedPlanted) {
+    stabilizeFirstWaterHintFlags(plantRuntime);
+  }
 }
 
 function getPlantStateForStorage() {
@@ -9394,7 +9448,6 @@ function sendMultiplayerPresence(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();
-  const isWateringNow = now - lastWaterSplashAt < 600;
   const state = {
     id: currentSessionId,
     userId: currentUserId,
@@ -9405,9 +9458,7 @@ function sendMultiplayerPresence(forceSend) {
         ? "planting"
         : appleState.isEating
           ? "eating"
-          : isWateringNow
-            ? "watering"
-            : "state",
+          : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
@@ -9701,12 +9752,18 @@ function renderRemotePlayerState(state) {
   const nextX = Number(state.x) || 0;
   const nextY = -(Number(state.depth) || 0) + (Number(state.jumpY) || 0);
   const nextPositionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
-  const hasAction = typeof state.action === "string" && state.action !== "";
+  const statusAction =
+    typeof state.action === "string" &&
+    state.action !== "" &&
+    state.action !== "watering" &&
+    state.action !== "state"
+      ? state.action
+      : "";
 
   remotePlayer.nameElement.textContent = nameForIngameUiDisplay(
     state.name || "OVC"
   );
-  if (hasAction) {
+  if (statusAction) {
     remotePlayer.statusElement.textContent =
       state.action === "magic_powder"
         ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911..."
@@ -9714,9 +9771,7 @@ function renderRemotePlayerState(state) {
           ? "\uC528\uC557 \uC2EC\uB294\uC911..."
           : state.action === "eating"
             ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
-            : state.action === "watering"
-              ? "\uBB3C \uC8FC\uB294 \uC911..."
-              : "";
+            : "";
     remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
     remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
   } else if (
@@ -10420,6 +10475,19 @@ function ensureButterflyWaypoint(butterfly, now) {
   return waypoint;
 }
 
+function getButterflyFlutterOffsetWorld(now, butterfly) {
+  const salt =
+    butterfly.id.split("").reduce(function (acc, ch) {
+      return acc + ch.charCodeAt(0);
+    }, 0) % 6283;
+  const omegaX = (2 * Math.PI) / butterflyFlutterPeriodHorizontalMs;
+  const omegaY = (2 * Math.PI) / butterflyFlutterPeriodVerticalMs;
+  return {
+    dx: Math.sin(now * omegaX + salt * 0.001) * butterflyFlutterAmplitudeX,
+    dy: Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * butterflyFlutterAmplitudeY
+  };
+}
+
 function simulateButterflyAuthorityStep(butterfly, now) {
   let waypoint = butterflyAuthorityWaypointById[butterfly.id];
   if (waypoint && now > waypoint.endAt + 3000) {
@@ -10433,15 +10501,9 @@ function simulateButterflyAuthorityStep(butterfly, now) {
   const previousX = butterfly.x;
   butterfly.x = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
   butterfly.y = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
-  // Slow horizontal + vertical sway (one full cycle each per configured period).
-  const salt =
-    butterfly.id.split("").reduce(function (acc, ch) {
-      return acc + ch.charCodeAt(0);
-    }, 0) % 6283;
-  const omegaX = (2 * Math.PI) / butterflyFlutterPeriodHorizontalMs;
-  const omegaY = (2 * Math.PI) / butterflyFlutterPeriodVerticalMs;
-  butterfly.x += Math.sin(now * omegaX + salt * 0.001) * butterflyFlutterAmplitudeX;
-  butterfly.y += Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * butterflyFlutterAmplitudeY;
+  const fl = getButterflyFlutterOffsetWorld(now, butterfly);
+  butterfly.x += fl.dx;
+  butterfly.y += fl.dy;
   clampButterflyToBounds(butterfly);
   const dx = butterfly.x - previousX;
   if (Math.abs(dx) > 0.05) {
@@ -10744,8 +10806,8 @@ function updateButterflies() {
   // frames are still animated locally for smoothness.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
-  /** 원격 좌표로 스냅 시 프레임당 최대 이동(월드 px) — 한 번에 점프하는 것처럼 보이는 현상 완화 */
-  const butterflyRemoteRenderMaxStepWorld = 12;
+  /** 원격 스냅샷 추적: 너무 작으면 목표에 못 닿아 멈춘 것처럼 보임 */
+  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 32 : 22;
 
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
@@ -10765,25 +10827,36 @@ function updateButterflies() {
   butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = ensureButterflyRenderEntry(butterfly);
-    let drawX = butterfly.x;
-    let drawY = butterfly.y;
+    const targetX = butterfly.x;
+    const targetY = butterfly.y;
+    let drawX = targetX;
+    let drawY = targetY;
     if (smoothRemoteButterflies) {
       if (typeof butterfly._renderX !== "number" || typeof butterfly._renderY !== "number") {
-        butterfly._renderX = drawX;
-        butterfly._renderY = drawY;
+        butterfly._renderX = targetX;
+        butterfly._renderY = targetY;
       }
-      let rdx = drawX - butterfly._renderX;
-      let rdy = drawY - butterfly._renderY;
+      let rdx = targetX - butterfly._renderX;
+      let rdy = targetY - butterfly._renderY;
       const rdist = Math.hypot(rdx, rdy);
-      if (rdist > butterflyRemoteRenderMaxStepWorld && rdist > 0.0001) {
+      if (rdist < 0.45) {
+        butterfly._renderX = targetX;
+        butterfly._renderY = targetY;
+      } else if (rdist > butterflyRemoteRenderMaxStepWorld && rdist > 0.0001) {
         const s = butterflyRemoteRenderMaxStepWorld / rdist;
         rdx *= s;
         rdy *= s;
+        butterfly._renderX += rdx;
+        butterfly._renderY += rdy;
+      } else {
+        butterfly._renderX += rdx;
+        butterfly._renderY += rdy;
       }
-      butterfly._renderX += rdx;
-      butterfly._renderY += rdy;
       drawX = butterfly._renderX;
       drawY = butterfly._renderY;
+      const flR = getButterflyFlutterOffsetWorld(now, butterfly);
+      drawX += flR.dx;
+      drawY += flR.dy;
     } else {
       butterfly._renderX = butterfly.x;
       butterfly._renderY = butterfly.y;

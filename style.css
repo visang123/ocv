@@ -1032,11 +1032,14 @@ body::-webkit-scrollbar {
 
 .water-drop {
   position: absolute;
-  width: 3px;
-  height: 6px;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  height: 7px;
   border-radius: 999px;
   background: #35a7ff;
-  opacity: 0.9;
+  box-shadow: 0 0 2px rgba(53, 167, 255, 0.9);
+  opacity: 0.95;
   pointer-events: none;
   animation: water-drop-fall 520ms ease-out forwards;
 }
