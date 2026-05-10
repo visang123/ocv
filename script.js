@@ -1067,6 +1067,10 @@ document.addEventListener("keydown", function (event) {
     return;
   }
 
+  if (isWorldChatBlockingGameInput() && event.code !== "Escape") {
+    return;
+  }
+
   if (key in keys) {
     event.preventDefault();
     keys[key] = true;
@@ -1120,6 +1124,8 @@ document.addEventListener("keydown", function (event) {
       worldChatPanelOpen = false;
       worldChatPanelEl.classList.remove("is-open");
       worldChatPanelEl.setAttribute("aria-hidden", "true");
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
       return;
     }
     if (isGuideBookOpen || guideCard.style.display === "block") {
@@ -1193,6 +1199,10 @@ window.addEventListener(
     event.preventDefault();
 
     if (isOnboardingLinearGateActive() && onboardingFlowStep < 19) {
+      return;
+    }
+
+    if (isWorldChatBlockingGameInput()) {
       return;
     }
 
@@ -5194,6 +5204,13 @@ function updatePlayerPosition() {
     return;
   }
 
+  if (isWorldChatBlockingGameInput()) {
+    lastMovementTickMs = performance.now();
+    setWorldPosition(player, playerX, getPlayerWorldY());
+    updatePlayerColorBodyPosition();
+    return;
+  }
+
   const nowMs = performance.now();
   if (lastMovementTickMs <= 0) {
     lastMovementTickMs = nowMs - 1000 / MOVEMENT_REFERENCE_HZ;
@@ -7630,6 +7647,13 @@ function isWorldSocialRealtimeReady() {
   return Boolean(multiplayerChannel && currentSessionId && isMultiplayerSubscribed);
 }
 
+function isWorldChatBlockingGameInput() {
+  if (!worldSocialUiReady) return false;
+  if (worldChatPanelOpen) return true;
+  if (worldChatInputEl && document.activeElement === worldChatInputEl) return true;
+  return false;
+}
+
 function sanitizeWorldChatText(raw) {
   let s = String(raw || "")
     .trim()
@@ -7997,7 +8021,11 @@ function ensureWorldSocialUi() {
     worldChatPanelOpen = !worldChatPanelOpen;
     worldChatPanelEl.classList.toggle("is-open", worldChatPanelOpen);
     worldChatPanelEl.setAttribute("aria-hidden", worldChatPanelOpen ? "false" : "true");
-    if (worldChatPanelOpen) worldChatInputEl.focus();
+    if (worldChatPanelOpen) {
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      worldChatInputEl.focus();
+    }
   });
   worldChatSendBtn.addEventListener("click", function () {
     sendWorldChatFromUi();
