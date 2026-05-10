@@ -7796,6 +7796,21 @@ function updateWorldSocialChatUiEnabled() {
   if (worldHeartBtn) worldHeartBtn.disabled = !ok;
 }
 
+function worldChatBubbleWobble(sessionIdForPhase, nowMs) {
+  let phase = 0;
+  const sid = sessionIdForPhase != null ? String(sessionIdForPhase) : "";
+  if (sid) {
+    for (let i = 0; i < sid.length; i++) phase += sid.charCodeAt(i);
+  } else {
+    phase = 204821;
+  }
+  const t = nowMs * 0.0042 + phase * 0.017;
+  return {
+    dx: Math.cos(t * 0.79) * 2.2,
+    dy: Math.sin(t) * 4.0
+  };
+}
+
 function updatePlayerChatBubbleOverlay() {
   if (!playerChatBubbleEl) return;
   const now = Date.now();
@@ -7811,8 +7826,10 @@ function updatePlayerChatBubbleOverlay() {
   const playerBox = getPlayerBox();
   const bw = playerChatBubbleEl.offsetWidth || 80;
   const bh = playerChatBubbleEl.offsetHeight || 28;
-  const sx = toScreenX(playerBox.left + playerBox.width / 2) - bw / 2;
-  const sy = toScreenY(playerBox.top) - bh - 4;
+  const wobble = worldChatBubbleWobble(null, now);
+  const sx =
+    toScreenX(playerBox.left + playerBox.width / 2) - bw / 2 + wobble.dx;
+  const sy = toScreenY(playerBox.top) - bh - 4 + wobble.dy;
   playerChatBubbleEl.style.display = "block";
   playerChatBubbleEl.style.transform = "translate(" + sx + "px, " + sy + "px)";
 }
@@ -7840,8 +7857,10 @@ function updateRemoteChatBubbleOverlays() {
     const headTopWorld = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + rp.worldY;
     const bw = el.offsetWidth || 72;
     const bh = el.offsetHeight || 26;
-    const sx = toScreenX(rp.worldX + PLAYER_WIDTH / 2) - bw / 2;
-    const sy = toScreenY(headTopWorld) - bh - 4;
+    const wobble = worldChatBubbleWobble(sid, now);
+    const sx =
+      toScreenX(rp.worldX + PLAYER_WIDTH / 2) - bw / 2 + wobble.dx;
+    const sy = toScreenY(headTopWorld) - bh - 4 + wobble.dy;
     el.style.display = "block";
     el.style.transform = "translate(" + sx + "px, " + sy + "px)";
   });
