@@ -1661,10 +1661,10 @@ body::-webkit-scrollbar {
 
 #network-debug-panel {
   position: fixed;
-  left: 118px;
+  left: 38px;
   top: 10px;
   z-index: 250;
-  width: min(148px, calc(100vw - 130px));
+  width: min(148px, calc(100vw - 48px));
   max-height: 56px;
   overflow: auto;
   display: none;
@@ -1894,17 +1894,21 @@ body::-webkit-scrollbar {
 
 #test-white-butterfly-button {
   position: fixed;
-  left: 24px;
-  top: 14px;
+  left: 23px;
+  top: 3px;
   z-index: 261;
-  height: 20px;
-  padding: 0 6px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 4px;
-  background: rgba(17, 24, 39, 0.85);
-  color: #fff;
-  font: 800 8px/1 Arial, sans-serif;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: #22c55e;
+  box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.65);
   cursor: pointer;
+}
+
+#test-white-butterfly-button:hover {
+  background: #4ade80;
 }
 
 #admin-overlay {

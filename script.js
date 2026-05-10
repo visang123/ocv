@@ -705,6 +705,13 @@ let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV
 let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
+/**
+ * Session ids recently seen in this room (DB presence + realtime broadcasts).
+ * Includes same-login tabs so butterfly authority is a single elected client.
+ */
+let multiplayerRoomSessionIdsLastSeen = Object.create(null);
+/** Dedupe water FX when we skip rendering same-account remote avatars */
+let lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 let lastBucketTraceAtByKey = {};
 let lastBucketRenderLoggedKey = "";
 let onlineDebugToastTimeout = null;
@@ -981,6 +988,7 @@ function applySupersededTabShutdown() {
   const channel = multiplayerChannel;
   multiplayerChannel = null;
   isMultiplayerSubscribed = false;
+  clearMultiplayerRoomSessionTracking();
   if (channel) {
     Promise.resolve(typeof channel.untrack === "function" ? channel.untrack() : undefined)
       .catch(function () {})
@@ -1471,8 +1479,9 @@ document.body.appendChild(networkDebugButton);
 const testWhiteButterflyButton = document.createElement("button");
 testWhiteButterflyButton.id = "test-white-butterfly-button";
 testWhiteButterflyButton.type = "button";
-testWhiteButterflyButton.textContent = "흰나비+10";
+testWhiteButterflyButton.textContent = "";
 testWhiteButterflyButton.setAttribute("aria-label", "흰나비 10마리 테스트");
+testWhiteButterflyButton.setAttribute("title", "흰나비 +10 (테스트)");
 document.body.appendChild(testWhiteButterflyButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -2305,6 +2314,7 @@ function teardownMultiplayerForTutorial() {
   isMultiplayerSubscribed = false;
   const channel = multiplayerChannel;
   multiplayerChannel = null;
+  clearMultiplayerRoomSessionTracking();
   channel.untrack().finally(function () {
     channel.unsubscribe();
     const client =
@@ -4193,6 +4203,14 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
   const snapshotSavedAt = resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt);
+  let hasServerRowTime = false;
+  if (serverRowUpdatedAt != null && serverRowUpdatedAt !== "") {
+    const parsedRowAt =
+      typeof serverRowUpdatedAt === "string"
+        ? Date.parse(serverRowUpdatedAt)
+        : Number(serverRowUpdatedAt);
+    hasServerRowTime = Number.isFinite(parsedRowAt) && parsedRowAt > 0;
+  }
   const snapshotResetToken = String(snapshot.resetToken || "");
   const isResetGuardWindow = Date.now() - lastWorldResetAt < 20000;
   // Guard only during the short reset window. After that, allow sync to recover
@@ -4296,10 +4314,13 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (snapshot.mainPlant && !plantRuntime.isPlanting) {
+    // Snapshots here are always from other clients (savedBy !== currentSessionId).
+    // Do not skip while local planting — that hid remote plants and showed wrong soil.
+    if (snapshot.mainPlant) {
       let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
       const snapAt = snapshotSavedAt || 0;
       if (
+        !hasServerRowTime &&
         incomingPlant &&
         snapAt > 0 &&
         lastMainPlantStateChangeAt > 0 &&
@@ -4308,6 +4329,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         incomingPlant = null;
       }
       if (
+        !hasServerRowTime &&
         incomingPlant &&
         snapAt > 0 &&
         snapAt < lastMainPlantStateChangeAt - 2000 &&
@@ -9248,6 +9270,7 @@ function setupMultiplayer() {
           addNetworkDebugLog("reset supabase realtime client");
         }
         multiplayerChannel = null;
+        clearMultiplayerRoomSessionTracking();
         updateMultiplayerStatus("\uC5F0\uACB0 \uC548\uB428");
         scheduleMultiplayerReconnect(1500);
       }
@@ -9285,10 +9308,11 @@ function sendMultiplayerPresence(forceSend) {
   };
   const stateKey = [
     state.color,
-    Math.round(state.x),
-    Math.round(state.depth),
-    Math.round(state.jumpY),
-    state.action
+    Math.round(state.x * 10),
+    Math.round(state.depth * 10),
+    Math.round(state.jumpY * 10),
+    state.action,
+    Math.round(state.waterSplashAt || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
 
@@ -9452,8 +9476,10 @@ function pollPresenceDatabase() {
     window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
   ).then(function (players) {
     const idsInDb = Object.create(null);
+    const now = Date.now();
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
+      multiplayerRoomSessionIdsLastSeen[String(state.id)] = now;
       if (isRemotePresenceSameLoggedInAccount(state)) return;
       idsInDb[String(state.id)] = true;
       renderRemotePlayerState(state);
@@ -9533,10 +9559,16 @@ function handleRemotePlayerBroadcast(state) {
   if (!state || !state.id || state.id === currentSessionId) return;
   if (state.action === "leave") {
     delete remoteBucketUpdateAtById[state.id];
+    delete multiplayerRoomSessionIdsLastSeen[state.id];
+    delete lastRemoteWaterSplashAppliedAtBySession[state.id];
     removeRemotePlayer(state.id);
     return;
   }
-  if (isRemotePresenceSameLoggedInAccount(state)) return;
+  multiplayerRoomSessionIdsLastSeen[String(state.id)] = Date.now();
+  if (isRemotePresenceSameLoggedInAccount(state)) {
+    maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
+    return;
+  }
   renderRemotePlayerState(state);
   updateRemotePlayerCount();
 }
@@ -10023,6 +10055,7 @@ function logout() {
         });
       }
       multiplayerChannel = null;
+      clearMultiplayerRoomSessionTracking();
       finishLogout();
     });
     return;
@@ -10194,18 +10227,43 @@ function createButterfly(now, options) {
   };
 }
 
+function pruneStaleMultiplayerRoomSessions(now) {
+  const staleMs = 45000;
+  Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
+    const seen = multiplayerRoomSessionIdsLastSeen[sid];
+    if (!seen || now - seen > staleMs) {
+      delete multiplayerRoomSessionIdsLastSeen[sid];
+      delete lastRemoteWaterSplashAppliedAtBySession[sid];
+    }
+  });
+}
+
+function clearMultiplayerRoomSessionTracking() {
+  multiplayerRoomSessionIdsLastSeen = Object.create(null);
+  lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
+}
+
+function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
+  if (!remoteId || !state) return;
+  const nextWaterSplashAt = Number(state.waterSplashAt || 0);
+  if (!nextWaterSplashAt || Date.now() - nextWaterSplashAt >= 5000) return;
+  if (nextWaterSplashAt <= Number(lastRemoteWaterSplashAppliedAtBySession[remoteId] || 0)) {
+    return;
+  }
+  const x = Number(state.waterSplashX);
+  const y = Number(state.waterSplashY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  createWaterSplashAt(x, y);
+  lastRemoteWaterSplashAppliedAtBySession[remoteId] = nextWaterSplashAt;
+}
+
 function isButterflyAuthority() {
   if (!currentSessionId) return false;
-  // Remote players are keyed by their sessionId. Election is "lowest active
-  // sessionId wins"; lexicographic ordering on the random suffix is fine
-  // because everyone uses the same generation scheme.
   const now = Date.now();
+  pruneStaleMultiplayerRoomSessions(now);
   const ids = [currentSessionId];
-  Object.keys(remotePlayers).forEach(function (remoteId) {
-    const remote = remotePlayers[remoteId];
-    if (!remote) return;
-    if (remote.lastSeenAt && now - remote.lastSeenAt > 30000) return;
-    ids.push(remoteId);
+  Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
+    if (sid !== currentSessionId) ids.push(sid);
   });
   ids.sort();
   return ids[0] === currentSessionId;
