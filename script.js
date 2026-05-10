@@ -8538,14 +8538,16 @@ function updateButterflyInventoryUi() {
   butterflyInventory.style.display = total > 0 ? "flex" : "none";
   const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
   butterflyInventory.classList.toggle("is-craftable", canCraft);
-  setInstantHoverTip(butterflyInventory, null);
+  setInstantHoverTip(
+    butterflyInventory,
+    canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5" : null
+  );
   if (butterflyInventoryTotal) {
     butterflyInventoryTotal.textContent = String(total);
-    setInstantHoverTip(
-      butterflyInventoryTotal,
-      canCraft ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5" : null
-    );
+    setInstantHoverTip(butterflyInventoryTotal, null);
   }
+  const legacyButterflyLabel = butterflyInventory.querySelector(".butterfly-inventory-label");
+  if (legacyButterflyLabel) legacyButterflyLabel.remove();
 }
 
 function updateMagicPowderInventoryUi() {

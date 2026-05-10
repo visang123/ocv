@@ -2223,7 +2223,8 @@ body #guide-book-button {
   gap: 5px;
   height: 50px;
   min-width: 154px;
-  padding: 4px 30px 4px 5px;
+  padding: 4px 12px 4px 4px;
+  overflow: visible;
   border-radius: 16px;
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 250, 252, 0.9) 100%);
   border: 1px solid rgba(15, 23, 42, 0.12);
@@ -2329,7 +2330,7 @@ body #guide-book-button {
 
 #butterfly-inventory-total {
   position: absolute;
-  right: 1px;
+  right: -10px;
   top: 50%;
   transform: translateY(-50%);
   min-width: 28px;
@@ -2345,15 +2346,10 @@ body #guide-book-button {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-#butterfly-inventory.is-craftable #butterfly-inventory-total {
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-/* 합계 칩: 생성 가능 안내(두 줄) — 슬롯(하얀 나비 등) 툴팁과 겹치지 않게 더 위에 */
-#butterfly-inventory-total[data-ovc-tip]:hover::after {
-  bottom: calc(100% + 30px);
+/* 생성 가능: 인벤 빈 곳·배경에 올리면 표시. 슬롯 위에서는 부모 툴팁 숨김 → 색 설명만 */
+#butterfly-inventory.is-craftable[data-ovc-tip]:hover:not(:has(.butterfly-inventory-slot:hover))::after {
   white-space: pre-line;
+  bottom: calc(100% + 38px);
   width: max-content;
   max-width: min(92vw, 320px);
   padding: 10px 16px;
@@ -2368,6 +2364,10 @@ body #guide-book-button {
   word-break: keep-all;
   overflow-wrap: normal;
   text-align: center;
+}
+
+#butterfly-inventory.is-craftable:has(.butterfly-inventory-slot:hover)::after {
+  display: none !important;
 }
 
 .butterfly-inventory-slot[data-ovc-tip]:hover::after {
@@ -2387,7 +2387,7 @@ body #guide-book-button {
 #magic-powder-inventory {
   /* 나비 인벤(고정 left + min-width + 간격) 오른쪽 */
   position: fixed;
-  left: calc(178px + 154px + 2 * 2px + 14px);
+  left: calc(178px + 154px + 2 * 2px + 14px + 10px);
   bottom: 24px;
   display: none;
   width: 72px;
