@@ -5259,20 +5259,6 @@ function seedInventoryHasPlantableSeedsForHoverHint() {
   });
 }
 
-function showSeedInventoryPlantHintLabel() {
-  if (!plantHoverLabel || !seedInventory) return;
-  plantHoverLabel.textContent = "\uC2EC\uAE30 click";
-  plantHoverLabel.classList.add("is-seed-inventory-hint");
-  plantHoverLabel.style.display = "block";
-  void plantHoverLabel.offsetWidth;
-  const r = seedInventory.getBoundingClientRect();
-  const w = plantHoverLabel.offsetWidth || 1;
-  const h = plantHoverLabel.offsetHeight || 1;
-  const sx = r.left + r.width / 2 - w / 2;
-  const sy = r.top - h - 4;
-  plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
-}
-
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
 
@@ -5289,11 +5275,13 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
       const panelOk = !panel || !panel.hidden;
       if (panelOk && seedInventoryHasPlantableSeedsForHoverHint()) {
         seedInventory.classList.add("is-seed-inventory-hover-hint");
-        showSeedInventoryPlantHintLabel();
+        if (plantHoverLabel) {
+          plantHoverLabel.classList.remove("is-seed-inventory-hint");
+          plantHoverLabel.style.display = "none";
+        }
       } else {
         seedInventory.classList.remove("is-seed-inventory-hover-hint");
-        plantHoverLabel.classList.remove("is-seed-inventory-hint");
-        plantHoverLabel.style.display = "none";
+        hidePlantHoverLabel();
       }
       return;
     }
