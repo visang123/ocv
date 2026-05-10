@@ -4306,15 +4306,9 @@ function updateExtraSeedsAndPlants() {
         plant.y - WATER_NEEDED_SIZE - 2
       );
     }
-    const tierE = Math.max(0, Number(plant.growthTier) || 0);
-    const pLabel = tierE >= 4 ? "" : getPlantWorldLabel(plant);
-    if (pLabel) {
-      plant.spotElement.title = pLabel;
-      plant.sproutElement.title = pLabel;
-    } else {
-      plant.spotElement.removeAttribute("title");
-      plant.sproutElement.removeAttribute("title");
-    }
+    const pLabel = getPlantWorldLabel(plant);
+    plant.spotElement.title = pLabel;
+    plant.sproutElement.title = pLabel;
     if (!isSproutGrown) return;
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     setWorldPosition(
@@ -5481,7 +5475,18 @@ function ensureGrassOrdinalIfNeeded(plant) {
 
 function getPlantWorldLabel(plant) {
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
+  const grassOrd =
+    plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
+      ? Math.max(0, Number(plant.grassOrdinal))
+      : 0;
+  if (tier >= 4 && grassOrd > 0) {
+    return name + "\uC758 \uD480" + grassOrd;
+  }
+  if (tier >= 4) {
+    return name + "\uC758 \uD480";
+  }
   if (sproutOrd > 0) {
     return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
   }
@@ -5503,18 +5508,20 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant || plant.spotX == null || plant.spotY == null) return;
-  const tier = Math.max(0, Number(plant.growthTier) || 0);
-  if (tier >= 4) {
-    hidePlantHoverLabel();
-    return;
-  }
   plantHoverLabel.textContent = getPlantWorldLabel(plant);
   plantHoverLabel.style.display = "block";
-  setWorldPosition(
-    plantHoverLabel,
-    plant.spotX + PLANT_SPOT_WIDTH / 2 - 23,
-    plant.spotY - 12
-  );
+  function placeHoverLabelCentered() {
+    const cxWorld = plant.spotX + PLANT_SPOT_WIDTH / 2;
+    const cyWorld = plant.spotY + PLANT_SPOT_HEIGHT / 2;
+    const w = plantHoverLabel.offsetWidth || 1;
+    const h = plantHoverLabel.offsetHeight || 1;
+    const sx = toScreenX(cxWorld) - w / 2;
+    const sy = toScreenY(cyWorld) - h / 2;
+    plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
+  }
+  window.requestAnimationFrame(function () {
+    window.requestAnimationFrame(placeHoverLabelCentered);
+  });
 }
 
 function plantProximityRectFromXYWH(x, y, w, h) {
@@ -6272,10 +6279,7 @@ function updatePlantCard() {
     }
 
     plantCard.style.display = "block";
-    if (plantCardTitle) {
-      const tierP = Math.max(0, Number(plant.growthTier) || 0);
-      plantCardTitle.textContent = tierP >= 4 ? "" : getPlantWorldLabel(plant);
-    }
+    if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     const waterCapacity = getPlantWaterCapacity(plant);
@@ -6300,10 +6304,7 @@ function updatePlantCard() {
   }
 
   plantCard.style.display = "block";
-  if (plantCardTitle) {
-    const tierM = Math.max(0, Number(plantRuntime.growthTier) || 0);
-    plantCardTitle.textContent = tierM >= 4 ? "" : getPlantWorldLabel(plantRuntime);
-  }
+  if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plantRuntime);
   plantCard.classList.toggle("is-dry", plantRuntime.status === "dry");
   plantCard.classList.toggle("is-overwatered", plantRuntime.isOverwatered);
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
@@ -6379,9 +6380,7 @@ function updatePlantGrowth() {
 }
 
 function updateSproutPosition() {
-  const tierS = Math.max(0, Number(plantRuntime.growthTier) || 0);
-  const worldLabel =
-    plantRuntime.isSeedPlanted && tierS < 4 ? getPlantWorldLabel(plantRuntime) : "";
+  const worldLabel = plantRuntime.isSeedPlanted ? getPlantWorldLabel(plantRuntime) : "";
   if (worldLabel) {
     plantSpot.title = worldLabel;
   } else {
@@ -6400,7 +6399,6 @@ function updateSproutPosition() {
   sprout.classList.toggle("is-big", stage >= 2);
   sprout.src = getSproutImageForStage(stage);
   if (worldLabel) sprout.title = worldLabel;
-  else sprout.removeAttribute("title");
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
   setWorldPosition(
     sprout,
