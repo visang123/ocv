@@ -2346,8 +2346,8 @@ body #guide-book-button {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* 생성 가능: 인벤 빈 곳·배경에 올리면 표시. 슬롯 위에서는 부모 툴팁 숨김 → 색 설명만 */
-#butterfly-inventory.is-craftable[data-ovc-tip]:hover:not(:has(.butterfly-inventory-slot:hover))::after {
+/* 생성 가능: 슬롯 툴팁 없음 → 인벤 전체에 올리면 한 종류의 안내만 (부모 ::after) */
+#butterfly-inventory.is-craftable[data-ovc-tip]:hover::after {
   white-space: pre-line;
   bottom: calc(100% + 38px);
   width: max-content;
@@ -2366,14 +2366,10 @@ body #guide-book-button {
   text-align: center;
 }
 
-#butterfly-inventory.is-craftable:has(.butterfly-inventory-slot:hover)::after {
-  display: none !important;
-}
-
 .butterfly-inventory-slot[data-ovc-tip]:hover::after {
-  white-space: pre-line;
+  white-space: nowrap;
   width: max-content;
-  max-width: min(92vw, 280px);
+  max-width: none;
   padding: 7px 11px;
   border-radius: 10px;
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(254, 252, 232, 0.98) 100%);
@@ -2381,12 +2377,11 @@ body #guide-book-button {
   color: #431407;
   font: 800 12px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
-  word-break: keep-all;
-  text-align: center;
+  word-break: normal;
 }
 
-#butterfly-inventory.is-craftable .butterfly-inventory-slot[data-ovc-tip]:hover::after {
-  bottom: calc(100% + 32px);
+#butterfly-inventory.is-craftable .butterfly-inventory-slot {
+  cursor: pointer;
 }
 
 #magic-powder-inventory {
