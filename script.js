@@ -7188,9 +7188,7 @@ function useBucket() {
       updateWellCard();
       onboardingHookFilledBucketAtWell();
     } else if (wellReachForScoop && wellState.water <= 0) {
-      flashPlantProximityWarning(
-        "\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uAE30\uB2E4\uB824 \uC8FC\uC138\uC694."
-      );
+      flashPlantProximityWarning("우물에 물이 없습니다.");
       updatePlayerStatus();
     }
     return;
