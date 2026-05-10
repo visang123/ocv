@@ -7688,28 +7688,58 @@ function getNearestWateringTarget() {
 }
 
 function createWaterSplashAt(startX, startY) {
+  const viewport = document.querySelector(".viewport");
+  const zs =
+    typeof zoomLevel === "number" && Number.isFinite(zoomLevel) && zoomLevel > 0 ? zoomLevel : 1;
+
   for (let index = 0; index < 8; index += 1) {
     const offsetX = (index - 3.5) * 3;
     const fallX = (index - 3.5) * 5;
     const fallY = 18 + (index % 3) * 5;
 
     const holder = document.createElement("div");
-    holder.style.position = "absolute";
-    holder.style.left = "0";
-    holder.style.bottom = "0";
     holder.style.pointerEvents = "none";
     holder.className = "water-splash-holder";
-    setWorldPosition(holder, startX + offsetX, startY);
+
+    if (viewport) {
+      const anchor = document.createElement("div");
+      anchor.style.cssText =
+        "position:absolute;left:0;top:0;width:0;height:0;margin:0;padding:0;border:0;pointer-events:none;visibility:hidden";
+      ground.appendChild(anchor);
+      setWorldPosition(anchor, startX + offsetX, startY);
+      const r = anchor.getBoundingClientRect();
+      anchor.remove();
+      holder.style.position = "fixed";
+      holder.style.left = r.left + "px";
+      holder.style.top = r.top + "px";
+      holder.style.zIndex = "450";
+      viewport.appendChild(holder);
+    } else {
+      holder.style.position = "absolute";
+      holder.style.left = "0";
+      holder.style.bottom = "0";
+      holder.style.zIndex = "450";
+      setWorldPosition(holder, startX + offsetX, startY);
+      ground.appendChild(holder);
+    }
 
     const drop = document.createElement("div");
     drop.className = "water-drop";
-    drop.style.setProperty("--drop-x", toScreenX(fallX) + "px");
-    drop.style.setProperty("--drop-y", toScreenY(fallY) + "px");
+    if (viewport) {
+      const dx = toScreenX(fallX) * zs;
+      const dy = toScreenY(fallY) * zs;
+      drop.style.setProperty("--drop-x", dx + "px");
+      drop.style.setProperty("--drop-y", dy + "px");
+    } else {
+      drop.style.setProperty("--drop-x", toScreenX(fallX) + "px");
+      drop.style.setProperty("--drop-y", toScreenY(fallY) + "px");
+    }
     holder.appendChild(drop);
-    ground.appendChild(holder);
 
     window.setTimeout(function () {
-      holder.remove();
+      if (holder.parentNode) {
+        holder.parentNode.removeChild(holder);
+      }
     }, 600);
   }
 }

@@ -1037,7 +1037,7 @@ body::-webkit-scrollbar {
 }
 
 .water-splash-holder {
-  z-index: 78;
+  z-index: 450;
   pointer-events: none;
 }
 
@@ -1045,8 +1045,8 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 9px;
-  height: 14px;
+  width: 12px;
+  height: 18px;
   border-radius: 999px;
   background: radial-gradient(ellipse at 30% 25%, #a8dcff 0%, #35a7ff 45%, #1e7fc4 100%);
   box-shadow:
