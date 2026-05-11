@@ -3275,11 +3275,11 @@ function applyDefaultState(options) {
     removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
     removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   }
-  if (!sharedWorldResetOnly) {
+  if (!sharedWorldResetOnly || isWorldDocumentEntry()) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
   }
   setStoredFlag(mainSeedCollectedKey, false);
-  if (!sharedWorldResetOnly) {
+  if (!sharedWorldResetOnly || isWorldDocumentEntry()) {
     setStoredFlag(hasGuideBookKey, false);
   }
   plantRuntime.isSeedPlanted = false;
@@ -3341,6 +3341,7 @@ function applyDefaultState(options) {
     isGuidePlantPageUnlocked = false;
     guidePageIndex = 0;
   } else {
+    hasGuideBook = false;
     onboardingClearAllOnboardingTimers();
     isGuideDismissedAtSign = false;
     hasHandledDryMainSeed = false;
