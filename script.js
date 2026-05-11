@@ -11025,7 +11025,8 @@ function ensureButterflyRenderEntry(butterfly) {
     frame: -1,
     facingRight: null,
     catchable: null,
-    lastMotionX: null
+    lastMotionX: null,
+    facingMomentumX: 0
   };
   butterflyRenderById[butterfly.id] = entry;
   return entry;
@@ -11463,10 +11464,20 @@ function updateButterflies() {
     let facingRight = entry.facingRight;
     if (facingRight == null) {
       facingRight = butterfly.dirX > 0;
-    } else if (Math.abs(drawDx) > 0.06) {
-      // Two visible tabs can alternate incoming dirX; use rendered movement
-      // delta so facing only flips when motion actually changes direction.
-      facingRight = drawDx > 0;
+      entry.facingMomentumX = 0;
+    } else {
+      // Two visible tabs can produce tiny back/forth network jitter.
+      // Accumulate horizontal motion and flip only after clear directional intent.
+      const clampedDx = Math.max(-0.35, Math.min(0.35, drawDx));
+      const momentum = Number(entry.facingMomentumX) || 0;
+      entry.facingMomentumX = Math.max(-1.4, Math.min(1.4, momentum * 0.84 + clampedDx));
+      if (!facingRight && entry.facingMomentumX > 0.95) {
+        facingRight = true;
+        entry.facingMomentumX = 0;
+      } else if (facingRight && entry.facingMomentumX < -0.95) {
+        facingRight = false;
+        entry.facingMomentumX = 0;
+      }
     }
     applyButterflyFacing(entry, Boolean(facingRight));
     entry.lastMotionX = motionX;
