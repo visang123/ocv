@@ -102,8 +102,6 @@ import {
   plantRotClearMs,
   overwaterWindowMs,
   BUTTERFLY_SIZE,
-  magicPowderCraftCost,
-  magicPowderCraftMs,
   level4GrowMs,
   level5GrowMs,
   butterflyMaxAlive,
@@ -192,15 +190,7 @@ import {
   seedDryText,
   seedWorldText,
   plantHoverLabel,
-  seedInventory,
-  seedCountText,
-  appleInventory,
-  appleCountText,
   treeAppleElements,
-  inventoryApple,
-  butterflyInventory,
-  butterflyInventorySlots,
-  butterflyInventoryTotal,
   world,
   ground,
   onboardingCallout,
@@ -704,8 +694,6 @@ const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 const magicPowderCountKey = "magicPowderCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
-let isCraftingMagicPowder = false;
-let magicPowderCraftTimer = null;
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
@@ -1516,7 +1504,7 @@ seed.addEventListener("mouseleave", function () {
   isHoveringMainSeed = false;
 });
 
-/* 인벤(#seed-inventory)은 ground 밖에 있어 document에서 호버 동기화 */
+/* 가방 버튼(#world-bag-inventory) 호버는 document 포인터로 심기 힌트와 동기화 */
 if (plantHoverLabel) {
   document.addEventListener("pointermove", function (e) {
     syncPlantHoverFromPointerClient(e.clientX, e.clientY);
@@ -1538,21 +1526,6 @@ guideNext.addEventListener("click", function (event) {
     guidePageIndex += 1;
   }
   updateGuidePages();
-});
-
-butterflyInventory.addEventListener("click", function () {
-  tryCraftMagicPowder();
-});
-butterflyInventory.addEventListener("mousemove", function (ev) {
-  if (butterflyInventory.style.display === "none") return;
-  butterflyInventoryLastPointerClientX = ev.clientX;
-  butterflyInventoryLastPointerClientY = ev.clientY;
-  syncButterflyInventoryBarHoverTip();
-});
-butterflyInventory.addEventListener("mouseleave", function () {
-  if (!butterflyInventory.classList.contains("is-craftable")) {
-    setInstantHoverTip(butterflyInventory, null);
-  }
 });
 
 characterSelectButton.addEventListener("click", function () {
@@ -2261,10 +2234,7 @@ function clearOnboardingHighlights() {
     well,
     bucket,
     bigTree,
-    plantSpot,
-    appleInventory,
-    seedInventory,
-    inventoryApple
+    plantSpot
   ].forEach(function (el) {
     if (el) el.classList.remove("onboarding-highlight");
   });
@@ -3417,14 +3387,12 @@ function applyDefaultState(options) {
   });
   hasSeededInitialButterflies = false;
   magicPowderCount = 0;
-  isCraftingMagicPowder = false;
-  clearTimeout(magicPowderCraftTimer);
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     delete butterflyLocalCatchTombstoneById[id];
   });
   saveButterflyCaughtCounts();
   saveMagicPowderCount();
-  updateButterflyInventoryUi();
+  updateBagInventorySlots();
   updateMagicPowderInventoryUi();
 
   wellState.water = maxWellWater;
@@ -3443,7 +3411,6 @@ function applyDefaultState(options) {
   }
   seedCard.style.display = "none";
   seedWorldText.style.display = "none";
-  seedInventory.style.display = "none";
   guideCard.style.display = "none";
   if (guideBook) guideBook.classList.remove("is-near");
   if (worldBag) worldBag.classList.remove("is-near");
@@ -3900,7 +3867,6 @@ function updateApples() {
   });
 
   syncGuideInventoryBar();
-  appleCountText.textContent = String(appleState.count);
   updateBagInventorySlots();
 }
 
@@ -4493,7 +4459,7 @@ function refreshUiAfterSharedWorldApply() {
   ensureSharedPlantVisuals();
   refreshSharedWaterIndicators();
   updateSeedInventory();
-  updateButterflyInventoryUi();
+  updateBagInventorySlots();
   updateMagicPowderInventoryUi();
 }
 
@@ -5968,7 +5934,7 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
   return best;
 }
 
-function seedInventoryHasPlantableSeedsForHoverHint() {
+function bagHasPlantableSeedsForHoverHint() {
   if (usesWorldLooseSeedMode()) {
     return appleState.seedCount > 0;
   }
@@ -5986,7 +5952,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
 
   if (
     hasGuideBook &&
-    seedInventoryHasPlantableSeedsForHoverHint() &&
+    bagHasPlantableSeedsForHoverHint() &&
     worldBagInventory &&
     worldBagInventory.style.display !== "none"
   ) {
@@ -6285,26 +6251,6 @@ function updateBagInventorySlots() {
 }
 
 function updateSeedInventory() {
-  if (usesWorldLooseSeedMode()) {
-    const n = appleState.seedCount;
-    const panel = document.getElementById("seed-count-panel");
-    if (seedCountText) {
-      seedCountText.textContent = String(n);
-    }
-    if (panel) {
-      panel.hidden = true;
-    }
-    appleState.extraSeeds.forEach(function (extraSeed) {
-      if (extraSeed.inventoryElement) {
-        extraSeed.inventoryElement.remove();
-        extraSeed.inventoryElement = undefined;
-        extraSeed.inventoryImage = undefined;
-      }
-    });
-    updateBagInventorySlots();
-    return;
-  }
-
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.inventoryElement) {
       extraSeed.inventoryElement.remove();
@@ -6312,18 +6258,6 @@ function updateSeedInventory() {
       extraSeed.inventoryImage = undefined;
     }
   });
-
-  const inventorySeeds = appleState.extraSeeds.filter(function (extraSeed) {
-    return extraSeed.inInventory && !extraSeed.planted && extraSeed.id !== plantingInventorySeedId;
-  });
-  const n = inventorySeeds.length;
-  const panel = document.getElementById("seed-count-panel");
-  if (seedCountText) {
-    seedCountText.textContent = String(n);
-  }
-  if (panel) {
-    panel.hidden = true;
-  }
   updateBagInventorySlots();
 }
 
@@ -6439,7 +6373,7 @@ function createPlantGrowthMeter() {
 }
 
 function clearExtraSeedAndPlantElements() {
-  document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .inventory-seed, .plant-growth-meter").forEach(
+  document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .plant-growth-meter").forEach(
     function (element) {
       if (element === mainPlantGrowthMeter.element) return;
       element.remove();
@@ -7321,69 +7255,6 @@ function plantWorldOrdinalSortTime(plant) {
   const a = Number(plant.plantedAt) || 0;
   if (a > 0) return a;
   return Number(plant.growthStartedAt) || 0;
-}
-
-function butterflyInventorySlotHoverTip(color) {
-  if (color === "yellow") {
-    return "\uB178\uB791 \uB098\uBE44";
-  }
-  if (color === "brown") {
-    return "\uAC08\uC0C9 \uB098\uBE44";
-  }
-  if (color === "white") {
-    return "\uD558\uC580 \uB098\uBE44";
-  }
-  return "\uB098\uBE44";
-}
-
-const butterflyInventoryCraftHoverTip =
-  "\uB9C8\uBC95\uC758 \uAC00\uB8E8\n\uC0DD\uC131 \uAC00\uB2A5";
-
-let butterflyInventoryLastPointerClientX = 0;
-let butterflyInventoryLastPointerClientY = 0;
-
-function butterflyInventoryHoverTipAtClient(clientX, clientY) {
-  if (!butterflyInventory || butterflyInventory.style.display === "none") {
-    return null;
-  }
-  const inv = butterflyInventory.getBoundingClientRect();
-  if (
-    clientX < inv.left ||
-    clientX > inv.right ||
-    clientY < inv.top ||
-    clientY > inv.bottom
-  ) {
-    return null;
-  }
-  if (butterflyInventory.classList.contains("is-craftable")) {
-    return butterflyInventoryCraftHoverTip;
-  }
-  const hit = document.elementFromPoint(clientX, clientY);
-  const slot = hit && hit.closest && hit.closest(".butterfly-inventory-slot");
-  if (slot && butterflyInventory.contains(slot)) {
-    return butterflyInventorySlotHoverTip(slot.dataset.color);
-  }
-  let bestColor = null;
-  let bestDist = Infinity;
-  butterflyInventorySlots.forEach(function (s) {
-    const r = s.getBoundingClientRect();
-    const mid = (r.left + r.right) / 2;
-    const d = Math.abs(clientX - mid);
-    if (d < bestDist) {
-      bestDist = d;
-      bestColor = s.dataset.color;
-    }
-  });
-  return bestColor ? butterflyInventorySlotHoverTip(bestColor) : null;
-}
-
-function syncButterflyInventoryBarHoverTip() {
-  if (!butterflyInventory) return;
-  const tip = butterflyInventoryHoverTipAtClient(
-    butterflyInventoryLastPointerClientX,
-    butterflyInventoryLastPointerClientY
-  );
-  setInstantHoverTip(butterflyInventory, tip);
 }
 
 /** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
@@ -10030,14 +9901,12 @@ function sendMultiplayerPresence(forceSend) {
     id: currentSessionId,
     userId: currentUserId,
     name: nameForIngameUiDisplay(accountDisplayNameForUi()),
-    action: isCraftingMagicPowder
-      ? "magic_powder"
-      : plantRuntime.isPlanting
-        ? "planting"
-        : appleState.isEating
-          ? "eating"
-          : shouldShowButterflyCatchAction
-            ? "butterfly_catch"
+    action: plantRuntime.isPlanting
+      ? "planting"
+      : appleState.isEating
+        ? "eating"
+        : shouldShowButterflyCatchAction
+          ? "butterfly_catch"
           : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
@@ -10910,62 +10779,10 @@ function getTotalCaughtButterflies() {
   }, 0);
 }
 
-function removeRandomButterfliesFromInventory(count) {
-  const pickedColors = [];
-  butterflyColors.forEach(function (color) {
-    const amount = Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
-    for (let i = 0; i < amount; i += 1) pickedColors.push(color);
-  });
-  for (let i = pickedColors.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = pickedColors[i];
-    pickedColors[i] = pickedColors[j];
-    pickedColors[j] = tmp;
-  }
-  const removing = Math.min(Math.max(0, count), pickedColors.length);
-  for (let i = 0; i < removing; i += 1) {
-    const color = pickedColors[i];
-    butterflyState.caughtCounts[color] = Math.max(
-      0,
-      (butterflyState.caughtCounts[color] || 0) - 1
-    );
-  }
-}
-
-function tryCraftMagicPowder() {
-  if (isOnboardingLinearGateActive()) {
-    flashOnboardingOrderHint("");
-    return false;
-  }
-  if (isCraftingMagicPowder) return false;
-  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
-  if (getTotalCaughtButterflies() < magicPowderCraftCost) return false;
-
-  isCraftingMagicPowder = true;
-  plantRuntime.isPlanting = true;
-  playerStatus.textContent = "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911...";
-  clearTimeout(magicPowderCraftTimer);
-  magicPowderCraftTimer = window.setTimeout(function () {
-    removeRandomButterfliesFromInventory(magicPowderCraftCost);
-    magicPowderCount += 1;
-    saveButterflyCaughtCounts();
-    saveMagicPowderCount();
-    isCraftingMagicPowder = false;
-    plantRuntime.isPlanting = false;
-    playerStatus.textContent = "";
-    updateButterflyInventoryUi();
-    updateMagicPowderInventoryUi();
-    sendMultiplayerPresence(true);
-  }, magicPowderCraftMs);
-  updateButterflyInventoryUi();
-  sendMultiplayerPresence(true);
-  return true;
-}
-
 function addWhiteButterfliesForTest() {
   butterflyState.caughtCounts.white = (butterflyState.caughtCounts.white || 0) + 10;
   saveButterflyCaughtCounts();
-  updateButterflyInventoryUi();
+  updateBagInventorySlots();
 }
 
 function generateButterflyId() {
@@ -11559,29 +11376,13 @@ function tryCatchButterfly() {
 
   broadcastButterflyCatch(caught.id);
   finalizeButterflyRemovalEffects(now);
-  updateButterflyInventoryUi();
+  updateBagInventorySlots();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 18) {
     onboardingFlowStep = 19;
     persistOnboardingStep();
     updateOnboardingFlowUI();
   }
   return true;
-}
-
-function updateButterflyInventoryUi() {
-  if (!butterflyInventory) return;
-  butterflyInventory.style.display = "none";
-  butterflyInventory.classList.remove("is-craftable");
-  setInstantHoverTip(butterflyInventory, null);
-  butterflyInventorySlots.forEach(function (slot) {
-    setInstantHoverTip(slot, null);
-  });
-  if (butterflyInventoryTotal) {
-    setInstantHoverTip(butterflyInventoryTotal, null);
-  }
-  const legacyButterflyLabel = butterflyInventory.querySelector(".butterfly-inventory-label");
-  if (legacyButterflyLabel) legacyButterflyLabel.remove();
-  updateBagInventorySlots();
 }
 
 function updateMagicPowderInventoryUi() {
@@ -12091,7 +11892,7 @@ try {
     loadPlayerPosition();
     loadButterflyCaughtCounts();
     loadMagicPowderCount();
-    updateButterflyInventoryUi();
+    updateBagInventorySlots();
     updateMagicPowderInventoryUi();
     addNetworkDebugLog(
       "init: configured=" +

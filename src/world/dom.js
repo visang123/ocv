@@ -48,17 +48,7 @@ const seedDryGauge = document.getElementById("seed-dry-gauge");
 const seedDryText = document.getElementById("seed-dry-text");
 const seedWorldText = document.getElementById("seed-world-text");
 const plantHoverLabel = document.getElementById("plant-hover-label");
-const seedInventory = document.getElementById("seed-inventory");
-const seedCountText = document.getElementById("seed-count");
-const appleInventory = document.getElementById("apple-inventory");
-const appleCountText = document.getElementById("apple-count");
 const treeAppleElements = Array.from(document.querySelectorAll(".tree-apple"));
-const inventoryApple = document.querySelector(".inventory-apple");
-const butterflyInventory = document.getElementById("butterfly-inventory");
-const butterflyInventorySlots = Array.from(
-  document.querySelectorAll("#butterfly-inventory .butterfly-inventory-slot")
-);
-const butterflyInventoryTotal = document.getElementById("butterfly-inventory-total");
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
 const onboardingCallout = document.getElementById("onboarding-callout");
@@ -117,15 +107,7 @@ export {
   seedDryText,
   seedWorldText,
   plantHoverLabel,
-  seedInventory,
-  seedCountText,
-  appleInventory,
-  appleCountText,
   treeAppleElements,
-  inventoryApple,
-  butterflyInventory,
-  butterflyInventorySlots,
-  butterflyInventoryTotal,
   world,
   ground,
   onboardingCallout,

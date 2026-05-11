@@ -243,8 +243,6 @@ export function getPlantFirstGrowthDurationMs(plant) {
 export const plantDrySoilClearMs = 15 * SECOND_MS;
 /** 썩은 흙(soil-rotten) 표시 후 심는 칸이 비워지기까지 — 마른 땅과 동일 */
 export const plantRotClearMs = plantDrySoilClearMs;
-export const magicPowderCraftCost = 10;
-export const magicPowderCraftMs = 3 * SECOND_MS;
 /** 가루 3→4(또는 동등 성장 구간) */
 export const level4GrowMs = 90 * SECOND_MS;
 /** 4단 풀 생존 후 자동 5단 */
