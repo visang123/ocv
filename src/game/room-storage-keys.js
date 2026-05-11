@@ -10,3 +10,8 @@ export function storageKeyMainSeedPickedForRoom() {
 export function storageKeyGuideBookPickedForRoom() {
   return "guideBookPickedRoomV1:" + getMultiplayerRoomSlug();
 }
+
+/** 월드 바닥 가방을 E로 줍기 완료했는지(가이드 소지 여부와 별도). */
+export function storageKeyWorldBagGroundPickedForRoom() {
+  return "worldBagGroundPickedRoomV1:" + getMultiplayerRoomSlug();
+}

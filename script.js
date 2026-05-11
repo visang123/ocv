@@ -284,7 +284,8 @@ import {
 import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
 import {
   storageKeyMainSeedPickedForRoom,
-  storageKeyGuideBookPickedForRoom
+  storageKeyGuideBookPickedForRoom,
+  storageKeyWorldBagGroundPickedForRoom
 } from "./src/game/room-storage-keys.js";
 
 let playerX = 100;
@@ -510,6 +511,14 @@ function setGuideBookPickedForCurrentRoom() {
   setStoredFlag(hasGuideBookKey, true);
 }
 
+function hasPickedWorldBagGroundInCurrentRoom() {
+  return getStoredFlag(storageKeyWorldBagGroundPickedForRoom());
+}
+
+function setWorldBagGroundPickedForCurrentRoom() {
+  setStoredFlag(storageKeyWorldBagGroundPickedForRoom(), true);
+}
+
 function syncGuideInventoryBar() {
   if (guideBookButton) {
     guideBookButton.style.display = "none";
@@ -524,7 +533,9 @@ function syncGuideInventoryBar() {
 
 function syncWorldBagGroundVisibility() {
   if (guideBook) guideBook.style.display = "none";
-  if (worldBag) worldBag.style.display = hasGuideBook ? "none" : "block";
+  if (worldBag) {
+    worldBag.style.display = hasPickedWorldBagGroundInCurrentRoom() ? "none" : "block";
+  }
 }
 
 let multiplayerChannel = null;
@@ -1530,6 +1541,7 @@ function skipTutorialFromSettings() {
   completeMovementTutorial();
   setStoredFlag(hasGuideBookKey, true);
   setGuideBookPickedForCurrentRoom();
+  setWorldBagGroundPickedForCurrentRoom();
   setStoredFlag(npcDialogueCompleteKey, true);
   setStoredFlag(guidePlantPageUnlockedKey, true);
   setStoredFlag(guideBookClickPromptDismissedKey, true);
@@ -1981,7 +1993,7 @@ function isNearSignBoard() {
 }
 
 function isNearWorldBagPickup() {
-  if (hasPickedGuideBookInCurrentRoom()) return false;
+  if (hasPickedWorldBagGroundInCurrentRoom()) return false;
   if (!worldBag) return false;
   const worldBagStyle = window.getComputedStyle(worldBag);
   if (worldBagStyle.display === "none" || worldBagStyle.visibility === "hidden") {
@@ -2239,6 +2251,7 @@ function resetTutorialProgressInStorage() {
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
   removeStoredValue(storageKeyGuideBookPickedForRoom());
+  removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
@@ -2975,6 +2988,7 @@ function pickUpWorldBag() {
   hasGuideBook = true;
   isGuideBookOpen = false;
   setGuideBookPickedForCurrentRoom();
+  setWorldBagGroundPickedForCurrentRoom();
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   updateGuideCard();
@@ -3116,6 +3130,7 @@ function applyDefaultState(options) {
   clearMainSeedPickedForCurrentRoom();
   if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
+    removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
   }
   setStoredFlag(mainSeedCollectedKey, false);
   if (!sharedWorldResetOnly) {
@@ -3383,6 +3398,7 @@ function startPlantMasterDialogue() {
       isGuidePlantPageUnlocked = true;
       hasGuideBook = true;
       setGuideBookPickedForCurrentRoom();
+      setWorldBagGroundPickedForCurrentRoom();
       guideBook.style.display = "none";
       syncWorldBagGroundVisibility();
       syncGuideInventoryBar();
