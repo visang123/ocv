@@ -11700,7 +11700,7 @@ function setup() {
   const bucketSize = getBucketSize();
   const wellSize = getWellSize();
 
-  setWorldSize(player, PLAYER_WIDTH, PLAYER_HEIGHT);
+  setWorldSize(player, PLAYER_WIDTH);
   setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
   Object.keys(remotePlayers).forEach(function (remoteId) {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
