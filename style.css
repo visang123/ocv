@@ -1194,22 +1194,17 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-.local-player-avatar {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 25px;
-  height: auto;
+/* 로컬 루트는 원격과 동일한 .remote-player 레이아웃을 쓰고, z-index만 살짝 올림 */
+.remote-player.local-player-avatar {
   z-index: 20;
-  pointer-events: none;
 }
 
-/* 원격과 같이 스프라이트는 흐름에 두어 루트 높이가 생기게 함 — 그래야
-   .remote-player-name 의 bottom: calc(100% + 2px) 가 스프라이트 위로 맞음 */
-.local-player-avatar #player {
-  position: relative;
-  left: 0;
-  top: 0;
+/* 전역 #player(position:absolute)를 덮어 원격 .remote-player-body와 같이 흐름에 둠 */
+#player.remote-player-body {
+  position: static;
+  left: auto;
+  top: auto;
+  bottom: auto;
   display: block;
   width: 100%;
   height: auto;
@@ -1218,7 +1213,7 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
-.local-player-avatar #player-name.remote-player-name {
+.remote-player.local-player-avatar #player-name.remote-player-name {
   z-index: 24;
 }
 

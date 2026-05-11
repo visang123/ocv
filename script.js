@@ -1556,10 +1556,11 @@ const spawnPortal = document.getElementById("spawn-portal");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 const localPlayerRoot = document.createElement("div");
-localPlayerRoot.className = "local-player-avatar";
+localPlayerRoot.className = "remote-player local-player-avatar";
 if (player && player.parentNode) {
   player.parentNode.insertBefore(localPlayerRoot, player);
   localPlayerRoot.appendChild(player);
+  player.classList.add("remote-player-body");
   if (playerName) {
     localPlayerRoot.appendChild(playerName);
     playerName.classList.add("remote-player-name");
