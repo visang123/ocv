@@ -43,8 +43,8 @@ export const GUIDE_BOOK_HEIGHT = 9;
 export const GUIDE_BOOK_START_X = 40 + 11 * GUIDE_BOOK_WIDTH;
 export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
-export const WORLD_BAG_WIDTH = 12;
-export const WORLD_BAG_HEIGHT = 10;
+export const WORLD_BAG_WIDTH = 28;
+export const WORLD_BAG_HEIGHT = 22;
 // 책 최초 스폰 좌표를 기준으로, Y만 조금 아래에 가방을 둔다.
 export const WORLD_BAG_START_X = GUIDE_BOOK_START_X;
 export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
