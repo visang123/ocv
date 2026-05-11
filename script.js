@@ -500,6 +500,8 @@ const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1200;
+const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
+const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const WORLD_HEART_FX_MS = 2200;
 const WORLD_CHAT_MAX_CHARS = 120;
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
@@ -522,6 +524,7 @@ let worldChatInputEl = null;
 let worldChatSendBtn = null;
 let playerChatBubbleEl = null;
 let worldSocialUiReady = false;
+let worldLoosePickupLockUntil = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
 let lastWellStateChangeAt = 0;
@@ -3393,8 +3396,13 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     if (isWorldLooseSyntheticPickupCandidate(nearest.seed)) {
       ensureWorldLooseSeedShape();
       const now = Date.now();
+      if (now < Number(worldLoosePickupLockUntil || 0)) return;
       appleState.seedCount += 1;
       scheduleWorldLooseRespawnAfterPickup(appleState.worldLooseSeed, now);
+      worldLoosePickupLockUntil = Math.max(
+        Number(worldLoosePickupLockUntil || 0),
+        Number(appleState.worldLooseSeed.nextSpawnAt || 0)
+      );
       saveAppleState();
       broadcastWorldLooseSeedPickup();
       markWorldDirty();
@@ -3512,7 +3520,11 @@ function getNearestPickableExtraSeed() {
   let nearest = null;
   const now = Date.now();
 
-  if (usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(now)) {
+  if (
+    usesWorldLooseSeedMode() &&
+    now >= Number(worldLoosePickupLockUntil || 0) &&
+    isWorldLooseSeedVisibleAt(now)
+  ) {
     ensureWorldLooseSeedShape();
     const ws = appleState.worldLooseSeed;
     const distance = getCenterDistance(ws.x, ws.y, SEED_SIZE, SEED_SIZE);
@@ -3958,7 +3970,8 @@ function applyServerWorldRowTimestamps(row) {
 function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
   if (!plant || !refTime || !Number.isFinite(refTime) || refTime <= 0) return;
   if (!Number.isFinite(localNow)) return;
-  const shift = localNow - refTime;
+  const rawShift = localNow - refTime;
+  const shift = Math.max(-MAX_SNAPSHOT_CLOCK_SKEW_MS, Math.min(MAX_SNAPSHOT_CLOCK_SKEW_MS, rawShift));
   if (shift === 0) return;
   const bump = function (t) {
     const n = Number(t);
@@ -4488,7 +4501,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           const nowLoose = Date.now();
           let mergedNextSpawnAt;
           if (hasServerRowTime) {
-            if (incomingNext > nowLoose) {
+            if (priorWorldLooseNextSpawnAt > nowLoose) {
+              // Keep local active pickup cooldown from being rolled back by stale rows.
+              mergedNextSpawnAt = Math.max(incomingNext, priorWorldLooseNextSpawnAt);
+            } else if (incomingNext > nowLoose) {
               mergedNextSpawnAt = Math.max(incomingNext, priorWorldLooseNextSpawnAt);
             } else {
               mergedNextSpawnAt = incomingNext;
@@ -4501,6 +4517,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
             y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
             nextSpawnAt: mergedNextSpawnAt
           };
+          worldLoosePickupLockUntil = Math.max(
+            Number(worldLoosePickupLockUntil || 0),
+            Number(mergedNextSpawnAt || 0)
+          );
         } else {
           ensureWorldLooseSeedShape();
         }
@@ -6538,6 +6558,7 @@ function startPlanting() {
       updateExtraSeedsAndPlants();
       updatePlantState();
       updateNpcPosition();
+      holdLocalPlantStateAgainstStaleSnapshot(3000);
       saveSeedState();
       saveAppleState();
       markWorldDirty();
@@ -6579,6 +6600,7 @@ function startPlanting() {
     setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
     updatePlantState();
     updateNpcPosition();
+    holdLocalPlantStateAgainstStaleSnapshot(3000);
     saveSeedState();
     onboardingNotifyMainPlantPlanted();
   }, plantActionMs);
@@ -6621,6 +6643,7 @@ function startPlantingExtraSeed() {
     appleState.extraPlants.push(newPlant);
     playerStatus.textContent = "";
     updateExtraSeedsAndPlants();
+    holdLocalPlantStateAgainstStaleSnapshot(3000);
     saveAppleState();
   }, plantActionMs);
 }
@@ -6709,6 +6732,7 @@ function plantWorldSeedCount() {
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
       updateNpcPosition();
+      holdLocalPlantStateAgainstStaleSnapshot(3000);
       saveSeedState();
       onboardingNotifyMainPlantPlanted();
     } else {
@@ -6717,6 +6741,7 @@ function plantWorldSeedCount() {
       ensureGrassOrdinalIfNeeded(invPlant);
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
+      holdLocalPlantStateAgainstStaleSnapshot(3000);
     }
 
     playerStatus.textContent = "";
@@ -9975,10 +10000,11 @@ function renderRemotePlayerState(state) {
   remotePlayer.userId = state.userId != null ? String(state.userId) : "";
   remotePlayer.name = state.name || "OVC";
   const nextWaterSplashAt = Number(state.waterSplashAt || 0);
+  const splashClockNow = Date.now();
   if (
     nextWaterSplashAt > 0 &&
     nextWaterSplashAt > Number(remotePlayer.lastWaterSplashAt || 0) &&
-    Date.now() - nextWaterSplashAt < 5000
+    Math.abs(splashClockNow - nextWaterSplashAt) <= REMOTE_WATER_SPLASH_ACCEPT_MS
   ) {
     const nextSplashX = Number(state.waterSplashX);
     const nextSplashY = Number(state.waterSplashY);
@@ -10674,8 +10700,10 @@ function clearMultiplayerRoomSessionTracking() {
 
 function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
   if (!remoteId || !state) return;
+  const now = Date.now();
   const nextWaterSplashAt = Number(state.waterSplashAt || 0);
-  if (!nextWaterSplashAt || Date.now() - nextWaterSplashAt >= 5000) return;
+  if (!nextWaterSplashAt) return;
+  if (Math.abs(now - nextWaterSplashAt) > REMOTE_WATER_SPLASH_ACCEPT_MS) return;
   if (nextWaterSplashAt <= Number(lastRemoteWaterSplashAppliedAtBySession[remoteId] || 0)) {
     return;
   }
@@ -10955,6 +10983,7 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   const cur = Math.max(0, Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
   if (nextAt <= cur) return;
   appleState.worldLooseSeed.nextSpawnAt = nextAt;
+  worldLoosePickupLockUntil = Math.max(Number(worldLoosePickupLockUntil || 0), nextAt);
   const px = Number(payload.x);
   const py = Number(payload.y);
   if (Number.isFinite(px)) appleState.worldLooseSeed.x = px;
