@@ -11012,7 +11012,7 @@ function ensureButterflyRenderEntry(butterfly) {
     frame: -1,
     facingRight: null,
     catchable: null,
-    lastDrawX: null
+    lastMotionX: null
   };
   butterflyRenderById[butterfly.id] = entry;
   return entry;
@@ -11433,6 +11433,7 @@ function updateButterflies() {
       butterfly._renderX = butterfly.x;
       butterfly._renderY = butterfly.y;
     }
+    const motionX = drawX;
     setWorldPosition(
       entry.element,
       drawX - BUTTERFLY_SIZE / 2,
@@ -11443,9 +11444,9 @@ function updateButterflies() {
       butterfly.color,
       getButterflyAnimationFrame(now, butterfly)
     );
-    const prevDrawX = Number(entry.lastDrawX);
-    const hasPrevDrawX = Number.isFinite(prevDrawX);
-    const drawDx = hasPrevDrawX ? drawX - prevDrawX : 0;
+    const prevMotionX = Number(entry.lastMotionX);
+    const hasPrevMotionX = Number.isFinite(prevMotionX);
+    const drawDx = hasPrevMotionX ? motionX - prevMotionX : 0;
     let facingRight = entry.facingRight;
     if (facingRight == null) {
       facingRight = butterfly.dirX > 0;
@@ -11455,7 +11456,7 @@ function updateButterflies() {
       facingRight = drawDx > 0;
     }
     applyButterflyFacing(entry, Boolean(facingRight));
-    entry.lastDrawX = drawX;
+    entry.lastMotionX = motionX;
     applyButterflyCatchable(
       entry,
       Boolean(catchTarget && catchTarget.butterfly.id === butterfly.id)
