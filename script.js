@@ -9303,6 +9303,7 @@ function finishCharacterSelect() {
 }
 
 function updatePlayerName() {
+  if (!playerName) return;
   if (
     !player ||
     player.classList.contains("is-hidden-before-spawn")
@@ -9312,14 +9313,32 @@ function updatePlayerName() {
     return;
   }
 
+  // #player-name was inside .world (camera transform). position:fixed was relative to that
+  // subtree, so getBoundingClientRect() (viewport px) + translate() placed the label off-screen.
+  if (playerName.parentNode !== document.body) {
+    document.body.appendChild(playerName);
+  }
+
   const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.textContent = displayName;
-  const nameWidth = playerName.offsetWidth || 36;
+  playerName.style.position = "fixed";
+  playerName.style.left = "0";
+  playerName.style.top = "0";
+  playerName.style.right = "auto";
+  playerName.style.bottom = "auto";
+  playerName.style.margin = "0";
+
   const rect = player.getBoundingClientRect();
   if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || rect.width <= 0 || rect.height <= 0) {
     playerName.style.display = "none";
     return;
   }
+
+  playerName.style.visibility = "hidden";
+  playerName.style.display = "block";
+  const nameWidth = playerName.offsetWidth || 36;
+  playerName.style.visibility = "";
+
   const x = rect.left + rect.width / 2 - nameWidth / 2;
   const y = rect.top - 10;
 
