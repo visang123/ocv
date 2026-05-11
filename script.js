@@ -502,6 +502,9 @@ const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
+const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
+const SYNC_EVENT_DEDUPE_MAX = 4000;
+const SYNC_DEBUG_TRACE = false;
 const WORLD_HEART_FX_MS = 2200;
 const WORLD_CHAT_MAX_CHARS = 120;
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
@@ -525,6 +528,7 @@ let worldChatSendBtn = null;
 let playerChatBubbleEl = null;
 let worldSocialUiReady = false;
 let worldLoosePickupLockUntil = 0;
+let lastWorldLooseSeedPickupAt = 0;
 let lastMainPlantStateChangeAt = 0;
 let lastAppleStateChangeAt = 0;
 let lastWellStateChangeAt = 0;
@@ -553,6 +557,7 @@ let lastLocalButterflyCatchActionAt = 0;
  */
 const butterflyLocalCatchTombstoneById = {};
 const BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS = 8000;
+let seenSyncEventAtById = Object.create(null);
 /** 탭 전환·백그라운드 후 복귀 시 한 프레임에 긴 시간이 건너뛰면 나비 경로가 순간이동처럼 보임 → 웨이포인트 리셋 */
 let lastButterflyWallClockMs = 0;
 let gameLoopCyclesForTutorialSync = 0;
@@ -585,6 +590,9 @@ let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
 let localPlantActionLockUntil = 0;
+let localAppleActionLockUntil = 0;
+let serverClockOffsetMs = 0;
+let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
 let hasHydratedSharedWorldFromServer = false;
 let pendingWorldResetToken = "";
@@ -3399,6 +3407,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       if (now < Number(worldLoosePickupLockUntil || 0)) return;
       appleState.seedCount += 1;
       scheduleWorldLooseRespawnAfterPickup(appleState.worldLooseSeed, now);
+      lastWorldLooseSeedPickupAt = Math.max(lastWorldLooseSeedPickupAt, now);
       worldLoosePickupLockUntil = Math.max(
         Number(worldLoosePickupLockUntil || 0),
         Number(appleState.worldLooseSeed.nextSpawnAt || 0)
@@ -3406,6 +3415,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       saveAppleState();
       broadcastWorldLooseSeedPickup();
       markWorldDirty();
+      holdLocalAppleStateAgainstStaleSnapshot(1200);
       syncWorldState(true);
       updateExtraSeedsAndPlants();
       updateSeedInventory();
@@ -3419,6 +3429,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     nearest.seed.inInventory = true;
     assignExtraSeedInventoryOwner(nearest.seed);
     saveAppleState();
+    holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateExtraSeedsAndPlants();
     updateSeedInventory();
     triggerFirstSeedFocus();
@@ -3461,6 +3472,7 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     nearest.seed.inInventory = true;
     assignExtraSeedInventoryOwner(nearest.seed);
     saveAppleState();
+    holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateExtraSeedsAndPlants();
     updateSeedInventory();
     triggerFirstSeedFocus();
@@ -4243,11 +4255,43 @@ function holdLocalPlantStateAgainstStaleSnapshot(ms) {
   localPlantActionLockUntil = Math.max(localPlantActionLockUntil, Date.now() + lockMs);
 }
 
+function holdLocalAppleStateAgainstStaleSnapshot(ms) {
+  const lockMs = Math.max(0, Number(ms) || 0);
+  if (!lockMs) return;
+  localAppleActionLockUntil = Math.max(localAppleActionLockUntil, Date.now() + lockMs);
+}
+
+function getSynchronizedNow() {
+  return Date.now() + Number(serverClockOffsetMs || 0);
+}
+
+function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
+  if (serverRowUpdatedAt == null || serverRowUpdatedAt === "") return;
+  const parsed =
+    typeof serverRowUpdatedAt === "string"
+      ? Date.parse(serverRowUpdatedAt)
+      : Number(serverRowUpdatedAt);
+  if (!Number.isFinite(parsed) || parsed <= 0) return;
+  const localNow = Date.now();
+  const sample = parsed - localNow;
+  const maxSkew = 2 * 60 * 1000;
+  const clamped = Math.max(-maxSkew, Math.min(maxSkew, sample));
+  if (!Number.isFinite(lastServerClockSyncAt) || lastServerClockSyncAt <= 0) {
+    serverClockOffsetMs = clamped;
+  } else {
+    // Smooth sudden jumps to keep growth/decay stable across polls.
+    serverClockOffsetMs = serverClockOffsetMs * 0.8 + clamped * 0.2;
+  }
+  lastServerClockSyncAt = localNow;
+}
+
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
   if (snapshot.savedBy === currentSessionId) return;
+  syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt);
   const snapshotSavedAt = resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt);
+  const syncedNow = getSynchronizedNow();
   let hasServerRowTime = false;
   if (serverRowUpdatedAt != null && serverRowUpdatedAt !== "") {
     const parsedRowAt =
@@ -4257,7 +4301,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     hasServerRowTime = Number.isFinite(parsedRowAt) && parsedRowAt > 0;
   }
   const snapshotResetToken = String(snapshot.resetToken || "");
-  const isResetGuardWindow = Date.now() - lastWorldResetAt < 20000;
+  const isResetGuardWindow = syncedNow - lastWorldResetAt < 20000;
   // Guard only during the short reset window. After that, allow sync to recover
   // even if some clients still publish snapshots without a reset token.
   if (
@@ -4272,7 +4316,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     snapshotResetToken !== lastAppliedWorldResetToken
   ) {
     lastAppliedWorldResetToken = snapshotResetToken;
-    lastWorldResetAt = Date.now();
+    lastWorldResetAt = syncedNow;
     ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
     sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
     // 공유 세계만: 로컬 월드 캐시 삭제 + 맵·자원 기본값(튜토리얼 세션/온보딩 키는 유지)
@@ -4289,6 +4333,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   }
   isApplyingWorldState = true;
   const shouldDeferRemotePlantApply = Date.now() < localPlantActionLockUntil;
+  const shouldDeferRemoteAppleApply = Date.now() < localAppleActionLockUntil;
 
   try {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
@@ -4363,9 +4408,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    // Snapshots here are always from other clients (savedBy !== currentSessionId).
-    // Do not skip while local planting — that hid remote plants and showed wrong soil.
-    if (snapshot.mainPlant && !shouldDeferRemotePlantApply) {
+    // Snapshot apply rule (mainPlant):
+    // - apply by default (server row is authoritative),
+    // - but defer during short local action locks to avoid flicker/rollback.
+    const shouldApplyMainPlantSnapshot = Boolean(snapshot.mainPlant) && !shouldDeferRemotePlantApply;
+    if (shouldApplyMainPlantSnapshot) {
       let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
       const snapAt = snapshotSavedAt || 0;
       if (
@@ -4400,7 +4447,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           });
         }
         applyLoadedPlantState(incomingPlant);
-        const localApplyNow = Date.now();
+        const localApplyNow = getSynchronizedNow();
         const snapshotRefTime =
           (Number(snapshot.savedAt) > 0 ? Number(snapshot.savedAt) : 0) ||
           (snapshotSavedAt > 0 ? snapshotSavedAt : 0);
@@ -4430,7 +4477,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       }
     }
 
-    if (snapshot.apples) {
+    // Snapshot apply rule (apples/extra seeds/plants):
+    // - defer during local apples lock window,
+    // - then resume full merge on subsequent polls.
+    if (snapshot.apples && !shouldDeferRemoteAppleApply) {
       const priorExtraSeeds = appleState.extraSeeds.slice();
       const priorExtraPlants = appleState.extraPlants.slice();
       const priorWorldLooseNextSpawnAt =
@@ -4498,7 +4548,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         const wls = snapshot.apples.worldLooseSeed;
         if (wls && typeof wls === "object") {
           const incomingNext = Math.max(0, Number(wls.nextSpawnAt) || 0);
-          const nowLoose = Date.now();
+          const nowLoose = syncedNow;
           let mergedNextSpawnAt;
           if (hasServerRowTime) {
             if (priorWorldLooseNextSpawnAt > nowLoose) {
@@ -4657,7 +4707,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       const snapRefPlants =
         (Number(snapshot.savedAt) > 0 ? Number(snapshot.savedAt) : 0) ||
         (snapshotSavedAt > 0 ? snapshotSavedAt : 0);
-      const extraPlantClockNow = Date.now();
+      const extraPlantClockNow = getSynchronizedNow();
       appleState.extraPlants.forEach(function (ep) {
         if (!ep) return;
         if (snapRefPlants > 0) {
@@ -4667,7 +4717,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
         normalizePlantSproutFieldsWhenSoilDry(ep);
       });
-      const now = Date.now();
+      const now = syncedNow;
       Object.keys(localApplePickedAtById).forEach(function (appleId) {
         const pickedAt = Number(localApplePickedAtById[appleId] || 0);
         if (!pickedAt || now - pickedAt >= appleRespawnMs) return;
@@ -6690,6 +6740,7 @@ function startPlantingExtraSeed() {
     playerStatus.textContent = "";
     updateExtraSeedsAndPlants();
     holdLocalPlantStateAgainstStaleSnapshot(3000);
+    holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
   }, plantActionMs);
 }
@@ -6779,6 +6830,7 @@ function plantWorldSeedCount() {
       updatePlantState();
       updateNpcPosition();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
+      holdLocalAppleStateAgainstStaleSnapshot(3000);
       saveSeedState();
       onboardingNotifyMainPlantPlanted();
     } else {
@@ -6788,10 +6840,12 @@ function plantWorldSeedCount() {
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
+      holdLocalAppleStateAgainstStaleSnapshot(3000);
     }
 
     playerStatus.textContent = "";
     updateSeedInventory();
+    holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
     markWorldDirty();
     syncWorldState(true);
@@ -7665,8 +7719,11 @@ function tryUseMagicPowder() {
   saveMagicPowderCount();
   if (target.type === "main") {
     saveSeedState();
+    holdLocalPlantStateAgainstStaleSnapshot(1600);
   } else {
     saveAppleState();
+    holdLocalAppleStateAgainstStaleSnapshot(1600);
+    holdLocalPlantStateAgainstStaleSnapshot(1600);
   }
   syncWorldState(true);
   updateMagicPowderInventoryUi();
@@ -7932,6 +7989,7 @@ function waterExtraPlant(plant) {
   plant.waterLevelUpdatedAt = now;
   plant.becameEmptyAt = null;
   holdLocalPlantStateAgainstStaleSnapshot(1200);
+  holdLocalAppleStateAgainstStaleSnapshot(1200);
 
   saveAppleState();
   syncWorldState(true);
@@ -9891,7 +9949,7 @@ function pollPresenceDatabase() {
         return;
       }
       idsInDb[String(state.id)] = true;
-      renderRemotePlayerState(state);
+      renderRemotePlayerState(state, "poll");
     });
     Object.keys(remotePlayers).forEach(function (remoteId) {
       if (idsInDb[remoteId]) return;
@@ -9957,7 +10015,7 @@ function renderRemotePlayersFromPresence(presenceState) {
   });
 
   Object.keys(nextRemotePlayers).forEach(function (remoteId) {
-    renderRemotePlayerState(nextRemotePlayers[remoteId]);
+    renderRemotePlayerState(nextRemotePlayers[remoteId], "presence");
   });
 
   updateRemotePlayerCount();
@@ -9965,7 +10023,7 @@ function renderRemotePlayersFromPresence(presenceState) {
 
 function handleRemotePlayerBroadcast(state) {
   if (isSharedWorldSyncPausedForTutorial()) return;
-  if (!state || !state.id || state.id === currentSessionId) return;
+  if (!isValidRemotePlayerStatePayload(state) || state.id === currentSessionId) return;
   if (state.action === "leave") {
     delete remoteBucketUpdateAtById[state.id];
     delete multiplayerRoomSessionIdsLastSeen[state.id];
@@ -9978,7 +10036,7 @@ function handleRemotePlayerBroadcast(state) {
     maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
     return;
   }
-  renderRemotePlayerState(state);
+  renderRemotePlayerState(state, "broadcast");
   updateRemotePlayerCount();
 }
 
@@ -9991,9 +10049,29 @@ function removeRemotePlayer(remoteId) {
   updateRemotePlayerCount();
 }
 
-function renderRemotePlayerState(state) {
+function renderRemotePlayerState(state, source) {
   const remoteId = state.id;
   const remotePlayer = remotePlayers[remoteId] || createRemotePlayer(remoteId);
+  const incomingVersion = getRemoteStateVersion(state);
+  const incomingRank = getRemoteStateSourceRank(source);
+  const currentVersion = Number(remotePlayer.lastStateVersion || 0);
+  const currentRank = Number(remotePlayer.lastStateSourceRank || 0);
+  if (
+    incomingVersion > 0 &&
+    (incomingVersion < currentVersion ||
+      (incomingVersion === currentVersion && incomingRank < currentRank))
+  ) {
+    addSyncDebugLog("remote_state_reject", {
+      remoteId: remoteId,
+      source: source || "",
+      incomingVersion: incomingVersion,
+      currentVersion: currentVersion,
+      incomingRank: incomingRank,
+      currentRank: currentRank,
+      reason: "stale_or_lower_rank"
+    }, true);
+    return;
+  }
   const remoteColor = state.color || "#7dd3fc";
   const nextX = Number(state.x) || 0;
   const nextY = -(Number(state.depth) || 0) + (Number(state.jumpY) || 0);
@@ -10045,6 +10123,15 @@ function renderRemotePlayerState(state) {
   remotePlayer.jumpY = Number(state.jumpY) || 0;
   remotePlayer.userId = state.userId != null ? String(state.userId) : "";
   remotePlayer.name = state.name || "OVC";
+  if (incomingVersion > 0) {
+    remotePlayer.lastStateVersion = incomingVersion;
+    remotePlayer.lastStateSourceRank = incomingRank;
+  }
+  addSyncDebugLog("remote_state_apply", {
+    remoteId: remoteId,
+    source: source || "",
+    version: incomingVersion || currentVersion
+  });
   const nextWaterSplashAt = Number(state.waterSplashAt || 0);
   const splashClockNow = Date.now();
   if (
@@ -10092,6 +10179,8 @@ function createRemotePlayer(remoteId) {
     worldY: 0,
     depth: 0,
     jumpY: 0,
+    lastStateVersion: 0,
+    lastStateSourceRank: 0,
     lastWaterSplashAt: 0,
     lastActionAt: 0,
     lastSeenAt: Date.now()
@@ -10378,6 +10467,33 @@ function addBucketTrace(key, message, minIntervalMs) {
   lastBucketTraceAtByKey[key] = now;
   addNetworkDebugLog("[bucket:" + key + "] " + message);
 }
+
+function addSyncDebugLog(topic, fields, force) {
+  if (!force && !SYNC_DEBUG_TRACE) return;
+  const payload = fields && typeof fields === "object" ? fields : {};
+  const keys = Object.keys(payload).sort();
+  const body = keys.map(function (k) {
+    const v = payload[k];
+    return k + "=" + (v == null ? "" : String(v));
+  }).join(" ");
+  addNetworkDebugLog("[sync:" + String(topic || "trace") + "] " + body);
+}
+
+function publishSyncDebugChecklistTemplate() {
+  window.OVCSyncDebugChecklist = function () {
+    return [
+      "[1] 동시 씨앗 줍기(2클라) -> 한쪽만 획득/리스폰 정상",
+      "[2] 나비 동시 잡기 -> 1회 포획 처리/중복 인벤 증가 없음",
+      "[3] 물주기 직후(양쪽) -> 깜빡임/롤백 없음",
+      "[4] 마법가루 사용 직후 -> 단계/게이지 역행 없음",
+      "[5] 시간 차(PC 시계 다르게) -> 급성장/즉시 마름 없음",
+      "[6] 네트워크 지연 후 복귀 -> 오래된 상태가 최신 상태를 덮지 않음",
+      "[7] 동일 eventId 재수신 -> 무시 로그 확인",
+      "[8] poll vs broadcast 동시 도착 -> broadcast 우선 적용"
+    ];
+  };
+}
+publishSyncDebugChecklistTemplate();
 
 async function validateCurrentAccount() {
   if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
@@ -10744,6 +10860,67 @@ function clearMultiplayerRoomSessionTracking() {
   lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 }
 
+function makeSyncEventId(kind, entityId, atMs) {
+  return [
+    String(kind || "evt"),
+    String(currentSessionId || "local"),
+    String(entityId || "na"),
+    String(Math.max(0, Number(atMs) || Date.now())).slice(-8),
+    Math.random().toString(36).slice(2, 8)
+  ].join(":");
+}
+
+function consumeSyncEventId(eventId, nowMs) {
+  if (!eventId) return true;
+  const now = Math.max(0, Number(nowMs) || Date.now());
+  const id = String(eventId);
+  const seenAt = Number(seenSyncEventAtById[id] || 0);
+  if (seenAt > 0 && now - seenAt <= SYNC_EVENT_DEDUPE_TTL_MS) {
+    addSyncDebugLog("event_dedupe_reject", {
+      eventId: id,
+      ageMs: now - seenAt
+    }, true);
+    return false;
+  }
+  seenSyncEventAtById[id] = now;
+  const ids = Object.keys(seenSyncEventAtById);
+  if (ids.length <= SYNC_EVENT_DEDUPE_MAX) return true;
+  ids.forEach(function (k) {
+    const t = Number(seenSyncEventAtById[k] || 0);
+    if (!t || now - t > SYNC_EVENT_DEDUPE_TTL_MS) {
+      delete seenSyncEventAtById[k];
+    }
+  });
+  addSyncDebugLog("event_dedupe_accept", { eventId: id, at: now });
+  return true;
+}
+
+function getRemoteStateVersion(state) {
+  if (!state || typeof state !== "object") return 0;
+  const updatedAt = Number(state.updatedAt || 0);
+  const splashAt = Number(state.waterSplashAt || 0);
+  return Math.max(0, updatedAt, splashAt);
+}
+
+function getRemoteStateSourceRank(source) {
+  // Same version arrives from both paths: prefer broadcast over DB poll.
+  if (source === "broadcast") return 3;
+  if (source === "presence") return 2;
+  return 1;
+}
+
+function isValidRemotePlayerStatePayload(state) {
+  if (!state || !state.id) return false;
+  const x = Number(state.x);
+  const depth = Number(state.depth);
+  const jumpY = Number(state.jumpY);
+  if ((state.x != null && !Number.isFinite(x)) || (state.depth != null && !Number.isFinite(depth))) {
+    return false;
+  }
+  if (state.jumpY != null && !Number.isFinite(jumpY)) return false;
+  return true;
+}
+
 function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
   if (!remoteId || !state) return;
   const now = Date.now();
@@ -10834,16 +11011,22 @@ function simulateButterflyAuthorityStep(butterfly, now) {
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
   // Linear progress: ease-in-out made speed → 0 at each waypoint (looked like stopping).
   const eased = t;
-  const previousX = butterfly.x;
-  butterfly.x = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
-  butterfly.y = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
+  const pathX = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
+  const pathY = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
+  const previousPathX = Number.isFinite(Number(butterfly.lastPathX))
+    ? Number(butterfly.lastPathX)
+    : waypoint.startX;
+  butterfly.lastPathX = pathX;
+  butterfly.x = pathX;
+  butterfly.y = pathY;
   const fl = getButterflyFlutterOffsetWorld(now, butterfly);
   butterfly.x += fl.dx;
   butterfly.y += fl.dy;
   clampButterflyToBounds(butterfly);
-  const dx = butterfly.x - previousX;
-  if (Math.abs(dx) > 0.05) {
-    butterfly.dirX = dx > 0 ? 1 : -1;
+  // Face actual path direction, not flutter jitter around the path.
+  const pathDx = pathX - previousPathX;
+  if (Math.abs(pathDx) > 0.01) {
+    butterfly.dirX = pathDx > 0 ? 1 : -1;
   }
 }
 
@@ -10972,10 +11155,14 @@ function findCatchableButterfly() {
   return nearest;
 }
 
-function stripButterflyFromSharedList(butterflyId) {
+function stripButterflyFromSharedList(butterflyId, tombstoneAt) {
   const id = String(butterflyId || "");
   if (!id) return false;
-  butterflyLocalCatchTombstoneById[id] = Date.now();
+  const ts = Math.max(
+    Number(butterflyLocalCatchTombstoneById[id] || 0),
+    Math.max(0, Number(tombstoneAt) || Date.now())
+  );
+  butterflyLocalCatchTombstoneById[id] = ts;
   const had = butterflyState.list.some(function (b) {
     return b.id === id;
   });
@@ -11001,13 +11188,17 @@ function broadcastWorldLooseSeedPickup() {
   if (!multiplayerChannel || !currentSessionId) return;
   ensureWorldLooseSeedShape();
   const ws = appleState.worldLooseSeed;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_loose_seed_pickup", "world-loose-seed", at);
+  consumeSyncEventId(eventId, at);
   Promise.resolve(
     multiplayerChannel.send({
       type: "broadcast",
       event: "world_loose_seed_pickup",
       payload: {
         from: currentSessionId,
-        at: Date.now(),
+        eventId: eventId,
+        at: at,
         x: Number(ws.x) || WORLD_LOOSE_SEED_X,
         y: Number(ws.y) || WORLD_LOOSE_SEED_Y,
         nextSpawnAt: Math.max(0, Number(ws.nextSpawnAt) || 0)
@@ -11022,12 +11213,41 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!usesWorldLooseSeedMode()) return;
   if (!payload || payload.from === currentSessionId) return;
-  const nextAt = Math.max(0, Number(payload.nextSpawnAt) || 0);
+  if ((payload.x != null && !Number.isFinite(Number(payload.x))) || (payload.y != null && !Number.isFinite(Number(payload.y)))) {
+    addSyncDebugLog("world_loose_seed_reject", { reason: "invalid_position" }, true);
+    return;
+  }
   const now = Date.now();
-  if (nextAt <= now) return;
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const evtAt = Math.max(0, Number(payload.at) || 0);
+  if (evtAt > 0 && evtAt <= Number(lastWorldLooseSeedPickupAt || 0)) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "older_event",
+      eventAt: evtAt,
+      lastAppliedAt: lastWorldLooseSeedPickupAt
+    }, true);
+    return;
+  }
+  const nextAt = Math.max(0, Number(payload.nextSpawnAt) || 0);
+  if (nextAt <= now) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "expired_next_spawn",
+      nextAt: nextAt,
+      now: now
+    }, true);
+    return;
+  }
   ensureWorldLooseSeedShape();
   const cur = Math.max(0, Number(appleState.worldLooseSeed.nextSpawnAt) || 0);
-  if (nextAt <= cur) return;
+  if (nextAt <= cur) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "older_next_spawn",
+      nextAt: nextAt,
+      currentNextAt: cur
+    }, true);
+    return;
+  }
+  if (evtAt > 0) lastWorldLooseSeedPickupAt = Math.max(lastWorldLooseSeedPickupAt, evtAt);
   appleState.worldLooseSeed.nextSpawnAt = nextAt;
   worldLoosePickupLockUntil = Math.max(Number(worldLoosePickupLockUntil || 0), nextAt);
   const px = Number(payload.x);
@@ -11038,18 +11258,28 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   markWorldDirty();
   updateExtraSeedsAndPlants();
   updateSeedInventory();
+  addSyncDebugLog("world_loose_seed_apply", {
+    eventId: payload.eventId || "",
+    eventAt: evtAt || 0,
+    nextSpawnAt: nextAt
+  });
 }
 
 function broadcastButterflyCatch(butterflyId) {
   if (!multiplayerChannel || !currentSessionId) return;
+  const at = Date.now();
+  const bid = String(butterflyId || "");
+  const eventId = makeSyncEventId("butterfly_catch", bid, at);
+  consumeSyncEventId(eventId, at);
   Promise.resolve(
     multiplayerChannel.send({
       type: "broadcast",
       event: "butterfly_catch",
       payload: {
-        butterflyId: String(butterflyId || ""),
+        butterflyId: bid,
         from: currentSessionId,
-        at: Date.now()
+        eventId: eventId,
+        at: at
       }
     })
   ).catch(function () {
@@ -11061,9 +11291,38 @@ function handleRemoteButterflyCatchBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.butterflyId) return;
   if (payload.from === currentSessionId) return;
+  const now = Date.now();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const butterflyId = String(payload.butterflyId || "");
+  if (!butterflyId) return;
+  const evtAt = Math.max(0, Number(payload.at) || now);
+  if (Math.abs(now - evtAt) > SYNC_EVENT_DEDUPE_TTL_MS) {
+    addSyncDebugLog("butterfly_catch_reject", {
+      reason: "clock_out_of_window",
+      butterflyId: butterflyId,
+      now: now,
+      eventAt: evtAt
+    }, true);
+    return;
+  }
+  const tombstoneAt = Number(butterflyLocalCatchTombstoneById[butterflyId] || 0);
+  if (evtAt <= tombstoneAt) {
+    addSyncDebugLog("butterfly_catch_reject", {
+      reason: "older_than_tombstone",
+      butterflyId: butterflyId,
+      eventAt: evtAt,
+      tombstoneAt: tombstoneAt
+    }, true);
+    return;
+  }
   // Even if this client already dropped it, keep world-state clocks aligned.
-  stripButterflyFromSharedList(payload.butterflyId);
-  finalizeButterflyRemovalEffects(Number(payload.at) || Date.now());
+  stripButterflyFromSharedList(butterflyId, evtAt);
+  finalizeButterflyRemovalEffects(evtAt);
+  addSyncDebugLog("butterfly_catch_apply", {
+    eventId: payload.eventId || "",
+    butterflyId: butterflyId,
+    eventAt: evtAt
+  });
 }
 
 function tryCatchButterfly() {
