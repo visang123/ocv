@@ -1190,8 +1190,34 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-#player.is-hidden-before-spawn + #player-color-body {
+#player.is-hidden-before-spawn ~ #player-color-body {
   display: none;
+}
+
+.local-player-avatar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 25px;
+  height: auto;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.local-player-avatar #player {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  z-index: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
+.local-player-avatar #player-name.remote-player-name {
+  z-index: 1;
 }
 
 #spawn-portal {

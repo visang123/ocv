@@ -1555,7 +1555,19 @@ const adminAccountList = document.getElementById("admin-account-list");
 const spawnPortal = document.getElementById("spawn-portal");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
-player.insertAdjacentElement("afterend", playerColorBody);
+const localPlayerRoot = document.createElement("div");
+localPlayerRoot.className = "local-player-avatar";
+if (player && player.parentNode) {
+  player.parentNode.insertBefore(localPlayerRoot, player);
+  localPlayerRoot.appendChild(player);
+  if (playerName) {
+    localPlayerRoot.appendChild(playerName);
+    playerName.classList.add("remote-player-name");
+  }
+  localPlayerRoot.appendChild(playerColorBody);
+} else if (player) {
+  player.insertAdjacentElement("afterend", playerColorBody);
+}
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
@@ -2439,7 +2451,7 @@ function applyTutorialWorldResetIfPending() {
   applyDefaultState();
   clearTutorialSessionWorldFloorPickupFlags();
   loadGuideBookState(true);
-  setWorldPosition(player, playerX, getPlayerWorldY());
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updateCamera();
   savePlayerPosition(true);
@@ -3234,7 +3246,7 @@ function settlePlayerBeforeBackground() {
     isOnGround = true;
     isTreeFalling = false;
     wasPlayerInTree = false;
-    setWorldPosition(player, playerX, getPlayerWorldY());
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
   }
 }
@@ -6508,21 +6520,21 @@ function updateBucketPosition() {
 function updatePlayerPosition() {
   if (isCharacterSelecting || !hasSpawnedCharacter) {
     lastMovementTickMs = performance.now();
-    setWorldPosition(player, playerX, getPlayerWorldY());
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
 
   if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) {
     lastMovementTickMs = performance.now();
-    setWorldPosition(player, playerX, getPlayerWorldY());
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
 
   if (isWorldChatBlockingGameInput()) {
     lastMovementTickMs = performance.now();
-    setWorldPosition(player, playerX, getPlayerWorldY());
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
@@ -6628,7 +6640,7 @@ function updatePlayerPosition() {
     jumpY = previousJumpY;
   }
 
-  setWorldPosition(player, playerX, getPlayerWorldY());
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   wasPlayerInTree = isInTree || (isTreeFalling && playerDepth > groundMaxDepth);
 }
@@ -9284,7 +9296,7 @@ function finishCharacterSelect() {
 
   if (!applyTutorialWorldResetIfPending()) {
     loadOnboardingFlowState();
-    setWorldPosition(player, playerX, getPlayerWorldY());
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     updateCamera();
     savePlayerPosition(true);
@@ -9313,43 +9325,20 @@ function updatePlayerName() {
     return;
   }
 
-  if (playerName.parentNode !== ground) {
-    ground.appendChild(playerName);
-  }
-  if (player && player.parentNode === ground) {
-    player.after(playerName);
-  }
-
-  const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
-  playerName.textContent = displayName;
-
-  playerName.style.position = "absolute";
-  playerName.style.left = "0";
-  playerName.style.top = "0";
-  playerName.style.right = "auto";
-  playerName.style.bottom = "auto";
-  playerName.style.margin = "0";
-
-  const playerBox = getPlayerBox();
+  playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.style.display = "block";
-  playerName.style.visibility = "hidden";
-  const halfTextWidth = (playerName.offsetWidth || 36) / 2;
+  playerName.style.position = "";
+  playerName.style.left = "";
+  playerName.style.top = "";
+  playerName.style.right = "";
+  playerName.style.bottom = "";
+  playerName.style.margin = "";
+  playerName.style.transform = "";
   playerName.style.visibility = "";
-
-  const targetX = toScreenX(playerBox.left + playerBox.width / 2);
-  const clampedX = Math.max(
-    halfTextWidth,
-    Math.min(targetX, window.innerWidth - halfTextWidth)
-  );
-  const headTopPx = toScreenY(playerBox.top);
-  const anchorY = headTopPx - 2;
 
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
   playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
-  playerName.style.display = "block";
-  playerName.style.transform =
-    "translate(" + clampedX + "px, " + anchorY + "px) translate(-50%, -100%)";
 }
 
 function isWorldSocialRealtimeReady() {
@@ -11784,7 +11773,7 @@ function loadPlayerPosition() {
   jumpY = 0;
   velocityY = 0;
   isOnGround = true;
-  setWorldPosition(player, playerX, getPlayerWorldY());
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updateCamera();
   savePlayerPosition(true);
@@ -11795,7 +11784,7 @@ function setup() {
   const bucketSize = getBucketSize();
   const wellSize = getWellSize();
 
-  setWorldSize(player, PLAYER_WIDTH);
+  setWorldSize(localPlayerRoot, PLAYER_WIDTH);
   setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
   Object.keys(remotePlayers).forEach(function (remoteId) {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
