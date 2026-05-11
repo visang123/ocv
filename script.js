@@ -3205,10 +3205,10 @@ function applyDefaultState(options) {
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
   clearMainSeedPickedForCurrentRoom();
+  removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
+  removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
-    removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
-    removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   }
   setStoredFlag(mainSeedCollectedKey, false);
   if (!sharedWorldResetOnly) {
@@ -3343,16 +3343,11 @@ function applyDefaultState(options) {
   seedWorldText.style.display = "none";
   seedInventory.style.display = "none";
   guideCard.style.display = "none";
-  if (!sharedWorldResetOnly) {
-    guideBook.classList.remove("is-near");
-    if (worldBag) {
-      worldBag.style.display = "block";
-      worldBag.classList.remove("is-near");
-    }
-    syncGuideInventoryBar();
-    syncWorldBagGroundVisibility();
-    setBagInventoryPanelOpen(false);
-  }
+  if (guideBook) guideBook.classList.remove("is-near");
+  if (worldBag) worldBag.classList.remove("is-near");
+  setBagInventoryPanelOpen(false);
+  syncGuideInventoryBar();
+  syncWorldBagGroundVisibility();
   hasShownFirstSeedFocus = false;
   window.clearTimeout(firstSeedFocusTimeout);
   seedInventory.classList.remove("is-first-seed-focus");
