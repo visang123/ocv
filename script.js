@@ -498,6 +498,8 @@ let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
 const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
+const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
+const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1200;
 const WORLD_HEART_FX_MS = 2200;
 const WORLD_CHAT_MAX_CHARS = 120;
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
@@ -539,6 +541,7 @@ const butterflyRenderById = {};
 const butterflyAuthorityWaypointById = {};
 let lastButterflyBroadcastAt = 0;
 let lastLocalButterflyCatchAt = 0;
+let lastLocalButterflyCatchActionAt = 0;
 /**
  * Map of butterflyId -> ms timestamp of when this client caught it locally.
  * Used to suppress the butterfly from re-appearing if the authority's stale
@@ -560,6 +563,7 @@ const butterflyState = {
 let hasSeededInitialButterflies = false;
 const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 const magicPowderCountKey = "magicPowderCountV1";
+const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
 let isCraftingMagicPowder = false;
 let magicPowderCraftTimer = null;
@@ -6406,7 +6410,7 @@ function isPlayerNearTreeTrunk() {
     top: footY - 8,
     bottom: footY + 2
   };
-  const hPad = TREE_CLIMB_DISTANCE;
+  const hPad = TREE_CLIMB_DISTANCE + 4;
   const rootsRect = {
     left: BIG_TREE_X + TREE_CSS_ROOTS_LEFT - hPad,
     right: BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH + hPad,
@@ -7516,6 +7520,7 @@ function useBucket() {
 
 function getNearestPlantForMagicPowder() {
   let nearest = null;
+  const powderDistance = MAGIC_POWDER_USE_DISTANCE;
   if (
     plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "dry" &&
@@ -7528,7 +7533,7 @@ function getNearestPlantForMagicPowder() {
         PLANT_SPOT_WIDTH,
         PLANT_SPOT_HEIGHT
       );
-      if (distance <= plantWaterDistance) {
+      if (distance <= powderDistance) {
         nearest = { type: "main", plant: plantRuntime, distance };
       }
     }
@@ -7537,7 +7542,7 @@ function getNearestPlantForMagicPowder() {
     if (!plant || plant.status === "dry" || plant.status === "rotten") return;
     if (!getNextPowderTargetTier(plant) || isPowderUpgradeInProgress(plant)) return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
-    if (distance > plantWaterDistance) return;
+    if (distance > powderDistance) return;
     if (!nearest || distance < nearest.distance) {
       nearest = { type: "extra", plant, distance };
     }
@@ -7758,19 +7763,26 @@ function waterPlant(target) {
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   } else if (plantRuntime.waterLevel >= waterCapacity) {
-    // Already at the cap. Pouring more water rots the plant: the soil flips to
-    // the rotten image and the sprout disappears, then the slot is cleared
-    // a few seconds later so the player can plant something new.
-    plantRuntime.isOverwatered = true;
-    plantRuntime.status = "rotten";
-    plantRuntime.rottenAt = now;
-    plantRuntime.growthStartedAt = null;
-    plantRuntime.isSproutGrown = false;
-    plantRuntime.sproutGrownAt = null;
-    plantRuntime.sproutEvolutionMs = 0;
-    plantRuntime.sproutEvolutionLastTickAt = null;
-    plantRuntime.isSproutSelfSustaining = false;
-    plantRuntime.needsFirstWater = false;
+    if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
+      // Final idle stage(3/5): keep healthy even when players keep watering.
+      plantRuntime.waterLevel = waterCapacity;
+      plantRuntime.isOverwatered = false;
+      plantRuntime.status = "normal";
+    } else {
+      // Already at the cap. Pouring more water rots the plant: the soil flips to
+      // the rotten image and the sprout disappears, then the slot is cleared
+      // a few seconds later so the player can plant something new.
+      plantRuntime.isOverwatered = true;
+      plantRuntime.status = "rotten";
+      plantRuntime.rottenAt = now;
+      plantRuntime.growthStartedAt = null;
+      plantRuntime.isSproutGrown = false;
+      plantRuntime.sproutGrownAt = null;
+      plantRuntime.sproutEvolutionMs = 0;
+      plantRuntime.sproutEvolutionLastTickAt = null;
+      plantRuntime.isSproutSelfSustaining = false;
+      plantRuntime.needsFirstWater = false;
+    }
   } else {
     plantRuntime.waterLevel = Math.min(waterCapacity, plantRuntime.waterLevel + 1);
     plantRuntime.isOverwatered = false;
@@ -7824,16 +7836,22 @@ function waterExtraPlant(plant) {
     plant.isOverwatered = false;
     plant.status = "normal";
   } else if (plant.waterLevel >= waterCapacity) {
-    plant.isOverwatered = true;
-    plant.status = "rotten";
-    plant.rottenAt = now;
-    plant.growthStartedAt = null;
-    plant.isSproutGrown = false;
-    plant.sproutGrownAt = null;
-    plant.sproutEvolutionMs = 0;
-    plant.sproutEvolutionLastTickAt = null;
-    plant.isSproutSelfSustaining = false;
-    plant.needsFirstWater = false;
+    if (shouldPauseWaterDecayForPlant(plant, now)) {
+      plant.waterLevel = waterCapacity;
+      plant.isOverwatered = false;
+      plant.status = "normal";
+    } else {
+      plant.isOverwatered = true;
+      plant.status = "rotten";
+      plant.rottenAt = now;
+      plant.growthStartedAt = null;
+      plant.isSproutGrown = false;
+      plant.sproutGrownAt = null;
+      plant.sproutEvolutionMs = 0;
+      plant.sproutEvolutionLastTickAt = null;
+      plant.isSproutSelfSustaining = false;
+      plant.needsFirstWater = false;
+    }
   } else {
     plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
@@ -9598,6 +9616,8 @@ function sendMultiplayerPresence(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();
+  const shouldShowButterflyCatchAction =
+    now - Number(lastLocalButterflyCatchActionAt || 0) <= REMOTE_BUTTERFLY_CATCH_ACTION_MS;
   const state = {
     id: currentSessionId,
     userId: currentUserId,
@@ -9608,6 +9628,8 @@ function sendMultiplayerPresence(forceSend) {
         ? "planting"
         : appleState.isEating
           ? "eating"
+          : shouldShowButterflyCatchAction
+            ? "butterfly_catch"
           : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
@@ -9793,7 +9815,10 @@ function pollPresenceDatabase() {
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
       multiplayerRoomSessionIdsLastSeen[String(state.id)] = now;
-      if (isRemotePresenceSameLoggedInAccount(state)) return;
+      if (isRemotePresenceSameLoggedInAccount(state)) {
+        maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
+        return;
+      }
       idsInDb[String(state.id)] = true;
       renderRemotePlayerState(state);
     });
@@ -9914,21 +9939,28 @@ function renderRemotePlayerState(state) {
     state.name || "OVC"
   );
   if (statusAction) {
-    remotePlayer.statusElement.textContent =
+    const nextStatusText =
       state.action === "magic_powder"
         ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911..."
         : state.action === "planting"
           ? "\uC528\uC557 \uC2EC\uB294\uC911..."
           : state.action === "eating"
             ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
-            : "";
-    remotePlayer.statusElement.style.display = remotePlayer.statusElement.textContent ? "block" : "none";
-    remotePlayer.lastActionAt = remotePlayer.statusElement.textContent ? Date.now() : 0;
+            : state.action === "butterfly_catch"
+              ? "\uB098\uBE44 \uC7A1\uB294\uC911..."
+              : "";
+    if (nextStatusText) {
+      remotePlayer.statusElement.textContent = nextStatusText;
+      remotePlayer.statusElement.style.display = "block";
+      remotePlayer.lastActionAt = Date.now();
+    }
   } else {
-    // 상대 클라이언트는 이미 텍스트를 뗐을 때(state/watering) — 여기서 늘리지 않음
-    remotePlayer.statusElement.textContent = "";
-    remotePlayer.statusElement.style.display = "none";
-    remotePlayer.lastActionAt = 0;
+    const keepUntil = Number(remotePlayer.lastActionAt || 0) + REMOTE_ACTION_STATUS_HOLD_MS;
+    if (Date.now() >= keepUntil) {
+      remotePlayer.statusElement.textContent = "";
+      remotePlayer.statusElement.style.display = "none";
+      remotePlayer.lastActionAt = 0;
+    }
   }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
@@ -10954,8 +10986,9 @@ function handleRemoteButterflyCatchBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.butterflyId) return;
   if (payload.from === currentSessionId) return;
-  if (!stripButterflyFromSharedList(payload.butterflyId)) return;
-  finalizeButterflyRemovalEffects();
+  // Even if this client already dropped it, keep world-state clocks aligned.
+  stripButterflyFromSharedList(payload.butterflyId);
+  finalizeButterflyRemovalEffects(Number(payload.at) || Date.now());
 }
 
 function tryCatchButterfly() {
@@ -10968,6 +11001,7 @@ function tryCatchButterfly() {
   if (!target) return false;
 
   lastLocalButterflyCatchAt = now;
+  lastLocalButterflyCatchActionAt = now;
   const caught = target.butterfly;
   stripButterflyFromSharedList(caught.id);
   if (!butterflyState.caughtCounts[caught.color]) {
