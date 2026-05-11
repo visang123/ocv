@@ -768,9 +768,10 @@ body::-webkit-scrollbar {
   height: 10px;
   background: transparent;
   border: 0;
-  color: #c68b44;
-  font: 700 7px/10px Arial, sans-serif;
-  text-align: center;
+  object-fit: contain;
+  object-position: center;
+  /* 이미지의 검은 배경이 바닥에서 덜 보이게 */
+  mix-blend-mode: screen;
   user-select: none;
   pointer-events: none;
 }
