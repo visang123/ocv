@@ -6113,9 +6113,6 @@ function hasActiveGreenGrowthProgress(plant, now) {
   return false;
 }
 
-/**
- * 3단계(완성 새싹)·5단계(완성 풀)이면서 성장 게이지가 없을 때: 물 감소·마름 멈춤, 카드에서 수분만 숨김.
- */
 function isSproutStage3Or5IdleNoGrowth(plant, now) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
   const st = getSproutStageFromPlant(plant);
@@ -6128,16 +6125,10 @@ function shouldPauseWaterDecayForPlant(plant, now) {
   return isSproutStage3Or5IdleNoGrowth(plant, now);
 }
 
-function syncPlantCardWaterReadoutVisibility(plant, now) {
+function syncPlantCardWaterReadoutVisibility() {
   if (!plantWaterText || !plantWaterBar) return;
-  const hide = plant && shouldPauseWaterDecayForPlant(plant, now);
-  if (hide) {
-    plantWaterText.style.display = "none";
-    plantWaterBar.style.display = "none";
-  } else {
-    plantWaterText.style.display = "";
-    plantWaterBar.style.display = "grid";
-  }
+  plantWaterText.style.display = "";
+  plantWaterBar.style.display = "grid";
 }
 
 function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
@@ -8388,7 +8379,7 @@ function updatePlantCard() {
       segment.style.display = index < waterCapacity ? "block" : "none";
       segment.classList.toggle("is-filled", index < plant.waterLevel);
     });
-    syncPlantCardWaterReadoutVisibility(plant, Date.now());
+    syncPlantCardWaterReadoutVisibility();
     return;
   }
 
@@ -8397,8 +8388,7 @@ function updatePlantCard() {
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
     plantRuntime.isOverwatered ||
-    shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime) ||
-    !wateringTarget
+    shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime)
   ) {
     plantCard.style.display = "none";
     if (plantCardTitle) plantCardTitle.textContent = "";
@@ -8416,7 +8406,7 @@ function updatePlantCard() {
     segment.style.display = index < waterCapacity ? "block" : "none";
     segment.classList.toggle("is-filled", index < plantRuntime.waterLevel);
   });
-  syncPlantCardWaterReadoutVisibility(plantRuntime, Date.now());
+  syncPlantCardWaterReadoutVisibility();
 
 }
 
@@ -9195,19 +9185,43 @@ function openCharacterSelectIfNeeded() {
 
   if (hasSpawnedCharacter) {
     player.classList.remove("is-hidden-before-spawn");
-    if (playerBaseImageReady) {
+    function runAfterPlayerBaseReady() {
       applyTutorialWorldResetIfPending();
       applyPlayerColor(selectedPlayerColor);
       syncPlayerColorToServer(true);
       setupMultiplayer();
+    }
+    const baseImageDecoded =
+      playerBaseImageReady ||
+      (playerBaseImage.complete && playerBaseImage.naturalWidth > 0 && playerBaseImage.naturalHeight > 0);
+    if (baseImageDecoded) {
+      runAfterPlayerBaseReady();
     } else {
-      playerBaseImage.addEventListener("load", function onceLoaded() {
-        playerBaseImage.removeEventListener("load", onceLoaded);
-        applyTutorialWorldResetIfPending();
-        applyPlayerColor(selectedPlayerColor);
-        syncPlayerColorToServer(true);
-        setupMultiplayer();
-      }, { once: true });
+      let fallbackTimer = null;
+      const onReady = function () {
+        playerBaseImage.removeEventListener("load", onReady);
+        playerBaseImage.removeEventListener("error", onError);
+        if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
+        playerBaseImageReady =
+          Boolean(playerBaseImage.naturalWidth && playerBaseImage.naturalHeight) || playerBaseImageReady;
+        runAfterPlayerBaseReady();
+      };
+      const onError = function () {
+        playerBaseImage.removeEventListener("load", onReady);
+        playerBaseImage.removeEventListener("error", onError);
+        if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
+        addNetworkDebugLog("player base image load error; continuing init without tint cache");
+        runAfterPlayerBaseReady();
+      };
+      fallbackTimer = window.setTimeout(function () {
+        playerBaseImage.removeEventListener("load", onReady);
+        playerBaseImage.removeEventListener("error", onError);
+        fallbackTimer = null;
+        addNetworkDebugLog("player base image load timeout; continuing multiplayer setup");
+        runAfterPlayerBaseReady();
+      }, 4000);
+      playerBaseImage.addEventListener("load", onReady, { once: true });
+      playerBaseImage.addEventListener("error", onError, { once: true });
     }
     return;
   }
