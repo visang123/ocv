@@ -23,6 +23,7 @@ const growthFill = document.getElementById("growth-fill");
 const guideBook = document.getElementById("guide-book");
 const worldBag = document.getElementById("world-bag");
 const guideBookButton = document.getElementById("guide-book-button");
+const worldBagInventory = document.getElementById("world-bag-inventory");
 const guideCard = document.getElementById("guide-card");
 const guideCloseButton = document.getElementById("guide-close-button");
 const guidePages = Array.from(document.querySelectorAll(".guide-page"));
@@ -88,6 +89,7 @@ export {
   guideBook,
   worldBag,
   guideBookButton,
+  worldBagInventory,
   guideCard,
   guideCloseButton,
   guidePages,
