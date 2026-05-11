@@ -9313,40 +9313,42 @@ function updatePlayerName() {
     return;
   }
 
-  // #player-name was inside .world (camera transform). position:fixed was relative to that
-  // subtree, so getBoundingClientRect() (viewport px) + translate() placed the label off-screen.
-  if (playerName.parentNode !== document.body) {
-    document.body.appendChild(playerName);
+  if (playerName.parentNode !== ground) {
+    ground.appendChild(playerName);
+  }
+  if (player && player.parentNode === ground) {
+    player.after(playerName);
   }
 
   const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.textContent = displayName;
-  playerName.style.position = "fixed";
+
+  playerName.style.position = "absolute";
   playerName.style.left = "0";
   playerName.style.top = "0";
   playerName.style.right = "auto";
   playerName.style.bottom = "auto";
   playerName.style.margin = "0";
 
-  const rect = player.getBoundingClientRect();
-  if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || rect.width <= 0 || rect.height <= 0) {
-    playerName.style.display = "none";
-    return;
-  }
-
-  playerName.style.visibility = "hidden";
+  const playerBox = getPlayerBox();
   playerName.style.display = "block";
-  const nameWidth = playerName.offsetWidth || 36;
+  playerName.style.visibility = "hidden";
+  const halfTextWidth = (playerName.offsetWidth || 36) / 2;
   playerName.style.visibility = "";
 
-  const x = rect.left + rect.width / 2 - nameWidth / 2;
-  const y = rect.top - 10;
+  const targetX = toScreenX(playerBox.left + playerBox.width / 2);
+  const clampedX = Math.max(
+    halfTextWidth,
+    Math.min(targetX, window.innerWidth - halfTextWidth)
+  );
+  const anchorY = toScreenY(playerBox.top - 6);
 
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
   playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
   playerName.style.display = "block";
-  playerName.style.transform = "translate(" + x + "px, " + y + "px)";
+  playerName.style.transform =
+    "translate(" + clampedX + "px, " + anchorY + "px) translate(-50%, -100%)";
 }
 
 function isWorldSocialRealtimeReady() {

@@ -1110,8 +1110,8 @@ body::-webkit-scrollbar {
 }
 
 #player-name {
-  position: fixed;
-  z-index: 42;
+  position: absolute;
+  z-index: 45;
   display: none;
   min-width: 24px;
   max-width: 75px;
