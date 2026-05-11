@@ -5634,20 +5634,66 @@ function groundClientToWorldXY(clientX, clientY) {
   };
 }
 
-/** 식물 중심(호버 앵커)과 가장 가까운 식물 — 겹침 시 포인터에 가까운 쪽 */
+function isWorldPointInsideRect(x, y, rect) {
+  if (!rect) return false;
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+/** 현재 보이는 식물 스프라이트(흙/새싹/풀)의 월드 박스 목록 */
+function getPlantVisibleHoverRectsWorld(plant) {
+  if (!plant) return [];
+  const px = plant.spotX != null ? plant.spotX : plant.x;
+  const py = plant.spotY != null ? plant.spotY : plant.y;
+  const rects = [];
+
+  if (!shouldHideSeparateSoilUnderBigGrass(plant)) {
+    rects.push({
+      left: px,
+      top: py,
+      right: px + PLANT_SPOT_WIDTH,
+      bottom: py + PLANT_SPOT_HEIGHT
+    });
+  }
+
+  const sproutVisible =
+    plant.isSproutGrown &&
+    plant.status !== "rotten" &&
+    plant.status !== "dry" &&
+    !plant.isOverwatered;
+  if (sproutVisible) {
+    const st = getSproutStageFromPlant(plant);
+    const sz = getSproutSizeForStage(st);
+    const pos = getSproutWorldPositionForPlant(px, py, sz, st);
+    rects.push({
+      left: pos.x,
+      top: pos.y,
+      right: pos.x + sz.width,
+      bottom: pos.y + sz.height
+    });
+  }
+
+  return rects;
+}
+
+/** 포인터가 현재 식물 이미지 영역 안에 있을 때만 선택(겹침 시 중심거리 가까운 쪽) */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
   let best = null;
   let bestD = Infinity;
-  const rMax = plantHoverPickRadiusWorld;
   function consider(plant) {
     if (!plant) return;
-    const a = getPlantHoverAnchorWorld(plant);
-    const d = Math.hypot(pxy.x - a.cxWorld, pxy.y - a.cyWorld);
-    if (d <= rMax && d < bestD) {
-      bestD = d;
-      best = plant;
+    const rects = getPlantVisibleHoverRectsWorld(plant);
+    for (let i = 0; i < rects.length; i += 1) {
+      const rect = rects[i];
+      if (!isWorldPointInsideRect(pxy.x, pxy.y, rect)) continue;
+      const cx = (rect.left + rect.right) / 2;
+      const cy = (rect.top + rect.bottom) / 2;
+      const d = Math.hypot(pxy.x - cx, pxy.y - cy);
+      if (d < bestD) {
+        bestD = d;
+        best = plant;
+      }
     }
   }
   if (plantRuntime.isSeedPlanted) consider(plantRuntime);
