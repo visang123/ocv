@@ -536,7 +536,6 @@ const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
 const SYNC_DEBUG_TRACE = false;
-const LOCAL_PLAYER_RENDER_SCALE = 0.88;
 const WORLD_HEART_FX_MS = 2200;
 const WORLD_CHAT_MAX_CHARS = 120;
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
@@ -9152,13 +9151,14 @@ function finishCharacterSelect() {
 }
 
 function updatePlayerName() {
-  if (!currentUserName || !hasSpawnedCharacter) {
+  if (!hasSpawnedCharacter) {
     playerName.style.display = "none";
     playerName.classList.remove("is-dialogue-layer");
     return;
   }
 
-  playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
+  const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
+  playerName.textContent = displayName;
   const nameWidth = playerName.offsetWidth || 36;
   const rect = player.getBoundingClientRect();
   const x = rect.left + rect.width / 2 - nameWidth / 2;
@@ -11700,16 +11700,8 @@ function setup() {
   const bucketSize = getBucketSize();
   const wellSize = getWellSize();
 
-  setWorldSize(
-    player,
-    PLAYER_WIDTH * LOCAL_PLAYER_RENDER_SCALE,
-    PLAYER_HEIGHT * LOCAL_PLAYER_RENDER_SCALE
-  );
-  setWorldSize(
-    playerColorBody,
-    PLAYER_WIDTH * LOCAL_PLAYER_RENDER_SCALE,
-    PLAYER_HEIGHT * LOCAL_PLAYER_RENDER_SCALE
-  );
+  setWorldSize(player, PLAYER_WIDTH, PLAYER_HEIGHT);
+  setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
   Object.keys(remotePlayers).forEach(function (remoteId) {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
   });
