@@ -119,7 +119,7 @@ export function getMinPlantCenterClearanceWorld(maturityLevel) {
   const w1 = SPROUT_STAGE_WIDTHS[0];
   const w2 = SPROUT_STAGE_WIDTHS[1];
 
-  if (m >= 5) return 7;
+  if (m >= 5) return 12;
   if (m >= 4) return 6;
   if (m >= 3) return 1.5;
   if (m === 2) return (w2 + spot) / 2 + minPlantCenterGapWorld;

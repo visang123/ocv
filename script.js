@@ -499,7 +499,7 @@ let lastWaterSplashY = 0;
 const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
-const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1200;
+const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const WORLD_HEART_FX_MS = 2200;
@@ -10018,7 +10018,7 @@ function renderRemotePlayerState(state) {
           : state.action === "eating"
             ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
             : state.action === "butterfly_catch"
-              ? "\uB098\uBE44 \uC7A1\uB294\uC911..."
+              ? "\uB098\uBE44 \uC7A1\uC74C"
               : "";
     if (nextStatusText) {
       remotePlayer.statusElement.textContent = nextStatusText;
