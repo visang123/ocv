@@ -55,6 +55,10 @@ import {
   GUIDE_BOOK_START_Y,
   GUIDE_BOOK_WIDTH,
   GUIDE_BOOK_HEIGHT,
+  WORLD_BAG_WIDTH,
+  WORLD_BAG_HEIGHT,
+  WORLD_BAG_START_X,
+  WORLD_BAG_START_Y,
   NPC_START_X,
   NPC_START_Y,
   appleEatMs,
@@ -162,6 +166,7 @@ import {
   growthCard,
   growthFill,
   guideBook,
+  worldBag,
   guideBookButton,
   guideCard,
   guideCloseButton,
@@ -297,6 +302,8 @@ let signX = SIGN_START_X;
 let signY = SIGN_START_Y;
 let guideBookX = GUIDE_BOOK_START_X;
 let guideBookY = GUIDE_BOOK_START_Y;
+let worldBagX = WORLD_BAG_START_X;
+let worldBagY = WORLD_BAG_START_Y;
 let hasGuideBook = false;
 let isGuideBookOpen = false;
 let isGuideDismissedAtSign = false;
@@ -3063,6 +3070,8 @@ function applyDefaultState(options) {
   signY = SIGN_START_Y;
   guideBookX = GUIDE_BOOK_START_X;
   guideBookY = GUIDE_BOOK_START_Y;
+  worldBagX = WORLD_BAG_START_X;
+  worldBagY = WORLD_BAG_START_Y;
   plantRuntime.seedCreatedAt = Date.now();
   setStoredValue(seedCreatedAtKey, String(plantRuntime.seedCreatedAt));
   plantRuntime.isSeedDry = false;
@@ -3222,6 +3231,7 @@ function applyDefaultState(options) {
   updateBucketPosition();
   setWorldPosition(signBoard, signX, signY);
   setWorldPosition(guideBook, guideBookX, guideBookY);
+  if (worldBag) setWorldPosition(worldBag, worldBagX, worldBagY);
   if (sharedWorldResetOnly) {
     loadGuideBookState(true);
   } else {
@@ -8803,8 +8813,11 @@ function loadSeedState() {
     signY = SIGN_START_Y;
     guideBookX = GUIDE_BOOK_START_X;
     guideBookY = GUIDE_BOOK_START_Y;
+    worldBagX = WORLD_BAG_START_X;
+    worldBagY = WORLD_BAG_START_Y;
     setWorldPosition(signBoard, signX, signY);
     setWorldPosition(guideBook, guideBookX, guideBookY);
+    if (worldBag) setWorldPosition(worldBag, worldBagX, worldBagY);
     if (npcX !== NPC_START_X || npcY !== NPC_START_Y) {
       npcX = NPC_START_X;
       npcY = NPC_START_Y;
@@ -11699,6 +11712,7 @@ function setup() {
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   setWorldSize(signBoard, SIGN_WIDTH, SIGN_HEIGHT);
   setWorldSize(guideBook, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT);
+  if (worldBag) setWorldSize(worldBag, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT);
   applyGuideTexts();
 
   if (!isSetupComplete) {
@@ -11717,6 +11731,7 @@ function setup() {
   setWorldPosition(well, wellX, wellY);
   setWorldPosition(signBoard, signX, signY);
   setWorldPosition(guideBook, guideBookX, guideBookY);
+  if (worldBag) setWorldPosition(worldBag, worldBagX, worldBagY);
   guideBook.style.display = hasGuideBook ? "none" : "block";
   guideBookButton.style.display = hasGuideBook ? "block" : "none";
   setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);

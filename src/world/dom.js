@@ -21,6 +21,7 @@ const signBoard = document.getElementById("sign-board");
 const growthCard = document.getElementById("growth-card");
 const growthFill = document.getElementById("growth-fill");
 const guideBook = document.getElementById("guide-book");
+const worldBag = document.getElementById("world-bag");
 const guideBookButton = document.getElementById("guide-book-button");
 const guideCard = document.getElementById("guide-card");
 const guideCloseButton = document.getElementById("guide-close-button");
@@ -85,6 +86,7 @@ export {
   growthCard,
   growthFill,
   guideBook,
+  worldBag,
   guideBookButton,
   guideCard,
   guideCloseButton,

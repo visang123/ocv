@@ -759,6 +759,23 @@ body::-webkit-scrollbar {
   animation: guide-book-tutorial-pulse 900ms ease-in-out infinite;
 }
 
+#world-bag {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+  background: #7b5c35;
+  border: 1px solid #4f3620;
+  color: #f8e4bf;
+  font: 700 7px/10px Arial, sans-serif;
+  text-align: center;
+  user-select: none;
+  pointer-events: none;
+}
+
 @keyframes guide-book-tutorial-pulse {
   0%,
   100% {
