@@ -1204,10 +1204,12 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+/* 원격과 같이 스프라이트는 흐름에 두어 루트 높이가 생기게 함 — 그래야
+   .remote-player-name 의 bottom: calc(100% + 2px) 가 스프라이트 위로 맞음 */
 .local-player-avatar #player {
-  position: absolute;
+  position: relative;
   left: 0;
-  bottom: 0;
+  top: 0;
   display: block;
   width: 100%;
   height: auto;
@@ -1217,7 +1219,7 @@ body::-webkit-scrollbar {
 }
 
 .local-player-avatar #player-name.remote-player-name {
-  z-index: 1;
+  z-index: 24;
 }
 
 #spawn-portal {
