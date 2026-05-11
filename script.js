@@ -224,6 +224,10 @@ import {
 } from "./src/game/storage.js";
 import { createWellState, createAppleState, createPlantState } from "./src/game/state.js";
 import {
+  getSynchronizedNow as getSynchronizedNowCore,
+  syncServerClockOffset as syncServerClockOffsetCore
+} from "./src/game/timeSync.js";
+import {
   readWaterLevel,
   resolveSnapshotSavedAt,
   dedupeExtraSeedsPreferInventory,
@@ -232,6 +236,26 @@ import {
   parseSharedGroundSeedFromSnapshot,
   parseExtraPlantFromSnapshot
 } from "./src/game/worldSnapshot.js";
+import {
+  makeSyncEventId as makeSyncEventIdCore,
+  getRemoteStateVersion as getRemoteStateVersionCore,
+  getRemoteStateSourceRank as getRemoteStateSourceRankCore,
+  isValidRemotePlayerStatePayload as isValidRemotePlayerStatePayloadCore,
+  createSyncEventDedupeStore
+} from "./src/multiplayer/syncCore.js";
+import { createSyncDebugHelpers } from "./src/multiplayer/syncDebug.js";
+import {
+  shouldApplyIncomingRemoteState,
+  getRemoteStatusText
+} from "./src/multiplayer/presence.js";
+import {
+  getNumericButterflyValue as getNumericButterflyValueCore,
+  simulateButterflyAuthorityStep as simulateButterflyAuthorityStepCore
+} from "./src/multiplayer/butterflyMotion.js";
+import {
+  isWorldPointInsideRect as isWorldPointInsideRectCore,
+  getPlantVisibleHoverRectsWorld as getPlantVisibleHoverRectsWorldCore
+} from "./src/game/plantHover.js";
 import {
   HELD_ITEM_SEED,
   HELD_ITEM_BUCKET,
@@ -557,7 +581,7 @@ let lastLocalButterflyCatchActionAt = 0;
  */
 const butterflyLocalCatchTombstoneById = {};
 const BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS = 8000;
-let seenSyncEventAtById = Object.create(null);
+let syncEventDedupeStore = null;
 /** 탭 전환·백그라운드 후 복귀 시 한 프레임에 긴 시간이 건너뛰면 나비 경로가 순간이동처럼 보임 → 웨이포인트 리셋 */
 let lastButterflyWallClockMs = 0;
 let gameLoopCyclesForTutorialSync = 0;
@@ -4262,27 +4286,19 @@ function holdLocalAppleStateAgainstStaleSnapshot(ms) {
 }
 
 function getSynchronizedNow() {
-  return Date.now() + Number(serverClockOffsetMs || 0);
+  return getSynchronizedNowCore(serverClockOffsetMs);
 }
 
 function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
-  if (serverRowUpdatedAt == null || serverRowUpdatedAt === "") return;
-  const parsed =
-    typeof serverRowUpdatedAt === "string"
-      ? Date.parse(serverRowUpdatedAt)
-      : Number(serverRowUpdatedAt);
-  if (!Number.isFinite(parsed) || parsed <= 0) return;
-  const localNow = Date.now();
-  const sample = parsed - localNow;
-  const maxSkew = 2 * 60 * 1000;
-  const clamped = Math.max(-maxSkew, Math.min(maxSkew, sample));
-  if (!Number.isFinite(lastServerClockSyncAt) || lastServerClockSyncAt <= 0) {
-    serverClockOffsetMs = clamped;
-  } else {
-    // Smooth sudden jumps to keep growth/decay stable across polls.
-    serverClockOffsetMs = serverClockOffsetMs * 0.8 + clamped * 0.2;
-  }
-  lastServerClockSyncAt = localNow;
+  const next = syncServerClockOffsetCore(
+    serverClockOffsetMs,
+    lastServerClockSyncAt,
+    serverRowUpdatedAt,
+    Date.now()
+  );
+  if (!next.changed) return;
+  serverClockOffsetMs = next.offsetMs;
+  lastServerClockSyncAt = next.syncedAtMs;
 }
 
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
@@ -5685,44 +5701,19 @@ function groundClientToWorldXY(clientX, clientY) {
 }
 
 function isWorldPointInsideRect(x, y, rect) {
-  if (!rect) return false;
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  return isWorldPointInsideRectCore(x, y, rect);
 }
 
 /** 현재 보이는 식물 스프라이트(흙/새싹/풀)의 월드 박스 목록 */
 function getPlantVisibleHoverRectsWorld(plant) {
-  if (!plant) return [];
-  const px = plant.spotX != null ? plant.spotX : plant.x;
-  const py = plant.spotY != null ? plant.spotY : plant.y;
-  const rects = [];
-
-  if (!shouldHideSeparateSoilUnderBigGrass(plant)) {
-    rects.push({
-      left: px,
-      top: py,
-      right: px + PLANT_SPOT_WIDTH,
-      bottom: py + PLANT_SPOT_HEIGHT
-    });
-  }
-
-  const sproutVisible =
-    plant.isSproutGrown &&
-    plant.status !== "rotten" &&
-    plant.status !== "dry" &&
-    !plant.isOverwatered;
-  if (sproutVisible) {
-    const st = getSproutStageFromPlant(plant);
-    const sz = getSproutSizeForStage(st);
-    const pos = getSproutWorldPositionForPlant(px, py, sz, st);
-    rects.push({
-      left: pos.x,
-      top: pos.y,
-      right: pos.x + sz.width,
-      bottom: pos.y + sz.height
-    });
-  }
-
-  return rects;
+  return getPlantVisibleHoverRectsWorldCore(plant, {
+    shouldHideSoil: shouldHideSeparateSoilUnderBigGrass,
+    plantSpotWidth: PLANT_SPOT_WIDTH,
+    plantSpotHeight: PLANT_SPOT_HEIGHT,
+    getSproutStageFromPlant: getSproutStageFromPlant,
+    getSproutSizeForStage: getSproutSizeForStage,
+    getSproutWorldPositionForPlant: getSproutWorldPositionForPlant
+  });
 }
 
 /** 포인터가 현재 식물 이미지 영역 안에 있을 때만 선택(겹침 시 중심거리 가까운 쪽) */
@@ -10056,11 +10047,10 @@ function renderRemotePlayerState(state, source) {
   const incomingRank = getRemoteStateSourceRank(source);
   const currentVersion = Number(remotePlayer.lastStateVersion || 0);
   const currentRank = Number(remotePlayer.lastStateSourceRank || 0);
-  if (
-    incomingVersion > 0 &&
-    (incomingVersion < currentVersion ||
-      (incomingVersion === currentVersion && incomingRank < currentRank))
-  ) {
+  if (!shouldApplyIncomingRemoteState(
+    { version: currentVersion, rank: currentRank },
+    { version: incomingVersion, rank: incomingRank }
+  )) {
     addSyncDebugLog("remote_state_reject", {
       remoteId: remoteId,
       source: source || "",
@@ -10088,16 +10078,7 @@ function renderRemotePlayerState(state, source) {
     state.name || "OVC"
   );
   if (statusAction) {
-    const nextStatusText =
-      state.action === "magic_powder"
-        ? "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \uC0DD\uC131 \uC911..."
-        : state.action === "planting"
-          ? "\uC528\uC557 \uC2EC\uB294\uC911..."
-          : state.action === "eating"
-            ? "\uC0AC\uACFC\uBA39\uB294\uC911..."
-            : state.action === "butterfly_catch"
-              ? "\uB098\uBE44 \uC7A1\uC74C"
-              : "";
+    const nextStatusText = getRemoteStatusText(state.action);
     if (nextStatusText) {
       remotePlayer.statusElement.textContent = nextStatusText;
       remotePlayer.statusElement.style.display = "block";
@@ -10468,32 +10449,12 @@ function addBucketTrace(key, message, minIntervalMs) {
   addNetworkDebugLog("[bucket:" + key + "] " + message);
 }
 
-function addSyncDebugLog(topic, fields, force) {
-  if (!force && !SYNC_DEBUG_TRACE) return;
-  const payload = fields && typeof fields === "object" ? fields : {};
-  const keys = Object.keys(payload).sort();
-  const body = keys.map(function (k) {
-    const v = payload[k];
-    return k + "=" + (v == null ? "" : String(v));
-  }).join(" ");
-  addNetworkDebugLog("[sync:" + String(topic || "trace") + "] " + body);
-}
-
-function publishSyncDebugChecklistTemplate() {
-  window.OVCSyncDebugChecklist = function () {
-    return [
-      "[1] 동시 씨앗 줍기(2클라) -> 한쪽만 획득/리스폰 정상",
-      "[2] 나비 동시 잡기 -> 1회 포획 처리/중복 인벤 증가 없음",
-      "[3] 물주기 직후(양쪽) -> 깜빡임/롤백 없음",
-      "[4] 마법가루 사용 직후 -> 단계/게이지 역행 없음",
-      "[5] 시간 차(PC 시계 다르게) -> 급성장/즉시 마름 없음",
-      "[6] 네트워크 지연 후 복귀 -> 오래된 상태가 최신 상태를 덮지 않음",
-      "[7] 동일 eventId 재수신 -> 무시 로그 확인",
-      "[8] poll vs broadcast 동시 도착 -> broadcast 우선 적용"
-    ];
-  };
-}
-publishSyncDebugChecklistTemplate();
+const syncDebugHelpers = createSyncDebugHelpers({
+  enabled: SYNC_DEBUG_TRACE,
+  addNetworkDebugLog: addNetworkDebugLog
+});
+const addSyncDebugLog = syncDebugHelpers.addSyncDebugLog;
+syncDebugHelpers.publishSyncDebugChecklistTemplate(window);
 
 async function validateCurrentAccount() {
   if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
@@ -10860,65 +10821,45 @@ function clearMultiplayerRoomSessionTracking() {
   lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 }
 
+function ensureSyncEventDedupeStore() {
+  if (syncEventDedupeStore) return syncEventDedupeStore;
+  syncEventDedupeStore = createSyncEventDedupeStore({
+    ttlMs: SYNC_EVENT_DEDUPE_TTL_MS,
+    maxEntries: SYNC_EVENT_DEDUPE_MAX,
+    onReject: function (info) {
+      addSyncDebugLog("event_dedupe_reject", {
+        eventId: info.eventId,
+        ageMs: info.ageMs
+      }, true);
+    },
+    onAccept: function (info) {
+      addSyncDebugLog("event_dedupe_accept", {
+        eventId: info.eventId,
+        at: info.now
+      });
+    }
+  });
+  return syncEventDedupeStore;
+}
+
 function makeSyncEventId(kind, entityId, atMs) {
-  return [
-    String(kind || "evt"),
-    String(currentSessionId || "local"),
-    String(entityId || "na"),
-    String(Math.max(0, Number(atMs) || Date.now())).slice(-8),
-    Math.random().toString(36).slice(2, 8)
-  ].join(":");
+  return makeSyncEventIdCore(currentSessionId, kind, entityId, atMs);
 }
 
 function consumeSyncEventId(eventId, nowMs) {
-  if (!eventId) return true;
-  const now = Math.max(0, Number(nowMs) || Date.now());
-  const id = String(eventId);
-  const seenAt = Number(seenSyncEventAtById[id] || 0);
-  if (seenAt > 0 && now - seenAt <= SYNC_EVENT_DEDUPE_TTL_MS) {
-    addSyncDebugLog("event_dedupe_reject", {
-      eventId: id,
-      ageMs: now - seenAt
-    }, true);
-    return false;
-  }
-  seenSyncEventAtById[id] = now;
-  const ids = Object.keys(seenSyncEventAtById);
-  if (ids.length <= SYNC_EVENT_DEDUPE_MAX) return true;
-  ids.forEach(function (k) {
-    const t = Number(seenSyncEventAtById[k] || 0);
-    if (!t || now - t > SYNC_EVENT_DEDUPE_TTL_MS) {
-      delete seenSyncEventAtById[k];
-    }
-  });
-  addSyncDebugLog("event_dedupe_accept", { eventId: id, at: now });
-  return true;
-}
-
-function getRemoteStateVersion(state) {
-  if (!state || typeof state !== "object") return 0;
-  const updatedAt = Number(state.updatedAt || 0);
-  const splashAt = Number(state.waterSplashAt || 0);
-  return Math.max(0, updatedAt, splashAt);
+  return ensureSyncEventDedupeStore().consume(eventId, nowMs);
 }
 
 function getRemoteStateSourceRank(source) {
-  // Same version arrives from both paths: prefer broadcast over DB poll.
-  if (source === "broadcast") return 3;
-  if (source === "presence") return 2;
-  return 1;
+  return getRemoteStateSourceRankCore(source);
+}
+
+function getRemoteStateVersion(state) {
+  return getRemoteStateVersionCore(state);
 }
 
 function isValidRemotePlayerStatePayload(state) {
-  if (!state || !state.id) return false;
-  const x = Number(state.x);
-  const depth = Number(state.depth);
-  const jumpY = Number(state.jumpY);
-  if ((state.x != null && !Number.isFinite(x)) || (state.depth != null && !Number.isFinite(depth))) {
-    return false;
-  }
-  if (state.jumpY != null && !Number.isFinite(jumpY)) return false;
-  return true;
+  return isValidRemotePlayerStatePayloadCore(state);
 }
 
 function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
@@ -10950,15 +10891,7 @@ function isButterflyAuthority() {
 }
 
 function getNumericButterflyValue(value, fallback) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
-function clampButterflyToBounds(butterfly) {
-  if (butterfly.x < butterflyBoundsLeft) butterfly.x = butterflyBoundsLeft;
-  if (butterfly.x > butterflyBoundsRight) butterfly.x = butterflyBoundsRight;
-  if (butterfly.y < butterflyBoundsTop) butterfly.y = butterflyBoundsTop;
-  if (butterfly.y > butterflyBoundsBottom) butterfly.y = butterflyBoundsBottom;
+  return getNumericButterflyValueCore(value, fallback);
 }
 
 function ensureButterflyWaypoint(butterfly, now) {
@@ -11002,32 +10935,22 @@ function getButterflyFlutterOffsetWorld(now, butterfly) {
 }
 
 function simulateButterflyAuthorityStep(butterfly, now) {
-  let waypoint = butterflyAuthorityWaypointById[butterfly.id];
-  if (waypoint && now > waypoint.endAt + 3000) {
-    delete butterflyAuthorityWaypointById[butterfly.id];
-  }
-  waypoint = ensureButterflyWaypoint(butterfly, now);
-  const total = Math.max(1, waypoint.endAt - waypoint.startAt);
-  const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
-  // Linear progress: ease-in-out made speed → 0 at each waypoint (looked like stopping).
-  const eased = t;
-  const pathX = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
-  const pathY = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
-  const previousPathX = Number.isFinite(Number(butterfly.lastPathX))
-    ? Number(butterfly.lastPathX)
-    : waypoint.startX;
-  butterfly.lastPathX = pathX;
-  butterfly.x = pathX;
-  butterfly.y = pathY;
-  const fl = getButterflyFlutterOffsetWorld(now, butterfly);
-  butterfly.x += fl.dx;
-  butterfly.y += fl.dy;
-  clampButterflyToBounds(butterfly);
-  // Face actual path direction, not flutter jitter around the path.
-  const pathDx = pathX - previousPathX;
-  if (Math.abs(pathDx) > 0.01) {
-    butterfly.dirX = pathDx > 0 ? 1 : -1;
-  }
+  simulateButterflyAuthorityStepCore(butterfly, now, {
+    waypointMap: butterflyAuthorityWaypointById,
+    ensureWaypoint: ensureButterflyWaypoint,
+    bounds: {
+      left: butterflyBoundsLeft,
+      right: butterflyBoundsRight,
+      top: butterflyBoundsTop,
+      bottom: butterflyBoundsBottom
+    },
+    flutter: {
+      periodHorizontalMs: butterflyFlutterPeriodHorizontalMs,
+      periodVerticalMs: butterflyFlutterPeriodVerticalMs,
+      amplitudeX: butterflyFlutterAmplitudeX,
+      amplitudeY: butterflyFlutterAmplitudeY
+    }
+  });
 }
 
 function authoritySpawnButterfliesIfNeeded(now) {
@@ -11088,7 +11011,8 @@ function ensureButterflyRenderEntry(butterfly) {
     color: null,
     frame: -1,
     facingRight: null,
-    catchable: null
+    catchable: null,
+    lastDrawX: null
   };
   butterflyRenderById[butterfly.id] = entry;
   return entry;
@@ -11519,7 +11443,19 @@ function updateButterflies() {
       butterfly.color,
       getButterflyAnimationFrame(now, butterfly)
     );
-    applyButterflyFacing(entry, butterfly.dirX > 0);
+    const prevDrawX = Number(entry.lastDrawX);
+    const hasPrevDrawX = Number.isFinite(prevDrawX);
+    const drawDx = hasPrevDrawX ? drawX - prevDrawX : 0;
+    let facingRight = entry.facingRight;
+    if (facingRight == null) {
+      facingRight = butterfly.dirX > 0;
+    } else if (Math.abs(drawDx) > 0.06) {
+      // Two visible tabs can alternate incoming dirX; use rendered movement
+      // delta so facing only flips when motion actually changes direction.
+      facingRight = drawDx > 0;
+    }
+    applyButterflyFacing(entry, Boolean(facingRight));
+    entry.lastDrawX = drawX;
     applyButterflyCatchable(
       entry,
       Boolean(catchTarget && catchTarget.butterfly.id === butterfly.id)
