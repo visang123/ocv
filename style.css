@@ -766,10 +766,9 @@ body::-webkit-scrollbar {
   top: 0;
   width: 12px;
   height: 10px;
-  border-radius: 2px;
-  background: #7b5c35;
-  border: 1px solid #4f3620;
-  color: #f8e4bf;
+  background: transparent;
+  border: 0;
+  color: #c68b44;
   font: 700 7px/10px Arial, sans-serif;
   text-align: center;
   user-select: none;
