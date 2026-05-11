@@ -24,6 +24,9 @@ const guideBook = document.getElementById("guide-book");
 const worldBag = document.getElementById("world-bag");
 const guideBookButton = document.getElementById("guide-book-button");
 const worldBagInventory = document.getElementById("world-bag-inventory");
+const bagInventoryPanel = document.getElementById("bag-inventory-panel");
+const bagInventoryClose = document.getElementById("bag-inventory-close");
+const bagInventorySlots = Array.from(document.querySelectorAll(".bag-inventory-slot"));
 const guideCard = document.getElementById("guide-card");
 const guideCloseButton = document.getElementById("guide-close-button");
 const guidePages = Array.from(document.querySelectorAll(".guide-page"));
@@ -90,6 +93,9 @@ export {
   worldBag,
   guideBookButton,
   worldBagInventory,
+  bagInventoryPanel,
+  bagInventoryClose,
+  bagInventorySlots,
   guideCard,
   guideCloseButton,
   guidePages,

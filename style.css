@@ -2355,6 +2355,73 @@ body #world-bag-inventory {
   }
 }
 
+#bag-inventory-panel {
+  position: fixed;
+  left: calc(18px + 78px + 10px);
+  bottom: 18px;
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  z-index: 65;
+  pointer-events: auto;
+  max-width: calc(100vw - 18px - 78px - 24px);
+}
+
+.bag-inventory-panel-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 28px;
+}
+
+.bag-inventory-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(20, 28, 48, 0.55);
+  color: #fff;
+  font: 700 20px/1 Arial, sans-serif;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.bag-inventory-close:hover {
+  background: rgba(40, 50, 80, 0.82);
+}
+
+.bag-inventory-close:focus,
+.bag-inventory-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
+}
+
+.bag-inventory-slots {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(8, 12, 24, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  overflow-x: auto;
+}
+
+.bag-inventory-slot {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+}
+
 #seed-inventory {
   position: fixed;
   left: 18px;

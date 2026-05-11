@@ -15,3 +15,8 @@ export function storageKeyGuideBookPickedForRoom() {
 export function storageKeyWorldBagGroundPickedForRoom() {
   return "worldBagGroundPickedRoomV1:" + getMultiplayerRoomSlug();
 }
+
+/** 월드 책을 E로 줍기(가이드 소지 플래그 없이 바닥에서만 제거). */
+export function storageKeyWorldGuideBookOffGroundPickedForRoom() {
+  return "worldGuideBookOffGroundPickedRoomV1:" + getMultiplayerRoomSlug();
+}

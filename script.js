@@ -169,6 +169,8 @@ import {
   worldBag,
   guideBookButton,
   worldBagInventory,
+  bagInventoryPanel,
+  bagInventoryClose,
   guideCard,
   guideCloseButton,
   guidePages,
@@ -285,7 +287,8 @@ import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-displ
 import {
   storageKeyMainSeedPickedForRoom,
   storageKeyGuideBookPickedForRoom,
-  storageKeyWorldBagGroundPickedForRoom
+  storageKeyWorldBagGroundPickedForRoom,
+  storageKeyWorldGuideBookOffGroundPickedForRoom
 } from "./src/game/room-storage-keys.js";
 
 let playerX = 100;
@@ -519,6 +522,21 @@ function setWorldBagGroundPickedForCurrentRoom() {
   setStoredFlag(storageKeyWorldBagGroundPickedForRoom(), true);
 }
 
+function hasPickedWorldGuideBookOffGroundInCurrentRoom() {
+  return getStoredFlag(storageKeyWorldGuideBookOffGroundPickedForRoom());
+}
+
+function setWorldGuideBookOffGroundPickedForCurrentRoom() {
+  setStoredFlag(storageKeyWorldGuideBookOffGroundPickedForRoom(), true);
+}
+
+let bagInventoryPanelOpen = false;
+
+function syncWorldGuideBookGroundVisibility() {
+  if (!guideBook) return;
+  guideBook.style.display = hasPickedWorldGuideBookOffGroundInCurrentRoom() ? "none" : "block";
+}
+
 function syncGuideInventoryBar() {
   if (guideBookButton) {
     guideBookButton.style.display = "none";
@@ -532,7 +550,7 @@ function syncGuideInventoryBar() {
 }
 
 function syncWorldBagGroundVisibility() {
-  if (guideBook) guideBook.style.display = "none";
+  syncWorldGuideBookGroundVisibility();
   if (worldBag) {
     worldBag.style.display = hasPickedWorldBagGroundInCurrentRoom() ? "none" : "block";
   }
@@ -1150,6 +1168,7 @@ document.addEventListener("keydown", function (event) {
     }
     if (pickApple()) return;
     if (pickUpWorldBag()) return;
+    if (pickUpWorldGuideBookNoHold()) return;
     pickUpNearestItem();
   }
 
@@ -1288,8 +1307,47 @@ function onGuideInventoryToggleClick() {
   }
 }
 
+function setBagInventoryPanelOpen(open) {
+  bagInventoryPanelOpen = Boolean(open);
+  if (!bagInventoryPanel) return;
+  bagInventoryPanel.style.display = bagInventoryPanelOpen ? "flex" : "none";
+  bagInventoryPanel.setAttribute("aria-hidden", bagInventoryPanelOpen ? "false" : "true");
+}
+
+function closeBagInventoryPanel() {
+  setBagInventoryPanelOpen(false);
+  updateOnboardingFlowUI();
+}
+
+function toggleBagInventoryPanelFromBagClick() {
+  if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+  const nextOpen = !bagInventoryPanelOpen;
+  setBagInventoryPanelOpen(nextOpen);
+  if (nextOpen && isOnboardingLinearGateActive() && onboardingFlowStep === 2) {
+    isGuideBookOpen = true;
+    updateGuideCard();
+  }
+  updateOnboardingFlowUI();
+}
+
+function onWorldBagInventoryClick(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleBagInventoryPanelFromBagClick();
+}
+
 guideBookButton.addEventListener("click", onGuideInventoryToggleClick);
-if (worldBagInventory) worldBagInventory.addEventListener("click", onGuideInventoryToggleClick);
+if (worldBagInventory) worldBagInventory.addEventListener("click", onWorldBagInventoryClick);
+if (bagInventoryClose) {
+  bagInventoryClose.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeBagInventoryPanel();
+  });
+}
 
 signBoard.addEventListener("click", function () {
   if (isOnboardingLinearGateActive()) {
@@ -1348,6 +1406,8 @@ document.addEventListener("click", function (event) {
   if (guideCard.contains(event.target)) return;
   if (event.target === guideBookButton) return;
   if (worldBagInventory && (event.target === worldBagInventory || worldBagInventory.contains(event.target)))
+    return;
+  if (bagInventoryPanel && (event.target === bagInventoryPanel || bagInventoryPanel.contains(event.target)))
     return;
 
   closeGuideCardFromClick();
@@ -1542,6 +1602,7 @@ function skipTutorialFromSettings() {
   setStoredFlag(hasGuideBookKey, true);
   setGuideBookPickedForCurrentRoom();
   setWorldBagGroundPickedForCurrentRoom();
+  setWorldGuideBookOffGroundPickedForCurrentRoom();
   setStoredFlag(npcDialogueCompleteKey, true);
   setStoredFlag(guidePlantPageUnlockedKey, true);
   setStoredFlag(guideBookClickPromptDismissedKey, true);
@@ -1550,7 +1611,7 @@ function skipTutorialFromSettings() {
   isGuidePlantPageUnlocked = true;
   isGuideBookOpen = false;
   isGuideBookClickPromptActive = false;
-  if (guideBook) guideBook.style.display = "none";
+  setWorldGuideBookOffGroundPickedForCurrentRoom();
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   if (guideCard) guideCard.style.display = "none";
@@ -2004,9 +2065,14 @@ function isNearWorldBagPickup() {
   );
 }
 
-/** 월드 책 근접(구) — 가방 줍기로 대체됨. */
 function isNearGuideBook() {
-  return isNearWorldBagPickup();
+  if (hasPickedWorldGuideBookOffGroundInCurrentRoom()) return false;
+  if (!guideBook) return false;
+  const st = window.getComputedStyle(guideBook);
+  if (st.display === "none" || st.visibility === "hidden") return false;
+  return (
+    getCenterDistance(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT) < pickupDistance
+  );
 }
 
 function shouldRunMovementTutorial() {
@@ -2018,7 +2084,7 @@ function shouldRunMovementTutorial() {
     !isTabSessionSuperseded &&
     !getStoredFlag(movementTutorialCompleteKey) &&
     !hasGuideBook &&
-    !(onboardingFlowStep === 1 && isNearGuideBook())
+    !(onboardingFlowStep === 1 && isNearWorldBagPickup())
   );
 }
 
@@ -2252,6 +2318,7 @@ function resetTutorialProgressInStorage() {
   setStoredFlag(hasGuideBookKey, false);
   removeStoredValue(storageKeyGuideBookPickedForRoom());
   removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
+  removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
@@ -2978,6 +3045,17 @@ function onboardingHookDroppedBucketForTutorial() {
   updateOnboardingFlowUI();
 }
 
+function pickUpWorldGuideBookNoHold() {
+  if (isOnboardingLinearGateActive()) {
+    return false;
+  }
+  if (!isNearGuideBook()) return false;
+  setWorldGuideBookOffGroundPickedForCurrentRoom();
+  syncWorldBagGroundVisibility();
+  updateGuideCard();
+  return true;
+}
+
 function pickUpWorldBag() {
   if (isOnboardingLinearGateActive()) {
     if (hasGuideBook) return false;
@@ -3000,9 +3078,9 @@ function pickUpWorldBag() {
   return true;
 }
 
-/** 구: 월드 책 E줍기. 저장 키·이름 호환용으로 유지 — 동작은 가방 줍기와 동일. */
+/** 구: 월드 책 E줍기 — 가이드 소지 없이 바닥에서만 제거. */
 function pickUpGuideBook() {
-  return pickUpWorldBag();
+  return pickUpWorldGuideBookNoHold();
 }
 
 function loadGuideBookState(skipMaybeResetTutorial) {
@@ -3021,7 +3099,6 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
   isGuideBookClickPromptActive =
     hasGuideBook && isGuidePlantPageUnlocked && !promptDismissed;
-  guideBook.style.display = "none";
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   updateGuidePages();
@@ -3131,6 +3208,7 @@ function applyDefaultState(options) {
   if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
     removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
+    removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   }
   setStoredFlag(mainSeedCollectedKey, false);
   if (!sharedWorldResetOnly) {
@@ -3266,13 +3344,14 @@ function applyDefaultState(options) {
   seedInventory.style.display = "none";
   guideCard.style.display = "none";
   if (!sharedWorldResetOnly) {
-    guideBook.style.display = "none";
     guideBook.classList.remove("is-near");
     if (worldBag) {
       worldBag.style.display = "block";
       worldBag.classList.remove("is-near");
     }
     syncGuideInventoryBar();
+    syncWorldBagGroundVisibility();
+    setBagInventoryPanelOpen(false);
   }
   hasShownFirstSeedFocus = false;
   window.clearTimeout(firstSeedFocusTimeout);
@@ -3399,7 +3478,7 @@ function startPlantMasterDialogue() {
       hasGuideBook = true;
       setGuideBookPickedForCurrentRoom();
       setWorldBagGroundPickedForCurrentRoom();
-      guideBook.style.display = "none";
+      setWorldGuideBookOffGroundPickedForCurrentRoom();
       syncWorldBagGroundVisibility();
       syncGuideInventoryBar();
       setStoredFlag(npcDialogueCompleteKey, true);
@@ -7433,6 +7512,23 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uAC00\uBC29");
   }
 
+  const bookPad = 0;
+  if (
+    guideBook &&
+    guideBook.style.display !== "none" &&
+    plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      guideBookX,
+      guideBookY,
+      GUIDE_BOOK_WIDTH,
+      GUIDE_BOOK_HEIGHT,
+      bookPad
+    )
+  ) {
+    return plantProximityPhraseForNoun("\uCC45");
+  }
+
   if (isPlantMasterVisible()) {
     const npcPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
@@ -8514,7 +8610,6 @@ function updatePlayerAlert() {
 
 function updateGuideCard() {
   const nearSign = isNearSignBoard();
-  guideBook.style.display = "none";
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   const shouldShow =
@@ -8527,6 +8622,12 @@ function updateGuideCard() {
     guideCard.style.display = "none";
   }
 
+  if (guideBook) {
+    guideBook.classList.toggle(
+      "is-near",
+      !hasPickedWorldGuideBookOffGroundInCurrentRoom() && isNearGuideBook()
+    );
+  }
   if (worldBag) {
     worldBag.classList.toggle("is-near", !hasGuideBook && isNearWorldBagPickup());
   }
@@ -11811,7 +11912,6 @@ function setup() {
   setWorldPosition(signBoard, signX, signY);
   setWorldPosition(guideBook, guideBookX, guideBookY);
   if (worldBag) setWorldPosition(worldBag, worldBagX, worldBagY);
-  guideBook.style.display = "none";
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);

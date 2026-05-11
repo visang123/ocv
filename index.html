@@ -69,7 +69,7 @@
           <div class="big-tree-roots"></div>
         </div>
         <div id="sign-board">&#50504;&#45236;&#54032;</div>
-        <div id="guide-book" style="display: none" aria-hidden="true">&#52293;</div>
+        <div id="guide-book">&#52293;</div>
         <img
           id="world-bag"
           src="이미지/world-bag-icon.png?v=20260511c"
@@ -195,7 +195,7 @@
     </div>
   </div>
   <button id="guide-book-button" type="button" hidden aria-hidden="true">&#52293;</button>
-  <button id="world-bag-inventory" type="button" aria-label="설명 보기" style="display: none">
+  <button id="world-bag-inventory" type="button" aria-label="가방 인벤토리" style="display: none">
     <img
       class="world-bag-inventory-img"
       src="이미지/world-bag-clean.png?v=20260511d"
@@ -203,6 +203,24 @@
       draggable="false"
     >
   </button>
+  <div id="bag-inventory-panel" class="bag-inventory-panel" style="display: none" aria-hidden="true">
+    <div class="bag-inventory-panel-header">
+      <button type="button" id="bag-inventory-close" class="bag-inventory-close" aria-label="닫기">
+        &#215;
+      </button>
+    </div>
+    <div class="bag-inventory-slots" role="group" aria-label="가방 칸">
+      <div class="bag-inventory-slot" data-slot="0"></div>
+      <div class="bag-inventory-slot" data-slot="1"></div>
+      <div class="bag-inventory-slot" data-slot="2"></div>
+      <div class="bag-inventory-slot" data-slot="3"></div>
+      <div class="bag-inventory-slot" data-slot="4"></div>
+      <div class="bag-inventory-slot" data-slot="5"></div>
+      <div class="bag-inventory-slot" data-slot="6"></div>
+      <div class="bag-inventory-slot" data-slot="7"></div>
+      <div class="bag-inventory-slot" data-slot="8"></div>
+    </div>
+  </div>
   <div id="seed-inventory">
     <div id="seed-count-panel" class="seed-count-panel" hidden>
       <div class="inventory-seed-icon" aria-hidden="true"></div>
