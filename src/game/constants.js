@@ -45,8 +45,9 @@ export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
 export const WORLD_BAG_WIDTH = 12;
 export const WORLD_BAG_HEIGHT = 10;
-export const WORLD_BAG_START_X = GUIDE_BOOK_START_X - 1;
-export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 2;
+// 책 최초 스폰 좌표를 기준으로, Y만 조금 아래에 가방을 둔다.
+export const WORLD_BAG_START_X = GUIDE_BOOK_START_X;
+export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
 /** 책 오른쪽–씨앗 왼쪽 최소 간격(책 너비 약 5칸) */
 export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH * 5;
 /** 씨앗 — 안내판 오른쪽과, 책+5칸 간격 중 더 오른쪽(겹침 방지) */
