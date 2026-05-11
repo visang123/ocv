@@ -9341,7 +9341,8 @@ function updatePlayerName() {
     halfTextWidth,
     Math.min(targetX, window.innerWidth - halfTextWidth)
   );
-  const anchorY = toScreenY(playerBox.top - 6);
+  const headTopPx = toScreenY(playerBox.top);
+  const anchorY = headTopPx - 2;
 
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
