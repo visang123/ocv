@@ -9151,7 +9151,10 @@ function finishCharacterSelect() {
 }
 
 function updatePlayerName() {
-  if (!hasSpawnedCharacter) {
+  if (
+    !player ||
+    player.classList.contains("is-hidden-before-spawn")
+  ) {
     playerName.style.display = "none";
     playerName.classList.remove("is-dialogue-layer");
     return;
@@ -9160,9 +9163,13 @@ function updatePlayerName() {
   const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.textContent = displayName;
   const nameWidth = playerName.offsetWidth || 36;
-  const playerBox = getPlayerBox();
-  const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
-  const y = toScreenY(playerBox.top) + 13;
+  const rect = player.getBoundingClientRect();
+  if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || rect.width <= 0 || rect.height <= 0) {
+    playerName.style.display = "none";
+    return;
+  }
+  const x = rect.left + rect.width / 2 - nameWidth / 2;
+  const y = rect.top - 10;
 
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
