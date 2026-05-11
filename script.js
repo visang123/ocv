@@ -1379,6 +1379,9 @@ function toggleBagInventoryPanelFromBagClick() {
   }
   const nextOpen = !bagInventoryPanelOpen;
   setBagInventoryPanelOpen(nextOpen);
+  if (nextOpen) {
+    updateBagInventorySlots();
+  }
   if (nextOpen && isOnboardingLinearGateActive() && onboardingFlowStep === 2) {
     isGuideBookOpen = true;
     updateGuideCard();
@@ -1399,6 +1402,45 @@ if (bagInventoryClose) {
     event.preventDefault();
     event.stopPropagation();
     closeBagInventoryPanel();
+  });
+}
+
+if (bagInventoryPanel) {
+  bagInventoryPanel.addEventListener("click", function (event) {
+    const slot = event.target.closest(".bag-inventory-slot");
+    if (!slot || !bagInventoryPanel.contains(slot)) return;
+    const kind = slot.dataset.bagType;
+    if (!kind || kind === "empty") return;
+    if (kind === "butterfly") {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (kind === "seed") {
+      if (getBagInventorySeedCount() <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (usesWorldLooseSeedMode()) {
+        plantWorldSeedCount();
+        return;
+      }
+      const firstInv = appleState.extraSeeds.find(function (extraSeed) {
+        return (
+          extraSeed.inInventory &&
+          !extraSeed.planted &&
+          extraSeed.id !== plantingInventorySeedId
+        );
+      });
+      if (!firstInv) return;
+      plantInventorySeed(firstInv.id);
+      return;
+    }
+    if (kind === "apple") {
+      if (appleState.count <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      eatApple();
+    }
   });
 }
 
@@ -1498,9 +1540,6 @@ guideNext.addEventListener("click", function (event) {
   updateGuidePages();
 });
 
-inventoryApple.addEventListener("click", function () {
-  eatApple();
-});
 butterflyInventory.addEventListener("click", function () {
   tryCraftMagicPowder();
 });
@@ -1820,26 +1859,6 @@ adminOverlay.addEventListener("click", function (event) {
 
 adminRefreshButton.addEventListener("click", function () {
   loadAdminAccounts();
-});
-
-seedInventory.addEventListener("click", function (event) {
-  if (usesWorldLooseSeedMode()) {
-    if (!event.target.closest("#seed-count-panel")) return;
-    event.preventDefault();
-    plantWorldSeedCount();
-    return;
-  }
-  if (!event.target.closest("#seed-count-panel")) return;
-  event.preventDefault();
-  const firstInv = appleState.extraSeeds.find(function (extraSeed) {
-    return (
-      extraSeed.inInventory &&
-      !extraSeed.planted &&
-      extraSeed.id !== plantingInventorySeedId
-    );
-  });
-  if (!firstInv) return;
-  plantInventorySeed(firstInv.id);
 });
 
 function applyGuideTexts() {
@@ -2257,6 +2276,11 @@ function clearOnboardingHighlights() {
   }
   if (worldBagInventory) {
     worldBagInventory.classList.remove("onboarding-highlight-book-inv");
+  }
+  if (bagInventoryPanel) {
+    bagInventoryPanel.querySelectorAll(".bag-inventory-slot").forEach(function (el) {
+      el.classList.remove("onboarding-highlight");
+    });
   }
   Object.keys(butterflyRenderById).forEach(function (id) {
     const entry = butterflyRenderById[id];
@@ -2887,11 +2911,12 @@ function updateOnboardingFlowUI() {
     case 7: {
       setOnboardingCalloutVisible(
         true,
-        "\uC2EC\uC744 \uC704\uCE58\uB85C \uC774\uB3D9\uD6C4, \uAC00\uBC29 \uC704\uC5D0 \uC528\uC557\uC744 \uD074\uB9AD\uD574 \uC2EC\uC73C\uC138\uC694."
+        "\uC2EC\uC744 \uC704\uCE58\uB85C \uC774\uB3D9\uD55C \uB4A4, \uAC00\uBC29\uC744 \uC5F4\uACE0 \uC528\uC557 \uCE78\uC744 \uB20C\uB7EC \uC2EC\uC73C\uC138\uC694."
       );
       if (player) player.classList.add("onboarding-highlight");
-      if (seedInventory && !tutorialMainSeedRegenCompleted) {
-        seedInventory.classList.add("onboarding-highlight");
+      if (!tutorialMainSeedRegenCompleted && bagInventoryPanel) {
+        const bagSeedSlot = bagInventoryPanel.querySelector('[data-bag-type="seed"]');
+        if (bagSeedSlot) bagSeedSlot.classList.add("onboarding-highlight");
       }
       break;
     }
@@ -3016,9 +3041,12 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 24: {
-      setOnboardingCalloutVisible(true, "왼쪽 아래 열매를 클릭해 먹으세요.");
-      if (appleInventory) appleInventory.classList.add("onboarding-highlight");
-      if (inventoryApple) inventoryApple.classList.add("onboarding-highlight");
+      setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
+      if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
+      if (bagInventoryPanel) {
+        const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
+        if (bagAppleSlot) bagAppleSlot.classList.add("onboarding-highlight");
+      }
       break;
     }
     case 25: {
@@ -3032,7 +3060,10 @@ function updateOnboardingFlowUI() {
           onboardingSeedTutorialSecondLine ? lineSeed + "\n\n" + lineB : lineSeed
         );
       }
-      if (seedInventory) seedInventory.classList.add("onboarding-highlight");
+      if (bagInventoryPanel) {
+        const bagSeedSlot = bagInventoryPanel.querySelector('[data-bag-type="seed"]');
+        if (bagSeedSlot) bagSeedSlot.classList.add("onboarding-highlight");
+      }
       break;
     }
     case 26: {
@@ -3136,6 +3167,7 @@ function pickUpWorldBag() {
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   updateGuideCard();
+  updateBagInventorySlots();
   completeMovementTutorial();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 1) {
     onboardingFlowStep = 2;
@@ -3169,6 +3201,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   syncGuideInventoryBar();
   updateGuidePages();
   updateGuideCard();
+  updateBagInventorySlots();
   updateNpcPosition();
   loadOnboardingFlowState();
 }
@@ -3419,7 +3452,7 @@ function applyDefaultState(options) {
   syncWorldBagGroundVisibility();
   hasShownFirstSeedFocus = false;
   window.clearTimeout(firstSeedFocusTimeout);
-  seedInventory.classList.remove("is-first-seed-focus");
+  if (worldBagInventory) worldBagInventory.classList.remove("is-first-seed-focus");
   npcBubble.style.display = "none";
   playerAlert.style.display = "none";
 
@@ -3732,10 +3765,10 @@ function triggerFirstSeedFocus() {
   if (hasShownFirstSeedFocus) return;
 
   hasShownFirstSeedFocus = true;
-  seedInventory.classList.add("is-first-seed-focus");
+  if (worldBagInventory) worldBagInventory.classList.add("is-first-seed-focus");
   window.clearTimeout(firstSeedFocusTimeout);
   firstSeedFocusTimeout = window.setTimeout(function () {
-    seedInventory.classList.remove("is-first-seed-focus");
+    if (worldBagInventory) worldBagInventory.classList.remove("is-first-seed-focus");
   }, 6500);
 }
 
@@ -3866,28 +3899,9 @@ function updateApples() {
       : "block";
   });
 
-  appleInventory.style.display = appleState.count > 0 ? "block" : "none";
   syncGuideInventoryBar();
   appleCountText.textContent = String(appleState.count);
-  const appleTip =
-    "\uC0AC\uACFC \uBCF4\uC720 " +
-    appleState.count +
-    "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uBA39\uC2B5\uB2C8\uB2E4.";
-  if (inventoryApple) {
-    if (appleState.count > 0) {
-      inventoryApple.title = appleTip;
-    } else {
-      inventoryApple.removeAttribute("title");
-    }
-  }
-  if (appleInventory) {
-    if (appleState.count > 0) appleInventory.title = appleTip;
-    else appleInventory.removeAttribute("title");
-  }
-  if (appleCountText) {
-    if (appleState.count > 0) appleCountText.title = appleTip;
-    else appleCountText.removeAttribute("title");
-  }
+  updateBagInventorySlots();
 }
 
 function eatApple() {
@@ -5970,8 +5984,13 @@ function seedInventoryHasPlantableSeedsForHoverHint() {
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
 
-  if (seedInventory && seedInventory.style.display !== "none") {
-    const sr = seedInventory.getBoundingClientRect();
+  if (
+    hasGuideBook &&
+    seedInventoryHasPlantableSeedsForHoverHint() &&
+    worldBagInventory &&
+    worldBagInventory.style.display !== "none"
+  ) {
+    const sr = worldBagInventory.getBoundingClientRect();
     const pad = 16;
     const overInv =
       clientX >= sr.left - pad &&
@@ -5979,23 +5998,16 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
       clientY >= sr.top - pad &&
       clientY <= sr.bottom + pad;
     if (overInv) {
-      const panel = document.getElementById("seed-count-panel");
-      const panelOk = !panel || !panel.hidden;
-      if (panelOk && seedInventoryHasPlantableSeedsForHoverHint()) {
-        seedInventory.classList.add("is-seed-inventory-hover-hint");
-        if (plantHoverLabel) {
-          plantHoverLabel.classList.remove("is-seed-inventory-hint");
-          plantHoverLabel.style.display = "none";
-        }
-      } else {
-        seedInventory.classList.remove("is-seed-inventory-hover-hint");
-        hidePlantHoverLabel();
+      worldBagInventory.classList.add("is-seed-inventory-hover-hint");
+      if (plantHoverLabel) {
+        plantHoverLabel.classList.remove("is-seed-inventory-hint");
+        plantHoverLabel.style.display = "none";
       }
       return;
     }
   }
 
-  if (seedInventory) seedInventory.classList.remove("is-seed-inventory-hover-hint");
+  if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
 
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (plant) showPlantHoverForPlant(plant);
@@ -6228,26 +6240,60 @@ function getPlantSoilSrc(plant) {
   return "이미지/tilled-soil.png";
 }
 
+function getBagInventorySeedCount() {
+  if (usesWorldLooseSeedMode()) {
+    return Math.max(0, Number(appleState.seedCount) || 0);
+  }
+  return appleState.extraSeeds.filter(function (extraSeed) {
+    return (
+      extraSeed.inInventory &&
+      !extraSeed.planted &&
+      extraSeed.id !== plantingInventorySeedId
+    );
+  }).length;
+}
+
+function updateBagInventorySlots() {
+  if (!bagInventoryPanel) return;
+  const seedCount = getBagInventorySeedCount();
+  const looseVisible = usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(Date.now());
+  if (usesWorldLooseSeedMode() && seedCount <= 0 && !looseVisible) {
+    hasShownFirstSeedFocus = false;
+  }
+  const appleCount = Math.max(0, Number(appleState.count) || 0);
+  const brown = butterflyState.caughtCounts.brown || 0;
+  const yellow = butterflyState.caughtCounts.yellow || 0;
+  const white = butterflyState.caughtCounts.white || 0;
+
+  function setSlot(type, count, butterflyColor) {
+    let sel = '[data-bag-type="' + type + '"]';
+    if (type === "butterfly" && butterflyColor) {
+      sel = '[data-bag-type="butterfly"][data-butterfly-color="' + butterflyColor + '"]';
+    }
+    const slot = bagInventoryPanel.querySelector(sel);
+    if (!slot) return;
+    const countEl = slot.querySelector(".bag-slot-count");
+    if (countEl) countEl.textContent = String(count);
+    slot.classList.toggle("is-empty", count <= 0);
+  }
+
+  setSlot("seed", seedCount);
+  setSlot("apple", appleCount);
+  setSlot("butterfly", brown, "brown");
+  setSlot("butterfly", yellow, "yellow");
+  setSlot("butterfly", white, "white");
+}
+
 function updateSeedInventory() {
   if (usesWorldLooseSeedMode()) {
     const n = appleState.seedCount;
-    const looseVisible = isWorldLooseSeedVisibleAt(Date.now());
-    if (n <= 0) {
-      hasShownFirstSeedFocus = false;
-    }
     const panel = document.getElementById("seed-count-panel");
     if (seedCountText) {
       seedCountText.textContent = String(n);
     }
     if (panel) {
-      panel.hidden = n <= 0 && !looseVisible;
+      panel.hidden = true;
     }
-    seedInventory.style.display = n > 0 || looseVisible ? "flex" : "none";
-    const seedTip =
-      "\uC528\uC557 \uBCF4\uC720 " +
-      n +
-      "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uC774 \uC790\uB9AC\uC5D0 \uC2EC\uC2B5\uB2C8\uB2E4.";
-    seedInventory.title = n > 0 ? seedTip : "";
     appleState.extraSeeds.forEach(function (extraSeed) {
       if (extraSeed.inventoryElement) {
         extraSeed.inventoryElement.remove();
@@ -6255,6 +6301,7 @@ function updateSeedInventory() {
         extraSeed.inventoryImage = undefined;
       }
     });
+    updateBagInventorySlots();
     return;
   }
 
@@ -6275,14 +6322,9 @@ function updateSeedInventory() {
     seedCountText.textContent = String(n);
   }
   if (panel) {
-    panel.hidden = n <= 0;
+    panel.hidden = true;
   }
-  seedInventory.style.display = n > 0 ? "flex" : "none";
-  const seedTipHub =
-    "\uC528\uC557 \uBCF4\uC720 " +
-    n +
-    "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uC774 \uC790\uB9AC\uC5D0 \uC2EC\uC2B5\uB2C8\uB2E4.";
-  seedInventory.title = n > 0 ? seedTipHub : "";
+  updateBagInventorySlots();
 }
 
 function discardInventorySeed(seedId) {
@@ -7467,7 +7509,7 @@ function extraPlantFromDomElement(el) {
 }
 
 function hidePlantHoverLabel() {
-  if (seedInventory) seedInventory.classList.remove("is-seed-inventory-hover-hint");
+  if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   if (plantHoverLabel) {
     plantHoverLabel.classList.remove("is-seed-inventory-hint");
     plantHoverLabel.style.display = "none";
@@ -11528,34 +11570,18 @@ function tryCatchButterfly() {
 
 function updateButterflyInventoryUi() {
   if (!butterflyInventory) return;
-  let total = 0;
-  butterflyInventorySlots.forEach(function (slot) {
-    const color = slot.dataset.color;
-    const count = butterflyState.caughtCounts[color] || 0;
-    total += count;
-    const countNode = slot.querySelector(".butterfly-inventory-count");
-    if (countNode) countNode.textContent = String(count);
-    slot.classList.toggle("is-empty", count === 0);
-  });
-  butterflyInventory.style.display = total > 0 ? "flex" : "none";
-  const canCraft = total >= magicPowderCraftCost && !isCraftingMagicPowder;
-  butterflyInventory.classList.toggle("is-craftable", canCraft);
+  butterflyInventory.style.display = "none";
+  butterflyInventory.classList.remove("is-craftable");
+  setInstantHoverTip(butterflyInventory, null);
   butterflyInventorySlots.forEach(function (slot) {
     setInstantHoverTip(slot, null);
   });
-  if (canCraft) {
-    setInstantHoverTip(butterflyInventory, butterflyInventoryCraftHoverTip);
-  } else if (butterflyInventory.matches(":hover")) {
-    syncButterflyInventoryBarHoverTip();
-  } else {
-    setInstantHoverTip(butterflyInventory, null);
-  }
   if (butterflyInventoryTotal) {
-    butterflyInventoryTotal.textContent = String(total);
     setInstantHoverTip(butterflyInventoryTotal, null);
   }
   const legacyButterflyLabel = butterflyInventory.querySelector(".butterfly-inventory-label");
   if (legacyButterflyLabel) legacyButterflyLabel.remove();
+  updateBagInventorySlots();
 }
 
 function updateMagicPowderInventoryUi() {

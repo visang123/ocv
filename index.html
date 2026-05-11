@@ -210,15 +210,30 @@
       </button>
     </div>
     <div class="bag-inventory-slots" role="group" aria-label="가방 칸 3×3">
-      <div class="bag-inventory-slot" data-slot="0"></div>
-      <div class="bag-inventory-slot" data-slot="1"></div>
-      <div class="bag-inventory-slot" data-slot="2"></div>
-      <div class="bag-inventory-slot" data-slot="3"></div>
-      <div class="bag-inventory-slot" data-slot="4"></div>
-      <div class="bag-inventory-slot" data-slot="5"></div>
-      <div class="bag-inventory-slot" data-slot="6"></div>
-      <div class="bag-inventory-slot" data-slot="7"></div>
-      <div class="bag-inventory-slot" data-slot="8"></div>
+      <div class="bag-inventory-slot" data-slot="0" data-bag-type="seed">
+        <img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">
+        <span class="bag-slot-count">0</span>
+      </div>
+      <div class="bag-inventory-slot" data-slot="1" data-bag-type="apple">
+        <span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>
+        <span class="bag-slot-count">0</span>
+      </div>
+      <div class="bag-inventory-slot" data-slot="2" data-bag-type="butterfly" data-butterfly-color="brown">
+        <span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-brown" aria-hidden="true"></span>
+        <span class="bag-slot-count">0</span>
+      </div>
+      <div class="bag-inventory-slot" data-slot="3" data-bag-type="butterfly" data-butterfly-color="yellow">
+        <span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-yellow" aria-hidden="true"></span>
+        <span class="bag-slot-count">0</span>
+      </div>
+      <div class="bag-inventory-slot" data-slot="4" data-bag-type="butterfly" data-butterfly-color="white">
+        <span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-white" aria-hidden="true"></span>
+        <span class="bag-slot-count">0</span>
+      </div>
+      <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="5" data-bag-type="empty"></div>
+      <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="6" data-bag-type="empty"></div>
+      <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="7" data-bag-type="empty"></div>
+      <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="8" data-bag-type="empty"></div>
     </div>
   </div>
   <div id="seed-inventory">
