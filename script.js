@@ -9160,9 +9160,9 @@ function updatePlayerName() {
   const displayName = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.textContent = displayName;
   const nameWidth = playerName.offsetWidth || 36;
-  const rect = player.getBoundingClientRect();
-  const x = rect.left + rect.width / 2 - nameWidth / 2;
-  const y = rect.top + Math.max(10, rect.height * 0.3);
+  const playerBox = getPlayerBox();
+  const x = toScreenX(playerBox.left + playerBox.width / 2) - nameWidth / 2;
+  const y = toScreenY(playerBox.top) + 13;
 
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
