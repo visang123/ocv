@@ -530,11 +530,64 @@ function setWorldGuideBookOffGroundPickedForCurrentRoom() {
   setStoredFlag(storageKeyWorldGuideBookOffGroundPickedForRoom(), true);
 }
 
+const tutorialSessionWorldBagGroundPickedKey = "ovcTutorialSessionWorldBagGroundPickedV1";
+const tutorialSessionWorldGuideBookOffGroundKey = "ovcTutorialSessionWorldGuideBookOffGroundPickedV1";
+
+function clearTutorialSessionWorldFloorPickupFlags() {
+  try {
+    sessionStorage.removeItem(tutorialSessionWorldBagGroundPickedKey);
+    sessionStorage.removeItem(tutorialSessionWorldGuideBookOffGroundKey);
+  } catch (e) {}
+}
+
+function tutorialSessionWorldBagGroundPicked() {
+  try {
+    return sessionStorage.getItem(tutorialSessionWorldBagGroundPickedKey) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+function setTutorialSessionWorldBagGroundPicked() {
+  try {
+    sessionStorage.setItem(tutorialSessionWorldBagGroundPickedKey, "1");
+  } catch (e) {}
+}
+
+function tutorialSessionWorldGuideBookOffGroundPicked() {
+  try {
+    return sessionStorage.getItem(tutorialSessionWorldGuideBookOffGroundKey) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+function setTutorialSessionWorldGuideBookOffGroundPicked() {
+  try {
+    sessionStorage.setItem(tutorialSessionWorldGuideBookOffGroundKey, "1");
+  } catch (e) {}
+}
+
+/** 월드(index): 로컬 저장. 튜토리얼: 이번 페이지 방문(session)만 — 월드와 별도. */
+function isWorldFloorBagHiddenForCurrentView() {
+  if (isWorldDocumentEntry()) {
+    return hasPickedWorldBagGroundInCurrentRoom();
+  }
+  return tutorialSessionWorldBagGroundPicked();
+}
+
+function isWorldFloorGuideBookHiddenForCurrentView() {
+  if (isWorldDocumentEntry()) {
+    return hasPickedWorldGuideBookOffGroundInCurrentRoom();
+  }
+  return tutorialSessionWorldGuideBookOffGroundPicked();
+}
+
 let bagInventoryPanelOpen = false;
 
 function syncWorldGuideBookGroundVisibility() {
   if (!guideBook) return;
-  guideBook.style.display = hasPickedWorldGuideBookOffGroundInCurrentRoom() ? "none" : "block";
+  guideBook.style.display = isWorldFloorGuideBookHiddenForCurrentView() ? "none" : "block";
 }
 
 function syncGuideInventoryBar() {
@@ -552,7 +605,7 @@ function syncGuideInventoryBar() {
 function syncWorldBagGroundVisibility() {
   syncWorldGuideBookGroundVisibility();
   if (worldBag) {
-    worldBag.style.display = hasPickedWorldBagGroundInCurrentRoom() ? "none" : "block";
+    worldBag.style.display = isWorldFloorBagHiddenForCurrentView() ? "none" : "block";
   }
 }
 
@@ -2054,7 +2107,11 @@ function isNearSignBoard() {
 }
 
 function isNearWorldBagPickup() {
-  if (hasPickedWorldBagGroundInCurrentRoom()) return false;
+  if (isWorldDocumentEntry()) {
+    if (hasPickedWorldBagGroundInCurrentRoom()) return false;
+  } else if (tutorialSessionWorldBagGroundPicked()) {
+    return false;
+  }
   if (!worldBag) return false;
   const worldBagStyle = window.getComputedStyle(worldBag);
   if (worldBagStyle.display === "none" || worldBagStyle.visibility === "hidden") {
@@ -2066,7 +2123,11 @@ function isNearWorldBagPickup() {
 }
 
 function isNearGuideBook() {
-  if (hasPickedWorldGuideBookOffGroundInCurrentRoom()) return false;
+  if (isWorldDocumentEntry()) {
+    if (hasPickedWorldGuideBookOffGroundInCurrentRoom()) return false;
+  } else if (tutorialSessionWorldGuideBookOffGroundPicked()) {
+    return false;
+  }
   if (!guideBook) return false;
   const st = window.getComputedStyle(guideBook);
   if (st.display === "none" || st.visibility === "hidden") return false;
@@ -2317,8 +2378,6 @@ function resetTutorialProgressInStorage() {
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
   removeStoredValue(storageKeyGuideBookPickedForRoom());
-  removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
-  removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
@@ -2384,6 +2443,7 @@ function applyTutorialWorldResetIfPending() {
     sessionStorage.removeItem("ovcTutorialWorldResetPending");
   } catch (e2) {}
   applyDefaultState();
+  clearTutorialSessionWorldFloorPickupFlags();
   loadGuideBookState(true);
   setWorldPosition(player, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
@@ -3051,6 +3111,9 @@ function pickUpWorldGuideBookNoHold() {
   }
   if (!isNearGuideBook()) return false;
   setWorldGuideBookOffGroundPickedForCurrentRoom();
+  if (isTutorialDocumentEntry()) {
+    setTutorialSessionWorldGuideBookOffGroundPicked();
+  }
   syncWorldBagGroundVisibility();
   updateGuideCard();
   return true;
@@ -3067,6 +3130,9 @@ function pickUpWorldBag() {
   isGuideBookOpen = false;
   setGuideBookPickedForCurrentRoom();
   setWorldBagGroundPickedForCurrentRoom();
+  if (isTutorialDocumentEntry()) {
+    setTutorialSessionWorldBagGroundPicked();
+  }
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   updateGuideCard();
@@ -3205,8 +3271,10 @@ function applyDefaultState(options) {
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
   clearMainSeedPickedForCurrentRoom();
-  removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
-  removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
+  if (sharedWorldResetOnly || isWorldDocumentEntry()) {
+    removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
+    removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
+  }
   if (!sharedWorldResetOnly) {
     removeStoredValue(storageKeyGuideBookPickedForRoom());
   }
@@ -8620,7 +8688,7 @@ function updateGuideCard() {
   if (guideBook) {
     guideBook.classList.toggle(
       "is-near",
-      !hasPickedWorldGuideBookOffGroundInCurrentRoom() && isNearGuideBook()
+      !isWorldFloorGuideBookHiddenForCurrentView() && isNearGuideBook()
     );
   }
   if (worldBag) {
@@ -11986,6 +12054,9 @@ try {
     loadSeedState();
     loadAppleState();
     loadBucketState();
+    if (isTutorialDocumentEntry()) {
+      clearTutorialSessionWorldFloorPickupFlags();
+    }
     loadGuideBookState();
     if (currentUserId && getStoredFlag(onboardingFlowDoneKey)) {
       setStoredFlag(everBeenToWorldKey, true);
