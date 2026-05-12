@@ -74,6 +74,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "book",
       butterflyColor: "",
+      label: "식물의 책",
       iconHtml:
         '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512b" alt="plant book" width="28" height="28" draggable="false">'
     };
@@ -82,6 +83,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "seed",
       butterflyColor: "",
+      label: "씨앗",
       iconHtml:
         '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
     };
@@ -90,6 +92,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "apple",
       butterflyColor: "",
+      label: "사과",
       iconHtml: '<span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>'
     };
   }
@@ -97,6 +100,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "butterfly",
       butterflyColor: "brown",
+      label: "갈색 나비",
       iconHtml:
         '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-brown" aria-hidden="true"></span>'
     };
@@ -105,6 +109,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "butterfly",
       butterflyColor: "yellow",
+      label: "노란 나비",
       iconHtml:
         '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-yellow" aria-hidden="true"></span>'
     };
@@ -112,6 +117,7 @@ export function getBagItemDescriptor(itemKey) {
   return {
     bagType: "butterfly",
     butterflyColor: "white",
+    label: "흰 나비",
     iconHtml:
       '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-white" aria-hidden="true"></span>'
   };

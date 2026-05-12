@@ -6296,6 +6296,8 @@ function updateBagInventorySlots() {
     if (!itemKey) {
       slot.dataset.bagType = "empty";
       delete slot.dataset.butterflyColor;
+      slot.removeAttribute("data-ovc-tip");
+      slot.removeAttribute("aria-label");
       slot.classList.add("bag-inventory-slot--empty");
       slot.classList.add("is-empty");
       slot.innerHTML = "";
@@ -6304,6 +6306,13 @@ function updateBagInventorySlots() {
     const descriptor = getBagItemDescriptorCore(itemKey);
     const itemCount = Math.max(0, Number(counts[itemKey] || 0));
     slot.dataset.bagType = descriptor.bagType;
+    if (descriptor.label) {
+      slot.setAttribute("data-ovc-tip", descriptor.label);
+      slot.setAttribute("aria-label", descriptor.label);
+    } else {
+      slot.removeAttribute("data-ovc-tip");
+      slot.removeAttribute("aria-label");
+    }
     if (descriptor.butterflyColor) {
       slot.dataset.butterflyColor = descriptor.butterflyColor;
     } else {
@@ -6782,6 +6791,17 @@ function isPlayerNearTreeTrunk() {
     top: TREE_TRUNK_TOP - 22,
     bottom: rootsBottom
   };
+  const centerX = getPlayerCenterX();
+  const climbColumnLeft = Math.min(rootsRect.left, trunkRect.left);
+  const climbColumnRight = Math.max(rootsRect.right, trunkRect.right);
+  if (
+    centerX >= climbColumnLeft &&
+    centerX <= climbColumnRight &&
+    footY >= TREE_CANOPY_TOP &&
+    footY <= rootsBottom + 10
+  ) {
+    return true;
+  }
   return isOverlappingRect(feetRect, trunkRect);
 }
 
@@ -6882,10 +6902,10 @@ function startPlanting() {
       newPlant.plantedAt = plantedAt;
       newPlant.lastWateredAt = null;
       newPlant.wateredAtList = [];
-      newPlant.waterLevel = 0;
+      newPlant.waterLevel = 1;
       newPlant.waterLevelUpdatedAt = plantedAt;
-      newPlant.needsFirstWater = true;
-      newPlant.growthStartedAt = null;
+      newPlant.needsFirstWater = false;
+      newPlant.growthStartedAt = plantedAt;
       newPlant.ownerUserId = getPlanterOwnerId();
       newPlant.ownerDisplayName = getPlanterDisplayName();
       assignSproutIdentityToNewPlant(newPlant);
@@ -6909,13 +6929,13 @@ function startPlanting() {
     plantRuntime.lastWateredAt = null;
     plantRuntime.wateredAtList = [];
     plantRuntime.status = "normal";
-    plantRuntime.waterLevel = 0;
+    plantRuntime.waterLevel = 1;
     plantRuntime.waterLevelUpdatedAt = plantedAt;
     plantRuntime.becameEmptyAt = null;
     plantRuntime.isOverwatered = false;
     plantRuntime.rottenAt = null;
-    plantRuntime.needsFirstWater = true;
-    plantRuntime.growthStartedAt = null;
+    plantRuntime.needsFirstWater = false;
+    plantRuntime.growthStartedAt = plantedAt;
     plantRuntime.plantedAt = plantedAt;
     plantRuntime.isSproutGrown = false;
     plantRuntime.sproutGrownAt = null;
@@ -7044,13 +7064,13 @@ function plantWorldSeedCount() {
       plantRuntime.lastWateredAt = null;
       plantRuntime.wateredAtList = [];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 0;
+      plantRuntime.waterLevel = 1;
       plantRuntime.waterLevelUpdatedAt = plantedAt;
       plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
       plantRuntime.rottenAt = null;
-      plantRuntime.needsFirstWater = true;
-      plantRuntime.growthStartedAt = null;
+      plantRuntime.needsFirstWater = false;
+      plantRuntime.growthStartedAt = plantedAt;
       plantRuntime.plantedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
@@ -7161,13 +7181,13 @@ function plantInventorySeed(seedId) {
       plantRuntime.lastWateredAt = null;
       plantRuntime.wateredAtList = [];
       plantRuntime.status = "normal";
-      plantRuntime.waterLevel = 0;
+      plantRuntime.waterLevel = 1;
       plantRuntime.waterLevelUpdatedAt = plantedAt;
       plantRuntime.becameEmptyAt = null;
       plantRuntime.isOverwatered = false;
       plantRuntime.rottenAt = null;
-      plantRuntime.needsFirstWater = true;
-      plantRuntime.growthStartedAt = null;
+      plantRuntime.needsFirstWater = false;
+      plantRuntime.growthStartedAt = plantedAt;
       plantRuntime.plantedAt = plantedAt;
       plantRuntime.isSproutGrown = false;
       plantRuntime.sproutGrownAt = null;
@@ -7214,13 +7234,13 @@ function createExtraPlant(id, x, y) {
     lastWateredAt: null,
     wateredAtList: [],
     status: "normal",
-    waterLevel: 0,
+    waterLevel: 1,
     waterLevelUpdatedAt: now,
     becameEmptyAt: null,
     isOverwatered: false,
     rottenAt: null,
-    needsFirstWater: true,
-    growthStartedAt: null,
+    needsFirstWater: false,
+    growthStartedAt: now,
     isSproutGrown: false,
     sproutGrownAt: null,
     sproutEvolutionMs: 0,
@@ -8458,6 +8478,8 @@ function updatePlantCard() {
   }
 
   if (
+    !wateringTarget ||
+    wateringTarget.type !== "main" ||
     !plantRuntime.isSeedPlanted ||
     plantRuntime.status === "dry" ||
     plantRuntime.status === "rotten" ||
