@@ -330,7 +330,6 @@ let movementTutorialPhase = 0;
 let movementTutorialBaseline = null;
 let onboardingFlowStep = 1;
 let onboardingJumpLatch = false;
-let onboardingFirstGuideEscHintShown = false;
 let onboardingNpcGuideEscHintShown = false;
 let onboardingEscHintTimerId = null;
 let onboardingCongratsTimerId = null;
@@ -1395,9 +1394,16 @@ if (bagInventoryPanel) {
       if (!hasGuideBook) return;
       event.preventDefault();
       event.stopPropagation();
+      const wasOpen = isGuideBookOpen || guideCard.style.display === "block";
       isGuideDismissedAtSign = false;
-      isGuideBookOpen = true;
+      isGuideBookOpen = !wasOpen;
+      if (wasOpen) {
+        dismissGuideBookClickPrompt();
+      }
       updateGuideCard();
+      if (wasOpen) {
+        maybeAdvanceOnboardingAfterGuideBookClosed();
+      }
       updateOnboardingFlowUI();
       return;
     }
@@ -1449,7 +1455,6 @@ function maybeAdvanceOnboardingAfterGuideBookClosed() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   if (onboardingFlowStep === 3) {
     onboardingClearEscHintTimer();
-    onboardingFirstGuideEscHintShown = false;
     onboardingFlowStep = 4;
     persistOnboardingStep();
   } else if (onboardingFlowStep === 10) {
@@ -2518,12 +2523,6 @@ function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
   }, 2000);
 }
 
-function scheduleOnboardingFirstGuideEscHint() {
-  scheduleOnboardingGuideEscHintLine(3, function () {
-    onboardingFirstGuideEscHintShown = true;
-  });
-}
-
 function scheduleOnboardingNpcGuideEscHint() {
   scheduleOnboardingGuideEscHintLine(10, function () {
     onboardingNpcGuideEscHintShown = true;
@@ -2674,7 +2673,6 @@ function syncOnboardingFlowProgressFromWorld() {
 
 function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
-  onboardingFirstGuideEscHintShown = false;
   onboardingNpcGuideEscHintShown = false;
   onboardingPostAppleSeedIntroPhase = 0;
   onboardingPostWaterCongratsPhase = 0;
@@ -6760,17 +6758,6 @@ function isPlayerNearTreeTrunk() {
     top: TREE_TRUNK_TOP - 22,
     bottom: rootsBottom
   };
-  const centerX = getPlayerCenterX();
-  const climbColumnLeft = Math.min(rootsRect.left, trunkRect.left);
-  const climbColumnRight = Math.max(rootsRect.right, trunkRect.right);
-  if (
-    centerX >= climbColumnLeft &&
-    centerX <= climbColumnRight &&
-    footY >= TREE_CANOPY_TOP &&
-    footY <= rootsBottom + 10
-  ) {
-    return true;
-  }
   return isOverlappingRect(feetRect, trunkRect);
 }
 

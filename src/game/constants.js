@@ -39,30 +39,26 @@ export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
 export const GUIDE_BOOK_WIDTH = 34;
 export const GUIDE_BOOK_HEIGHT = 23;
-/** 책 — 지면·오브젝트에 안 묻도록 위·오른쪽(책 너비 11칸 + 기준 40) */
-export const GUIDE_BOOK_START_X = 40 + 11 * GUIDE_BOOK_WIDTH;
+/** 책 — 우물 오른쪽·지면에 안 묻도록 (책 너비 10칸 + 기준 40) */
+export const GUIDE_BOOK_START_X = 40 + 10 * GUIDE_BOOK_WIDTH;
 export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
 export const WORLD_BAG_WIDTH = 14;
 export const WORLD_BAG_HEIGHT = 11;
-// 책 최초 스폰 좌표를 기준으로, Y만 조금 아래에 가방을 둔다.
-export const WORLD_BAG_START_X = GUIDE_BOOK_START_X;
+// 책과 같은 세로축 근처에 두되, 가로는 책 아래 중앙에 맞춤
+export const WORLD_BAG_START_X =
+  GUIDE_BOOK_START_X + Math.round((GUIDE_BOOK_WIDTH - WORLD_BAG_WIDTH) / 2);
 export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
-/** 책 오른쪽–씨앗 왼쪽 최소 간격(책 너비 약 5칸) */
-export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH * 5;
-/** 씨앗 — 안내판 오른쪽과, 책+5칸 간격 중 더 오른쪽(겹침 방지) */
+/** 책 오른쪽–씨앗 왼쪽 최소 간격(가까이 배치) */
+export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH + 8;
+/** 씨앗 — 안내판 오른쪽과, 책·간격 중 더 오른쪽(겹침 방지) */
 export const SEED_START_X = Math.max(
   SIGN_START_X + SIGN_WIDTH + 48,
   GUIDE_BOOK_START_X + GUIDE_BOOK_WIDTH + GUIDE_BOOK_SEED_MIN_GAP
 );
 export const SEED_START_Y = SIGN_START_Y + SIGN_HEIGHT - SEED_SIZE;
-/** 식물의 달인 — 씨앗·플레이어 폭 기준; 나무·줄기와 동선 분리를 위해 추가로 왼쪽 */
-export const NPC_START_X =
-  SEED_START_X +
-  36 +
-  8 * PLAYER_WIDTH -
-  Math.round(NPC_WIDTH * 2.5) -
-  Math.round(NPC_WIDTH * 4.5);
+/** 식물의 달인 — 씨앗 바로 오른쪽(가로로 붙임) */
+export const NPC_START_X = SEED_START_X + SEED_SIZE + 12;
 export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 
 export const SECOND_MS = 1000;
