@@ -76,7 +76,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "식물의 책",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512b" alt="plant book" width="28" height="28" draggable="false">'
+        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512w" alt="plant book" width="28" height="28" draggable="false">'
     };
   }
   if (itemKey === "seed") {
