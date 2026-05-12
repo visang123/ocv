@@ -574,6 +574,31 @@ function isWorldFloorGuideBookHiddenForCurrentView() {
 }
 
 let bagInventoryPanelOpen = false;
+const BAG_SLOT_ITEM_KEYS = ["seed", "apple", "butterfly:brown", "butterfly:yellow", "butterfly:white"];
+const bagInventoryOrderKey = "ovcBagInventoryOrderV1";
+let bagInventoryItemOrder = [];
+let bagInventoryCountsPrev = null;
+
+function loadBagInventoryOrder() {
+  try {
+    const raw = getStoredValue(bagInventoryOrderKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(function (key) {
+      return BAG_SLOT_ITEM_KEYS.includes(key);
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveBagInventoryOrder() {
+  try {
+    setStoredValue(bagInventoryOrderKey, JSON.stringify(bagInventoryItemOrder));
+  } catch (e) {}
+}
+bagInventoryItemOrder = loadBagInventoryOrder();
 
 function syncWorldGuideBookGroundVisibility() {
   if (!guideBook) return;
@@ -6223,35 +6248,122 @@ function getBagInventorySeedCount() {
   }).length;
 }
 
+function getBagInventoryCountsByKey() {
+  return {
+    seed: getBagInventorySeedCount(),
+    apple: Math.max(0, Number(appleState.count) || 0),
+    "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
+    "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
+    "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
+  };
+}
+
+function normalizeBagInventoryOrderByCounts(counts) {
+  let changed = false;
+  const aliveOrder = bagInventoryItemOrder.filter(function (key) {
+    return Number(counts[key] || 0) > 0;
+  });
+  if (aliveOrder.length !== bagInventoryItemOrder.length) {
+    changed = true;
+    bagInventoryItemOrder = aliveOrder;
+  }
+  if (!bagInventoryCountsPrev) {
+    BAG_SLOT_ITEM_KEYS.forEach(function (key) {
+      if (Number(counts[key] || 0) <= 0) return;
+      if (bagInventoryItemOrder.includes(key)) return;
+      bagInventoryItemOrder.push(key);
+      changed = true;
+    });
+    bagInventoryCountsPrev = Object.assign({}, counts);
+    if (changed) saveBagInventoryOrder();
+    return;
+  }
+  BAG_SLOT_ITEM_KEYS.forEach(function (key) {
+    const prev = Number(bagInventoryCountsPrev[key] || 0);
+    const next = Number(counts[key] || 0);
+    if (prev <= 0 && next > 0 && !bagInventoryItemOrder.includes(key)) {
+      bagInventoryItemOrder.push(key);
+      changed = true;
+    }
+  });
+  bagInventoryCountsPrev = Object.assign({}, counts);
+  if (changed) saveBagInventoryOrder();
+}
+
+function getBagItemDescriptor(itemKey) {
+  if (itemKey === "seed") {
+    return {
+      bagType: "seed",
+      butterflyColor: "",
+      iconHtml: '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
+    };
+  }
+  if (itemKey === "apple") {
+    return {
+      bagType: "apple",
+      butterflyColor: "",
+      iconHtml: '<span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>'
+    };
+  }
+  if (itemKey === "butterfly:brown") {
+    return {
+      bagType: "butterfly",
+      butterflyColor: "brown",
+      iconHtml:
+        '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-brown" aria-hidden="true"></span>'
+    };
+  }
+  if (itemKey === "butterfly:yellow") {
+    return {
+      bagType: "butterfly",
+      butterflyColor: "yellow",
+      iconHtml:
+        '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-yellow" aria-hidden="true"></span>'
+    };
+  }
+  return {
+    bagType: "butterfly",
+    butterflyColor: "white",
+    iconHtml:
+      '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-white" aria-hidden="true"></span>'
+  };
+}
+
 function updateBagInventorySlots() {
   if (!bagInventoryPanel) return;
-  const seedCount = getBagInventorySeedCount();
+  const counts = getBagInventoryCountsByKey();
+  const seedCount = Number(counts.seed || 0);
   const looseVisible = usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(Date.now());
   if (usesWorldLooseSeedMode() && seedCount <= 0 && !looseVisible) {
     hasShownFirstSeedFocus = false;
   }
-  const appleCount = Math.max(0, Number(appleState.count) || 0);
-  const brown = butterflyState.caughtCounts.brown || 0;
-  const yellow = butterflyState.caughtCounts.yellow || 0;
-  const white = butterflyState.caughtCounts.white || 0;
+  normalizeBagInventoryOrderByCounts(counts);
 
-  function setSlot(type, count, butterflyColor) {
-    let sel = '[data-bag-type="' + type + '"]';
-    if (type === "butterfly" && butterflyColor) {
-      sel = '[data-bag-type="butterfly"][data-butterfly-color="' + butterflyColor + '"]';
+  const slots = Array.from(bagInventoryPanel.querySelectorAll(".bag-inventory-slot")).sort(function (a, b) {
+    return Number(a.dataset.slot || 0) - Number(b.dataset.slot || 0);
+  });
+  slots.forEach(function (slot, index) {
+    const itemKey = bagInventoryItemOrder[index] || "";
+    if (!itemKey) {
+      slot.dataset.bagType = "empty";
+      delete slot.dataset.butterflyColor;
+      slot.classList.add("bag-inventory-slot--empty");
+      slot.classList.add("is-empty");
+      slot.innerHTML = "";
+      return;
     }
-    const slot = bagInventoryPanel.querySelector(sel);
-    if (!slot) return;
-    const countEl = slot.querySelector(".bag-slot-count");
-    if (countEl) countEl.textContent = String(count);
-    slot.classList.toggle("is-empty", count <= 0);
-  }
-
-  setSlot("seed", seedCount);
-  setSlot("apple", appleCount);
-  setSlot("butterfly", brown, "brown");
-  setSlot("butterfly", yellow, "yellow");
-  setSlot("butterfly", white, "white");
+    const descriptor = getBagItemDescriptor(itemKey);
+    const itemCount = Math.max(0, Number(counts[itemKey] || 0));
+    slot.dataset.bagType = descriptor.bagType;
+    if (descriptor.butterflyColor) {
+      slot.dataset.butterflyColor = descriptor.butterflyColor;
+    } else {
+      delete slot.dataset.butterflyColor;
+    }
+    slot.classList.remove("bag-inventory-slot--empty");
+    slot.classList.toggle("is-empty", itemCount <= 0);
+    slot.innerHTML = descriptor.iconHtml + '<span class="bag-slot-count">' + itemCount + "</span>";
+  });
 }
 
 function updateSeedInventory() {
@@ -8602,15 +8714,8 @@ function updateGuideCard() {
     guideCard.style.display = "none";
   }
 
-  if (guideBook) {
-    guideBook.classList.toggle(
-      "is-near",
-      !isWorldFloorGuideBookHiddenForCurrentView() && isNearGuideBook()
-    );
-  }
-  if (worldBag) {
-    worldBag.classList.toggle("is-near", !hasGuideBook && isNearWorldBagPickup());
-  }
+  if (guideBook) guideBook.classList.remove("is-near");
+  if (worldBag) worldBag.classList.remove("is-near");
   if (worldBagInventory) {
     worldBagInventory.classList.toggle(
       "is-click-prompt",
