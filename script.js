@@ -1388,6 +1388,16 @@ if (bagInventoryPanel) {
       event.stopPropagation();
       return;
     }
+    if (kind === "book") {
+      if (!hasGuideBook) return;
+      event.preventDefault();
+      event.stopPropagation();
+      isGuideDismissedAtSign = false;
+      isGuideBookOpen = true;
+      updateGuideCard();
+      updateOnboardingFlowUI();
+      return;
+    }
     if (kind === "seed") {
       if (getBagInventorySeedCount() <= 0) return;
       event.preventDefault();
@@ -3103,12 +3113,17 @@ function pickUpWorldGuideBookNoHold() {
     return false;
   }
   if (!isNearGuideBook()) return false;
+  hasGuideBook = true;
+  isGuideBookOpen = false;
+  setGuideBookPickedForCurrentRoom();
   setWorldGuideBookOffGroundPickedForCurrentRoom();
   if (isTutorialDocumentEntry()) {
     setTutorialSessionWorldGuideBookOffGroundPicked();
   }
   syncWorldBagGroundVisibility();
+  syncGuideInventoryBar();
   updateGuideCard();
+  updateBagInventorySlots();
   return true;
 }
 
@@ -6204,6 +6219,7 @@ function getBagInventorySeedCount() {
 
 function getBagInventoryCountsByKey() {
   return {
+    book: hasGuideBook ? 1 : 0,
     seed: getBagInventorySeedCount(),
     apple: Math.max(0, Number(appleState.count) || 0),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),

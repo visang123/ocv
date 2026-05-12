@@ -1,4 +1,5 @@
 export const BAG_SLOT_ITEM_KEYS = [
+  "book",
   "seed",
   "apple",
   "butterfly:brown",
@@ -69,11 +70,20 @@ export function normalizeBagInventoryOrderByCounts(order, previousCounts, counts
 }
 
 export function getBagItemDescriptor(itemKey) {
+  if (itemKey === "book") {
+    return {
+      bagType: "book",
+      butterflyColor: "",
+      iconHtml:
+        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512b" alt="plant book" width="28" height="28" draggable="false">'
+    };
+  }
   if (itemKey === "seed") {
     return {
       bagType: "seed",
       butterflyColor: "",
-      iconHtml: '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
+      iconHtml:
+        '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
     };
   }
   if (itemKey === "apple") {
