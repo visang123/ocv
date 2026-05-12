@@ -247,6 +247,15 @@ import {
   getRemoteStatusText
 } from "./src/multiplayer/presence.js";
 import {
+  MULTIPLAYER_BROADCAST_MIN_MS,
+  MULTIPLAYER_HEARTBEAT_MS,
+  countActiveRemotePlayers,
+  getAdaptiveWorldPollMinMs,
+  getAdaptiveWorldSyncLoopMs,
+  getAdaptivePresenceDbSyncMs,
+  getAdaptivePresenceDbPollMs
+} from "./src/multiplayer/timing.js";
+import {
   getNumericButterflyValue as getNumericButterflyValueCore,
   simulateButterflyAuthorityStep as simulateButterflyAuthorityStepCore
 } from "./src/multiplayer/butterflyMotion.js";
@@ -266,6 +275,14 @@ import {
   isWorldDocumentEntry
 } from "./src/app/ovc-page-entry.js";
 import {
+  showAppLoadingScreen,
+  hideAppLoadingScreen
+} from "./src/app/loading-screen.js";
+import {
+  setOverlayOpen as setSettingsOverlayOpen,
+  updateSettingsTutorialButtons as updateSettingsTutorialButtonsUi
+} from "./src/app/settings-panel.js";
+import {
   ovcTutorialReplaySessionKey,
   ovcClearPendingWorldHubMarkers,
   ovcTutorialPageUrl,
@@ -280,6 +297,12 @@ import {
   storageKeyWorldBagGroundPickedForRoom,
   storageKeyWorldGuideBookOffGroundPickedForRoom
 } from "./src/game/room-storage-keys.js";
+import {
+  loadBagInventoryOrder as loadBagInventoryOrderCore,
+  saveBagInventoryOrder as saveBagInventoryOrderCore,
+  normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
+  getBagItemDescriptor as getBagItemDescriptorCore
+} from "./src/game/bag-inventory.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -574,29 +597,15 @@ function isWorldFloorGuideBookHiddenForCurrentView() {
 }
 
 let bagInventoryPanelOpen = false;
-const BAG_SLOT_ITEM_KEYS = ["seed", "apple", "butterfly:brown", "butterfly:yellow", "butterfly:white"];
-const bagInventoryOrderKey = "ovcBagInventoryOrderV1";
 let bagInventoryItemOrder = [];
 let bagInventoryCountsPrev = null;
 
 function loadBagInventoryOrder() {
-  try {
-    const raw = getStoredValue(bagInventoryOrderKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(function (key) {
-      return BAG_SLOT_ITEM_KEYS.includes(key);
-    });
-  } catch (e) {
-    return [];
-  }
+  return loadBagInventoryOrderCore(getStoredValue);
 }
 
 function saveBagInventoryOrder() {
-  try {
-    setStoredValue(bagInventoryOrderKey, JSON.stringify(bagInventoryItemOrder));
-  } catch (e) {}
+  saveBagInventoryOrderCore(setStoredValue, bagInventoryItemOrder);
 }
 bagInventoryItemOrder = loadBagInventoryOrder();
 
@@ -759,9 +768,6 @@ let networkDebugDomStale = false;
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
 ground.appendChild(playerBucketOverlay);
-const appLoadingScreen = document.getElementById("app-loading-screen");
-const appLoadingText = document.getElementById("app-loading-text");
-let appLoadingHideTimer = null;
 /** 버킷 네트워크 로그 — 필요할 때만 true */
 const BUCKET_DEBUG_TRACE = false;
 const playerTintCache = new Map();
@@ -868,72 +874,25 @@ const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 12;
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
 
-function showAppLoadingScreen(message) {
-  if (!appLoadingScreen) return;
-  clearTimeout(appLoadingHideTimer);
-  if (appLoadingText && message) {
-    appLoadingText.textContent = message;
-  }
-  appLoadingScreen.hidden = false;
-  document.body.classList.remove("is-game-ready");
-}
-
-function hideAppLoadingScreen() {
-  clearTimeout(appLoadingHideTimer);
-  document.body.classList.add("is-game-ready");
-  if (!appLoadingScreen) return;
-  appLoadingScreen.hidden = true;
-}
-const MULTIPLAYER_BROADCAST_MIN_MS = 80;
-const MULTIPLAYER_HEARTBEAT_MS = 500;
-const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
-const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
-const MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE = 150;
-const MULTIPLAYER_WORLD_POLL_MIN_MS_BASE = 150;
-
 function getActiveRemotePlayerCountForTick() {
-  const now = Date.now();
-  let n = 0;
-  Object.keys(remotePlayers).forEach(function (remoteId) {
-    const remote = remotePlayers[remoteId];
-    if (!remote) return;
-    if (remote.lastSeenAt && now - remote.lastSeenAt > 30000) return;
-    n += 1;
-  });
-  return n;
+  return countActiveRemotePlayers(remotePlayers, Date.now());
 }
 
 /** 원격 인원이 많을수록 폴링·저장 간격을 약간 늘려 DB·클라이언트 부하를 줄임 */
 function getMultiplayerWorldPollMinMs() {
-  const c = getActiveRemotePlayerCountForTick();
-  if (c >= 10) return 280;
-  if (c >= 6) return 220;
-  if (c >= 3) return 180;
-  return MULTIPLAYER_WORLD_POLL_MIN_MS_BASE;
+  return getAdaptiveWorldPollMinMs(getActiveRemotePlayerCountForTick());
 }
 
 function getMultiplayerWorldSyncLoopMs() {
-  const c = getActiveRemotePlayerCountForTick();
-  if (c >= 10) return 280;
-  if (c >= 6) return 220;
-  if (c >= 3) return 180;
-  return MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE;
+  return getAdaptiveWorldSyncLoopMs(getActiveRemotePlayerCountForTick());
 }
 
 function getMultiplayerPresenceDbSyncMs() {
-  const c = getActiveRemotePlayerCountForTick();
-  if (c >= 12) return 2400;
-  if (c >= 8) return 2000;
-  if (c >= 5) return 1600;
-  return MULTIPLAYER_PRESENCE_DB_SYNC_MS;
+  return getAdaptivePresenceDbSyncMs(getActiveRemotePlayerCountForTick());
 }
 
 function getMultiplayerPresenceDbPollMs() {
-  const c = getActiveRemotePlayerCountForTick();
-  if (c >= 12) return 2800;
-  if (c >= 8) return 2400;
-  if (c >= 5) return 1900;
-  return MULTIPLAYER_PRESENCE_DB_POLL_MS;
+  return getAdaptivePresenceDbPollMs(getActiveRemotePlayerCountForTick());
 }
 
 const keys = createInputState();
@@ -1646,34 +1605,30 @@ document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
 
 function updateSettingsTutorialButtons() {
-  if (!tutorialExitButton || !tutorialReplayButton) return;
-  const done = getStoredFlag(onboardingFlowDoneKey);
-  const inTutorial = Boolean(currentUserId && hasSpawnedCharacter && !done && onboardingFlowStep > 0);
-  tutorialExitButton.style.display = inTutorial ? "block" : "none";
-  tutorialReplayButton.style.display =
-    currentUserId && hasSpawnedCharacter && done ? "block" : "none";
+  updateSettingsTutorialButtonsUi({
+    tutorialExitButton,
+    tutorialReplayButton,
+    currentUserId,
+    hasSpawnedCharacter,
+    onboardingDone: getStoredFlag(onboardingFlowDoneKey),
+    onboardingFlowStep
+  });
 }
 
 function openSettingsOverlay() {
-  if (!settingsOverlay) return;
-  settingsOverlay.classList.add("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "false");
+  setSettingsOverlayOpen(settingsOverlay, true);
   updateSettingsTutorialButtons();
 }
 
 function closeSettingsOverlayFromBackdrop() {
   onboardingStep26OpenedSettingsWithEsc = false;
-  if (!settingsOverlay) return;
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
+  setSettingsOverlayOpen(settingsOverlay, false);
   updateSettingsTutorialButtons();
 }
 
 function closeSettingsOverlayFromEscape() {
   const hadEscOpenCycle = onboardingStep26OpenedSettingsWithEsc;
-  if (!settingsOverlay) return;
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
+  setSettingsOverlayOpen(settingsOverlay, false);
   updateSettingsTutorialButtons();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 26 && hadEscOpenCycle) {
     onboardingFlowStep = 27;
@@ -1795,8 +1750,7 @@ settingsOverlay.addEventListener("click", function (event) {
 
 controlsButton.addEventListener("click", function () {
   onboardingStep26OpenedSettingsWithEsc = false;
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
+  setSettingsOverlayOpen(settingsOverlay, false);
   controlsOverlay.classList.add("is-open");
   controlsOverlay.setAttribute("aria-hidden", "false");
 });
@@ -6259,35 +6213,14 @@ function getBagInventoryCountsByKey() {
 }
 
 function normalizeBagInventoryOrderByCounts(counts) {
-  let changed = false;
-  const aliveOrder = bagInventoryItemOrder.filter(function (key) {
-    return Number(counts[key] || 0) > 0;
-  });
-  if (aliveOrder.length !== bagInventoryItemOrder.length) {
-    changed = true;
-    bagInventoryItemOrder = aliveOrder;
-  }
-  if (!bagInventoryCountsPrev) {
-    BAG_SLOT_ITEM_KEYS.forEach(function (key) {
-      if (Number(counts[key] || 0) <= 0) return;
-      if (bagInventoryItemOrder.includes(key)) return;
-      bagInventoryItemOrder.push(key);
-      changed = true;
-    });
-    bagInventoryCountsPrev = Object.assign({}, counts);
-    if (changed) saveBagInventoryOrder();
-    return;
-  }
-  BAG_SLOT_ITEM_KEYS.forEach(function (key) {
-    const prev = Number(bagInventoryCountsPrev[key] || 0);
-    const next = Number(counts[key] || 0);
-    if (prev <= 0 && next > 0 && !bagInventoryItemOrder.includes(key)) {
-      bagInventoryItemOrder.push(key);
-      changed = true;
-    }
-  });
-  bagInventoryCountsPrev = Object.assign({}, counts);
-  if (changed) saveBagInventoryOrder();
+  const normalized = normalizeBagInventoryOrderByCountsCore(
+    bagInventoryItemOrder,
+    bagInventoryCountsPrev,
+    counts
+  );
+  bagInventoryItemOrder = normalized.order;
+  bagInventoryCountsPrev = normalized.previousCounts;
+  if (normalized.changed) saveBagInventoryOrder();
 }
 
 function getBagItemDescriptor(itemKey) {
@@ -6352,7 +6285,7 @@ function updateBagInventorySlots() {
       slot.innerHTML = "";
       return;
     }
-    const descriptor = getBagItemDescriptor(itemKey);
+    const descriptor = getBagItemDescriptorCore(itemKey);
     const itemCount = Math.max(0, Number(counts[itemKey] || 0));
     slot.dataset.bagType = descriptor.bagType;
     if (descriptor.butterflyColor) {
@@ -9354,8 +9287,7 @@ function openCharacterSelectIfNeeded() {
 
 function openCharacterColorChange() {
   onboardingStep26OpenedSettingsWithEsc = false;
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
+  setSettingsOverlayOpen(settingsOverlay, false);
   isCharacterSelecting = true;
   buildCharacterColorGrid();
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
@@ -10666,8 +10598,7 @@ function formatAdminDate(value) {
 }
 
 function openLogoutConfirm() {
-  settingsOverlay.classList.remove("is-open");
-  settingsOverlay.setAttribute("aria-hidden", "true");
+  setSettingsOverlayOpen(settingsOverlay, false);
   logoutConfirmOverlay.classList.add("is-open");
   logoutConfirmOverlay.setAttribute("aria-hidden", "false");
 }

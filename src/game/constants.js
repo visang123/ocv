@@ -37,8 +37,8 @@ export const SIGN_START_X = 138;
 export const SIGN_START_Y = 268;
 export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
-export const GUIDE_BOOK_WIDTH = 10;
-export const GUIDE_BOOK_HEIGHT = 9;
+export const GUIDE_BOOK_WIDTH = 24;
+export const GUIDE_BOOK_HEIGHT = 17;
 /** 책 — 지면·오브젝트에 안 묻도록 위·오른쪽(책 너비 11칸 + 기준 40) */
 export const GUIDE_BOOK_START_X = 40 + 11 * GUIDE_BOOK_WIDTH;
 export const GUIDE_BOOK_START_Y = 284;
