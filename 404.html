@@ -39,8 +39,12 @@
         return parts.length ? "/" + parts[0] + "/" : "/";
       }
 
-      var hasSession = Boolean((localStorage.getItem(currentUserKey) || "").trim());
-      var nextFile = hasSession ? "index.html" : "ovc-login.html?v=" + appVersion;
+      var hasLsUser = Boolean((localStorage.getItem(currentUserKey) || "").trim());
+      var hasTabUser = false;
+      try {
+        hasTabUser = Boolean((sessionStorage.getItem("ovcSessionUserIdV1") || "").trim());
+      } catch (eT) {}
+      var nextFile = hasLsUser || hasTabUser ? "index.html" : "ovc-login.html?v=" + appVersion;
       var basePath = resolveBasePath();
       var target = new URL(nextFile, window.location.origin + basePath);
       window.location.replace(target.toString());

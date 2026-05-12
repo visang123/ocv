@@ -295,7 +295,13 @@
           sessionStorage.setItem("ovcForceWorldHubV1", "1");
         } catch (e1) {}
         try {
-          var uid = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
+          var uid = "";
+          try {
+            uid = (sessionStorage.getItem("ovcSessionUserIdV1") || "").trim();
+          } catch (eS) {}
+          if (!uid) {
+            uid = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
+          }
           if (uid) {
             localStorage.setItem("ovcPendingWorldHubUserV1:" + uid, "1");
           } else {

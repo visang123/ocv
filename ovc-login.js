@@ -4,6 +4,12 @@ const currentUserColorKey = "ovcCurrentUserColorV1";
 const lastSelectedColorKey = "ovcLastSelectedColorV1";
 const currentUserHasChosenColorKey = "ovcCurrentUserHasChosenColorV1";
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
+/** 탭 단위 로그인 신원 — localStorage보다 우선(script.js와 동일 키) */
+const ovcSessionUserIdKey = "ovcSessionUserIdV1";
+const ovcSessionUserNameKey = "ovcSessionUserNameV1";
+const ovcSessionTokenKey = "ovcSessionTokenV1";
+/** script.js 리더 하트비트 주기(25s)보다 여유 있게 */
+const OVC_ACCOUNT_LEADER_STALE_MS = 55000;
 const koreanNamePattern = /^[가-힣ㄱ-ㅎㅏ-ㅣ]{1,3}$/;
 const APP_VERSION = "20260510v";
 const loginHandoffKey = "ovcLoginHandoffV1";
@@ -187,6 +193,35 @@ function startUiWatchdog(button, messageElement, timeoutMessage) {
   }, REQUEST_TIMEOUT_MS + 1000);
 }
 
+function ovcHasConflictingLiveSession(userId) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return false;
+  try {
+    const raw = localStorage.getItem("ovcAccountSessionLeaderV1:" + uid);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const at = Number(parsed && parsed.at) || 0;
+    if (!at || Date.now() - at > OVC_ACCOUNT_LEADER_STALE_MS) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function completeLoginAndNavigate(account) {
+  const accountId = account && account.id != null ? String(account.id).trim() : "";
+  if (accountId && ovcHasConflictingLiveSession(accountId)) {
+    throw new Error(
+      "이미 다른 창에서 이 계정으로 접속 중입니다. 해당 창을 닫거나 로그아웃한 뒤 다시 시도하세요."
+    );
+  }
+  try {
+    loginMessage.textContent = "게임으로 이동 중...";
+  } catch (eMsg) {}
+  finalizeSuccessfulLogin(account);
+  goToGame(account);
+}
+
 function goToGame(account) {
   try {
     sessionStorage.setItem(
@@ -250,6 +285,19 @@ function finalizeSuccessfulLogin(account) {
   const userId = account && account.id != null ? String(account.id).trim() : "";
   localStorage.setItem(currentUserKey, account.name);
   localStorage.setItem(currentUserIdKey, userId);
+  try {
+    if (userId) {
+      sessionStorage.setItem(ovcSessionUserIdKey, userId);
+    } else {
+      sessionStorage.removeItem(ovcSessionUserIdKey);
+    }
+    sessionStorage.setItem(ovcSessionUserNameKey, account.name);
+    if (account.session_token) {
+      sessionStorage.setItem(ovcSessionTokenKey, account.session_token);
+    } else {
+      sessionStorage.removeItem(ovcSessionTokenKey);
+    }
+  } catch (eSess) {}
   ovcMigrateUnscopedTutorialFlagsToUserScope(userId);
   const accountColor = normalizeHexColor(account.color);
   const scopedKey = "ovcUserColorV1:" + account.id;
@@ -426,17 +474,13 @@ async function handleLoginSubmit() {
       account = await loginWithSupabaseRestFallback(name, password);
     }
     loginMessage.textContent = "로그인 중... (3/3 계정 저장)";
-    finalizeSuccessfulLogin(account);
-
-    loginMessage.textContent = "게임으로 이동 중...";
-    goToGame(account);
+    completeLoginAndNavigate(account);
   } catch (error) {
     if (isRetryableLoginError(error)) {
       try {
         loginMessage.textContent = "대체 경로로 재시도 중...";
         const account = await loginWithSupabaseRestFallback(name, password);
-        finalizeSuccessfulLogin(account);
-        goToGame(account);
+        completeLoginAndNavigate(account);
         return;
       } catch (fallbackError) {
         loginMessage.textContent =
@@ -472,5 +516,13 @@ window.addEventListener("unhandledrejection", function (event) {
 });
 
 window.addEventListener("load", function () {
+  try {
+    var p = new URLSearchParams(window.location.search || "");
+    if (p.get("ovc_err") === "duplicate_session") {
+      loginMessage.textContent =
+        "이 계정은 이미 다른 창에서 플레이 중입니다. 해당 창을 닫거나 로그아웃한 뒤 다시 로그인하세요.";
+      return;
+    }
+  } catch (eQ) {}
   loginMessage.textContent = "로그인 준비 완료";
 });

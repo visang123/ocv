@@ -85,8 +85,13 @@ export function ovcForceWorldHubIsRequested() {
     }
     var uidFromLs = "";
     try {
-      uidFromLs = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
-    } catch (eUid) {}
+      uidFromLs = (sessionStorage.getItem("ovcSessionUserIdV1") || "").trim();
+    } catch (eSess) {}
+    if (!uidFromLs) {
+      try {
+        uidFromLs = (localStorage.getItem("ovcCurrentUserIdV1") || "").trim();
+      } catch (eUid) {}
+    }
     if (
       uidFromLs &&
       localStorage.getItem(ovcPendingWorldHubUserStorageKey(uidFromLs)) ===

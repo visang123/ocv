@@ -247,13 +247,13 @@ import {
   getRemoteStatusText
 } from "./src/multiplayer/presence.js";
 import {
-  MULTIPLAYER_BROADCAST_MIN_MS,
-  MULTIPLAYER_HEARTBEAT_MS,
   countActiveRemotePlayers,
   getAdaptiveWorldPollMinMs,
   getAdaptiveWorldSyncLoopMs,
   getAdaptivePresenceDbSyncMs,
-  getAdaptivePresenceDbPollMs
+  getAdaptivePresenceDbPollMs,
+  getAdaptiveBroadcastMinMs,
+  getAdaptiveHeartbeatMs
 } from "./src/multiplayer/timing.js";
 import {
   getNumericButterflyValue as getNumericButterflyValueCore,
@@ -396,8 +396,54 @@ const guideBookClickPromptDismissedKeyBase = "ovcGuideBookClickPromptDismissedV1
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
-const currentUserName = (getStoredValue(currentUserKey) || "").trim();
-const currentUserId = (getStoredValue(currentUserIdKey) || "").trim();
+/** 탭 단위 로그인 신원(ovc-login.js와 동일 키). 있으면 localStorage보다 우선 */
+const ovcSessionUserIdKey = "ovcSessionUserIdV1";
+const ovcSessionUserNameKey = "ovcSessionUserNameV1";
+const ovcSessionTokenKey = "ovcSessionTokenV1";
+const OVC_ACCOUNT_LEADER_STALE_MS = 55000;
+
+function readOvcTabSessionUserId() {
+  try {
+    return (sessionStorage.getItem(ovcSessionUserIdKey) || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+function readOvcTabSessionUserName() {
+  try {
+    return (sessionStorage.getItem(ovcSessionUserNameKey) || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+function getEffectiveOvcSessionToken() {
+  try {
+    const t = (sessionStorage.getItem(ovcSessionTokenKey) || "").trim();
+    if (t) return t;
+  } catch (e) {}
+  try {
+    return (localStorage.getItem(currentSessionTokenKey) || "").trim();
+  } catch (e2) {}
+  return "";
+}
+
+const localLoginUserId = (getStoredValue(currentUserIdKey) || "").trim();
+const localLoginUserName = (getStoredValue(currentUserKey) || "").trim();
+const tabSessionUserId = readOvcTabSessionUserId();
+const tabSessionUserName = readOvcTabSessionUserName();
+const currentUserId = tabSessionUserId ? tabSessionUserId : localLoginUserId;
+const currentUserName = (function () {
+  if (tabSessionUserId) {
+    if (tabSessionUserName) return tabSessionUserName;
+    if (localLoginUserId === tabSessionUserId && localLoginUserName) {
+      return localLoginUserName;
+    }
+    return "";
+  }
+  return localLoginUserName;
+})().trim();
 const ovcTutorialDoneUserSessionKey = "ovcTutorialDoneUserSessionV1";
 
 function setOnboardingFlowDoneStored(done) {
@@ -742,6 +788,7 @@ let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
+let lastWorldSyncUserToastAt = 0;
 let localPlantActionLockUntil = 0;
 let localAppleActionLockUntil = 0;
 let serverClockOffsetMs = 0;
@@ -895,6 +942,21 @@ function getMultiplayerPresenceDbPollMs() {
   return getAdaptivePresenceDbPollMs(getActiveRemotePlayerCountForTick());
 }
 
+function getMultiplayerBroadcastMinMs() {
+  return getAdaptiveBroadcastMinMs(getActiveRemotePlayerCountForTick());
+}
+
+function getMultiplayerHeartbeatMs() {
+  return getAdaptiveHeartbeatMs(getActiveRemotePlayerCountForTick());
+}
+
+function showThrottledWorldSyncToast(message) {
+  const now = Date.now();
+  if (now - lastWorldSyncUserToastAt < 14000) return;
+  lastWorldSyncUserToastAt = now;
+  showOnlineDebugMessage(message);
+}
+
 const keys = createInputState();
 
 /** Other browser tabs use a different session id but the same account — do not draw them as remotes. */
@@ -923,6 +985,27 @@ const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
 
 function getAccountSessionLeaderStorageKey() {
   return "ovcAccountSessionLeaderV1:" + currentUserId;
+}
+
+function ovcIsForeignLiveAccountSession() {
+  if (!currentUserId) return false;
+  try {
+    const raw = localStorage.getItem(getAccountSessionLeaderStorageKey());
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const at = Number(parsed && parsed.at) || 0;
+    if (!at || Date.now() - at > OVC_ACCOUNT_LEADER_STALE_MS) return false;
+    const myTok = sessionStorage.getItem(accountLeaderTokenSessionKey) || "";
+    if (myTok && parsed.token === myTok) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+if (ovcIsForeignLiveAccountSession()) {
+  window.location.replace("ovc-login.html?v=20260509a&ovc_err=duplicate_session");
+  throw new Error("OVC login required");
 }
 
 function claimAccountSessionTabOwnership() {
@@ -1026,6 +1109,40 @@ function applySupersededTabShutdown() {
 claimAccountSessionTabOwnership();
 window.addEventListener("storage", onAccountSessionLeaderStorageEvent);
 
+const ACCOUNT_SESSION_LEADER_HEARTBEAT_MS = 25000;
+setInterval(function () {
+  if (isTabSessionSuperseded || !currentUserId) return;
+  try {
+    const key = getAccountSessionLeaderStorageKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const myToken = sessionStorage.getItem(accountLeaderTokenSessionKey);
+    if (!myToken || !parsed || parsed.token !== myToken) return;
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        token: parsed.token,
+        sessionId: parsed.sessionId,
+        at: Date.now()
+      })
+    );
+  } catch (eHb) {}
+}, ACCOUNT_SESSION_LEADER_HEARTBEAT_MS);
+
+window.addEventListener("pagehide", function () {
+  if (!currentUserId) return;
+  try {
+    const key = getAccountSessionLeaderStorageKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const myToken = sessionStorage.getItem(accountLeaderTokenSessionKey);
+    if (!myToken || !parsed || !parsed.token || parsed.token !== myToken) return;
+    localStorage.removeItem(key);
+  } catch (ePh) {}
+});
+
 function toScreenX(worldX) {
   return toScreenXUtil(worldX, ground, WORLD_WIDTH);
 }
@@ -1057,6 +1174,13 @@ function setWorldPosition(element, x, y) {
 }
 
 function accountDisplayNameForUi() {
+  try {
+    const sid = readOvcTabSessionUserId();
+    const sname = readOvcTabSessionUserName();
+    if (sid && sname && sid === String(currentUserId).trim()) {
+      return sname;
+    }
+  } catch (eSess) {}
   try {
     const fromStore = (localStorage.getItem(currentUserKey) || "").trim();
     if (fromStore) {
@@ -1712,7 +1836,7 @@ function skipTutorialFromSettings() {
   };
   let skipTok = "";
   try {
-    skipTok = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+    skipTok = getEffectiveOvcSessionToken();
   } catch (eSkipTok) {}
   if (currentUserId && skipTok && window.OVCOnline && typeof window.OVCOnline.saveTutorialDone === "function") {
     Promise.resolve(window.OVCOnline.saveTutorialDone(currentUserId, skipTok, true))
@@ -2305,7 +2429,7 @@ function requestAccountTutorialDoneSync(options) {
   } catch (eSkip) {}
   let token = "";
   try {
-    token = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+    token = getEffectiveOvcSessionToken();
   } catch (eTok) {}
   if (!token || !window.OVCOnline || typeof window.OVCOnline.saveTutorialDone !== "function") {
     return;
@@ -2558,7 +2682,7 @@ function onboardingScheduleTutorialCompleteHide() {
     };
     let finalTok = "";
     try {
-      finalTok = (localStorage.getItem(currentSessionTokenKey) || "").trim();
+      finalTok = getEffectiveOvcSessionToken();
     } catch (eFinalTok) {}
     if (currentUserId && finalTok && window.OVCOnline && typeof window.OVCOnline.saveTutorialDone === "function") {
       Promise.resolve(window.OVCOnline.saveTutorialDone(currentUserId, finalTok, true))
@@ -5053,6 +5177,9 @@ function syncWorldState(forceSave) {
     addNetworkDebugLog(
       "world save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
+    showThrottledWorldSyncToast(
+      "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
+    );
     isWorldDirty = true;
   }).finally(function () {
     isWorldSyncing = false;
@@ -5092,6 +5219,9 @@ function saveSharedWorldAndReload(options) {
     addNetworkDebugLog(
       "world reset save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
+    showThrottledWorldSyncToast(
+      "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
+    );
   }).finally(function () {
     isWorldSyncing = false;
     isReloadingForWorldReset = true;
@@ -5119,6 +5249,9 @@ function pollWorldState(forcePoll) {
   window.OVCOnline.loadWorldState(
     window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
   ).then(function (row) {
+    if (isWorldServerSyncAvailable()) {
+      hasHydratedSharedWorldFromServer = true;
+    }
     if (!row || !row.state || !row.updated_at || row.updated_at === lastWorldUpdatedAt) return;
     lastWorldUpdatedAt = row.updated_at;
     applySharedWorldSnapshot(row.state, row.updated_at);
@@ -5126,11 +5259,11 @@ function pollWorldState(forcePoll) {
     addNetworkDebugLog(
       "world poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
+    showThrottledWorldSyncToast(
+      "\uC6D4\uB4DC \uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
+    );
   }).finally(function () {
     isWorldPolling = false;
-    if (isWorldServerSyncAvailable()) {
-      hasHydratedSharedWorldFromServer = true;
-    }
   });
 }
 
@@ -9989,8 +10122,8 @@ function sendMultiplayerPresence(forceSend) {
     multiplayerChannel &&
     (
       forceSend ||
-      (hasChanged && now - lastBroadcastAt >= MULTIPLAYER_BROADCAST_MIN_MS) ||
-      now - lastHeartbeatBroadcastAt >= MULTIPLAYER_HEARTBEAT_MS
+      (hasChanged && now - lastBroadcastAt >= getMultiplayerBroadcastMinMs()) ||
+      now - lastHeartbeatBroadcastAt >= getMultiplayerHeartbeatMs()
     )
   ) {
     Promise.resolve(multiplayerChannel.send({
@@ -10672,7 +10805,7 @@ async function validateCurrentAccount() {
 
   try {
     if (typeof window.OVCOnline.validateSession === "function") {
-      const storedToken = localStorage.getItem(currentSessionTokenKey);
+      const storedToken = getEffectiveOvcSessionToken();
       if (!storedToken) {
         // Token may be temporarily missing (e.g. migration/fallback path).
         // Only force logout when the account itself no longer exists.
@@ -10741,6 +10874,11 @@ function logout() {
     }
     sessionStorage.removeItem(currentSessionKey);
     sessionStorage.removeItem(accountLeaderTokenSessionKey);
+    try {
+      sessionStorage.removeItem(ovcSessionUserIdKey);
+      sessionStorage.removeItem(ovcSessionUserNameKey);
+      sessionStorage.removeItem(ovcSessionTokenKey);
+    } catch (eSessOut) {}
     window.location.href = "ovc-login.html?v=20260509a";
   };
 
