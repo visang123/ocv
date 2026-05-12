@@ -2283,11 +2283,11 @@ body #guide-book-button {
   bottom: 18px;
   display: none;
   box-sizing: border-box;
-  width: 78px;
-  height: 72px;
-  padding: 4px;
-  border: 4px solid #1c3271;
-  border-radius: 10px;
+  width: 117px;
+  height: 108px;
+  padding: 6px;
+  border: 6px solid #1c3271;
+  border-radius: 15px;
   background: #2a3f7a;
   box-shadow: none;
   cursor: pointer;
