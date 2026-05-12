@@ -874,9 +874,9 @@ body::-webkit-scrollbar {
 
 #bag-inventory-panel .bag-inventory-slot.onboarding-highlight {
   z-index: 28 !important;
-  outline: 4px solid #ea580c;
-  outline-offset: 3px;
-  border-radius: 10px;
+  outline: 6px solid #ea580c;
+  outline-offset: 5px;
+  border-radius: 15px;
   animation: onboarding-target-glow 1s ease-in-out infinite;
 }
 

@@ -6648,6 +6648,7 @@ function updatePlayerPosition() {
   const isInCanopy = isPlayerInTreeCanopy();
   const isNearTrunk = isPlayerNearTreeTrunk();
   const isInTree = !isTreeFalling && (isInCanopy || isNearTrunk);
+  let shouldClampToTree = isInTree;
 
   const shouldTreeFall =
     playerDepth > groundMaxDepth &&
@@ -6672,11 +6673,15 @@ function updatePlayerPosition() {
     velocityY = 0;
     isOnGround = true;
 
-    if (keys.ArrowUp || keys.w) {
+    const wantsTreeDown = keys.ArrowDown || keys.s;
+    const isAtTreeBase = !isInCanopy && playerDepth <= groundMaxDepth + treeClimbSpeed * frameScale + 2;
+    if (wantsTreeDown && isAtTreeBase) {
+      playerDepth -= speed * frameScale;
+      shouldClampToTree = false;
+      wasPlayerInTree = false;
+    } else if (keys.ArrowUp || keys.w) {
       movePlayerVerticallyInTree(treeClimbSpeed * frameScale);
-    }
-
-    if (keys.ArrowDown || keys.s) {
+    } else if (wantsTreeDown) {
       movePlayerVerticallyInTree(-treeClimbSpeed * frameScale);
     }
   } else {
@@ -6697,7 +6702,7 @@ function updatePlayerPosition() {
   // Do not hard-snap to ground depth here; if the player is above ground and
   // outside tree support we want a smooth fall, not an instant teleport.
 
-  if (isInTree) {
+  if (shouldClampToTree) {
     clampPlayerToTreeOutline();
   }
 
@@ -6716,7 +6721,7 @@ function updatePlayerPosition() {
 
   setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
-  wasPlayerInTree = isInTree || (isTreeFalling && playerDepth > groundMaxDepth);
+  wasPlayerInTree = shouldClampToTree || (isTreeFalling && playerDepth > groundMaxDepth);
 }
 
 function isPlayerInWellWaterArea() {
