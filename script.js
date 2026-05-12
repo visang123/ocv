@@ -642,6 +642,14 @@ function isWorldFloorGuideBookHiddenForCurrentView() {
   return tutorialSessionWorldGuideBookOffGroundPicked();
 }
 
+/** 가방 UI 슬롯의 책 — 바닥 책을 줍기 전에는 0(가방만 줍은 직후 인벤은 비어 있음). */
+function hasGuideBookItemInBagCounts() {
+  if (isWorldDocumentEntry()) {
+    return hasPickedWorldGuideBookOffGroundInCurrentRoom();
+  }
+  return tutorialSessionWorldGuideBookOffGroundPicked();
+}
+
 let bagInventoryPanelOpen = false;
 let bagInventoryItemOrder = [];
 let bagInventoryCountsPrev = null;
@@ -6353,7 +6361,7 @@ function getBagInventorySeedCount() {
 
 function getBagInventoryCountsByKey() {
   return {
-    book: hasGuideBook ? 1 : 0,
+    book: hasGuideBookItemInBagCounts() ? 1 : 0,
     seed: getBagInventorySeedCount(),
     apple: Math.max(0, Number(appleState.count) || 0),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
