@@ -39,15 +39,22 @@ export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
 export const GUIDE_BOOK_WIDTH = 34;
 export const GUIDE_BOOK_HEIGHT = 23;
+/** 땅의 책·씨앗·NPC를 한 덩어리로 왼쪽 이동(World px) */
+const WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT = 40;
+/** 가방은 위 이동에 더해 책 대비 조금 더 왼쪽으로(World px) */
+const WORLD_BAG_EXTRA_SHIFT_LEFT = 14;
 /** 책 — 우물 오른쪽·지면에 안 묻도록 (책 너비 10칸 + 기준 40) */
-export const GUIDE_BOOK_START_X = 40 + 10 * GUIDE_BOOK_WIDTH;
+export const GUIDE_BOOK_START_X =
+  40 + 10 * GUIDE_BOOK_WIDTH - WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT;
 export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
 export const WORLD_BAG_WIDTH = 14;
 export const WORLD_BAG_HEIGHT = 11;
-// 책과 같은 세로축 근처에 두되, 가로는 책 아래 중앙에 맞춤
+// 책 아래 중앙에서 출발하되, 가방만 추가로 왼쪽
 export const WORLD_BAG_START_X =
-  GUIDE_BOOK_START_X + Math.round((GUIDE_BOOK_WIDTH - WORLD_BAG_WIDTH) / 2);
+  GUIDE_BOOK_START_X +
+  Math.round((GUIDE_BOOK_WIDTH - WORLD_BAG_WIDTH) / 2) -
+  WORLD_BAG_EXTRA_SHIFT_LEFT;
 export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
 /** 책 오른쪽–씨앗 왼쪽 최소 간격(가까이 배치) */
 export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH + 8;
