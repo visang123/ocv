@@ -1181,9 +1181,6 @@ document.addEventListener("keydown", function (event) {
     const now = Date.now();
     if (now - lastPickupToggleAt < 180) return;
     lastPickupToggleAt = now;
-    // Catching is allowed even with hands full: nothing else uses E for the
-    // butterfly's slot, and forcing a drop first would feel clumsy.
-    if (tryCatchButterfly()) return;
     if (heldItem) {
       if (heldItem === HELD_ITEM_BUCKET && now - lastBucketPickupAt < 260) {
         return;
@@ -1191,8 +1188,14 @@ document.addEventListener("keydown", function (event) {
       dropHeldItem();
       return;
     }
-    if (pickApple()) return;
     if (pickUpWorldBag()) return;
+    if (!hasGuideBook) {
+      return;
+    }
+    // Catching is allowed even with hands full: nothing else uses E for the
+    // butterfly's slot, and forcing a drop first would feel clumsy.
+    if (tryCatchButterfly()) return;
+    if (pickApple()) return;
     if (pickUpWorldGuideBookNoHold()) return;
     pickUpNearestItem();
   }
@@ -1202,7 +1205,7 @@ document.addEventListener("keydown", function (event) {
     if (isNearPlantMaster()) {
       if (tryTalkToPlantMaster()) return;
     }
-    if (tryCatchButterfly()) return;
+    if (hasGuideBook && tryCatchButterfly()) return;
     useHeldItem();
   }
 

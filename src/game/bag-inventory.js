@@ -74,16 +74,16 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "book",
       butterflyColor: "",
-      label: "식물의 책",
+      label: "\uC2DD\uBB3C\uC758 \uCC45",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512w" alt="plant book" width="28" height="28" draggable="false">'
+        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512x" alt="plant book" width="28" height="28" draggable="false">'
     };
   }
   if (itemKey === "seed") {
     return {
       bagType: "seed",
       butterflyColor: "",
-      label: "씨앗",
+      label: "\uC528\uC557",
       iconHtml:
         '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
     };
@@ -92,7 +92,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "apple",
       butterflyColor: "",
-      label: "사과",
+      label: "\uC0AC\uACFC",
       iconHtml: '<span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>'
     };
   }
@@ -100,7 +100,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "butterfly",
       butterflyColor: "brown",
-      label: "갈색 나비",
+      label: "\uAC08\uC0C9 \uB098\uBE44",
       iconHtml:
         '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-brown" aria-hidden="true"></span>'
     };
@@ -109,7 +109,7 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "butterfly",
       butterflyColor: "yellow",
-      label: "노란 나비",
+      label: "\uB178\uB780 \uB098\uBE44",
       iconHtml:
         '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-yellow" aria-hidden="true"></span>'
     };
@@ -117,7 +117,7 @@ export function getBagItemDescriptor(itemKey) {
   return {
     bagType: "butterfly",
     butterflyColor: "white",
-    label: "흰 나비",
+    label: "\uD770 \uB098\uBE44",
     iconHtml:
       '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-white" aria-hidden="true"></span>'
   };
