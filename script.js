@@ -6242,45 +6242,6 @@ function normalizeBagInventoryOrderByCounts(counts) {
   if (normalized.changed) saveBagInventoryOrder();
 }
 
-function getBagItemDescriptor(itemKey) {
-  if (itemKey === "seed") {
-    return {
-      bagType: "seed",
-      butterflyColor: "",
-      iconHtml: '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
-    };
-  }
-  if (itemKey === "apple") {
-    return {
-      bagType: "apple",
-      butterflyColor: "",
-      iconHtml: '<span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>'
-    };
-  }
-  if (itemKey === "butterfly:brown") {
-    return {
-      bagType: "butterfly",
-      butterflyColor: "brown",
-      iconHtml:
-        '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-brown" aria-hidden="true"></span>'
-    };
-  }
-  if (itemKey === "butterfly:yellow") {
-    return {
-      bagType: "butterfly",
-      butterflyColor: "yellow",
-      iconHtml:
-        '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-yellow" aria-hidden="true"></span>'
-    };
-  }
-  return {
-    bagType: "butterfly",
-    butterflyColor: "white",
-    iconHtml:
-      '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-white" aria-hidden="true"></span>'
-  };
-}
-
 function updateBagInventorySlots() {
   if (!bagInventoryPanel) return;
   const counts = getBagInventoryCountsByKey();

@@ -76,7 +76,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC2DD\uBB3C\uC758 \uCC45",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512x" alt="plant book" width="28" height="28" draggable="false">'
+        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512x" alt="plant book" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "seed") {
@@ -85,7 +85,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC528\uC557",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="28" height="28" draggable="false">'
+        '<img class="bag-slot-icon" src="이미지/seed.png" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "apple") {
