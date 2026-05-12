@@ -11477,13 +11477,17 @@ function updateButterflies() {
       markWorldDirty();
     }
   }
+  // 나비 위치 시뮬은 권한 클라이언트(가장 낮은 sessionId)만 수행. 비권한 탭이
+  // 같이 돌리면 스냅샷 좌표와 싸워서 2창·멀티에서 튀는 현상이 난다.
   if (sharedHydrated && butterflyState.list.length > 0) {
-    butterflyState.list.forEach(function (butterfly) {
-      simulateButterflyAuthorityStep(butterfly, now);
-    });
+    const runAuthorityButterflyMotion = !onlineAvailable || isButterflyAuthority();
+    if (runAuthorityButterflyMotion) {
+      butterflyState.list.forEach(function (butterfly) {
+        simulateButterflyAuthorityStep(butterfly, now);
+      });
+    }
   }
-  // Non-authority clients just render whatever the snapshot gave us. Wing
-  // frames are still animated locally for smoothness.
+  // 비권한: 스냅샷 target(butterfly.x/y)만 쫓아가고, 날개 프레임은 로컬.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
   /** 원격 스냅샷 추적: 지연 환경(다른 IP)에서 따라붙도록 스텝을 더 크게 */
