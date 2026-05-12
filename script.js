@@ -2704,14 +2704,6 @@ function loadOnboardingFlowState() {
     onboardingPostAppleSeedIntroPhase = 1;
   }
   if (
-    onboardingFlowStep === 3 &&
-    guideCard &&
-    guideCard.style.display === "block" &&
-    !onboardingFirstGuideEscHintShown
-  ) {
-    scheduleOnboardingFirstGuideEscHint();
-  }
-  if (
     onboardingFlowStep === 10 &&
     guideCard &&
     guideCard.style.display === "block" &&
@@ -2820,9 +2812,6 @@ function updateOnboardingFlowUI() {
 
   const guideOpen = guideCard && guideCard.style.display === "block";
 
-  if (onboardingFlowStep === 3 && guideOpen && !onboardingEscHintTimerId && !onboardingFirstGuideEscHintShown) {
-    scheduleOnboardingFirstGuideEscHint();
-  }
   if (onboardingFlowStep === 10 && guideOpen && !onboardingEscHintTimerId && !onboardingNpcGuideEscHintShown) {
     scheduleOnboardingNpcGuideEscHint();
   }
@@ -2848,16 +2837,8 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        const line1 = "게임과 관련된 설명을 볼 수 있습니다.";
-        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
-        setOnboardingCalloutVisible(
-          true,
-          onboardingFirstGuideEscHintShown ? line2 + "\n\n" + line1 : line1
-        );
+        setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
-        if (onboardingFirstGuideEscHintShown && guideCard) {
-          guideCard.classList.add("onboarding-highlight");
-        }
       } else {
         setOnboardingCalloutVisible(false, "");
       }
@@ -3333,7 +3314,6 @@ function applyDefaultState(options) {
     movementTutorialBaseline = null;
     onboardingFlowStep = 1;
     onboardingJumpLatch = false;
-    onboardingFirstGuideEscHintShown = false;
     onboardingNpcGuideEscHintShown = false;
     onboardingSeedTutorialSecondLine = false;
     onboardingPostAppleSeedIntroPhase = 0;
@@ -8657,9 +8637,7 @@ function updateGuideCard() {
     guideCard.style.display === "block"
   ) {
     onboardingFlowStep = 3;
-    onboardingFirstGuideEscHintShown = false;
     persistOnboardingStep();
-    scheduleOnboardingFirstGuideEscHint();
   }
 }
 
