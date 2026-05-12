@@ -332,6 +332,7 @@ let onboardingFlowStep = 1;
 let onboardingJumpLatch = false;
 let onboardingNpcGuideEscHintShown = false;
 let onboardingEscHintTimerId = null;
+let playerAlertHideTimerId = null;
 let onboardingCongratsTimerId = null;
 let onboardingTreeLeaveHintTimerId = null;
 let onboardingFinalHideTimerId = null;
@@ -3409,7 +3410,12 @@ function applyDefaultState(options) {
   window.clearTimeout(firstSeedFocusTimeout);
   if (worldBagInventory) worldBagInventory.classList.remove("is-first-seed-focus");
   npcBubble.style.display = "none";
+  if (playerAlertHideTimerId) {
+    window.clearTimeout(playerAlertHideTimerId);
+    playerAlertHideTimerId = null;
+  }
   playerAlert.style.display = "none";
+  playerAlert.classList.remove("is-butterfly-catch");
 
   updateWellImage();
   updateWellCard();
@@ -3572,11 +3578,25 @@ function showDialogueLine(lineInfo) {
   updatePlayerBubblePosition();
 }
 
-function showPlayerAlert() {
+function showPlayerAlert(options) {
+  if (!playerAlert) return;
+  const opts = options || {};
+  const message = opts.message != null ? String(opts.message) : "!";
+  const durationMs = Number.isFinite(Number(opts.durationMs)) ? Number(opts.durationMs) : 1800;
+  const butterflyCatch = Boolean(opts.butterflyCatch);
+  if (playerAlertHideTimerId) {
+    window.clearTimeout(playerAlertHideTimerId);
+    playerAlertHideTimerId = null;
+  }
+  playerAlert.textContent = message;
+  playerAlert.classList.toggle("is-butterfly-catch", butterflyCatch);
   playerAlert.style.display = "block";
-  window.setTimeout(function () {
+  updatePlayerAlert();
+  playerAlertHideTimerId = window.setTimeout(function () {
+    playerAlertHideTimerId = null;
     playerAlert.style.display = "none";
-  }, 1800);
+    playerAlert.classList.remove("is-butterfly-catch");
+  }, durationMs);
 }
 
 function toggleSeed() {
@@ -11060,19 +11080,6 @@ function ensureButterflyWaypoint(butterfly, now) {
   return waypoint;
 }
 
-function getButterflyFlutterOffsetWorld(now, butterfly) {
-  const salt =
-    butterfly.id.split("").reduce(function (acc, ch) {
-      return acc + ch.charCodeAt(0);
-    }, 0) % 6283;
-  const omegaX = (2 * Math.PI) / butterflyFlutterPeriodHorizontalMs;
-  const omegaY = (2 * Math.PI) / butterflyFlutterPeriodVerticalMs;
-  return {
-    dx: Math.sin(now * omegaX + salt * 0.001) * butterflyFlutterAmplitudeX,
-    dy: Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * butterflyFlutterAmplitudeY
-  };
-}
-
 function simulateButterflyAuthorityStep(butterfly, now) {
   simulateButterflyAuthorityStepCore(butterfly, now, {
     waypointMap: butterflyAuthorityWaypointById,
@@ -11410,6 +11417,11 @@ function tryCatchButterfly() {
 
   broadcastButterflyCatch(caught.id);
   finalizeButterflyRemovalEffects(now);
+  showPlayerAlert({
+    message: "나비 catch",
+    durationMs: 2400,
+    butterflyCatch: true
+  });
   updateBagInventorySlots();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 18) {
     onboardingFlowStep = 19;
@@ -11453,8 +11465,7 @@ function updateButterflies() {
   const sharedHydrated = hasHydratedSharedWorldFromServer || !onlineAvailable;
 
   if (sharedHydrated && isButterflyAuthority()) {
-    // Authority: spawn / persistence tick only. Movement runs for every client below
-    // so non-authority tabs are not frozen between DB snapshots.
+    // Authority: 스폰·저장 주기만. 이동 시뮬은 아래에서 권한 클라이언트만 수행.
     if (
       !hasSeededInitialButterflies &&
       butterflyState.list.length === 0 &&
@@ -11487,11 +11498,13 @@ function updateButterflies() {
       });
     }
   }
-  // 비권한: 스냅샷 target(butterfly.x/y)만 쫓아가고, 날개 프레임은 로컬.
+  // 비권한: 스냅샷의 butterfly.x/y(권한이 넣은 위치+플러터)만 부드럽게 따라감.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
-  /** 원격 스냅샷 추적: 지연 환경(다른 IP)에서 따라붙도록 스텝을 더 크게 */
-  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 48 : 30;
+  /** 스냅샷 간격이 길수록 조금 더 빠르게 따라붙임. 프레임당 최대 이동으로만 캡. */
+  const butterflyRemoteLerpAlpha =
+    wallDelta > 200 ? 0.52 : wallDelta > 120 ? 0.4 : 0.26;
+  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 36 : 20;
 
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
@@ -11520,27 +11533,22 @@ function updateButterflies() {
         butterfly._renderX = targetX;
         butterfly._renderY = targetY;
       }
-      let rdx = targetX - butterfly._renderX;
-      let rdy = targetY - butterfly._renderY;
-      const rdist = Math.hypot(rdx, rdy);
-      if (rdist < 0.45) {
-        butterfly._renderX = targetX;
-        butterfly._renderY = targetY;
-      } else if (rdist > butterflyRemoteRenderMaxStepWorld && rdist > 0.0001) {
-        const s = butterflyRemoteRenderMaxStepWorld / rdist;
-        rdx *= s;
-        rdy *= s;
-        butterfly._renderX += rdx;
-        butterfly._renderY += rdy;
-      } else {
-        butterfly._renderX += rdx;
-        butterfly._renderY += rdy;
+      let nx =
+        butterfly._renderX + (targetX - butterfly._renderX) * butterflyRemoteLerpAlpha;
+      let ny =
+        butterfly._renderY + (targetY - butterfly._renderY) * butterflyRemoteLerpAlpha;
+      let mx = nx - butterfly._renderX;
+      let my = ny - butterfly._renderY;
+      const mlen = Math.hypot(mx, my);
+      if (mlen > butterflyRemoteRenderMaxStepWorld && mlen > 0.0001) {
+        const s = butterflyRemoteRenderMaxStepWorld / mlen;
+        nx = butterfly._renderX + mx * s;
+        ny = butterfly._renderY + my * s;
       }
-      drawX = butterfly._renderX;
-      drawY = butterfly._renderY;
-      const flR = getButterflyFlutterOffsetWorld(now, butterfly);
-      drawX += flR.dx;
-      drawY += flR.dy;
+      butterfly._renderX = nx;
+      butterfly._renderY = ny;
+      drawX = nx;
+      drawY = ny;
     } else {
       butterfly._renderX = butterfly.x;
       butterfly._renderY = butterfly.y;

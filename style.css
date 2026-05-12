@@ -585,6 +585,74 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+/* 나비 잡기: 말풍선형 토스트 + 가벼운 팝 이펙트 */
+#player-alert.is-butterfly-catch {
+  position: fixed;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 5px 11px 6px;
+  border-radius: 12px 12px 12px 4px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 243, 200, 0.98) 45%, #fcd34d 100%);
+  border: 2px solid rgba(194, 65, 12, 0.88);
+  color: #431407;
+  font: 900 10px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+    0 3px 10px rgba(234, 88, 12, 0.35),
+    0 10px 22px rgba(15, 23, 42, 0.12);
+  /* 위치는 JS가 transform: translate 로 매 프레임 갱신 — 여기서 transform 애니메이션 쓰면 충돌 */
+  animation: butterfly-catch-toast-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#player-alert.is-butterfly-catch::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+  border-right: 2px solid rgba(194, 65, 12, 0.75);
+  border-bottom: 2px solid rgba(194, 65, 12, 0.75);
+  transform: rotate(45deg);
+  border-radius: 1px;
+  pointer-events: none;
+  box-shadow: 1px 1px 0 rgba(255, 255, 255, 0.4) inset;
+}
+
+@keyframes butterfly-catch-toast-in {
+  0% {
+    opacity: 0;
+    filter: blur(2px) brightness(1.15);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.4) inset,
+      0 0 0 rgba(251, 191, 36, 0);
+  }
+
+  55% {
+    opacity: 1;
+    filter: none;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+      0 0 18px rgba(251, 191, 36, 0.65),
+      0 3px 10px rgba(234, 88, 12, 0.35),
+      0 10px 22px rgba(15, 23, 42, 0.12);
+  }
+
+  100% {
+    opacity: 1;
+    filter: none;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+      0 3px 10px rgba(234, 88, 12, 0.35),
+      0 10px 22px rgba(15, 23, 42, 0.12);
+  }
+}
+
 #water-needed {
   position: absolute;
   left: 0;
