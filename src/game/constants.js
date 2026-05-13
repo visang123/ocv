@@ -45,16 +45,13 @@ const WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT = 40;
 const WORLD_BAG_EXTRA_SHIFT_LEFT = 14;
 /** 책 가로 위치용 기준 너비(스프라이트만 2/3로 줄여도 허브 가로 배치 유지) */
 const GUIDE_BOOK_LAYOUT_REF_WIDTH = 34;
-/** 바닥 책 X — 왼쪽으로(World px). 가방·씨앗·NPC는 아래 값만큼 더 이동 */
+/** 책·씨앗 간격 계산용 기준 X(책 스프라이트만 옮길 때 씨앗·NPC는 이 좌표 기준 유지) */
+const GUIDE_BOOK_BASE_START_X =
+  40 + 10 * GUIDE_BOOK_LAYOUT_REF_WIDTH - WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT;
+/** 바닥 책(및 그 아래 가방) X만 왼쪽으로 — 씨앗·NPC는 이전 허브 좌표 유지 */
 const GROUND_HUB_SHIFT_BOOK_LEFT_PX = 20;
-/** 가방·씨앗·NPC만 책보다 추가로 왼쪽(World px) */
-const GROUND_HUB_SHIFT_OTHERS_EXTRA_LEFT_PX = 18;
 /** 책 — 우물 오른쪽·지면에 안 묻도록 (책 너비 10칸 + 기준 40) */
-export const GUIDE_BOOK_START_X =
-  40 +
-  10 * GUIDE_BOOK_LAYOUT_REF_WIDTH -
-  WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT -
-  GROUND_HUB_SHIFT_BOOK_LEFT_PX;
+export const GUIDE_BOOK_START_X = GUIDE_BOOK_BASE_START_X - GROUND_HUB_SHIFT_BOOK_LEFT_PX;
 export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
 export const WORLD_BAG_WIDTH = 21;
@@ -63,17 +60,15 @@ export const WORLD_BAG_HEIGHT = 17;
 export const WORLD_BAG_START_X =
   GUIDE_BOOK_START_X +
   Math.round((GUIDE_BOOK_WIDTH - WORLD_BAG_WIDTH) / 2) -
-  WORLD_BAG_EXTRA_SHIFT_LEFT -
-  GROUND_HUB_SHIFT_OTHERS_EXTRA_LEFT_PX;
+  WORLD_BAG_EXTRA_SHIFT_LEFT;
 export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
 /** 책 오른쪽–씨앗 왼쪽 최소 간격(가까이 배치) */
 export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH + 8;
-/** 씨앗 — 안내판 오른쪽과, 책·간격 중 더 오른쪽(겹침 방지) */
-export const SEED_START_X =
-  Math.max(
-    SIGN_START_X + SIGN_WIDTH + 48,
-    GUIDE_BOOK_START_X + GUIDE_BOOK_WIDTH + GUIDE_BOOK_SEED_MIN_GAP
-  ) - GROUND_HUB_SHIFT_OTHERS_EXTRA_LEFT_PX;
+/** 씨앗 — 안내판 오른쪽과, 책·간격 중 더 오른쪽(겹침 방지). 책 X 이동과 무관하게 기준 X 사용 */
+export const SEED_START_X = Math.max(
+  SIGN_START_X + SIGN_WIDTH + 48,
+  GUIDE_BOOK_BASE_START_X + GUIDE_BOOK_WIDTH + GUIDE_BOOK_SEED_MIN_GAP
+);
 export const SEED_START_Y = SIGN_START_Y + SIGN_HEIGHT - SEED_SIZE;
 /** 식물의 달인 — 씨앗 바로 오른쪽(가로로 붙임) */
 export const NPC_START_X = SEED_START_X + SEED_SIZE + 12;

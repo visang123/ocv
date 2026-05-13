@@ -5169,19 +5169,35 @@ function syncWorldState(forceSave) {
     return;
   }
   if (!forceSave && !isWorldDirty) return;
-  if (!forceSave && !hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+  if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
+    isWorldDirty = true;
+    pollWorldState(true);
     return;
   }
-
   isWorldSyncing = true;
   isWorldDirty = false;
   lastWorldSaveAt = now;
+  const expectedUpdatedAt =
+    isWorldServerSyncAvailable() && hasHydratedSharedWorldFromServer && lastWorldUpdatedAt
+      ? lastWorldUpdatedAt
+      : "";
   window.OVCOnline.saveWorldState(
     window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
-    getSharedWorldSnapshot()
+    getSharedWorldSnapshot(),
+    { expectedUpdatedAt }
   ).then(function (row) {
     applyServerWorldRowTimestamps(row);
   }).catch(function (error) {
+    if (
+      error &&
+      (error.code === "world_state_conflict" ||
+        String(error.message || "").indexOf("world_state_conflict") !== -1)
+    ) {
+      addNetworkDebugLog("world save conflict: polling latest snapshot before retry");
+      isWorldDirty = true;
+      pollWorldState(true);
+      return;
+    }
     addNetworkDebugLog(
       "world save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
@@ -12148,7 +12164,7 @@ setTimeout(function () {
 }, 8000);
 setInterval(function () {
   if (isTabSessionSuperseded) return;
-  sendMultiplayerPresence(true);
+  sendMultiplayerPresence(false);
 }, 1000);
 function runMultiplayerWorldSyncTick() {
   if (isTabSessionSuperseded) return;

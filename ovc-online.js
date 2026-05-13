@@ -532,18 +532,44 @@
     }, { attempts: 2, baseDelayMs: 120 });
   }
 
-  async function saveWorldState(roomName, state) {
+  async function saveWorldState(roomName, state, options) {
     const supabaseClient = getClient();
     if (!supabaseClient || !state) return null;
 
     const room = roomName || config.multiplayerRoom || "ovc-main-room";
+    const expectedUpdatedAt =
+      options && options.expectedUpdatedAt != null
+        ? String(options.expectedUpdatedAt || "")
+        : "";
     return await withNetworkRetry(async function () {
+      const nextUpdatedAt = new Date().toISOString();
+      if (expectedUpdatedAt) {
+        const { data, error } = await supabaseClient
+          .from(config.worldTable || "ovc_world")
+          .update({
+            state,
+            updated_at: nextUpdatedAt
+          })
+          .eq("room", room)
+          .eq("updated_at", expectedUpdatedAt)
+          .select("state, updated_at")
+          .maybeSingle();
+
+        if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+        if (!data) {
+          const conflict = new Error("world_state_conflict");
+          conflict.code = "world_state_conflict";
+          throw conflict;
+        }
+        return data;
+      }
+
       const { data, error } = await supabaseClient
         .from(config.worldTable || "ovc_world")
         .upsert({
           room,
           state,
-          updated_at: new Date().toISOString()
+          updated_at: nextUpdatedAt
         }, { onConflict: "room" })
         .select("state, updated_at")
         .single();

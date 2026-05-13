@@ -1,9 +1,9 @@
-export const MULTIPLAYER_BROADCAST_MIN_MS = 80;
-export const MULTIPLAYER_HEARTBEAT_MS = 500;
-export const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1200;
-export const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1200;
-export const MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE = 150;
-export const MULTIPLAYER_WORLD_POLL_MIN_MS_BASE = 150;
+export const MULTIPLAYER_BROADCAST_MIN_MS = 120;
+export const MULTIPLAYER_HEARTBEAT_MS = 900;
+export const MULTIPLAYER_PRESENCE_DB_SYNC_MS = 1800;
+export const MULTIPLAYER_PRESENCE_DB_POLL_MS = 1800;
+export const MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE = 350;
+export const MULTIPLAYER_WORLD_POLL_MIN_MS_BASE = 350;
 
 /**
  * 동시 접속 ~20명 전제: 월드 폴링·저장·Presence·브로드캐스트 간격을
@@ -24,57 +24,57 @@ export function countActiveRemotePlayers(remotePlayers, now) {
 
 export function getAdaptiveWorldPollMinMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 420;
-  if (n >= 15) return 360;
-  if (n >= 10) return 300;
-  if (n >= 6) return 220;
-  if (n >= 3) return 180;
+  if (n >= 18) return 1200;
+  if (n >= 15) return 1000;
+  if (n >= 10) return 800;
+  if (n >= 6) return 600;
+  if (n >= 3) return 450;
   return MULTIPLAYER_WORLD_POLL_MIN_MS_BASE;
 }
 
 export function getAdaptiveWorldSyncLoopMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 420;
-  if (n >= 15) return 360;
-  if (n >= 10) return 300;
-  if (n >= 6) return 220;
-  if (n >= 3) return 180;
+  if (n >= 18) return 1200;
+  if (n >= 15) return 1000;
+  if (n >= 10) return 800;
+  if (n >= 6) return 600;
+  if (n >= 3) return 450;
   return MULTIPLAYER_WORLD_SYNC_LOOP_MS_BASE;
 }
 
 export function getAdaptivePresenceDbSyncMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 3200;
-  if (n >= 15) return 2800;
-  if (n >= 12) return 2400;
-  if (n >= 8) return 2000;
-  if (n >= 5) return 1600;
+  if (n >= 18) return 5000;
+  if (n >= 15) return 4400;
+  if (n >= 12) return 3800;
+  if (n >= 8) return 3000;
+  if (n >= 5) return 2400;
   return MULTIPLAYER_PRESENCE_DB_SYNC_MS;
 }
 
 export function getAdaptivePresenceDbPollMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 3600;
-  if (n >= 15) return 3200;
-  if (n >= 12) return 2800;
-  if (n >= 8) return 2400;
-  if (n >= 5) return 1900;
+  if (n >= 18) return 6000;
+  if (n >= 15) return 5200;
+  if (n >= 12) return 4400;
+  if (n >= 8) return 3600;
+  if (n >= 5) return 2600;
   return MULTIPLAYER_PRESENCE_DB_POLL_MS;
 }
 
 /** 인원 많을수록 player_state 브로드캐스트 최소 간격을 약간 늘림 */
 export function getAdaptiveBroadcastMinMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 125;
-  if (n >= 12) return 105;
-  if (n >= 8) return 95;
+  if (n >= 18) return 220;
+  if (n >= 12) return 190;
+  if (n >= 8) return 160;
   return MULTIPLAYER_BROADCAST_MIN_MS;
 }
 
 export function getAdaptiveHeartbeatMs(activeRemotePlayerCount) {
   const n = Math.max(0, Number(activeRemotePlayerCount) || 0);
-  if (n >= 18) return 720;
-  if (n >= 12) return 640;
-  if (n >= 8) return 580;
+  if (n >= 18) return 1800;
+  if (n >= 12) return 1500;
+  if (n >= 8) return 1200;
   return MULTIPLAYER_HEARTBEAT_MS;
 }
