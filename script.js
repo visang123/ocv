@@ -735,6 +735,8 @@ const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
 const SYNC_DEBUG_TRACE = false;
 const WORLD_HEART_FX_MS = 2200;
+/** 슬퍼요 버튼과 이펙트 첫 알갱이에 동일하게 쓰는 이모지(😢) */
+const WORLD_SAD_BUTTON_EMOJI = "\uD83D\uDE22";
 const WORLD_CHAT_MAX_CHARS = 120;
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
 const WORLD_CHAT_NAMEPLATE_PAD_V = 1;
@@ -10508,11 +10510,12 @@ function spawnWorldSadFxNearBodyRect(rect) {
   const spreadY = Math.max(20, rect.height * 0.72);
   const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
   const n = 9;
-  const faces = ["\uD83D\uDE22", "\uD83D\uDE2D", "\uD83D\uDE15", "\uD83E\uDD72", "\u2639\uFE0F"];
+  const facesVariety = ["\uD83D\uDE2D", "\uD83D\uDE15", "\uD83E\uDD72", "\u2639\uFE0F"];
   for (let i = 0; i < n; i++) {
     const bit = document.createElement("span");
     bit.className = "ovc-heart-fx-bit";
-    bit.textContent = faces[i % faces.length];
+    bit.textContent =
+      i === 0 ? WORLD_SAD_BUTTON_EMOJI : facesVariety[(i - 1) % facesVariety.length];
     bit.style.fontSize = fontPx + "px";
     const dx = (Math.random() - 0.35) * spreadX;
     const dy = -rise - Math.random() * spreadY;
@@ -10705,7 +10708,7 @@ function ensureWorldSocialUi() {
   worldSadBtn.id = "world-sad-button";
   worldSadBtn.className = "world-sad-button";
   worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
-  worldSadBtn.innerHTML = "\uD83D\uDE22";
+  worldSadBtn.innerHTML = WORLD_SAD_BUTTON_EMOJI;
   document.body.appendChild(worldSadBtn);
 
   worldHeartBtn = document.createElement("button");
@@ -11233,7 +11236,10 @@ function renderRemotePlayersFromPresence(presenceState) {
 
     const latestPresence = presences[presences.length - 1];
     if (!latestPresence || !latestPresence.id || latestPresence.id === currentSessionId) return;
-    if (isRemotePresenceSameLoggedInAccount(latestPresence)) return;
+    if (isRemotePresenceSameLoggedInAccount(latestPresence)) {
+      multiplayerRoomSessionIdsLastSeen[String(latestPresence.id)] = Date.now();
+      return;
+    }
 
     nextRemotePlayers[latestPresence.id] = latestPresence;
   });
@@ -12734,6 +12740,10 @@ function broadcastButterflyState(now) {
 function handleRemoteButterflyStateBroadcast(payload) {
   if (!payload || payload.id === currentSessionId) return;
   if (isSharedWorldSyncPausedForTutorial()) return;
+  const sender = String(payload.id || "").trim();
+  if (sender) {
+    multiplayerRoomSessionIdsLastSeen[sender] = Date.now();
+  }
   if (isButterflyAuthority()) return;
   const snapshot = payload.butterflies || payload;
   const sentAt = Number(payload.sentAt) || Date.now();
