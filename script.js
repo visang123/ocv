@@ -570,6 +570,11 @@ function syncMainSeedPickedStateFromLoadedExtraSeeds() {
 
 function hasPickedGuideBookInCurrentRoom() {
   if (getStoredFlag(storageKeyGuideBookPickedForRoom())) return true;
+  if (getStoredFlag(storageKeyWorldBagGroundPickedForRoom())) {
+    setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
+    setStoredFlag(hasGuideBookKey, true);
+    return true;
+  }
   if (getStoredFlag(hasGuideBookKey)) {
     setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
     return true;
@@ -693,13 +698,8 @@ function syncWorldBagGroundVisibility() {
   syncWorldGuideBookGroundVisibility();
   if (worldBag) {
     if (isWorldFloorBagHiddenForCurrentView() && !hasGuideBook) {
-      if (isWorldDocumentEntry()) {
-        removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
-      } else {
-        try {
-          sessionStorage.removeItem(tutorialSessionWorldBagGroundPickedKey);
-        } catch (e) {}
-      }
+      hasGuideBook = true;
+      setGuideBookPickedForCurrentRoom();
     }
     worldBag.style.display = isWorldFloorBagHiddenForCurrentView() ? "none" : "block";
   }
@@ -4036,17 +4036,27 @@ function getNearestPickableWorldRock() {
 }
 
 function rebuildWorldRockDom() {
-  if (!ground || !player) return;
+  if (!ground) return;
   ground.querySelectorAll(".world-ground-rock").forEach(function (node) {
     node.remove();
   });
   if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldRocks)) return;
+  const insertBeforeEl =
+    localPlayerRoot && localPlayerRoot.parentNode === ground
+      ? localPlayerRoot
+      : player && player.parentNode === ground
+        ? player
+        : null;
   appleState.worldRocks.forEach(function (rock) {
     const el = document.createElement("div");
     el.className = "world-ground-rock";
     el.dataset.rockId = rock.id;
     el.setAttribute("aria-hidden", "true");
-    ground.insertBefore(el, player);
+    if (insertBeforeEl) {
+      ground.insertBefore(el, insertBeforeEl);
+    } else {
+      ground.appendChild(el);
+    }
     rock._el = el;
   });
   updateWorldRocks();
@@ -4370,6 +4380,15 @@ function loadAppleState() {
         return arr.indexOf(id) === idx;
       })
     : [];
+  if (
+    appleState.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT ||
+    appleState.worldRocks.some(function (r) {
+      return !r || typeof r.id !== "string";
+    })
+  ) {
+    appleState.worldRocks = createRandomWorldRocks();
+    appleState.worldRockPickedIds = [];
+  }
   ensureWorldLooseSeedShape();
   if (usesWorldLooseSeedMode()) {
     let migrateInvToCount = 0;
@@ -4767,6 +4786,7 @@ function refreshUiAfterSharedWorldApply() {
   updateSeedInventory();
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
+  rebuildWorldRockDom();
 }
 
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
@@ -6476,7 +6496,7 @@ function syncPlantCardWaterReadoutVisibility(showWater) {
 
 function renderPlantCardForPlant(plant) {
   if (getPlantSoilBadStateTitle(plant)) {
-    if (plantCardTitle) plantCardTitle.textContent = getPlantSoilBadStateTitle(plant);
+    if (plantCardTitle) plantCardTitle.textContent = "";
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     if (plantWaterText) {
@@ -7762,8 +7782,7 @@ function getPlantSoilBadStateTitle(plant) {
 
 function getPlantWorldLabel(plant) {
   if (!plant) return "";
-  const soilTitle = getPlantSoilBadStateTitle(plant);
-  if (soilTitle) return soilTitle;
+  if (getPlantSoilBadStateTitle(plant)) return "";
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
@@ -8846,7 +8865,7 @@ function updatePlantCard() {
   if (badNear && badDist <= plantWaterDistance && badDist < goodDist) {
     const plant = badNear.plant;
     plantCard.style.display = "block";
-    if (plantCardTitle) plantCardTitle.textContent = getPlantSoilBadStateTitle(plant);
+    if (plantCardTitle) plantCardTitle.textContent = "";
     plantCard.classList.toggle("is-dry", plant.status === "dry");
     plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     if (plantWaterText) {
