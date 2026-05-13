@@ -6871,6 +6871,7 @@ function getPlayerFootY() {
 
 function isPlayerNearTreeTrunk() {
   if (isTreeFalling) return false;
+  const centerX = getPlayerCenterX();
   const footY = getPlayerFootY();
   const rootsTop =
     BIG_TREE_Y +
@@ -6885,21 +6886,31 @@ function isPlayerNearTreeTrunk() {
     top: footY - 8,
     bottom: footY + 2
   };
-  const hPad = TREE_CLIMB_DISTANCE + 4;
+  const hPad = 1;
   const rootsRect = {
     left: BIG_TREE_X + TREE_CSS_ROOTS_LEFT - hPad,
     right: BIG_TREE_X + TREE_CSS_ROOTS_LEFT + TREE_CSS_ROOTS_WIDTH + hPad,
     top: rootsTop,
     bottom: rootsBottom
   };
-  if (isOverlappingRect(feetRect, rootsRect)) return true;
+  if (
+    centerX >= rootsRect.left &&
+    centerX <= rootsRect.right &&
+    isOverlappingRect(feetRect, rootsRect)
+  ) {
+    return true;
+  }
   const trunkRect = {
     left: TREE_TRUNK_X - hPad,
     right: TREE_TRUNK_X + TREE_TRUNK_WIDTH + hPad,
     top: TREE_TRUNK_TOP - 22,
     bottom: rootsBottom
   };
-  return isOverlappingRect(feetRect, trunkRect);
+  return (
+    centerX >= trunkRect.left &&
+    centerX <= trunkRect.right &&
+    isOverlappingRect(feetRect, trunkRect)
+  );
 }
 
 function isPlayerInTreeSpace() {

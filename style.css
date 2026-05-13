@@ -798,8 +798,8 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  width: 34px;
-  height: 23px;
+  width: 23px;
+  height: 15px;
   object-fit: contain;
   object-position: center;
   background: transparent;
@@ -827,8 +827,8 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  width: 14px;
-  height: 11px;
+  width: 21px;
+  height: 17px;
   background: transparent;
   border: 0;
   object-fit: contain;
