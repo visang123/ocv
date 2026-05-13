@@ -302,9 +302,7 @@ import {
 import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
 import {
   storageKeyMainSeedPickedForRoom,
-  storageKeyGuideBookPickedForRoom,
-  storageKeyWorldBagGroundPickedForRoom,
-  storageKeyWorldGuideBookOffGroundPickedForRoom
+  getWorldFloorPickupStorageSlugs
 } from "./src/game/room-storage-keys.js";
 import {
   loadBagInventoryOrder as loadBagInventoryOrderCore,
@@ -569,39 +567,62 @@ function syncMainSeedPickedStateFromLoadedExtraSeeds() {
   }
 }
 
+function roomKeyedPickupFlagTrueAnySlug(keyPrefix) {
+  const slugs = getWorldFloorPickupStorageSlugs();
+  for (let i = 0; i < slugs.length; i += 1) {
+    if (getStoredFlag(keyPrefix + slugs[i])) return true;
+  }
+  return false;
+}
+
+function setRoomKeyedPickupFlagAllSlugs(keyPrefix, enabled) {
+  getWorldFloorPickupStorageSlugs().forEach(function (slug) {
+    setStoredFlag(keyPrefix + slug, Boolean(enabled));
+  });
+}
+
+function removeRoomKeyedPickupForAllSlugs(keyPrefix) {
+  getWorldFloorPickupStorageSlugs().forEach(function (slug) {
+    removeStoredValue(keyPrefix + slug);
+  });
+}
+
+const GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX = "guideBookPickedRoomV1:";
+const WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX = "worldBagGroundPickedRoomV1:";
+const WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX = "worldGuideBookOffGroundPickedRoomV1:";
+
 function hasPickedGuideBookInCurrentRoom() {
-  if (getStoredFlag(storageKeyGuideBookPickedForRoom())) return true;
-  if (getStoredFlag(storageKeyWorldBagGroundPickedForRoom())) {
-    setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
-    setStoredFlag(hasGuideBookKey, true);
+  if (roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX)) return true;
+  if (roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX)) {
+    setGuideBookPickedForCurrentRoom();
     return true;
   }
   if (getStoredFlag(hasGuideBookKey)) {
-    setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
+    setGuideBookPickedForCurrentRoom();
     return true;
   }
   return false;
 }
 
 function setGuideBookPickedForCurrentRoom() {
-  setStoredFlag(storageKeyGuideBookPickedForRoom(), true);
+  setRoomKeyedPickupFlagAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX, true);
   setStoredFlag(hasGuideBookKey, true);
 }
 
 function hasPickedWorldBagGroundInCurrentRoom() {
-  return getStoredFlag(storageKeyWorldBagGroundPickedForRoom());
+  return roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
 }
 
 function setWorldBagGroundPickedForCurrentRoom() {
-  setStoredFlag(storageKeyWorldBagGroundPickedForRoom(), true);
+  setRoomKeyedPickupFlagAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX, true);
 }
 
 function hasPickedWorldGuideBookOffGroundInCurrentRoom() {
-  return getStoredFlag(storageKeyWorldGuideBookOffGroundPickedForRoom());
+  return roomKeyedPickupFlagTrueAnySlug(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
 }
 
 function setWorldGuideBookOffGroundPickedForCurrentRoom() {
-  setStoredFlag(storageKeyWorldGuideBookOffGroundPickedForRoom(), true);
+  setRoomKeyedPickupFlagAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX, true);
 }
 
 const tutorialSessionWorldBagGroundPickedKey = "ovcTutorialSessionWorldBagGroundPickedV1";
@@ -2623,7 +2644,7 @@ function resetTutorialProgressInStorage() {
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
-  removeStoredValue(storageKeyGuideBookPickedForRoom());
+  removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
@@ -3509,12 +3530,12 @@ function applyDefaultState(options) {
   isMainSeedAvailable = true;
   lastMainSeedStateChangeAt = Date.now();
   clearMainSeedPickedForCurrentRoom();
-  if (sharedWorldResetOnly || isWorldDocumentEntry()) {
-    removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
-    removeStoredValue(storageKeyWorldGuideBookOffGroundPickedForRoom());
+  if (sharedWorldResetOnly) {
+    removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
+    removeRoomKeyedPickupForAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
   }
   if (!sharedWorldResetOnly || isWorldDocumentEntry()) {
-    removeStoredValue(storageKeyGuideBookPickedForRoom());
+    removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   }
   setStoredFlag(mainSeedCollectedKey, false);
   if (!sharedWorldResetOnly || isWorldDocumentEntry()) {
@@ -11808,21 +11829,22 @@ function getFitZoom() {
 // ----------------------------------------------------------------------------
 // Butterflies
 //
-// Butterflies are a shared, multiplayer entity. To avoid two clients fighting
-// over their positions we elect a single "authority" (the lowest active
-// sessionId) that simulates random-walk movement and broadcasts positions on a
-// short cadence. Every other client just renders the broadcast positions and
-// animates wing frames locally.
+// Shared multiplayer entity. One "authority" tab simulates motion (lowest
+// sessionId among this client + `multiplayerRoomSessionIdsLastSeen`; same-login
+// tabs are included via player_state / presence / butterfly_state so only one
+// tab runs `simulateButterflyAuthorityStep`). Authority broadcasts `butterfly_state`
+// every `butterflyBroadcastMs`. Others extrapolate snapshot positions and lerp
+// for display. Catch distance uses that same smoothed center on non-authority
+// clients so hitboxes match sprites.
 //
-// Catching: the catcher removes the butterfly locally, saves world state, and
-// broadcasts `butterfly_catch` so every tab (including the authority) drops the
-// same id immediately. World snapshots from others always merge butterfly lists
-// so DB saves are not ignored when the authority's movement clock is ahead.
-// Inventory counts stay per-player (localStorage).
+// Catching: local remove + `butterfly_catch` broadcast (sync dedupe). Tombstones
+// in `butterflyLocalCatchTombstoneById` briefly block stale snapshot resurrections.
+// World DB merges always apply butterfly lists so catches persist across saves.
+// `butterflyCaughtCounts` is per-player localStorage. Tutorial gates catch until
+// onboarding step 18 (`tryCatchButterfly`).
 //
-// Respawning is owned by the authority: while alive count is below the cap and
-// at least `butterflyRespawnMs` has passed since the last spawn, a new
-// butterfly appears at a random in-bounds position with a random color.
+// Respawn: authority only — `authoritySpawnButterfliesIfNeeded` vs cap and
+// `butterflyRespawnMs` since `butterflyState.lastSpawnAt`.
 // ----------------------------------------------------------------------------
 
 function loadButterflyCaughtCounts() {
@@ -12237,10 +12259,11 @@ function getButterflyAnimationFrame(now, butterfly) {
   return Math.floor((now + offset) / butterflyFrameMs) % butterflyFrameCount;
 }
 
-function getButterflyCenterDistance(butterfly) {
+/** 월드 중심(cx, cy) 기준 플레이어와의 거리 */
+function getButterflyCatchDistanceAtWorldCenter(cx, cy) {
   return getCenterDistance(
-    butterfly.x - BUTTERFLY_SIZE / 2,
-    butterfly.y - BUTTERFLY_SIZE / 2,
+    cx - BUTTERFLY_SIZE / 2,
+    cy - BUTTERFLY_SIZE / 2,
     BUTTERFLY_SIZE,
     BUTTERFLY_SIZE
   );
@@ -12249,10 +12272,18 @@ function getButterflyCenterDistance(butterfly) {
 function findCatchableButterfly() {
   let nearest = null;
   butterflyState.list.forEach(function (butterfly) {
-    const distance = getButterflyCenterDistance(butterfly);
+    const cx =
+      typeof butterfly._catchProbeCx === "number" && Number.isFinite(butterfly._catchProbeCx)
+        ? butterfly._catchProbeCx
+        : butterfly.x;
+    const cy =
+      typeof butterfly._catchProbeCy === "number" && Number.isFinite(butterfly._catchProbeCy)
+        ? butterfly._catchProbeCy
+        : butterfly.y;
+    const distance = getButterflyCatchDistanceAtWorldCenter(cx, cy);
     if (distance > butterflyCatchDistance) return;
     if (!nearest || distance < nearest.distance) {
-      nearest = { butterfly, distance };
+      nearest = { butterfly: butterfly, distance: distance };
     }
   });
   return nearest;
@@ -12591,11 +12622,14 @@ function updateButterflies() {
   // 비권한: 스냅샷의 butterfly.x/y(권한이 넣은 위치+플러터)만 부드럽게 따라감.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
-  /** 스냅샷 간격이 길수록 조금 더 빠르게 따라붙임. 프레임당 최대 이동으로만 캡. */
-  /** 스냅샷 간격 + 네트워크 지연 보정: 권한 외 클라이언트는 속도 외삽으로 목표를 앞당겨 끊김 완화 */
-  const butterflyRemoteLerpAlpha =
-    wallDelta > 200 ? 0.55 : wallDelta > 120 ? 0.46 : 0.36;
-  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 44 : 28;
+  /** 프레임 간격에 맞춘 지수 보간(짧은 dt에서도 곡선이 끊기지 않게). */
+  const butterflyRemoteLerpAlpha = (function () {
+    const dt = Math.max(1, wallDelta);
+    const a = 1 - Math.exp(-dt / 92);
+    return Math.min(0.44, Math.max(0.11, a));
+  })();
+  /** 과도한 단발 점프만 막음(이전 낮은 캡은 계단처럼 보이기 쉬움). */
+  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 160 : 120;
 
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
@@ -12609,9 +12643,9 @@ function updateButterflies() {
     });
   }
 
-  // Render
+  // Render (잡기 판정은 보간된 중심 `_catchProbe*`와 동일 — 비권한 탭에서 화면과 일치)
   const aliveIds = {};
-  const catchTarget = findCatchableButterfly();
+  let catchTarget = null;
   butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = ensureButterflyRenderEntry(butterfly);
@@ -12619,7 +12653,7 @@ function updateButterflies() {
     let targetY = butterfly.y;
     if (smoothRemoteButterflies) {
       const ar = typeof butterfly._netRecvAt === "number" ? butterfly._netRecvAt : now;
-      const lag = Math.min(220, Math.max(0, now - ar));
+      const lag = Math.min(150, Math.max(0, now - ar));
       const vx = Number(butterfly._netVx) || 0;
       const vy = Number(butterfly._netVy) || 0;
       targetX = butterfly.x + vx * lag;
@@ -12634,10 +12668,12 @@ function updateButterflies() {
         butterfly._renderX = targetX;
         butterfly._renderY = targetY;
       }
-      let nx =
-        butterfly._renderX + (targetX - butterfly._renderX) * butterflyRemoteLerpAlpha;
-      let ny =
-        butterfly._renderY + (targetY - butterfly._renderY) * butterflyRemoteLerpAlpha;
+      const rdx = targetX - butterfly._renderX;
+      const rdy = targetY - butterfly._renderY;
+      const t = butterflyRemoteLerpAlpha;
+      const smoothT = t * t * (3 - 2 * t);
+      let nx = butterfly._renderX + rdx * smoothT;
+      let ny = butterfly._renderY + rdy * smoothT;
       let mx = nx - butterfly._renderX;
       let my = ny - butterfly._renderY;
       const mlen = Math.hypot(mx, my);
@@ -12653,6 +12689,14 @@ function updateButterflies() {
     } else {
       butterfly._renderX = butterfly.x;
       butterfly._renderY = butterfly.y;
+    }
+    butterfly._catchProbeCx = drawX;
+    butterfly._catchProbeCy = drawY;
+    const catchDist = getButterflyCatchDistanceAtWorldCenter(drawX, drawY);
+    if (catchDist <= butterflyCatchDistance) {
+      if (!catchTarget || catchDist < catchTarget.distance) {
+        catchTarget = { butterfly: butterfly, distance: catchDist };
+      }
     }
     const motionX = drawX;
     setWorldPosition(
@@ -12835,8 +12879,13 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       const newY = getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop);
       if (prevX != null && prevY != null && Number.isFinite(prevRecv) && prevRecv > 0) {
         const dtMs = Math.max(16, recvAt - prevRecv);
-        butterfly._netVx = (newX - prevX) / dtMs;
-        butterfly._netVy = (newY - prevY) / dtMs;
+        const rawVx = (newX - prevX) / dtMs;
+        const rawVy = (newY - prevY) / dtMs;
+        const prevVx = Number(butterfly._netVx) || 0;
+        const prevVy = Number(butterfly._netVy) || 0;
+        const blend = 0.4;
+        butterfly._netVx = prevVx * (1 - blend) + rawVx * blend;
+        butterfly._netVy = prevVy * (1 - blend) + rawVy * blend;
       } else {
         butterfly._netVx = 0;
         butterfly._netVy = 0;
