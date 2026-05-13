@@ -726,6 +726,7 @@ const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
+const WORLD_ROCK_PICKUP_ACTION_MS = 1500;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
@@ -3846,6 +3847,8 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
     lastLocalWorldRockPickupAt = Date.now();
+    flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
+    plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
@@ -3942,6 +3945,8 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
     lastLocalWorldRockPickupAt = Date.now();
+    flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
+    plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
@@ -4759,8 +4764,9 @@ function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
 }
 
 /**
- * After a remote world snapshot, local `applyPlantWaterDecay` uses this client's
- * Date.now(). Clamp hydration timestamps so skew cannot drain all water or
+ * After a remote world snapshot, passive decay should use the same clock as
+ * `rebasePlantModelTimestampsToLocalNow` (`getSynchronizedNow()` when shared merge
+ * is active). Clamp hydration timestamps so skew cannot drain all water or
  * trigger dry soil in the same frame as apply.
  * @param {function} getDryAfterEmptyMs (plant, now) => ms until soil dries after water hits 0
  */
@@ -4841,7 +4847,7 @@ function snapWellRefillToGrid(nowMs) {
  */
 function flushPassiveSimulationBeforeSharedSnapshot() {
   if (!isSharedWorldMergeActive()) return;
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   refillWellIfNeeded();
   if (
     plantRuntime.isSeedPlanted &&
@@ -4872,7 +4878,8 @@ function getSharedWorldSnapshot() {
   flushPassiveSimulationBeforeSharedSnapshot();
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
   return {
-    savedAt: Date.now(),
+    /** 멀티: 식물 타임스탬프와 같은 시각축으로 두어 `rebasePlantModelTimestampsToLocalNow`의 refTime과 괴리 감소 */
+    savedAt: getSharedPlantSimulationNow(),
     savedBy: currentSessionId,
     resetToken: pendingWorldResetToken || lastAppliedWorldResetToken || "",
     bucket: {
@@ -5637,6 +5644,16 @@ function isSharedWorldMergeActive() {
   return isWorldServerSyncAvailable() && hasHydratedSharedWorldFromServer;
 }
 
+/**
+ * 멀티 공유 월드: 스냅샷의 `rebasePlantModelTimestampsToLocalNow`·sanitize가
+ * `getSynchronizedNow()`(서버 행 시각 기준 오프셋)으로 맞춰져 있는데,
+ * 물 감소만 `Date.now()`를 쓰면 오프셋만큼 경과가 벌어져 한 틱에 물이 다 빠지고
+ * 땅이 바로 마른 것처럼 보인다. 패시브 식물 틱은 이 시각과 맞출 것.
+ */
+function getSharedPlantSimulationNow() {
+  return isSharedWorldMergeActive() ? getSynchronizedNow() : Date.now();
+}
+
 function syncWorldState(forceSave) {
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
@@ -5964,7 +5981,7 @@ function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) {
 }
 
 function updateExtraSeedsAndPlants() {
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   let didAutoRemoveDryExtraSeed = false;
 
   if (isTutorialDocumentEntry() && worldLooseSeedElement) {
@@ -7533,7 +7550,7 @@ function startPlanting() {
   sendMultiplayerPresence(true);
 
   window.setTimeout(function () {
-    const plantedAt = Date.now();
+    const plantedAt = getSharedPlantSimulationNow();
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
     const spotX = plantRuntime.spotX;
@@ -7704,7 +7721,7 @@ function plantWorldSeedCount() {
     appleState.seedCount = Math.max(0, appleState.seedCount - 1);
 
     if (!plantRuntime.isSeedPlanted) {
-      const plantedAt = Date.now();
+      const plantedAt = getSharedPlantSimulationNow();
       plantRuntime.spotX = plantX;
       plantRuntime.spotY = plantY;
       plantRuntime.isSeedPlanted = true;
@@ -7821,7 +7838,7 @@ function plantInventorySeed(seedId) {
     inventorySeed.inInventory = false;
 
     if (!plantRuntime.isSeedPlanted) {
-      const plantedAt = Date.now();
+      const plantedAt = getSharedPlantSimulationNow();
       plantRuntime.spotX = plantX;
       plantRuntime.spotY = plantY;
       plantRuntime.isSeedPlanted = true;
@@ -7872,7 +7889,7 @@ function plantInventorySeed(seedId) {
 }
 
 function createExtraPlant(id, x, y) {
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   return {
     id,
     x,
@@ -8744,7 +8761,7 @@ function waterPlant(target) {
     return;
   }
 
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
 
   updatePlantWaterLevel();
 
@@ -8818,7 +8835,7 @@ function waterPlant(target) {
 }
 
 function waterExtraPlant(plant) {
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
   const waterCapacity = getPlantWaterCapacity(plant);
@@ -8896,7 +8913,7 @@ function updatePlantWaterLevel() {
     return;
   }
 
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
 
   if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
     if (plantRuntime.waterLevel > 0 && plantRuntime.becameEmptyAt != null) {
@@ -8940,7 +8957,7 @@ function updatePlantState() {
     return;
   }
 
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
 
   if (
     (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) &&
@@ -9082,7 +9099,7 @@ function removeMainPlant() {
   plantRuntime.wateredAtList = [];
   plantRuntime.status = "normal";
   plantRuntime.waterLevel = 1;
-  plantRuntime.waterLevelUpdatedAt = Date.now();
+  plantRuntime.waterLevelUpdatedAt = getSharedPlantSimulationNow();
   plantRuntime.becameEmptyAt = null;
   plantRuntime.isOverwatered = false;
   plantRuntime.rottenAt = null;
@@ -10501,6 +10518,17 @@ function ensureWorldSocialUi() {
     }
   });
 
+  document.addEventListener("click", function (ev) {
+    if (!worldChatPanelOpen || !worldChatPanelEl) return;
+    const t = ev.target;
+    if (!(t instanceof Node)) return;
+    if (worldChatPanelEl.contains(t)) return;
+    if (worldChatToggleBtn && worldChatToggleBtn.contains(t)) return;
+    worldChatPanelOpen = false;
+    worldChatPanelEl.classList.remove("is-open");
+    worldChatPanelEl.setAttribute("aria-hidden", "true");
+  });
+
   worldSocialUiReady = true;
   updateWorldSocialChatUiEnabled();
 }
@@ -10677,7 +10705,7 @@ function sendMultiplayerPresence(forceSend) {
   const now = Date.now();
   const shouldShowWorldRockPickupAction =
     isWorldDocumentEntry() &&
-    now - Number(lastLocalWorldRockPickupAt || 0) <= REMOTE_BUTTERFLY_CATCH_ACTION_MS;
+    now - Number(lastLocalWorldRockPickupAt || 0) <= WORLD_ROCK_PICKUP_ACTION_MS;
   const shouldShowButterflyCatchAction =
     now - Number(lastLocalButterflyCatchActionAt || 0) <= REMOTE_BUTTERFLY_CATCH_ACTION_MS;
   const state = {
