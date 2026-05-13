@@ -210,15 +210,6 @@ body::-webkit-scrollbar {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
 }
 
-#plant-hover-label.is-stage3-complete {
-  min-width: 96px;
-  max-width: 150px;
-  padding: 3px 6px;
-  font-size: 4px;
-  line-height: 1.25;
-  white-space: pre-line;
-}
-
 .extra-seed {
   position: absolute;
   left: 0;

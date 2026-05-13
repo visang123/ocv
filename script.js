@@ -692,6 +692,15 @@ function syncGuideInventoryBar() {
 function syncWorldBagGroundVisibility() {
   syncWorldGuideBookGroundVisibility();
   if (worldBag) {
+    if (isWorldFloorBagHiddenForCurrentView() && !hasGuideBook) {
+      if (isWorldDocumentEntry()) {
+        removeStoredValue(storageKeyWorldBagGroundPickedForRoom());
+      } else {
+        try {
+          sessionStorage.removeItem(tutorialSessionWorldBagGroundPickedKey);
+        } catch (e) {}
+      }
+    }
     worldBag.style.display = isWorldFloorBagHiddenForCurrentView() ? "none" : "block";
   }
 }
@@ -7815,9 +7824,8 @@ function showPlantHoverForPlant(plant) {
     hidePlantHoverLabel();
     return;
   }
-  const showMagicHint = isStage3CompleteAwaitingMagicPowder(plant);
-  plantHoverLabel.classList.toggle("is-stage3-complete", showMagicHint);
-  plantHoverLabel.textContent = showMagicHint ? label + "\n" + stage3CompleteMagicHint : label;
+  plantHoverLabel.classList.remove("is-stage3-complete");
+  plantHoverLabel.textContent = label;
   plantHoverLabel.style.display = "block";
   function placeHoverLabelCentered() {
     const anchor = getPlantHoverAnchorWorld(plant);
