@@ -6693,8 +6693,22 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
   return null;
 }
 
+/** `.world`에 transform이 있으면 그 안의 fixed는 뷰포트가 아니라 월드 기준이 되어 좌표가 어긋남 → UI 힌트만 body로 */
+function ensurePlantHoverLabelOnBodyForFixedUi() {
+  if (!plantHoverLabel || !ground) return;
+  if (plantHoverLabel.parentNode === document.body) return;
+  document.body.appendChild(plantHoverLabel);
+}
+
+function restorePlantHoverLabelToWorldDom() {
+  if (!plantHoverLabel || !ground) return;
+  if (plantHoverLabel.parentNode === ground) return;
+  ground.appendChild(plantHoverLabel);
+}
+
 function showUiShortcutHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
+  ensurePlantHoverLabelOnBodyForFixedUi();
   plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete");
   plantHoverLabel.classList.add("is-ui-shortcut-hint");
   plantHoverLabel.textContent = text;
@@ -6743,6 +6757,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
       if (plantHoverLabel) {
         plantHoverLabel.classList.remove("is-seed-inventory-hint");
         plantHoverLabel.style.display = "none";
+        restorePlantHoverLabelToWorldDom();
       }
       return;
     }
@@ -8258,11 +8273,13 @@ function hidePlantHoverLabel() {
     plantHoverLabel.style.zIndex = "";
     plantHoverLabel.style.transform = "";
     plantHoverLabel.style.display = "none";
+    restorePlantHoverLabelToWorldDom();
   }
 }
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
+  restorePlantHoverLabelToWorldDom();
   plantHoverLabel.classList.remove("is-ui-shortcut-hint");
   plantHoverLabel.style.position = "";
   plantHoverLabel.style.left = "";
