@@ -12687,8 +12687,17 @@ function updateButterflies() {
       drawX = nx;
       drawY = ny;
     } else {
-      butterfly._renderX = butterfly.x;
-      butterfly._renderY = butterfly.y;
+      if (typeof butterfly._renderX !== "number" || typeof butterfly._renderY !== "number") {
+        butterfly._renderX = butterfly.x;
+        butterfly._renderY = butterfly.y;
+      }
+      const dt = Math.max(1, wallDelta);
+      const authFollow = 1 - Math.exp(-dt / 52);
+      const authAlpha = Math.min(0.88, Math.max(0.22, authFollow));
+      butterfly._renderX += (butterfly.x - butterfly._renderX) * authAlpha;
+      butterfly._renderY += (butterfly.y - butterfly._renderY) * authAlpha;
+      drawX = butterfly._renderX;
+      drawY = butterfly._renderY;
     }
     butterfly._catchProbeCx = drawX;
     butterfly._catchProbeCy = drawY;
@@ -12754,8 +12763,8 @@ function getButterflyStateForSnapshot() {
       return {
         id: butterfly.id,
         color: butterfly.color,
-        x: Math.round(butterfly.x * 100) / 100,
-        y: Math.round(butterfly.y * 100) / 100,
+        x: Math.round(butterfly.x * 10000) / 10000,
+        y: Math.round(butterfly.y * 10000) / 10000,
         dirX: butterfly.dirX > 0 ? 1 : -1,
         spawnedAt: butterfly.spawnedAt || null
       };

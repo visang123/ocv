@@ -38,11 +38,9 @@ export function setWorldPosition(
   worldWidth,
   groundWorldHeight
 ) {
-  element.style.transform =
-    "translate(" +
-    toScreenX(x, groundElement, worldWidth) +
-    "px, " +
-    toScreenY(y, groundElement, groundWorldHeight) +
-    "px)";
+  const tx = toScreenX(x, groundElement, worldWidth);
+  const ty = toScreenY(y, groundElement, groundWorldHeight);
+  /** translate3d: 줌된 .world 안에서도 합성 레이어로 올려 미세 떨림 완화 */
+  element.style.transform = "translate3d(" + tx + "px, " + ty + "px, 0)";
 }
 
