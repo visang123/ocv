@@ -6466,6 +6466,18 @@ function syncPlantCardWaterReadoutVisibility(showWater) {
 }
 
 function renderPlantCardForPlant(plant) {
+  if (getPlantSoilBadStateTitle(plant)) {
+    if (plantCardTitle) plantCardTitle.textContent = getPlantSoilBadStateTitle(plant);
+    plantCard.classList.toggle("is-dry", plant.status === "dry");
+    plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
+    if (plantWaterText) {
+      plantWaterText.textContent = "";
+      plantWaterText.style.display = "none";
+      plantWaterText.classList.remove("is-plant-card-hint");
+    }
+    if (plantWaterBar) plantWaterBar.style.display = "none";
+    return;
+  }
   const showMagicHint = isStage3CompleteAwaitingMagicPowder(plant);
   if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
   plantCard.classList.toggle("is-dry", plant.status === "dry");
@@ -7728,15 +7740,21 @@ function ensureGrassOrdinalIfNeeded(plant) {
   void plant;
 }
 
-function getPlantWorldLabel(plant) {
-  if (
-    !plant ||
-    plant.status === "dry" ||
-    plant.status === "rotten" ||
-    plant.isOverwatered
-  ) {
-    return "";
+function getPlantSoilBadStateTitle(plant) {
+  if (!plant) return "";
+  if (plant.status === "dry") {
+    return "\uB9C8\uB978\uB545";
   }
+  if (plant.status === "rotten" || plant.isOverwatered) {
+    return "\uC339\uC740\uB545";
+  }
+  return "";
+}
+
+function getPlantWorldLabel(plant) {
+  if (!plant) return "";
+  const soilTitle = getPlantSoilBadStateTitle(plant);
+  if (soilTitle) return soilTitle;
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
@@ -8688,7 +8706,6 @@ function updatePlantState() {
 
   if (mainSoilRotten) {
     waterNeeded.style.display = "none";
-    plantCard.style.display = "none";
     growthCard.style.display = "none";
     sprout.style.display = "none";
   } else if (shouldShowFirstWaterNeededDroplet(plantRuntime)) {
@@ -8764,15 +8781,49 @@ function removeMainPlant() {
   markWorldDirty();
 }
 
+function getNearestBadSoilPlantForProximityCard() {
+  let best = null;
+  let bestDist = Infinity;
+  function tryPlant(plant, x, y) {
+    if (!plant) return;
+    if (plant.status !== "dry" && plant.status !== "rotten" && !plant.isOverwatered) return;
+    const d = getCenterDistance(x, y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
+    if (d <= plantWaterDistance && d < bestDist) {
+      bestDist = d;
+      best = { plant, distance: d };
+    }
+  }
+  if (plantRuntime.isSeedPlanted) {
+    tryPlant(plantRuntime, plantRuntime.spotX, plantRuntime.spotY);
+  }
+  appleState.extraPlants.forEach(function (p) {
+    tryPlant(p, p.x, p.y);
+  });
+  return best;
+}
+
 function updatePlantCard() {
-  const wateringTarget = getNearestWateringTarget();
-  if (wateringTarget && wateringTarget.type === "extra") {
-    const plant = wateringTarget.plant;
+  const goodTarget = getNearestWateringTarget();
+  const badNear = getNearestBadSoilPlantForProximityCard();
+  const goodDist = goodTarget ? goodTarget.distance : Infinity;
+  const badDist = badNear ? badNear.distance : Infinity;
+
+  if (goodTarget && goodDist <= plantWaterDistance && goodDist <= badDist) {
+    if (goodTarget.type === "extra") {
+      const plant = goodTarget.plant;
+      if (shouldSuppressPlantWaterCardForSelfSustaining(plant)) {
+        plantCard.style.display = "none";
+        if (plantCardTitle) plantCardTitle.textContent = "";
+        return;
+      }
+      plantCard.style.display = "block";
+      renderPlantCardForPlant(plant);
+      return;
+    }
+
     if (
-      plant.status === "dry" ||
-      plant.status === "rotten" ||
-      plant.isOverwatered ||
-      shouldSuppressPlantWaterCardForSelfSustaining(plant)
+      !plantRuntime.isSeedPlanted ||
+      shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime)
     ) {
       plantCard.style.display = "none";
       if (plantCardTitle) plantCardTitle.textContent = "";
@@ -8780,27 +8831,27 @@ function updatePlantCard() {
     }
 
     plantCard.style.display = "block";
-    renderPlantCardForPlant(plant);
+    renderPlantCardForPlant(plantRuntime);
     return;
   }
 
-  if (
-    !wateringTarget ||
-    wateringTarget.type !== "main" ||
-    !plantRuntime.isSeedPlanted ||
-    plantRuntime.status === "dry" ||
-    plantRuntime.status === "rotten" ||
-    plantRuntime.isOverwatered ||
-    shouldSuppressPlantWaterCardForSelfSustaining(plantRuntime)
-  ) {
-    plantCard.style.display = "none";
-    if (plantCardTitle) plantCardTitle.textContent = "";
+  if (badNear && badDist <= plantWaterDistance && badDist < goodDist) {
+    const plant = badNear.plant;
+    plantCard.style.display = "block";
+    if (plantCardTitle) plantCardTitle.textContent = getPlantSoilBadStateTitle(plant);
+    plantCard.classList.toggle("is-dry", plant.status === "dry");
+    plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
+    if (plantWaterText) {
+      plantWaterText.textContent = "";
+      plantWaterText.style.display = "none";
+      plantWaterText.classList.remove("is-plant-card-hint");
+    }
+    if (plantWaterBar) plantWaterBar.style.display = "none";
     return;
   }
 
-  plantCard.style.display = "block";
-  renderPlantCardForPlant(plantRuntime);
-
+  plantCard.style.display = "none";
+  if (plantCardTitle) plantCardTitle.textContent = "";
 }
 
 function updatePlantGrowth() {
