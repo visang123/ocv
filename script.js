@@ -1773,9 +1773,6 @@ characterSelectButton.addEventListener("click", function () {
 });
 
 const settingsButton = document.getElementById("settings-button");
-if (settingsButton) {
-  settingsButton.title = "설정: Esc";
-}
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsModal = document.getElementById("settings-modal");
 const changeColorButton = document.getElementById("change-color-button");
@@ -6664,8 +6661,67 @@ function bagHasPlantableSeedsForHoverHint() {
   });
 }
 
+/** 고정 UI(설정·채팅·하트·슬퍼요) — 브라우저 title 대신 #plant-hover-label 스타일로 단축키 표시 */
+function pickUiShortcutHoverTarget(clientX, clientY) {
+  const pad = 4;
+  function over(el) {
+    if (!el || !el.isConnected) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    return (
+      clientX >= r.left - pad &&
+      clientX <= r.right + pad &&
+      clientY >= r.top - pad &&
+      clientY <= r.bottom + pad
+    );
+  }
+  if (settingsButton && over(settingsButton)) {
+    return { anchorEl: settingsButton, text: "설정: Esc" };
+  }
+  if (!worldSocialUiReady) return null;
+  if (worldChatToggleBtn && over(worldChatToggleBtn)) {
+    return { anchorEl: worldChatToggleBtn, text: "채팅: C" };
+  }
+  if (worldHeartBtn && over(worldHeartBtn)) {
+    return { anchorEl: worldHeartBtn, text: "하트: H" };
+  }
+  if (worldSadBtn && over(worldSadBtn)) {
+    return { anchorEl: worldSadBtn, text: "슬퍼요: Ctrl+S" };
+  }
+  return null;
+}
+
+function showUiShortcutHoverLabel(text, anchorEl) {
+  if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
+  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete");
+  plantHoverLabel.classList.add("is-ui-shortcut-hint");
+  plantHoverLabel.textContent = text;
+  plantHoverLabel.style.display = "block";
+  plantHoverLabel.style.position = "fixed";
+  plantHoverLabel.style.zIndex = "220";
+  plantHoverLabel.style.transform = "none";
+  const r = anchorEl.getBoundingClientRect();
+  void plantHoverLabel.offsetWidth;
+  const w = plantHoverLabel.offsetWidth || 1;
+  const h = plantHoverLabel.offsetHeight || 1;
+  const gap = 8;
+  let left = r.left + r.width / 2 - w / 2;
+  let top = r.top - h - gap;
+  left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
+  top = Math.max(8, top);
+  plantHoverLabel.style.left = left + "px";
+  plantHoverLabel.style.top = top + "px";
+}
+
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
+
+  const uiShortcut = pickUiShortcutHoverTarget(clientX, clientY);
+  if (uiShortcut) {
+    if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
+    showUiShortcutHoverLabel(uiShortcut.text, uiShortcut.anchorEl);
+    return;
+  }
 
   if (
     hasGuideBook &&
@@ -8193,12 +8249,23 @@ function hidePlantHoverLabel() {
   if (plantHoverLabel) {
     plantHoverLabel.classList.remove("is-seed-inventory-hint");
     plantHoverLabel.classList.remove("is-stage3-complete");
+    plantHoverLabel.classList.remove("is-ui-shortcut-hint");
+    plantHoverLabel.style.position = "";
+    plantHoverLabel.style.left = "";
+    plantHoverLabel.style.top = "";
+    plantHoverLabel.style.zIndex = "";
+    plantHoverLabel.style.transform = "";
     plantHoverLabel.style.display = "none";
   }
 }
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
+  plantHoverLabel.classList.remove("is-ui-shortcut-hint");
+  plantHoverLabel.style.position = "";
+  plantHoverLabel.style.left = "";
+  plantHoverLabel.style.top = "";
+  plantHoverLabel.style.zIndex = "";
   plantHoverLabel.classList.remove("is-seed-inventory-hint");
   const px = plant.spotX != null ? plant.spotX : plant.x;
   const py = plant.spotY != null ? plant.spotY : plant.y;
@@ -10619,7 +10686,6 @@ function ensureWorldSocialUi() {
   worldSadBtn.id = "world-sad-button";
   worldSadBtn.className = "world-sad-button";
   worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
-  worldSadBtn.title = "슬퍼요: Ctrl+S";
   worldSadBtn.innerHTML = "\uD83D\uDE22";
   document.body.appendChild(worldSadBtn);
 
@@ -10628,7 +10694,6 @@ function ensureWorldSocialUi() {
   worldHeartBtn.id = "world-heart-button";
   worldHeartBtn.className = "world-heart-button";
   worldHeartBtn.setAttribute("aria-label", "\uD558\uD2B8");
-  worldHeartBtn.title = "하트: H";
   worldHeartBtn.innerHTML = "\u2764\uFE0F";
   document.body.appendChild(worldHeartBtn);
 
@@ -10637,7 +10702,6 @@ function ensureWorldSocialUi() {
   worldChatToggleBtn.id = "world-chat-toggle";
   worldChatToggleBtn.className = "world-chat-toggle";
   worldChatToggleBtn.setAttribute("aria-label", "\uCC57");
-  worldChatToggleBtn.title = "채팅: C";
   worldChatToggleBtn.textContent = "\uD83D\uDCAC";
   document.body.appendChild(worldChatToggleBtn);
 

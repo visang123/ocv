@@ -214,6 +214,19 @@ body::-webkit-scrollbar {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
 }
 
+/** 고정 UI(설정·채팅·하트·슬퍼요) 단축키 — 월드 4px 스케일과 별도로 읽기 좋은 크기 */
+#plant-hover-label.is-ui-shortcut-hint {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  padding: 6px 12px;
+  min-width: auto;
+  max-width: min(240px, 72vw);
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.14);
+}
+
 .extra-seed {
   position: absolute;
   left: 0;
