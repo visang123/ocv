@@ -226,11 +226,11 @@ export function saveSeedStateToStorage(config) {
   setStoredValue(config.seedPlantedStateKey, JSON.stringify(config.plantedState));
 }
 
-function normalizeSavedWorldRocks(saved, createRandomWorldRocks) {
+function normalizeSavedWorldRocks(saved, createRandomWorldRocks, rockSpawnContext) {
   if (typeof createRandomWorldRocks !== "function") {
     return { worldRocks: [], worldRockPickedIds: [] };
   }
-  const fresh = createRandomWorldRocks();
+  const fresh = createRandomWorldRocks(rockSpawnContext);
   if (!saved || !Array.isArray(saved.worldRocks) || saved.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT) {
     return { worldRocks: fresh, worldRockPickedIds: [] };
   }
@@ -263,7 +263,7 @@ export function loadAppleStateFromStorage(config) {
   const savedRaw = getStoredValue(config.appleStateKey);
 
   if (!savedRaw) {
-    const rocksEmpty = normalizeSavedWorldRocks(null, config.createRandomWorldRocks);
+    const rocksEmpty = normalizeSavedWorldRocks(null, config.createRandomWorldRocks, null);
     return {
       hasSavedState: false,
       parseFailed: false,
@@ -324,7 +324,13 @@ export function loadAppleStateFromStorage(config) {
             nextSpawnAt: 0
           };
 
-    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks);
+    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks, {
+      apples,
+      worldLooseSeed,
+      extraSeeds,
+      extraPlants,
+      plantSpot: config.plantSpotForRocks || null
+    });
 
     return {
       hasSavedState: true,
@@ -430,7 +436,7 @@ export function loadAppleStateFromStorage(config) {
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
-    const rocksCatch = normalizeSavedWorldRocks(null, config.createRandomWorldRocks);
+    const rocksCatch = normalizeSavedWorldRocks(null, config.createRandomWorldRocks, null);
     return {
       hasSavedState: false,
       parseFailed: true,

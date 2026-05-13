@@ -776,6 +776,7 @@ const butterflyAuthorityWaypointById = {};
 let lastButterflyBroadcastAt = 0;
 let lastLocalButterflyCatchAt = 0;
 let lastLocalButterflyCatchActionAt = 0;
+let lastLocalWorldRockPickupAt = 0;
 /**
  * Map of butterflyId -> ms timestamp of when this client caught it locally.
  * Used to suppress the butterfly from re-appearing if the authority's stale
@@ -3551,7 +3552,7 @@ function applyDefaultState(options) {
     y: WORLD_LOOSE_SEED_Y,
     nextSpawnAt: 0
   };
-  appleState.worldRocks = createRandomWorldRocks();
+  appleState.worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
   appleState.worldRockPickedIds = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
@@ -3845,11 +3846,15 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
+    lastLocalWorldRockPickupAt = Date.now();
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
     updateBagInventorySlots();
     markWorldDirty();
+    broadcastWorldRockPickup(nearestRock.rock.id);
+    syncWorldState(true);
+    sendMultiplayerPresence(true);
     return;
   }
 
@@ -3937,10 +3942,15 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
+    lastLocalWorldRockPickupAt = Date.now();
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
     updateBagInventorySlots();
+    broadcastWorldRockPickup(nearestRock.rock.id);
+    markWorldDirty();
+    syncWorldState(true);
+    sendMultiplayerPresence(true);
     return;
   }
 
@@ -4289,7 +4299,148 @@ function createRandomApple(id) {
   };
 }
 
-function createRandomWorldRocks() {
+/** 돌과 월드 UI(우물·포탈·허브·나무 등) 사이 최소 여백 */
+const WORLD_ROCK_UI_CLEAR_PAD = 5;
+
+function expandWorldRockAvoidRect(left, top, w, h, pad) {
+  return {
+    left: left - pad,
+    top: top - pad,
+    right: left + w + pad,
+    bottom: top + h + pad
+  };
+}
+
+function worldRockRect(x, y, size) {
+  return { left: x, top: y, right: x + size, bottom: y + size };
+}
+
+function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
+  for (let i = 0; i < zones.length; i += 1) {
+    if (isOverlappingRect(rockRect, zones[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function collectWorldRockAvoidZones(ctx) {
+  const p = WORLD_ROCK_UI_CLEAR_PAD;
+  const zones = [];
+  const wx = Number.isFinite(wellX) && wellX > 0 ? wellX : WELL_START_X;
+  const wy = Number.isFinite(wellY) && wellY > 0 ? wellY : WELL_START_Y;
+  zones.push(expandWorldRockAvoidRect(wx, wy, WELL_SIZE, WELL_SIZE, p));
+  zones.push(
+    expandWorldRockAvoidRect(spawnPortalX, spawnPortalY, spawnPortalWidth, spawnPortalHeight, p)
+  );
+  zones.push(expandWorldRockAvoidRect(signX, signY, SIGN_WIDTH, SIGN_HEIGHT, p));
+  zones.push(expandWorldRockAvoidRect(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT, p));
+  zones.push(expandWorldRockAvoidRect(worldBagX, worldBagY, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT, p));
+  zones.push(expandWorldRockAvoidRect(npcX, npcY, NPC_WIDTH, NPC_HEIGHT, p));
+  zones.push(expandWorldRockAvoidRect(seedX, seedY, SEED_SIZE, SEED_SIZE, p));
+  const bucketSz = getBucketSize();
+  const bx =
+    Number.isFinite(bucketX) && bucketX > 0 ? bucketX : WELL_START_X - bucketSz.width - 8;
+  const by =
+    Number.isFinite(bucketY) && bucketY > 0 ? bucketY : WELL_START_Y + WELL_SIZE - bucketSz.height;
+  zones.push(expandWorldRockAvoidRect(bx, by, bucketSz.width, bucketSz.height, p));
+
+  const canopyInset = 6;
+  zones.push(
+    expandWorldRockAvoidRect(
+      TREE_CANOPY_LEFT + canopyInset,
+      TREE_CANOPY_TOP + canopyInset,
+      TREE_CANOPY_RIGHT - TREE_CANOPY_LEFT - 2 * canopyInset,
+      TREE_CANOPY_BOTTOM - TREE_CANOPY_TOP - 2 * canopyInset,
+      p
+    )
+  );
+  const trunkInset = 3;
+  const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE + trunkInset;
+  const trunkW = TREE_TRUNK_WIDTH + 2 * TREE_CLIMB_DISTANCE - 2 * trunkInset;
+  const trunkTop = TREE_TRUNK_TOP - 22;
+  const trunkBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  zones.push(expandWorldRockAvoidRect(trunkLeft, trunkTop, trunkW, trunkBottom - trunkTop, p));
+  const rootsTop =
+    BIG_TREE_Y +
+    BIG_TREE_HEIGHT +
+    TREE_CSS_ROOTS_BOTTOM_EXTEND -
+    TREE_CSS_ROOTS_HEIGHT;
+  const rootsBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  zones.push(
+    expandWorldRockAvoidRect(
+      BIG_TREE_X + TREE_CSS_ROOTS_LEFT,
+      rootsTop,
+      TREE_CSS_ROOTS_WIDTH,
+      rootsBottom - rootsTop,
+      p
+    )
+  );
+
+  const apples = (ctx && ctx.apples) || [];
+  apples.forEach(function (a) {
+    if (!a) return;
+    const sz = Number.isFinite(Number(a.size)) ? Number(a.size) : 10;
+    const ax = Number(a.x);
+    const ay = Number(a.y);
+    if (!Number.isFinite(ax) || !Number.isFinite(ay)) return;
+    zones.push(expandWorldRockAvoidRect(ax, ay, sz, sz, p));
+  });
+
+  if (ctx && ctx.worldLooseSeed) {
+    const lx = Number(ctx.worldLooseSeed.x);
+    const ly = Number(ctx.worldLooseSeed.y);
+    if (Number.isFinite(lx) && Number.isFinite(ly)) {
+      zones.push(expandWorldRockAvoidRect(lx, ly, SEED_SIZE, SEED_SIZE, p));
+    }
+  }
+
+  const extraSeeds = (ctx && ctx.extraSeeds) || [];
+  extraSeeds.forEach(function (s) {
+    if (!s || s.planted || s.inInventory) return;
+    const ex = Number(s.x);
+    const ey = Number(s.y);
+    if (!Number.isFinite(ex) || !Number.isFinite(ey)) return;
+    zones.push(expandWorldRockAvoidRect(ex, ey, SEED_SIZE, SEED_SIZE, p));
+  });
+
+  const extraPlants = (ctx && ctx.extraPlants) || [];
+  extraPlants.forEach(function (plant) {
+    if (!plant || plant.removed) return;
+    const px = Number(plant.x);
+    const py = Number(plant.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+    zones.push(expandWorldRockAvoidRect(px, py, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT, p));
+  });
+
+  if (ctx && ctx.plantSpot) {
+    const psx = Number(ctx.plantSpot.x);
+    const psy = Number(ctx.plantSpot.y);
+    if (Number.isFinite(psx) && Number.isFinite(psy)) {
+      zones.push(expandWorldRockAvoidRect(psx, psy, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT, p));
+    }
+  }
+
+  return zones;
+}
+
+function buildWorldRockSpawnContext() {
+  return {
+    apples: appleState.apples,
+    worldLooseSeed: appleState.worldLooseSeed,
+    extraSeeds: appleState.extraSeeds,
+    extraPlants: appleState.extraPlants,
+    plantSpot:
+      plantRuntime.isSeedPlanted &&
+      Number.isFinite(plantRuntime.spotX) &&
+      Number.isFinite(plantRuntime.spotY) &&
+      (plantRuntime.spotX !== 0 || plantRuntime.spotY !== 0)
+        ? { x: plantRuntime.spotX, y: plantRuntime.spotY }
+        : null
+  };
+}
+
+function createRandomWorldRocks(ctx) {
   const count = WORLD_LOOSE_ROCK_COUNT;
   const size = WORLD_ROCK_SIZE;
   const margin = WORLD_ROCK_SPAWN_X_MARGIN;
@@ -4297,17 +4448,21 @@ function createRandomWorldRocks() {
   const yTopMax = WORLD_ROCK_SPAWN_Y_MAX;
   const xSpan = Math.max(1, WORLD_WIDTH - 2 * margin - size + 1);
   const ySpan = Math.max(1, yTopMax - yMin + 1);
+  const spawnCtx = ctx || buildWorldRockSpawnContext();
+  const avoidZones = collectWorldRockAvoidZones(spawnCtx);
   const rocks = [];
   for (let i = 0; i < count; i += 1) {
     let x = margin;
     let y = yMin;
-    for (let attempt = 0; attempt < 48; attempt += 1) {
+    for (let attempt = 0; attempt < 220; attempt += 1) {
       x = margin + Math.floor(Math.random() * xSpan);
       y = yMin + Math.floor(Math.random() * ySpan);
-      const clash = rocks.some(function (other) {
+      const rockR = worldRockRect(x, y, size);
+      const clashRock = rocks.some(function (other) {
         return Math.abs(other.x - x) < 10 && Math.abs(other.y - y) < 10;
       });
-      if (!clash) {
+      const clashUi = worldRockOverlapsAnyAvoidRect(rockR, avoidZones);
+      if (!clashRock && !clashUi) {
         break;
       }
     }
@@ -4387,7 +4542,14 @@ function loadAppleState() {
     now: Date.now(),
     defaultSeedLabel: "\uC528\uC557",
     createRandomApples,
-    createRandomWorldRocks
+    createRandomWorldRocks,
+    plantSpotForRocks:
+      plantRuntime.isSeedPlanted &&
+      Number.isFinite(plantRuntime.spotX) &&
+      Number.isFinite(plantRuntime.spotY) &&
+      (plantRuntime.spotX !== 0 || plantRuntime.spotY !== 0)
+        ? { x: plantRuntime.spotX, y: plantRuntime.spotY }
+        : null
   });
 
   appleState.count = loaded.appleCount;
@@ -4415,6 +4577,8 @@ function loadAppleState() {
         return arr.indexOf(id) === idx;
       })
     : [];
+  const rockValidateCtx = buildWorldRockSpawnContext();
+  const rockValidateZones = collectWorldRockAvoidZones(rockValidateCtx);
   if (
     appleState.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT ||
     appleState.worldRocks.some(function (r) {
@@ -4431,11 +4595,12 @@ function loadAppleState() {
         x < m ||
         x > xMax ||
         y < WORLD_ROCK_SPAWN_Y_MIN ||
-        y > WORLD_ROCK_SPAWN_Y_MAX
+        y > WORLD_ROCK_SPAWN_Y_MAX ||
+        worldRockOverlapsAnyAvoidRect(worldRockRect(x, y, WORLD_ROCK_SIZE), rockValidateZones)
       );
     })
   ) {
-    appleState.worldRocks = createRandomWorldRocks();
+    appleState.worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
     appleState.worldRockPickedIds = [];
   }
   ensureWorldLooseSeedShape();
@@ -4814,7 +4979,25 @@ function getSharedWorldSnapshot() {
               ? Number(plant.drySoilAt)
               : null
         };
-      })
+      }),
+      worldRocks: isWorldDocumentEntry()
+        ? (Array.isArray(appleState.worldRocks) ? appleState.worldRocks : []).map(function (rock) {
+            if (!rock) {
+              return { id: "", x: 0, y: 0, size: WORLD_ROCK_SIZE };
+            }
+            return {
+              id: String(rock.id),
+              x: Number(rock.x),
+              y: Number(rock.y),
+              size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : WORLD_ROCK_SIZE
+            };
+          })
+        : undefined,
+      worldRockPickedIds: isWorldDocumentEntry()
+        ? (Array.isArray(appleState.worldRockPickedIds)
+            ? appleState.worldRockPickedIds.map(String)
+            : [])
+        : undefined
     },
     butterflies: getButterflyStateForSnapshot()
   };
@@ -5309,6 +5492,49 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           appleState.lastSpawnAt = pickedAt;
         }
       });
+      if (isWorldDocumentEntry()) {
+        const snapApples = snapshot.apples;
+        const sr = snapApples.worldRocks;
+        const sp = snapApples.worldRockPickedIds;
+        if (Array.isArray(sr) && sr.length === WORLD_LOOSE_ROCK_COUNT) {
+          const m = WORLD_ROCK_SPAWN_X_MARGIN;
+          const xMax = WORLD_WIDTH - m - WORLD_ROCK_SIZE;
+          const rocksOk = sr.every(function (r) {
+            if (!r || typeof r.id !== "string") return false;
+            const x = Number(r.x);
+            const y = Number(r.y);
+            const sz = Number(r.size);
+            return (
+              Number.isFinite(x) &&
+              Number.isFinite(y) &&
+              Number(sz) === WORLD_ROCK_SIZE &&
+              x >= m &&
+              x <= xMax &&
+              y >= WORLD_ROCK_SPAWN_Y_MIN &&
+              y <= WORLD_ROCK_SPAWN_Y_MAX
+            );
+          });
+          if (rocksOk) {
+            appleState.worldRocks = sr.map(function (r) {
+              return {
+                id: String(r.id),
+                x: Number(r.x),
+                y: Number(r.y),
+                size: WORLD_ROCK_SIZE
+              };
+            });
+          }
+        }
+        if (Array.isArray(sp)) {
+          const merged = new Set(appleState.worldRockPickedIds.map(String));
+          sp.forEach(function (id) {
+            if (id != null && String(id).trim() !== "") {
+              merged.add(String(id));
+            }
+          });
+          appleState.worldRockPickedIds = Array.from(merged);
+        }
+      }
       if (snapshotSavedAt) {
         lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
       }
@@ -10328,6 +10554,10 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemoteBucketBroadcast(payload.payload);
     })
+    .on("broadcast", { event: "butterfly_state" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteButterflyStateBroadcast(payload.payload);
+    })
     .on("broadcast", { event: "butterfly_catch" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleRemoteButterflyCatchBroadcast(payload.payload);
@@ -10335,6 +10565,10 @@ function setupMultiplayer() {
     .on("broadcast", { event: "world_loose_seed_pickup" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleRemoteWorldLooseSeedPickupBroadcast(payload.payload || {});
+    })
+    .on("broadcast", { event: "world_rock_pickup" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteWorldRockPickupBroadcast(payload.payload || {});
     })
     .on("broadcast", { event: "world_chat" }, function (payload) {
       if (channel !== multiplayerChannel) return;
@@ -10402,6 +10636,9 @@ function sendMultiplayerPresence(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();
+  const shouldShowWorldRockPickupAction =
+    isWorldDocumentEntry() &&
+    now - Number(lastLocalWorldRockPickupAt || 0) <= REMOTE_BUTTERFLY_CATCH_ACTION_MS;
   const shouldShowButterflyCatchAction =
     now - Number(lastLocalButterflyCatchActionAt || 0) <= REMOTE_BUTTERFLY_CATCH_ACTION_MS;
   const state = {
@@ -10412,9 +10649,11 @@ function sendMultiplayerPresence(forceSend) {
       ? "planting"
       : appleState.isEating
         ? "eating"
-        : shouldShowButterflyCatchAction
-          ? "butterfly_catch"
-          : "state",
+        : shouldShowWorldRockPickupAction
+          ? "rock_pickup"
+          : shouldShowButterflyCatchAction
+            ? "butterfly_catch"
+            : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,
@@ -11793,6 +12032,66 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   });
 }
 
+function broadcastWorldRockPickup(rockId) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!isWorldDocumentEntry()) return;
+  if (!multiplayerChannel || !currentSessionId) return;
+  const rid = String(rockId || "");
+  if (!rid) return;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_rock_pickup", rid, at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_rock_pickup",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        rockId: rid
+      }
+    })
+  ).catch(function () {
+    // syncWorldState still persists pickup for polling clients.
+  });
+}
+
+function handleRemoteWorldRockPickupBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!isWorldDocumentEntry()) return;
+  if (!payload || payload.from === currentSessionId) return;
+  const rockId = String(payload.rockId || "");
+  if (!rockId) return;
+  const now = Date.now();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const evtAt = Math.max(0, Number(payload.at) || 0);
+  if (evtAt > 0 && Math.abs(now - evtAt) > SYNC_EVENT_DEDUPE_TTL_MS) {
+    return;
+  }
+  if (appleState.worldRockPickedIds.includes(rockId)) {
+    return;
+  }
+  const exists = appleState.worldRocks.some(function (r) {
+    return r && String(r.id) === rockId;
+  });
+  if (!exists) {
+    return;
+  }
+  appleState.worldRockPickedIds.push(rockId);
+  saveAppleState();
+  markWorldDirty();
+  updateWorldRocks();
+  const remote = remotePlayers[payload.from];
+  if (remote && remote.statusElement) {
+    remote.statusElement.textContent = "\uB3CC \uC218\uC9D1";
+    remote.statusElement.style.display = "block";
+    remote.lastActionAt = Date.now();
+  } else {
+    showPlayerAlert({ message: "\uB3CC \uC218\uC9D1", durationMs: 2200 });
+  }
+}
+
 function broadcastButterflyCatch(butterflyId) {
   if (!multiplayerChannel || !currentSessionId) return;
   const at = Date.now();
@@ -11939,11 +12238,6 @@ function updateButterflies() {
       lastButterflyStateChangeAt = now;
       markWorldDirty();
     }
-    if (now - lastButterflyBroadcastAt >= butterflyBroadcastMs) {
-      lastButterflyBroadcastAt = now;
-      lastButterflyStateChangeAt = now;
-      markWorldDirty();
-    }
   }
   // 나비 위치 시뮬은 권한 클라이언트(가장 낮은 sessionId)만 수행. 비권한 탭이
   // 같이 돌리면 스냅샷 좌표와 싸워서 2창·멀티에서 튀는 현상이 난다.
@@ -11953,6 +12247,9 @@ function updateButterflies() {
       butterflyState.list.forEach(function (butterfly) {
         simulateButterflyAuthorityStep(butterfly, now);
       });
+      if (onlineAvailable && now - lastButterflyBroadcastAt >= butterflyBroadcastMs) {
+        broadcastButterflyState(now);
+      }
     }
   }
   // 비권한: 스냅샷의 butterfly.x/y(권한이 넣은 위치+플러터)만 부드럽게 따라감.
@@ -12073,6 +12370,32 @@ function getButterflyStateForSnapshot() {
       };
     })
   };
+}
+
+function broadcastButterflyState(now) {
+  if (!multiplayerChannel || !currentSessionId) return;
+  lastButterflyBroadcastAt = now;
+  lastButterflyStateChangeAt = now;
+  markWorldDirty();
+  Promise.resolve(multiplayerChannel.send({
+    type: "broadcast",
+    event: "butterfly_state",
+    payload: {
+      id: currentSessionId,
+      sentAt: now,
+      butterflies: getButterflyStateForSnapshot()
+    }
+  })).catch(function () {
+    // World sync remains the fallback when realtime misses an update.
+  });
+}
+
+function handleRemoteButterflyStateBroadcast(payload) {
+  if (!payload || payload.id === currentSessionId) return;
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (isButterflyAuthority()) return;
+  const snapshot = payload.butterflies || payload;
+  applyButterflySnapshot(snapshot);
 }
 
 function applyButterflySnapshot(snapshotButterflies) {
