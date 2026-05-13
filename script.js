@@ -4389,6 +4389,7 @@ function loadAppleState() {
         typeof r.id !== "string" ||
         !Number.isFinite(Number(r.x)) ||
         !Number.isFinite(y) ||
+        Number(r.size) !== WORLD_ROCK_SIZE ||
         y < WORLD_ROCK_SPAWN_Y_MIN ||
         y > WORLD_ROCK_SPAWN_Y_MAX
       );

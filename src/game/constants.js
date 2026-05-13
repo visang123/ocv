@@ -131,7 +131,7 @@ export const WORLD_LOOSE_SEED_X = SEED_START_X;
 export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 /** 월드 땅에 흩어지는 회색 돌(나무 사과 size 10의 1/2) */
 export const WORLD_LOOSE_ROCK_COUNT = 25;
-export const WORLD_ROCK_SIZE = 5;
+export const WORLD_ROCK_SIZE = 14;
 /** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) */
 export const WORLD_ROCK_SPAWN_X_MARGIN = 18;
 export const WORLD_ROCK_SPAWN_Y_MIN = 8;

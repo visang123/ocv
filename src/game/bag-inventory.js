@@ -102,7 +102,8 @@ export function getBagItemDescriptor(itemKey) {
       bagType: "rock",
       butterflyColor: "",
       label: "\uB3CC",
-      iconHtml: '<span class="bag-slot-icon bag-slot-icon--rock" aria-hidden="true"></span>'
+      iconHtml:
+        '<img class="bag-slot-icon bag-slot-icon--rock" src="이미지/rock-icon.svg?v=20260512a" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "butterfly:brown") {
