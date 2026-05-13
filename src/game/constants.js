@@ -37,6 +37,12 @@ export const SIGN_START_X = 138;
 export const SIGN_START_Y = 268;
 export const SIGN_WIDTH = 38;
 export const SIGN_HEIGHT = 36;
+/** 스폰 포탈 — script.js setWorldPosition 과 동일 수식 */
+export const SPAWN_PORTAL_WIDTH = 30;
+export const SPAWN_PORTAL_HEIGHT = 44;
+export const SPAWN_PORTAL_X = SIGN_START_X - SPAWN_PORTAL_WIDTH - 24;
+export const SPAWN_PORTAL_Y = SIGN_START_Y + SIGN_HEIGHT - SPAWN_PORTAL_HEIGHT;
+
 export const GUIDE_BOOK_WIDTH = 23;
 export const GUIDE_BOOK_HEIGHT = 15;
 /** 땅의 책·씨앗·NPC를 한 덩어리로 왼쪽 이동(World px) */
@@ -45,13 +51,15 @@ const WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT = 40;
 const WORLD_BAG_EXTRA_SHIFT_LEFT = 14;
 /** 책 가로 위치용 기준 너비(스프라이트만 2/3로 줄여도 허브 가로 배치 유지) */
 const GUIDE_BOOK_LAYOUT_REF_WIDTH = 34;
-/** 책·씨앗 간격 계산용 기준 X(책 스프라이트만 옮길 때 씨앗·NPC는 이 좌표 기준 유지) */
+/** 책·씨앗 간격 계산용 기준 X(책 스프라이트 위치와 무관하게 씨앗·NPC 허브 유지) */
 const GUIDE_BOOK_BASE_START_X =
   40 + 10 * GUIDE_BOOK_LAYOUT_REF_WIDTH - WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT;
-/** 바닥 책(및 그 아래 가방) X만 왼쪽으로 — 씨앗·NPC는 이전 허브 좌표 유지 */
-const GROUND_HUB_SHIFT_BOOK_LEFT_PX = 20;
-/** 책 — 우물 오른쪽·지면에 안 묻도록 (책 너비 10칸 + 기준 40) */
-export const GUIDE_BOOK_START_X = GUIDE_BOOK_BASE_START_X - GROUND_HUB_SHIFT_BOOK_LEFT_PX;
+const WELL_CENTER_X = WELL_START_X + WELL_SIZE / 2;
+const SPAWN_PORTAL_CENTER_X = SPAWN_PORTAL_X + SPAWN_PORTAL_WIDTH / 2;
+/** 바닥 책 — 우물·포탈 각 중심 x의 가운데쯤(스프라이트 가로 중앙 정렬) */
+export const GUIDE_BOOK_START_X = Math.round(
+  (WELL_CENTER_X + SPAWN_PORTAL_CENTER_X) / 2 - GUIDE_BOOK_WIDTH / 2
+);
 export const GUIDE_BOOK_START_Y = 284;
 /** 책 아래 월드 가방(인벤토리 진입 오브젝트 예정) */
 export const WORLD_BAG_WIDTH = 21;

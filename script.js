@@ -49,6 +49,10 @@ import {
   SIGN_START_Y,
   SIGN_WIDTH,
   SIGN_HEIGHT,
+  SPAWN_PORTAL_WIDTH,
+  SPAWN_PORTAL_HEIGHT,
+  SPAWN_PORTAL_X,
+  SPAWN_PORTAL_Y,
   SEED_START_X,
   SEED_START_Y,
   GUIDE_BOOK_START_X,
@@ -900,10 +904,10 @@ const defaultZoom = 3.5;
 const maxZoom = 5;
 const zoomStep = 0.25;
 const wellState = createWellState(maxWellWater);
-const spawnPortalWidth = 30;
-const spawnPortalHeight = 44;
-const spawnPortalX = SIGN_START_X - spawnPortalWidth - 24;
-const spawnPortalY = SIGN_START_Y + SIGN_HEIGHT - spawnPortalHeight;
+const spawnPortalWidth = SPAWN_PORTAL_WIDTH;
+const spawnPortalHeight = SPAWN_PORTAL_HEIGHT;
+const spawnPortalX = SPAWN_PORTAL_X;
+const spawnPortalY = SPAWN_PORTAL_Y;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
 /** 나무 세로 허용 범위로 끌어올릴 때 프레임당 최대 변화 (순간이동 느낌 완화) */
