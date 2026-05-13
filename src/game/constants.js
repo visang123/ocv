@@ -30,7 +30,7 @@ export const TREE_CANOPY_RIGHT = BIG_TREE_X + BIG_TREE_WIDTH - 6;
 export const TREE_CANOPY_TOP = BIG_TREE_Y + 8;
 export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108;
 
-export const WELL_START_X = 320;
+export const WELL_START_X = 405;
 export const WELL_START_Y = 190;
 /** 안내판 — 책·씨앗·NPC와 간격을 두기 위해 약간 왼쪽·위로 */
 export const SIGN_START_X = 138;
@@ -129,6 +129,13 @@ export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
  */
 export const WORLD_LOOSE_SEED_X = SEED_START_X;
 export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
+/** 월드 땅에 흩어지는 회색 돌(나무 사과 size 10의 1/2) */
+export const WORLD_LOOSE_ROCK_COUNT = 25;
+export const WORLD_ROCK_SIZE = 5;
+/** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) */
+export const WORLD_ROCK_SPAWN_X_MARGIN = 18;
+export const WORLD_ROCK_SPAWN_Y_MIN = 250;
+export const WORLD_ROCK_SPAWN_Y_MAX = 316;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 

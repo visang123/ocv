@@ -1,6 +1,8 @@
 import {
   WORLD_LOOSE_SEED_X,
-  WORLD_LOOSE_SEED_Y
+  WORLD_LOOSE_SEED_Y,
+  WORLD_LOOSE_ROCK_COUNT,
+  WORLD_ROCK_SIZE
 } from "./constants.js";
 
 let storagePrefix = "";
@@ -224,10 +226,44 @@ export function saveSeedStateToStorage(config) {
   setStoredValue(config.seedPlantedStateKey, JSON.stringify(config.plantedState));
 }
 
+function normalizeSavedWorldRocks(saved, createRandomWorldRocks) {
+  if (typeof createRandomWorldRocks !== "function") {
+    return { worldRocks: [], worldRockPickedIds: [] };
+  }
+  const fresh = createRandomWorldRocks();
+  if (!saved || !Array.isArray(saved.worldRocks) || saved.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT) {
+    return { worldRocks: fresh, worldRockPickedIds: [] };
+  }
+  const worldRocks = saved.worldRocks.map(function (rockData, index) {
+    const fallback = fresh[index] || {
+      id: "ground-rock-" + (index + 1),
+      x: 40,
+      y: 260,
+      size: WORLD_ROCK_SIZE
+    };
+    return {
+      id: String(rockData.id || fallback.id),
+      x: Number.isFinite(Number(rockData.x)) ? Number(rockData.x) : fallback.x,
+      y: Number.isFinite(Number(rockData.y)) ? Number(rockData.y) : fallback.y,
+      size: Number.isFinite(Number(rockData.size)) ? Number(rockData.size) : WORLD_ROCK_SIZE
+    };
+  });
+  const validIds = new Set(worldRocks.map(function (r) {
+    return r.id;
+  }));
+  const worldRockPickedIds = Array.isArray(saved.worldRockPickedIds)
+    ? saved.worldRockPickedIds.filter(function (id) {
+        return validIds.has(String(id));
+      })
+    : [];
+  return { worldRocks, worldRockPickedIds };
+}
+
 export function loadAppleStateFromStorage(config) {
   const savedRaw = getStoredValue(config.appleStateKey);
 
   if (!savedRaw) {
+    const rocksEmpty = normalizeSavedWorldRocks(null, config.createRandomWorldRocks);
     return {
       hasSavedState: false,
       parseFailed: false,
@@ -243,7 +279,9 @@ export function loadAppleStateFromStorage(config) {
         x: WORLD_LOOSE_SEED_X,
         y: WORLD_LOOSE_SEED_Y,
         nextSpawnAt: 0
-      }
+      },
+      worldRocks: rocksEmpty.worldRocks,
+      worldRockPickedIds: rocksEmpty.worldRockPickedIds
     };
   }
 
@@ -285,6 +323,8 @@ export function loadAppleStateFromStorage(config) {
             y: WORLD_LOOSE_SEED_Y,
             nextSpawnAt: 0
           };
+
+    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks);
 
     return {
       hasSavedState: true,
@@ -384,10 +424,13 @@ export function loadAppleStateFromStorage(config) {
             };
           })
         : [],
-      worldLooseSeed
+      worldLooseSeed,
+      worldRocks: worldRockParts.worldRocks,
+      worldRockPickedIds: worldRockParts.worldRockPickedIds
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
+    const rocksCatch = normalizeSavedWorldRocks(null, config.createRandomWorldRocks);
     return {
       hasSavedState: false,
       parseFailed: true,
@@ -403,7 +446,9 @@ export function loadAppleStateFromStorage(config) {
         x: WORLD_LOOSE_SEED_X,
         y: WORLD_LOOSE_SEED_Y,
         nextSpawnAt: 0
-      }
+      },
+      worldRocks: rocksCatch.worldRocks,
+      worldRockPickedIds: rocksCatch.worldRockPickedIds
     };
   }
 }
@@ -489,6 +534,15 @@ export function saveAppleStateToStorage(config) {
               : null
         };
       }),
+      worldRocks: (config.worldRocks || []).map(function (rock) {
+        return {
+          id: rock.id,
+          x: Number(rock.x) || 0,
+          y: Number(rock.y) || 0,
+          size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : WORLD_ROCK_SIZE
+        };
+      }),
+      worldRockPickedIds: Array.isArray(config.worldRockPickedIds) ? config.worldRockPickedIds : [],
       worldLooseSeed: worldLooseSeedOut
     })
   );

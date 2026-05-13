@@ -71,6 +71,11 @@ import {
   WORLD_LOOSE_SEED_ID,
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
+  WORLD_LOOSE_ROCK_COUNT,
+  WORLD_ROCK_SIZE,
+  WORLD_ROCK_SPAWN_X_MARGIN,
+  WORLD_ROCK_SPAWN_Y_MIN,
+  WORLD_ROCK_SPAWN_Y_MAX,
   getMinPlantCenterClearanceWorld,
   biggerSproutMs,
   sproutStage1Ms,
@@ -1568,6 +1573,11 @@ if (bagInventoryPanel) {
       event.preventDefault();
       event.stopPropagation();
       eatApple();
+      return;
+    }
+    if (kind === "rock") {
+      event.preventDefault();
+      event.stopPropagation();
     }
   });
 }
@@ -3499,6 +3509,8 @@ function applyDefaultState(options) {
     y: WORLD_LOOSE_SEED_Y,
     nextSpawnAt: 0
   };
+  appleState.worldRocks = createRandomWorldRocks();
+  appleState.worldRockPickedIds = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
 
@@ -3568,6 +3580,7 @@ function applyDefaultState(options) {
   }
   updateApples();
   updateExtraSeedsAndPlants();
+  rebuildWorldRockDom();
 }
 
 function isNearPlantSpot() {
@@ -3769,11 +3782,35 @@ function tryPickSharedBucket(bucketDistance) {
 }
 
 /**
- * World hub: tutorial 땅 #seed 줍기는 없음. worldLooseSeed(합성 후보) + extraSeeds + 양동이만.
+ * World hub: worldLooseSeed(합성 후보) + extraSeeds + 땅 돌 + 양동이.
  */
 function pickUpNearestItemWorldHub(bucketDistance) {
   const nearest = getNearestPickableExtraSeed();
   const extraDist = nearest ? nearest.distance : Infinity;
+  const nearestRock = getNearestPickableWorldRock();
+  const rockDist = nearestRock ? nearestRock.distance : Infinity;
+
+  if (
+    nearestRock &&
+    rockDist < extraDist &&
+    rockDist <= pickupDistance &&
+    rockDist <= bucketDistance
+  ) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+    if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
+      appleState.worldRockPickedIds.push(nearestRock.rock.id);
+    }
+    saveAppleState();
+    holdLocalAppleStateAgainstStaleSnapshot(1200);
+    updateWorldRocks();
+    updateBagInventorySlots();
+    markWorldDirty();
+    return;
+  }
+
   if (
     nearest &&
     extraDist <= pickupDistance &&
@@ -3825,11 +3862,14 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     : Infinity;
   const nearest = getNearestPickableExtraSeed();
   const extraDist = nearest ? nearest.distance : Infinity;
+  const nearestRock = getNearestPickableWorldRock();
+  const rockDist = nearestRock ? nearestRock.distance : Infinity;
 
   if (
     tutorialMainDist <= pickupDistance &&
     tutorialMainDist <= bucketDistance &&
-    tutorialMainDist <= extraDist
+    tutorialMainDist <= extraDist &&
+    tutorialMainDist <= rockDist
   ) {
     if (isOnboardingLinearGateActive() && onboardingFlowStep !== 6) {
       flashOnboardingOrderHint("");
@@ -3839,6 +3879,26 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     updateSeedPosition();
     updateSeedInventory();
     triggerFirstSeedFocus();
+    return;
+  }
+
+  if (
+    nearestRock &&
+    rockDist < extraDist &&
+    rockDist <= pickupDistance &&
+    rockDist <= bucketDistance
+  ) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+      flashOnboardingOrderHint("");
+      return;
+    }
+    if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
+      appleState.worldRockPickedIds.push(nearestRock.rock.id);
+    }
+    saveAppleState();
+    holdLocalAppleStateAgainstStaleSnapshot(1200);
+    updateWorldRocks();
+    updateBagInventorySlots();
     return;
   }
 
@@ -3947,6 +4007,56 @@ function getNearestPickableExtraSeed() {
   return nearest;
 }
 
+function getNearestPickableWorldRock() {
+  if (!isWorldDocumentEntry()) return null;
+  if (!Array.isArray(appleState.worldRocks) || !Array.isArray(appleState.worldRockPickedIds)) {
+    return null;
+  }
+  let nearest = null;
+  let bestDist = Infinity;
+  appleState.worldRocks.forEach(function (rock) {
+    if (appleState.worldRockPickedIds.includes(rock.id)) return;
+    const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+    const distance = getCenterDistance(rock.x, rock.y, sz, sz);
+    if (distance < bestDist) {
+      bestDist = distance;
+      nearest = { rock, distance };
+    }
+  });
+  return nearest;
+}
+
+function rebuildWorldRockDom() {
+  if (!ground || !player) return;
+  ground.querySelectorAll(".world-ground-rock").forEach(function (node) {
+    node.remove();
+  });
+  if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldRocks)) return;
+  appleState.worldRocks.forEach(function (rock) {
+    const el = document.createElement("div");
+    el.className = "world-ground-rock";
+    el.dataset.rockId = rock.id;
+    el.setAttribute("aria-hidden", "true");
+    ground.insertBefore(el, player);
+    rock._el = el;
+  });
+  updateWorldRocks();
+}
+
+function updateWorldRocks() {
+  if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldRocks)) return;
+  appleState.worldRocks.forEach(function (rock) {
+    if (!rock._el) return;
+    const picked = appleState.worldRockPickedIds.includes(rock.id);
+    rock._el.style.display = picked ? "none" : "block";
+    if (!picked) {
+      const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+      setWorldSize(rock._el, sz, sz);
+      setWorldPosition(rock._el, rock.x, rock.y);
+    }
+  });
+}
+
 function pickApple() {
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 23) {
     return false;
@@ -4012,6 +4122,7 @@ function updateApples() {
 
   syncGuideInventoryBar();
   updateBagInventorySlots();
+  updateWorldRocks();
 }
 
 function eatApple() {
@@ -4126,6 +4237,36 @@ function createRandomApple(id) {
   };
 }
 
+function createRandomWorldRocks() {
+  const count = WORLD_LOOSE_ROCK_COUNT;
+  const size = WORLD_ROCK_SIZE;
+  const margin = WORLD_ROCK_SPAWN_X_MARGIN;
+  const yMin = WORLD_ROCK_SPAWN_Y_MIN;
+  const yMax = WORLD_ROCK_SPAWN_Y_MAX;
+  const rocks = [];
+  for (let i = 0; i < count; i += 1) {
+    let x = margin;
+    let y = yMin;
+    for (let attempt = 0; attempt < 48; attempt += 1) {
+      x = margin + Math.floor(Math.random() * Math.max(8, WORLD_WIDTH - 2 * margin - size));
+      y = yMin + Math.floor(Math.random() * Math.max(8, yMax - yMin - size));
+      const clash = rocks.some(function (other) {
+        return Math.abs(other.x - x) < 10 && Math.abs(other.y - y) < 10;
+      });
+      if (!clash) {
+        break;
+      }
+    }
+    rocks.push({
+      id: "ground-rock-" + (i + 1),
+      x,
+      y,
+      size
+    });
+  }
+  return rocks;
+}
+
 function isAppleInTrunkArea(localX, localY, size) {
   const trunkLocalLeft = TREE_TRUNK_X - BIG_TREE_X;
   const trunkLocalRight = trunkLocalLeft + TREE_TRUNK_WIDTH;
@@ -4191,7 +4332,8 @@ function loadAppleState() {
     bigTreeY: BIG_TREE_Y,
     now: Date.now(),
     defaultSeedLabel: "\uC528\uC557",
-    createRandomApples
+    createRandomApples,
+    createRandomWorldRocks
   });
 
   appleState.count = loaded.appleCount;
@@ -4213,6 +4355,12 @@ function loadAppleState() {
         y: WORLD_LOOSE_SEED_Y,
         nextSpawnAt: 0
       };
+  appleState.worldRocks = Array.isArray(loaded.worldRocks) ? loaded.worldRocks : [];
+  appleState.worldRockPickedIds = Array.isArray(loaded.worldRockPickedIds)
+    ? loaded.worldRockPickedIds.map(String).filter(function (id, idx, arr) {
+        return arr.indexOf(id) === idx;
+      })
+    : [];
   ensureWorldLooseSeedShape();
   if (usesWorldLooseSeedMode()) {
     let migrateInvToCount = 0;
@@ -4243,7 +4391,9 @@ function loadAppleState() {
         lastAppleSpawnAt: appleState.lastSpawnAt,
         extraSeeds: appleState.extraSeeds,
         extraPlants: appleState.extraPlants,
-        worldLooseSeed: appleState.worldLooseSeed
+        worldLooseSeed: appleState.worldLooseSeed,
+        worldRocks: appleState.worldRocks,
+        worldRockPickedIds: appleState.worldRockPickedIds
       });
     }
   }
@@ -4254,6 +4404,7 @@ function loadAppleState() {
     clearExtraSeedAndPlantElements();
   }
 
+  rebuildWorldRockDom();
   updateApples();
   updateExtraSeedsAndPlants();
   updateSeedPosition();
@@ -4272,7 +4423,9 @@ function saveAppleState() {
     lastAppleSpawnAt: appleState.lastSpawnAt,
     extraSeeds: appleState.extraSeeds,
     extraPlants: appleState.extraPlants,
-    worldLooseSeed: appleState.worldLooseSeed
+    worldLooseSeed: appleState.worldLooseSeed,
+    worldRocks: appleState.worldRocks,
+    worldRockPickedIds: appleState.worldRockPickedIds
   });
   markWorldDirty();
 }
@@ -6294,10 +6447,41 @@ function shouldPauseWaterDecayForPlant(plant, now) {
   return isSproutStage3Or5IdleNoGrowth(plant, now);
 }
 
-function syncPlantCardWaterReadoutVisibility() {
+const stage3CompleteMagicHint = "\uC131\uC7A5 \uC644\uB8CC, \uB354 \uD0A4\uC6B0\uB824\uBA74 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \uD544\uC694.";
+
+function isStage3CompleteAwaitingMagicPowder(plant) {
+  if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
+    return false;
+  }
+  if (isPowderUpgradeInProgress(plant)) return false;
+  return getSproutStageFromPlant(plant) === 3 && getNextPowderTargetTier(plant) > 0;
+}
+
+function syncPlantCardWaterReadoutVisibility(showWater) {
   if (!plantWaterText || !plantWaterBar) return;
+  const shouldShowWater = showWater !== false;
   plantWaterText.style.display = "";
-  plantWaterBar.style.display = "grid";
+  plantWaterText.classList.toggle("is-plant-card-hint", !shouldShowWater);
+  plantWaterBar.style.display = shouldShowWater ? "grid" : "none";
+}
+
+function renderPlantCardForPlant(plant) {
+  const showMagicHint = isStage3CompleteAwaitingMagicPowder(plant);
+  if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
+  plantCard.classList.toggle("is-dry", plant.status === "dry");
+  plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
+  if (showMagicHint) {
+    plantWaterText.textContent = stage3CompleteMagicHint;
+    syncPlantCardWaterReadoutVisibility(false);
+    return;
+  }
+  const waterCapacity = getPlantWaterCapacity(plant);
+  plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plant.waterLevel + "/" + waterCapacity;
+  plantWaterSegments.forEach(function (segment, index) {
+    segment.style.display = index < waterCapacity ? "block" : "none";
+    segment.classList.toggle("is-filled", index < plant.waterLevel);
+  });
+  syncPlantCardWaterReadoutVisibility(true);
 }
 
 function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
@@ -6384,6 +6568,7 @@ function getBagInventoryCountsByKey() {
     book: hasGuideBookItemInBagCounts() ? 1 : 0,
     seed: getBagInventorySeedCount(),
     apple: Math.max(0, Number(appleState.count) || 0),
+    rock: Math.max(0, appleState.worldRockPickedIds ? appleState.worldRockPickedIds.length : 0),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
     "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
     "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
@@ -7596,6 +7781,7 @@ function hidePlantHoverLabel() {
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   if (plantHoverLabel) {
     plantHoverLabel.classList.remove("is-seed-inventory-hint");
+    plantHoverLabel.classList.remove("is-stage3-complete");
     plantHoverLabel.style.display = "none";
   }
 }
@@ -7611,7 +7797,9 @@ function showPlantHoverForPlant(plant) {
     hidePlantHoverLabel();
     return;
   }
-  plantHoverLabel.textContent = label;
+  const showMagicHint = isStage3CompleteAwaitingMagicPowder(plant);
+  plantHoverLabel.classList.toggle("is-stage3-complete", showMagicHint);
+  plantHoverLabel.textContent = showMagicHint ? label + "\n" + stage3CompleteMagicHint : label;
   plantHoverLabel.style.display = "block";
   function placeHoverLabelCentered() {
     const anchor = getPlantHoverAnchorWorld(plant);
@@ -8592,16 +8780,7 @@ function updatePlantCard() {
     }
 
     plantCard.style.display = "block";
-    if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plant);
-    plantCard.classList.toggle("is-dry", plant.status === "dry");
-    plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
-    const waterCapacity = getPlantWaterCapacity(plant);
-    plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plant.waterLevel + "/" + waterCapacity;
-    plantWaterSegments.forEach(function (segment, index) {
-      segment.style.display = index < waterCapacity ? "block" : "none";
-      segment.classList.toggle("is-filled", index < plant.waterLevel);
-    });
-    syncPlantCardWaterReadoutVisibility();
+    renderPlantCardForPlant(plant);
     return;
   }
 
@@ -8620,17 +8799,7 @@ function updatePlantCard() {
   }
 
   plantCard.style.display = "block";
-  if (plantCardTitle) plantCardTitle.textContent = getPlantWorldLabel(plantRuntime);
-  plantCard.classList.toggle("is-dry", plantRuntime.status === "dry");
-  plantCard.classList.toggle("is-overwatered", plantRuntime.isOverwatered);
-  const waterCapacity = getPlantWaterCapacity(plantRuntime);
-  plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plantRuntime.waterLevel + "/" + waterCapacity;
-
-  plantWaterSegments.forEach(function (segment, index) {
-    segment.style.display = index < waterCapacity ? "block" : "none";
-    segment.classList.toggle("is-filled", index < plantRuntime.waterLevel);
-  });
-  syncPlantCardWaterReadoutVisibility();
+  renderPlantCardForPlant(plantRuntime);
 
 }
 
@@ -12033,6 +12202,7 @@ function setup() {
   updateSeedPosition();
   updateBucketPosition();
   updatePlantState();
+  updateWorldRocks();
 }
 
 try {

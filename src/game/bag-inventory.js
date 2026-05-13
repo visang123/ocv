@@ -2,6 +2,7 @@ export const BAG_SLOT_ITEM_KEYS = [
   "book",
   "seed",
   "apple",
+  "rock",
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"
@@ -94,6 +95,14 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC0AC\uACFC",
       iconHtml: '<span class="bag-slot-icon bag-slot-icon--apple" aria-hidden="true"></span>'
+    };
+  }
+  if (itemKey === "rock") {
+    return {
+      bagType: "rock",
+      butterflyColor: "",
+      label: "\uB3CC",
+      iconHtml: '<span class="bag-slot-icon bag-slot-icon--rock" aria-hidden="true"></span>'
     };
   }
   if (itemKey === "butterfly:brown") {

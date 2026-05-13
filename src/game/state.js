@@ -26,7 +26,9 @@ export function createAppleState(initialApples) {
       x: WORLD_LOOSE_SEED_X,
       y: WORLD_LOOSE_SEED_Y,
       nextSpawnAt: 0
-    }
+    },
+    worldRocks: [],
+    worldRockPickedIds: []
   };
 }
 
