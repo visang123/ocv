@@ -171,9 +171,9 @@ export const butterflyFrameCount = 5;
 export const butterflyFrameMs = 140;
 /** Butterfly speed in world pixels per game frame (player speed is 1). */
 export const butterflySpeed = 1.2;
-/** How long it takes a butterfly to drift to a fresh waypoint, in ms. */
-export const butterflyLegMinMs = 2400;
-export const butterflyLegMaxMs = 5200;
+/** 한 구간 최대 체류(ms). 최소는 script `ensureButterflyWaypoint`에서 거리 비례로 둠(짧은 구간 2초 고정 방지). */
+export const butterflyLegMinMs = 900;
+export const butterflyLegMaxMs = 5600;
 /** Visible bob on top of waypoint path (short periods so motion never looks frozen). */
 export const butterflyFlutterPeriodHorizontalMs = 2800;
 export const butterflyFlutterPeriodVerticalMs = 3400;

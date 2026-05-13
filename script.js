@@ -118,7 +118,6 @@ import {
   butterflyFrameCount,
   butterflyFrameMs,
   butterflySpeed,
-  butterflyLegMinMs,
   butterflyLegMaxMs,
   butterflyFlutterPeriodHorizontalMs,
   butterflyFlutterPeriodVerticalMs,
@@ -4324,6 +4323,22 @@ function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
   return false;
 }
 
+function addPlantWorldRockAvoidZone(zones, plant, pad) {
+  const px = Number(plant && (plant.x != null ? plant.x : plant.spotX));
+  const py = Number(plant && (plant.y != null ? plant.y : plant.spotY));
+  const maturity = getPlantMaturityLevelForPlantingSpacing(plant);
+  if (!Number.isFinite(px) || !Number.isFinite(py) || maturity == null) return;
+  const centerX = px + PLANT_SPOT_WIDTH / 2;
+  const centerY = py + PLANT_SPOT_HEIGHT / 2;
+  const radius = getMinPlantCenterClearanceWorld(maturity) + WORLD_ROCK_SIZE / 2 + pad;
+  zones.push({
+    left: centerX - radius,
+    top: centerY - radius,
+    right: centerX + radius,
+    bottom: centerY + radius
+  });
+}
+
 function collectWorldRockAvoidZones(ctx) {
   const p = WORLD_ROCK_UI_CLEAR_PAD;
   const zones = [];
@@ -4407,18 +4422,11 @@ function collectWorldRockAvoidZones(ctx) {
   const extraPlants = (ctx && ctx.extraPlants) || [];
   extraPlants.forEach(function (plant) {
     if (!plant || plant.removed) return;
-    const px = Number(plant.x);
-    const py = Number(plant.y);
-    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
-    zones.push(expandWorldRockAvoidRect(px, py, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT, p));
+    addPlantWorldRockAvoidZone(zones, plant, p);
   });
 
   if (ctx && ctx.plantSpot) {
-    const psx = Number(ctx.plantSpot.x);
-    const psy = Number(ctx.plantSpot.y);
-    if (Number.isFinite(psx) && Number.isFinite(psy)) {
-      zones.push(expandWorldRockAvoidRect(psx, psy, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT, p));
-    }
+    addPlantWorldRockAvoidZone(zones, ctx.plantSpot, p);
   }
 
   return zones;
@@ -4435,7 +4443,14 @@ function buildWorldRockSpawnContext() {
       Number.isFinite(plantRuntime.spotX) &&
       Number.isFinite(plantRuntime.spotY) &&
       (plantRuntime.spotX !== 0 || plantRuntime.spotY !== 0)
-        ? { x: plantRuntime.spotX, y: plantRuntime.spotY }
+        ? {
+            x: plantRuntime.spotX,
+            y: plantRuntime.spotY,
+            growthTier: plantRuntime.growthTier,
+            isSproutGrown: plantRuntime.isSproutGrown,
+            sproutStage: plantRuntime.sproutStage,
+            removed: false
+          }
         : null
   };
 }
@@ -5499,6 +5514,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (Array.isArray(sr) && sr.length === WORLD_LOOSE_ROCK_COUNT) {
           const m = WORLD_ROCK_SPAWN_X_MARGIN;
           const xMax = WORLD_WIDTH - m - WORLD_ROCK_SIZE;
+          const rockValidateZones = collectWorldRockAvoidZones(buildWorldRockSpawnContext());
           const rocksOk = sr.every(function (r) {
             if (!r || typeof r.id !== "string") return false;
             const x = Number(r.x);
@@ -5511,7 +5527,8 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
               x >= m &&
               x <= xMax &&
               y >= WORLD_ROCK_SPAWN_Y_MIN &&
-              y <= WORLD_ROCK_SPAWN_Y_MAX
+              y <= WORLD_ROCK_SPAWN_Y_MAX &&
+              !worldRockOverlapsAnyAvoidRect(worldRockRect(x, y, WORLD_ROCK_SIZE), rockValidateZones)
             );
           });
           if (rocksOk) {
@@ -8156,6 +8173,22 @@ function plantSpotOverlapsExpandedRect(plantX, plantY, ox, oy, ow, oh, pad) {
   return isOverlappingRect(pr, br);
 }
 
+function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY) {
+  if (!isWorldDocumentEntry()) return false;
+  if (!Array.isArray(appleState.worldRocks)) return false;
+  const pickedIds = Array.isArray(appleState.worldRockPickedIds)
+    ? appleState.worldRockPickedIds
+    : [];
+  return appleState.worldRocks.some(function (rock) {
+    if (!rock || pickedIds.includes(rock.id)) return false;
+    const rx = Number(rock.x);
+    const ry = Number(rock.y);
+    const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+    if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
+    return plantSpotOverlapsExpandedRect(plantX, plantY, rx, ry, sz, sz, 0);
+  });
+}
+
 function plantProximityPhraseForNoun(noun) {
   const ch = noun.length ? noun[noun.length - 1] : "";
   const code = ch.charCodeAt(0);
@@ -8270,6 +8303,10 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   });
   if (blockedByLooseSeed) {
     return plantProximityPhraseForNoun("\uC528\uC557");
+  }
+
+  if (isPlantSpotOverlappingVisibleWorldRock(plantX, plantY)) {
+    return plantProximityPhraseForNoun("\uB3CC");
   }
 
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
@@ -11756,13 +11793,13 @@ function ensureButterflyWaypoint(butterfly, now) {
     const dx = target.x - butterfly.x;
     const dy = target.y - butterfly.y;
     const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    // Pixels-per-frame to ms-per-pixel @ ~60fps.
+    // Pixels-per-frame to ms @ ~60fps. 짧은 다리에도 2.4s를 강제하면 거의 제자리에 멈춘 것처럼 보임 → 거리 비례 + 낮은 바닥.
     const msPerFrame = 1000 / 60;
     const baseDuration = (distance / butterflySpeed) * msPerFrame;
-    const jitter =
-      butterflyLegMinMs +
-      Math.random() * (butterflyLegMaxMs - butterflyLegMinMs);
-    const duration = Math.max(butterflyLegMinMs, Math.min(butterflyLegMaxMs, baseDuration + jitter * 0.25));
+    const wander = 140 + Math.random() * 420;
+    const duration = Math.round(
+      Math.max(520, Math.min(butterflyLegMaxMs, baseDuration * (0.9 + Math.random() * 0.28) + wander))
+    );
     waypoint = {
       startX: butterfly.x,
       startY: butterfly.y,

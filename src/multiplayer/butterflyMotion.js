@@ -32,7 +32,8 @@ export function simulateButterflyAuthorityStep(butterfly, now, options) {
   waypoint = options.ensureWaypoint(butterfly, now);
   const total = Math.max(1, waypoint.endAt - waypoint.startAt);
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
-  const eased = t;
+  /** smoothstep — 구간 양끝에서 속도 0에 가깝게 해 이전/다음 다리와 덜 “뚝” 끊기게 */
+  const eased = t * t * (3 - 2 * t);
   const pathX = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
   const pathY = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
   const previousPathX = Number.isFinite(Number(butterfly.lastPathX))
