@@ -227,15 +227,15 @@ export function saveSeedStateToStorage(config) {
 }
 
 function normalizeSavedWorldRocks(saved, createRandomWorldRocks, rockSpawnContext) {
-  if (typeof createRandomWorldRocks !== "function") {
-    return { worldRocks: [], worldRockPickedIds: [] };
-  }
-  const fresh = createRandomWorldRocks(rockSpawnContext);
   if (!saved || !Array.isArray(saved.worldRocks) || saved.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT) {
+    if (typeof createRandomWorldRocks !== "function") {
+      return { worldRocks: [], worldRockPickedIds: [] };
+    }
+    const fresh = createRandomWorldRocks(rockSpawnContext);
     return { worldRocks: fresh, worldRockPickedIds: [] };
   }
   const worldRocks = saved.worldRocks.map(function (rockData, index) {
-    const fallback = fresh[index] || {
+    const fallback = {
       id: "ground-rock-" + (index + 1),
       x: 40,
       y: 260,
@@ -324,13 +324,7 @@ export function loadAppleStateFromStorage(config) {
             nextSpawnAt: 0
           };
 
-    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks, {
-      apples,
-      worldLooseSeed,
-      extraSeeds,
-      extraPlants,
-      plantSpot: config.plantSpotForRocks || null
-    });
+    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks, null);
 
     return {
       hasSavedState: true,

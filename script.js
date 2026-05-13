@@ -4592,32 +4592,6 @@ function loadAppleState() {
         return arr.indexOf(id) === idx;
       })
     : [];
-  const rockValidateCtx = buildWorldRockSpawnContext();
-  const rockValidateZones = collectWorldRockAvoidZones(rockValidateCtx);
-  if (
-    appleState.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT ||
-    appleState.worldRocks.some(function (r) {
-      const x = Number(r && r.x);
-      const y = Number(r && r.y);
-      const m = WORLD_ROCK_SPAWN_X_MARGIN;
-      const xMax = WORLD_WIDTH - m - WORLD_ROCK_SIZE;
-      return (
-        !r ||
-        typeof r.id !== "string" ||
-        !Number.isFinite(x) ||
-        !Number.isFinite(y) ||
-        Number(r.size) !== WORLD_ROCK_SIZE ||
-        x < m ||
-        x > xMax ||
-        y < WORLD_ROCK_SPAWN_Y_MIN ||
-        y > WORLD_ROCK_SPAWN_Y_MAX ||
-        worldRockOverlapsAnyAvoidRect(worldRockRect(x, y, WORLD_ROCK_SIZE), rockValidateZones)
-      );
-    })
-  ) {
-    appleState.worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
-    appleState.worldRockPickedIds = [];
-  }
   ensureWorldLooseSeedShape();
   if (usesWorldLooseSeedMode()) {
     let migrateInvToCount = 0;
@@ -5544,7 +5518,6 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (Array.isArray(sr) && sr.length === WORLD_LOOSE_ROCK_COUNT) {
           const m = WORLD_ROCK_SPAWN_X_MARGIN;
           const xMax = WORLD_WIDTH - m - WORLD_ROCK_SIZE;
-          const rockValidateZones = collectWorldRockAvoidZones(buildWorldRockSpawnContext());
           const rocksOk = sr.every(function (r) {
             if (!r || typeof r.id !== "string") return false;
             const x = Number(r.x);
@@ -5557,8 +5530,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
               x >= m &&
               x <= xMax &&
               y >= WORLD_ROCK_SPAWN_Y_MIN &&
-              y <= WORLD_ROCK_SPAWN_Y_MAX &&
-              !worldRockOverlapsAnyAvoidRect(worldRockRect(x, y, WORLD_ROCK_SIZE), rockValidateZones)
+              y <= WORLD_ROCK_SPAWN_Y_MAX
             );
           });
           if (rocksOk) {
