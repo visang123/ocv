@@ -134,8 +134,8 @@ export const WORLD_LOOSE_ROCK_COUNT = 25;
 export const WORLD_ROCK_SIZE = 5;
 /** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) */
 export const WORLD_ROCK_SPAWN_X_MARGIN = 18;
-export const WORLD_ROCK_SPAWN_Y_MIN = 250;
-export const WORLD_ROCK_SPAWN_Y_MAX = 316;
+export const WORLD_ROCK_SPAWN_Y_MIN = 8;
+export const WORLD_ROCK_SPAWN_Y_MAX = GROUND_WORLD_HEIGHT - WORLD_ROCK_SIZE - 8;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 

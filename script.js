@@ -4383,7 +4383,15 @@ function loadAppleState() {
   if (
     appleState.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT ||
     appleState.worldRocks.some(function (r) {
-      return !r || typeof r.id !== "string";
+      const y = Number(r && r.y);
+      return (
+        !r ||
+        typeof r.id !== "string" ||
+        !Number.isFinite(Number(r.x)) ||
+        !Number.isFinite(y) ||
+        y < WORLD_ROCK_SPAWN_Y_MIN ||
+        y > WORLD_ROCK_SPAWN_Y_MAX
+      );
     })
   ) {
     appleState.worldRocks = createRandomWorldRocks();
@@ -6496,9 +6504,8 @@ function syncPlantCardWaterReadoutVisibility(showWater) {
 
 function renderPlantCardForPlant(plant) {
   if (getPlantSoilBadStateTitle(plant)) {
+    plantCard.style.display = "none";
     if (plantCardTitle) plantCardTitle.textContent = "";
-    plantCard.classList.toggle("is-dry", plant.status === "dry");
-    plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
     if (plantWaterText) {
       plantWaterText.textContent = "";
       plantWaterText.style.display = "none";
@@ -8859,21 +8866,6 @@ function updatePlantCard() {
 
     plantCard.style.display = "block";
     renderPlantCardForPlant(plantRuntime);
-    return;
-  }
-
-  if (badNear && badDist <= plantWaterDistance && badDist < goodDist) {
-    const plant = badNear.plant;
-    plantCard.style.display = "block";
-    if (plantCardTitle) plantCardTitle.textContent = "";
-    plantCard.classList.toggle("is-dry", plant.status === "dry");
-    plantCard.classList.toggle("is-overwatered", plant.isOverwatered);
-    if (plantWaterText) {
-      plantWaterText.textContent = "";
-      plantWaterText.style.display = "none";
-      plantWaterText.classList.remove("is-plant-card-hint");
-    }
-    if (plantWaterBar) plantWaterBar.style.display = "none";
     return;
   }
 

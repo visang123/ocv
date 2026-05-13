@@ -121,8 +121,12 @@ body::-webkit-scrollbar {
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid rgba(0, 0, 0, 0.22);
-  color: #111;
-  font: 900 12px/1.2 Arial, sans-serif;
+  color: #0c0c0c;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.38;
+  letter-spacing: 0.01em;
   text-align: center;
   white-space: nowrap;
   max-width: min(220px, 85vw);
