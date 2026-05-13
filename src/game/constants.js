@@ -91,8 +91,8 @@ export const plantGrowthTestEveryMs = 3 * SECOND_MS;
 /** 심은 뒤 첫 새싹이 나올 때까지(티어0·첫 새싹 전용이 아닌 구간·레거시 폴백) */
 export const plantGrowthMs = 3 * SECOND_MS;
 /** 빈 땅(씨만)·티어0 → 첫 새싹 표시까지: 수분 1칸 / 물0 후 마름 / 초록 성장 */
-export const firstSproutWaterLevelTickMs = 7 * SECOND_MS;
-export const firstSproutDryAfterEmptyMs = 10 * SECOND_MS;
+export const firstSproutWaterLevelTickMs = 20 * SECOND_MS;
+export const firstSproutDryAfterEmptyMs = 40 * SECOND_MS;
 export const firstSproutGrowthMs = 20 * SECOND_MS;
 /** 새싹 표시 1→2 단계 */
 export const sproutStage1Ms = 30 * SECOND_MS;
@@ -174,11 +174,11 @@ export const butterflySpeed = 1.2;
 /** 한 구간 최대 체류(ms). 최소는 script `ensureButterflyWaypoint`에서 거리 비례로 둠(짧은 구간 2초 고정 방지). */
 export const butterflyLegMinMs = 900;
 export const butterflyLegMaxMs = 5600;
-/** Visible bob on top of waypoint path (short periods so motion never looks frozen). */
-export const butterflyFlutterPeriodHorizontalMs = 2800;
-export const butterflyFlutterPeriodVerticalMs = 3400;
-export const butterflyFlutterAmplitudeX = 2;
-export const butterflyFlutterAmplitudeY = 2.2;
+/** Visible bob on top of waypoint path (multi-frequency in butterflyMotion.js). */
+export const butterflyFlutterPeriodHorizontalMs = 2400;
+export const butterflyFlutterPeriodVerticalMs = 3000;
+export const butterflyFlutterAmplitudeX = 2.35;
+export const butterflyFlutterAmplitudeY = 2.55;
 /** Time between auto-spawns when below the map cap, in ms. */
 export const butterflyRespawnMs = 2 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */

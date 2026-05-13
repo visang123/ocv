@@ -17,10 +17,18 @@ export function getButterflyFlutterOffsetWorld(now, butterfly, config) {
     }, 0) % 6283;
   const omegaX = (2 * Math.PI) / config.periodHorizontalMs;
   const omegaY = (2 * Math.PI) / config.periodVerticalMs;
-  return {
-    dx: Math.sin(now * omegaX + salt * 0.001) * config.amplitudeX,
-    dy: Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * config.amplitudeY
-  };
+  const ax = config.amplitudeX;
+  const ay = config.amplitudeY;
+  /** 큰 호흡 + 약간 빠른 고조파 → 경로가 거의 평행일 때도 화면상 “완전 정지”가 덜함 */
+  const dx =
+    Math.sin(now * omegaX + salt * 0.001) * ax +
+    Math.sin(now * omegaX * 2.21 + salt * 0.37) * (ax * 0.38) +
+    Math.sin(now * omegaX * 5.1 + salt * 0.11) * (ax * 0.12);
+  const dy =
+    Math.sin(now * omegaY + salt * 0.002 + Math.PI / 2) * ay +
+    Math.sin(now * omegaY * 2.47 + salt * 0.29) * (ay * 0.38) +
+    Math.sin(now * omegaY * 4.8 + salt * 0.19) * (ay * 0.12);
+  return { dx, dy };
 }
 
 export function simulateButterflyAuthorityStep(butterfly, now, options) {
@@ -32,8 +40,8 @@ export function simulateButterflyAuthorityStep(butterfly, now, options) {
   waypoint = options.ensureWaypoint(butterfly, now);
   const total = Math.max(1, waypoint.endAt - waypoint.startAt);
   const t = Math.max(0, Math.min(1, (now - waypoint.startAt) / total));
-  /** smoothstep — 구간 양끝에서 속도 0에 가깝게 해 이전/다음 다리와 덜 “뚝” 끊기게 */
-  const eased = t * t * (3 - 2 * t);
+  /** 선형 보간: 구간 끝에서 속도가 0으로 떨어지지 않아 “잠깐 멈춤” 체감이 smoothstep보다 적음 */
+  const eased = t;
   const pathX = waypoint.startX + (waypoint.targetX - waypoint.startX) * eased;
   const pathY = waypoint.startY + (waypoint.targetY - waypoint.startY) * eased;
   const previousPathX = Number.isFinite(Number(butterfly.lastPathX))

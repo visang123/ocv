@@ -4825,6 +4825,34 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
 }
 
 /** 우물 패시브 리필 틱과 맞춰 다른 클라와 lastRefillAt 해석이 어긋나 덮어쓰기가 반복되는 것을 줄임 */
+function sanitizePrematureRemotePlantDryState(plant, now) {
+  if (!plant || plant.status !== "dry") return;
+  const plantedAt = Number(plant.plantedAt);
+  if (!Number.isFinite(plantedAt) || plantedAt <= 0) return;
+  const ageAtSnapshot = Math.max(0, now - plantedAt);
+  const tickMs = getPlantWaterLevelTickMsForPlant(plant);
+  const dryAfterMs = getPlantDryAfterEmptyMsForPlantPhase(plant);
+  const minDryAge = tickMs + dryAfterMs;
+  if (
+    !Number.isFinite(tickMs) ||
+    !Number.isFinite(dryAfterMs) ||
+    tickMs <= 0 ||
+    dryAfterMs <= 0 ||
+    ageAtSnapshot >= minDryAge
+  ) {
+    return;
+  }
+
+  plant.status = "normal";
+  plant.needsFirstWater = false;
+  plant.blockSproutRegrowthAfterDry = false;
+  plant.drySoilAt = null;
+  plant.waterLevel = ageAtSnapshot < tickMs ? 1 : 0;
+  plant.waterLevelUpdatedAt = plant.waterLevel > 0 ? Math.max(1, now - ageAtSnapshot) : now;
+  plant.becameEmptyAt =
+    plant.waterLevel > 0 ? null : Math.max(1, now - Math.max(0, ageAtSnapshot - tickMs));
+}
+
 function snapWellRefillToGrid(nowMs) {
   const t = Number(nowMs);
   if (!Number.isFinite(t) || t <= 0) {
@@ -5233,6 +5261,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (plantRuntime.isSeedPlanted && snapshotRefTime > 0) {
           rebasePlantModelTimestampsToLocalNow(plantRuntime, localApplyNow, snapshotRefTime);
         }
+        sanitizePrematureRemotePlantDryState(plantRuntime, localApplyNow, snapshotRefTime);
         sanitizeSharedPlantHydrationAfterRemoteSnapshot(
           plantRuntime,
           localApplyNow,
@@ -5492,6 +5521,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (snapRefPlants > 0) {
           rebasePlantModelTimestampsToLocalNow(ep, extraPlantClockNow, snapRefPlants);
         }
+        sanitizePrematureRemotePlantDryState(ep, extraPlantClockNow, snapRefPlants);
         stabilizeFirstWaterHintFlags(ep);
         sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
         normalizePlantSproutFieldsWhenSoilDry(ep);
@@ -11589,8 +11619,8 @@ function pickRandomButterflySpawnPoint() {
 function pickButterflyWaypoint(fromX, fromY) {
   // Prefer local legs around current position to avoid "teleport-thinking"
   // path changes on remote clients when snapshots arrive out of phase.
-  const minLeg = 42;
-  const maxLeg = 150;
+  const minLeg = 56;
+  const maxLeg = 158;
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const angle = Math.random() * Math.PI * 2;
     const leg = minLeg + Math.random() * (maxLeg - minLeg);
