@@ -1495,7 +1495,54 @@ body::-webkit-scrollbar {
   white-space: nowrap;
 }
 
-/* --- 월드 멀티: 하트 + 채팅 (설정 왼쪽·위) --- */
+/* --- 월드 멀티: 슬퍼요(위) + 하트 + 채팅 (설정 왼쪽·위) --- */
+.world-sad-button {
+  position: fixed;
+  right: 14px;
+  bottom: 116px;
+  z-index: 211;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(30, 64, 175, 0.9), rgba(59, 130, 246, 0.88));
+  color: #fff;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.world-sad-button:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.5);
+}
+
+.world-sad-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.world-sad-button.ovc-sad-btn-pulse {
+  animation: ovc-sad-btn-pulse 0.55s ease-out 1;
+}
+
+@keyframes ovc-sad-btn-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.18);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 .world-heart-button {
   position: fixed;
   right: 14px;

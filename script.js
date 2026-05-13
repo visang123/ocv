@@ -747,6 +747,7 @@ let localChatBubbleTimer = null;
 const remoteChatBubbles = Object.create(null);
 const remoteChatBubbleEls = Object.create(null);
 let worldHeartBtn = null;
+let worldSadBtn = null;
 let worldChatToggleBtn = null;
 let worldChatPanelEl = null;
 let worldChatLogEl = null;
@@ -1338,6 +1339,49 @@ document.addEventListener("keydown", function (event) {
     return;
   }
 
+  if (
+    isWorldDocumentEntry() &&
+    hasSpawnedCharacter &&
+    !isCharacterSelecting &&
+    worldSocialUiReady
+  ) {
+    const ae = document.activeElement;
+    const typingInWorldChat = ae === worldChatInputEl;
+    const typingInOtherField =
+      ae &&
+      (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable) &&
+      !typingInWorldChat;
+    const overlaysBlockWorldSocialShortcuts =
+      (settingsOverlay && settingsOverlay.classList.contains("is-open")) ||
+      (controlsOverlay && controlsOverlay.classList.contains("is-open")) ||
+      isGuideBookOpen ||
+      (guideCard && guideCard.style.display === "block");
+
+    if (!typingInOtherField && !overlaysBlockWorldSocialShortcuts) {
+      if (event.code === "KeyC" && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (!typingInWorldChat) {
+          event.preventDefault();
+          toggleWorldChatPanel();
+          return;
+        }
+      }
+      if (event.code === "KeyH" && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (!typingInWorldChat) {
+          event.preventDefault();
+          onWorldHeartClick();
+          return;
+        }
+      }
+      if (event.code === "KeyS" && (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey) {
+        if (!event.repeat && !typingInWorldChat) {
+          event.preventDefault();
+          onWorldSadClick();
+          return;
+        }
+      }
+    }
+  }
+
   if (isWorldChatBlockingGameInput() && event.code !== "Escape") {
     return;
   }
@@ -1396,9 +1440,7 @@ document.addEventListener("keydown", function (event) {
   if (key === "Escape") {
     if (worldChatPanelOpen && worldChatPanelEl) {
       event.preventDefault();
-      worldChatPanelOpen = false;
-      worldChatPanelEl.classList.remove("is-open");
-      worldChatPanelEl.setAttribute("aria-hidden", "true");
+      setWorldChatPanelOpen(false);
       resetInputKeys(keys);
       isInteractKeyLatched = false;
       return;
@@ -1725,6 +1767,9 @@ characterSelectButton.addEventListener("click", function () {
 });
 
 const settingsButton = document.getElementById("settings-button");
+if (settingsButton) {
+  settingsButton.title = "설정: Esc";
+}
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsModal = document.getElementById("settings-modal");
 const changeColorButton = document.getElementById("change-color-button");
@@ -10116,6 +10161,22 @@ function isWorldChatBlockingGameInput() {
   return false;
 }
 
+function setWorldChatPanelOpen(nextOpen) {
+  worldChatPanelOpen = Boolean(nextOpen);
+  if (!worldChatPanelEl) return;
+  worldChatPanelEl.classList.toggle("is-open", worldChatPanelOpen);
+  worldChatPanelEl.setAttribute("aria-hidden", worldChatPanelOpen ? "false" : "true");
+  if (worldChatPanelOpen && worldChatInputEl) {
+    resetInputKeys(keys);
+    isInteractKeyLatched = false;
+    worldChatInputEl.focus();
+  }
+}
+
+function toggleWorldChatPanel() {
+  setWorldChatPanelOpen(!worldChatPanelOpen);
+}
+
 function sanitizeWorldChatText(raw) {
   let s = String(raw || "")
     .trim()
@@ -10222,6 +10283,26 @@ function broadcastWorldHeart() {
   return true;
 }
 
+function broadcastWorldSad() {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_sad",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId || "",
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        x: playerX,
+        depth: playerDepth,
+        jumpY: jumpY,
+        t: Date.now()
+      }
+    })
+  ).catch(function () {});
+  return true;
+}
+
 function handleWorldChatBroadcast(payload) {
   if (!payload || !payload.id) return;
   const sid = String(payload.id);
@@ -10259,6 +10340,31 @@ function handleWorldHeartBroadcast(payload) {
   });
 }
 
+function handleWorldSadBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  const rp = remotePlayers[sid];
+  if (!rp || !rp.bodyElement) return;
+  const px = Number(payload.x);
+  const depth = Number(payload.depth);
+  const jy = Number(payload.jumpY);
+  if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
+    const wy = -depth + jy;
+    setWorldPosition(rp.element, px, wy);
+    rp.worldX = px;
+    rp.worldY = wy;
+    rp.depth = depth;
+    rp.jumpY = jy;
+    rp.positionKey = Math.round(px * 10) + "|" + Math.round(wy * 10);
+  }
+  window.requestAnimationFrame(function () {
+    const rpp = remotePlayers[sid];
+    if (!rpp || !rpp.bodyElement) return;
+    spawnWorldSadFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
+  });
+}
+
 function spawnWorldHeartFxNearBodyRect(rect) {
   if (!rect || rect.width < 2 || rect.height < 2) return;
   const root = document.createElement("div");
@@ -10292,6 +10398,39 @@ function spawnWorldHeartFxNearBodyRect(rect) {
   }, WORLD_HEART_FX_MS + 200);
 }
 
+function spawnWorldSadFxNearBodyRect(rect) {
+  if (!rect || rect.width < 2 || rect.height < 2) return;
+  const root = document.createElement("div");
+  root.className = "ovc-heart-fx-root";
+  const inset = Math.max(1, 0.14 * rect.width);
+  const sx = rect.right - inset;
+  const sy = rect.top + Math.max(1, 0.12 * rect.height);
+  root.style.left = Math.round(sx) + "px";
+  root.style.top = Math.round(sy) + "px";
+  const spreadX = Math.max(18, rect.width * 0.95);
+  const rise = Math.max(14, rect.height * 0.28);
+  const spreadY = Math.max(20, rect.height * 0.72);
+  const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
+  const n = 9;
+  const faces = ["\uD83D\uDE22", "\uD83D\uDE2D", "\uD83D\uDE15", "\uD83E\uDD72", "\u2639\uFE0F"];
+  for (let i = 0; i < n; i++) {
+    const bit = document.createElement("span");
+    bit.className = "ovc-heart-fx-bit";
+    bit.textContent = faces[i % faces.length];
+    bit.style.fontSize = fontPx + "px";
+    const dx = (Math.random() - 0.35) * spreadX;
+    const dy = -rise - Math.random() * spreadY;
+    bit.style.setProperty("--ovc-hx", dx + "px");
+    bit.style.setProperty("--ovc-hy", dy + "px");
+    bit.style.animationDelay = i * 0.05 + "s";
+    root.appendChild(bit);
+  }
+  document.body.appendChild(root);
+  window.setTimeout(function () {
+    if (root.parentNode) root.parentNode.removeChild(root);
+  }, WORLD_HEART_FX_MS + 200);
+}
+
 function pulseWorldHeartButton() {
   if (!worldHeartBtn) return;
   worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
@@ -10299,6 +10438,16 @@ function pulseWorldHeartButton() {
   worldHeartBtn.classList.add("ovc-heart-btn-pulse");
   window.setTimeout(function () {
     if (worldHeartBtn) worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
+  }, 600);
+}
+
+function pulseWorldSadButton() {
+  if (!worldSadBtn) return;
+  worldSadBtn.classList.remove("ovc-sad-btn-pulse");
+  void worldSadBtn.offsetWidth;
+  worldSadBtn.classList.add("ovc-sad-btn-pulse");
+  window.setTimeout(function () {
+    if (worldSadBtn) worldSadBtn.classList.remove("ovc-sad-btn-pulse");
   }, 600);
 }
 
@@ -10310,6 +10459,7 @@ function updateWorldSocialChatUiEnabled() {
   }
   if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
   if (worldHeartBtn) worldHeartBtn.disabled = !ok;
+  if (worldSadBtn) worldSadBtn.disabled = !ok;
 }
 
 function worldChatBubbleWobble(sessionIdForPhase, nowMs) {
@@ -10443,13 +10593,32 @@ function onWorldHeartClick() {
   spawnWorldHeartFxNearBodyRect(rect);
 }
 
+function onWorldSadClick() {
+  if (!isWorldSocialRealtimeReady()) return;
+  broadcastWorldSad();
+  pulseWorldSadButton();
+  if (!player) return;
+  const rect = player.getBoundingClientRect();
+  spawnWorldSadFxNearBodyRect(rect);
+}
+
 function ensureWorldSocialUi() {
   if (worldSocialUiReady) return;
+  worldSadBtn = document.createElement("button");
+  worldSadBtn.type = "button";
+  worldSadBtn.id = "world-sad-button";
+  worldSadBtn.className = "world-sad-button";
+  worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
+  worldSadBtn.title = "슬퍼요: Ctrl+S";
+  worldSadBtn.innerHTML = "\uD83D\uDE22";
+  document.body.appendChild(worldSadBtn);
+
   worldHeartBtn = document.createElement("button");
   worldHeartBtn.type = "button";
   worldHeartBtn.id = "world-heart-button";
   worldHeartBtn.className = "world-heart-button";
   worldHeartBtn.setAttribute("aria-label", "\uD558\uD2B8");
+  worldHeartBtn.title = "하트: H";
   worldHeartBtn.innerHTML = "\u2764\uFE0F";
   document.body.appendChild(worldHeartBtn);
 
@@ -10458,6 +10627,7 @@ function ensureWorldSocialUi() {
   worldChatToggleBtn.id = "world-chat-toggle";
   worldChatToggleBtn.className = "world-chat-toggle";
   worldChatToggleBtn.setAttribute("aria-label", "\uCC57");
+  worldChatToggleBtn.title = "채팅: C";
   worldChatToggleBtn.textContent = "\uD83D\uDCAC";
   document.body.appendChild(worldChatToggleBtn);
 
@@ -10495,18 +10665,14 @@ function ensureWorldSocialUi() {
   playerChatBubbleEl.style.display = "none";
   document.body.appendChild(playerChatBubbleEl);
 
+  worldSadBtn.addEventListener("click", function () {
+    onWorldSadClick();
+  });
   worldHeartBtn.addEventListener("click", function () {
     onWorldHeartClick();
   });
   worldChatToggleBtn.addEventListener("click", function () {
-    worldChatPanelOpen = !worldChatPanelOpen;
-    worldChatPanelEl.classList.toggle("is-open", worldChatPanelOpen);
-    worldChatPanelEl.setAttribute("aria-hidden", worldChatPanelOpen ? "false" : "true");
-    if (worldChatPanelOpen) {
-      resetInputKeys(keys);
-      isInteractKeyLatched = false;
-      worldChatInputEl.focus();
-    }
+    toggleWorldChatPanel();
   });
   worldChatSendBtn.addEventListener("click", function () {
     sendWorldChatFromUi();
@@ -10524,9 +10690,9 @@ function ensureWorldSocialUi() {
     if (!(t instanceof Node)) return;
     if (worldChatPanelEl.contains(t)) return;
     if (worldChatToggleBtn && worldChatToggleBtn.contains(t)) return;
-    worldChatPanelOpen = false;
-    worldChatPanelEl.classList.remove("is-open");
-    worldChatPanelEl.setAttribute("aria-hidden", "true");
+    if (worldHeartBtn && worldHeartBtn.contains(t)) return;
+    if (worldSadBtn && worldSadBtn.contains(t)) return;
+    setWorldChatPanelOpen(false);
   });
 
   worldSocialUiReady = true;
@@ -10644,6 +10810,10 @@ function setupMultiplayer() {
     .on("broadcast", { event: "world_heart" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleWorldHeartBroadcast(payload.payload || {});
+    })
+    .on("broadcast", { event: "world_sad" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleWorldSadBroadcast(payload.payload || {});
     })
     .on("system", {}, function (payload) {
       if (channel !== multiplayerChannel) return;
