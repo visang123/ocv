@@ -1304,6 +1304,39 @@ document.addEventListener("keydown", function (event) {
     return;
   }
 
+  if (event.code === "Tab" && !event.repeat && !event.shiftKey) {
+    const focusEl = document.activeElement;
+    const inOtherTextField =
+      focusEl &&
+      (focusEl.tagName === "INPUT" || focusEl.tagName === "TEXTAREA" || focusEl.isContentEditable) &&
+      focusEl !== worldChatInputEl;
+    if (inOtherTextField) {
+      return;
+    }
+    if (isWorldChatBlockingGameInput()) {
+      return;
+    }
+    if (!hasSpawnedCharacter) {
+      return;
+    }
+    if (
+      !worldBagInventory ||
+      worldBagInventory.style.display === "none" ||
+      worldBagInventory.hidden
+    ) {
+      return;
+    }
+    if (
+      (settingsOverlay && settingsOverlay.classList.contains("is-open")) ||
+      (controlsOverlay && controlsOverlay.classList.contains("is-open"))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    toggleBagInventoryPanelFromBagClick();
+    return;
+  }
+
   if (isWorldChatBlockingGameInput() && event.code !== "Escape") {
     return;
   }
