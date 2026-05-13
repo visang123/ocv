@@ -1578,6 +1578,9 @@ function toggleBagInventoryPanelFromBagClick() {
     flashOnboardingOrderHint("");
     return;
   }
+  if (worldSocialUiReady && worldChatPanelOpen) {
+    setWorldChatPanelOpen(false);
+  }
   const nextOpen = !bagInventoryPanelOpen;
   setBagInventoryPanelOpen(nextOpen);
   if (nextOpen) {
@@ -1608,6 +1611,9 @@ if (bagInventoryClose) {
 
 if (bagInventoryPanel) {
   bagInventoryPanel.addEventListener("click", function (event) {
+    if (worldSocialUiReady && worldChatPanelOpen) {
+      setWorldChatPanelOpen(false);
+    }
     const slot = event.target.closest(".bag-inventory-slot");
     if (!slot || !bagInventoryPanel.contains(slot)) return;
     const kind = slot.dataset.bagType;
@@ -3351,6 +3357,10 @@ function pickUpWorldBag() {
   }
   if (!isNearWorldBagPickup()) return false;
 
+  if (worldSocialUiReady && worldChatPanelOpen) {
+    setWorldChatPanelOpen(false);
+  }
+
   hasGuideBook = true;
   isGuideBookOpen = false;
   setGuideBookPickedForCurrentRoom();
@@ -3520,7 +3530,7 @@ function applyDefaultState(options) {
   plantRuntime.wateredAtList = [];
   plantRuntime.status = "normal";
   plantRuntime.waterLevel = 1;
-  plantRuntime.waterLevelUpdatedAt = Date.now();
+  plantRuntime.waterLevelUpdatedAt = getSharedPlantSimulationNow();
   plantRuntime.becameEmptyAt = null;
   plantRuntime.isOverwatered = false;
   plantRuntime.rottenAt = null;
@@ -5615,7 +5625,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     // guard would drop removals because the authority bumps lastButterflyStateChangeAt
     // every movement broadcast while non-authority catches use an older savedAt.
     if (snapshot.butterflies) {
-      applyButterflySnapshot(snapshot.butterflies);
+      applyButterflySnapshot(snapshot.butterflies, snapshotSavedAt || Date.now());
       if (snapshotSavedAt) {
         lastButterflyStateChangeAt = Math.max(
           lastButterflyStateChangeAt,
@@ -12493,9 +12503,10 @@ function updateButterflies() {
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
   /** 스냅샷 간격이 길수록 조금 더 빠르게 따라붙임. 프레임당 최대 이동으로만 캡. */
+  /** 스냅샷 간격 + 네트워크 지연 보정: 권한 외 클라이언트는 속도 외삽으로 목표를 앞당겨 끊김 완화 */
   const butterflyRemoteLerpAlpha =
-    wallDelta > 200 ? 0.52 : wallDelta > 120 ? 0.4 : 0.26;
-  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 36 : 20;
+    wallDelta > 200 ? 0.55 : wallDelta > 120 ? 0.46 : 0.36;
+  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 44 : 28;
 
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
@@ -12515,8 +12526,18 @@ function updateButterflies() {
   butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = ensureButterflyRenderEntry(butterfly);
-    const targetX = butterfly.x;
-    const targetY = butterfly.y;
+    let targetX = butterfly.x;
+    let targetY = butterfly.y;
+    if (smoothRemoteButterflies) {
+      const ar = typeof butterfly._netRecvAt === "number" ? butterfly._netRecvAt : now;
+      const lag = Math.min(220, Math.max(0, now - ar));
+      const vx = Number(butterfly._netVx) || 0;
+      const vy = Number(butterfly._netVy) || 0;
+      targetX = butterfly.x + vx * lag;
+      targetY = butterfly.y + vy * lag;
+      targetX = Math.max(butterflyBoundsLeft, Math.min(butterflyBoundsRight, targetX));
+      targetY = Math.max(butterflyBoundsTop, Math.min(butterflyBoundsBottom, targetY));
+    }
     let drawX = targetX;
     let drawY = targetY;
     if (smoothRemoteButterflies) {
@@ -12632,12 +12653,17 @@ function handleRemoteButterflyStateBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (isButterflyAuthority()) return;
   const snapshot = payload.butterflies || payload;
-  applyButterflySnapshot(snapshot);
+  const sentAt = Number(payload.sentAt) || Date.now();
+  applyButterflySnapshot(snapshot, sentAt);
 }
 
-function applyButterflySnapshot(snapshotButterflies) {
+function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
   if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
   const now = Date.now();
+  const recvAt =
+    Number.isFinite(Number(networkSampleAtMs)) && Number(networkSampleAtMs) > 0
+      ? Number(networkSampleAtMs)
+      : now;
   // Purge old tombstones so the map stays bounded.
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     if (now - butterflyLocalCatchTombstoneById[id] > BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS) {
@@ -12709,8 +12735,22 @@ function applyButterflySnapshot(snapshotButterflies) {
         spawnedAt: getNumericButterflyValue(raw.spawnedAt, Date.now())
       };
       butterfly.color = raw.color || butterfly.color;
-      butterfly.x = getNumericButterflyValue(raw.x, butterfly.x || butterflyBoundsLeft);
-      butterfly.y = getNumericButterflyValue(raw.y, butterfly.y || butterflyBoundsTop);
+      const prevX = Number.isFinite(Number(butterfly.x)) ? butterfly.x : null;
+      const prevY = Number.isFinite(Number(butterfly.y)) ? butterfly.y : null;
+      const prevRecv = butterfly._netRecvAt;
+      const newX = getNumericButterflyValue(raw.x, prevX != null ? prevX : butterflyBoundsLeft);
+      const newY = getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop);
+      if (prevX != null && prevY != null && Number.isFinite(prevRecv) && prevRecv > 0) {
+        const dtMs = Math.max(16, recvAt - prevRecv);
+        butterfly._netVx = (newX - prevX) / dtMs;
+        butterfly._netVy = (newY - prevY) / dtMs;
+      } else {
+        butterfly._netVx = 0;
+        butterfly._netVy = 0;
+      }
+      butterfly._netRecvAt = recvAt;
+      butterfly.x = newX;
+      butterfly.y = newY;
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       nextList.push(butterfly);
     });
