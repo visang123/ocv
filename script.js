@@ -4294,14 +4294,16 @@ function createRandomWorldRocks() {
   const size = WORLD_ROCK_SIZE;
   const margin = WORLD_ROCK_SPAWN_X_MARGIN;
   const yMin = WORLD_ROCK_SPAWN_Y_MIN;
-  const yMax = WORLD_ROCK_SPAWN_Y_MAX;
+  const yTopMax = WORLD_ROCK_SPAWN_Y_MAX;
+  const xSpan = Math.max(1, WORLD_WIDTH - 2 * margin - size + 1);
+  const ySpan = Math.max(1, yTopMax - yMin + 1);
   const rocks = [];
   for (let i = 0; i < count; i += 1) {
     let x = margin;
     let y = yMin;
     for (let attempt = 0; attempt < 48; attempt += 1) {
-      x = margin + Math.floor(Math.random() * Math.max(8, WORLD_WIDTH - 2 * margin - size));
-      y = yMin + Math.floor(Math.random() * Math.max(8, yMax - yMin - size));
+      x = margin + Math.floor(Math.random() * xSpan);
+      y = yMin + Math.floor(Math.random() * ySpan);
       const clash = rocks.some(function (other) {
         return Math.abs(other.x - x) < 10 && Math.abs(other.y - y) < 10;
       });
@@ -4416,13 +4418,18 @@ function loadAppleState() {
   if (
     appleState.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT ||
     appleState.worldRocks.some(function (r) {
+      const x = Number(r && r.x);
       const y = Number(r && r.y);
+      const m = WORLD_ROCK_SPAWN_X_MARGIN;
+      const xMax = WORLD_WIDTH - m - WORLD_ROCK_SIZE;
       return (
         !r ||
         typeof r.id !== "string" ||
-        !Number.isFinite(Number(r.x)) ||
+        !Number.isFinite(x) ||
         !Number.isFinite(y) ||
         Number(r.size) !== WORLD_ROCK_SIZE ||
+        x < m ||
+        x > xMax ||
         y < WORLD_ROCK_SPAWN_Y_MIN ||
         y > WORLD_ROCK_SPAWN_Y_MAX
       );

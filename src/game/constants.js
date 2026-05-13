@@ -132,10 +132,11 @@ export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 /** 월드 땅에 흩어지는 회색 돌(나무 사과 size 10의 1/2) */
 export const WORLD_LOOSE_ROCK_COUNT = 25;
 export const WORLD_ROCK_SIZE = 14;
-/** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) */
-export const WORLD_ROCK_SPAWN_X_MARGIN = 18;
-export const WORLD_ROCK_SPAWN_Y_MIN = 8;
-export const WORLD_ROCK_SPAWN_Y_MAX = GROUND_WORLD_HEIGHT - WORLD_ROCK_SIZE - 8;
+/** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) — 가장자리만 남기고 땅 전체에 분포 */
+export const WORLD_ROCK_SPAWN_X_MARGIN = 3;
+export const WORLD_ROCK_SPAWN_Y_MIN = 3;
+/** 돌 스프라이트 맨 위 y의 허용 최댓값(맨 아래까지 내려가게) */
+export const WORLD_ROCK_SPAWN_Y_MAX = GROUND_WORLD_HEIGHT - WORLD_ROCK_SIZE - WORLD_ROCK_SPAWN_Y_MIN;
 /** 심는 칸(씨앗) 반폭에 더하는 최소 여백(월드 px) — maturity 0–2만 사용 */
 const minPlantCenterGapWorld = 4;
 
