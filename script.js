@@ -216,6 +216,7 @@ import {
 import {
   clearStoredKeys,
   setStoragePrefix,
+  migrateUnscopedUserPickupFlagsToUserScope,
   getStoredValue,
   getStoredFlag,
   removeStoredValue,
@@ -504,6 +505,7 @@ let selectedPlayerColor =
   savedUserScopedColor || savedGlobalLoginColor || "#ffffff";
 if (currentUserId) {
   setStoragePrefix("ovc-user-" + currentUserId + ":");
+  migrateUnscopedUserPickupFlagsToUserScope(currentUserId);
   hasHandledDryMainSeed = getStoredFlag(mainDrySeedHandledKey);
   isMainSeedAvailable = !hasPickedMainSeedInCurrentRoom();
   lastMainSeedStateChangeAt = Date.now();

@@ -2,13 +2,59 @@ import {
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
   WORLD_LOOSE_ROCK_COUNT,
-  WORLD_ROCK_SIZE
+  WORLD_ROCK_SIZE,
+  hasGuideBookKey
 } from "./constants.js";
 
 let storagePrefix = "";
 
 export function setStoragePrefix(prefix) {
   storagePrefix = prefix || "";
+}
+
+/**
+ * 예전(또는 비로그인)에는 localStorage 키에 `ovc-user-{id}:` 접두사가 없었고,
+ * 로그인 후에는 동일 논리 키가 접두사 뒤에만 존재한다. 그 경우 바닥 가방/책 등이
+ * "다시 나타나는" 것처럼 보이므로, 접두사 없이 true로 남은 플래그를 계정 스코프로 옮긴다.
+ */
+export function migrateUnscopedUserPickupFlagsToUserScope(userId) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return;
+  const userPrefix = "ovc-user-" + uid + ":";
+  const roomKeyStarts = [
+    "guideBookPickedRoomV1:",
+    "worldBagGroundPickedRoomV1:",
+    "worldGuideBookOffGroundPickedRoomV1:",
+    "mainSeedPickedRoomV1:"
+  ];
+  const globalKeys = [hasGuideBookKey];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf("ovc-user-") === 0) continue;
+      let matched = false;
+      for (let s = 0; s < roomKeyStarts.length; s++) {
+        if (k.indexOf(roomKeyStarts[s]) === 0) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) continue;
+      if (localStorage.getItem(k) !== "true") continue;
+      const dest = userPrefix + k;
+      if (localStorage.getItem(dest) === null) {
+        localStorage.setItem(dest, "true");
+      }
+    }
+    for (let g = 0; g < globalKeys.length; g++) {
+      const gk = globalKeys[g];
+      if (localStorage.getItem(gk) !== "true") continue;
+      const destG = userPrefix + gk;
+      if (localStorage.getItem(destG) === null) {
+        localStorage.setItem(destG, "true");
+      }
+    }
+  } catch (e) {}
 }
 
 function getScopedKey(key) {
