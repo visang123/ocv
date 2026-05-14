@@ -16,6 +16,16 @@ import {
   scheduleWorldLooseRespawnAfterPickup
 } from "./src/game/groundSeed.js";
 import {
+  readTutorialSessionFloorBagPicked,
+  writeTutorialSessionFloorBagPicked,
+  clearTutorialSessionFloorBagPicked,
+  isWorldFloorBagClaimed,
+  persistWorldFloorBagClaim,
+  clearWorldFloorBagClaim,
+  hydrateWorldFloorBagClaimFromLegacy,
+  shouldHideWorldFloorBagMesh
+} from "./src/game/worldBagState.js";
+import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   GROUND_WORLD_HEIGHT,
@@ -136,7 +146,6 @@ import {
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
-  worldBagFloorPickedAccountKey,
   npcDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
@@ -602,7 +611,7 @@ const WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX = "worldGuideBookOffGro
 
 function hasPickedGuideBookInCurrentRoom() {
   if (roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX)) return true;
-  if (roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX)) {
+  if (isWorldFloorBagClaimed(getStoredFlag)) {
     setGuideBookPickedForCurrentRoom();
     return true;
   }
@@ -619,13 +628,11 @@ function setGuideBookPickedForCurrentRoom() {
 }
 
 function hasPickedWorldBagGroundInCurrentRoom() {
-  if (getStoredFlag(worldBagFloorPickedAccountKey)) return true;
-  return roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
+  return isWorldFloorBagClaimed(getStoredFlag);
 }
 
 function setWorldBagGroundPickedForCurrentRoom() {
-  setStoredFlag(worldBagFloorPickedAccountKey, true);
-  setRoomKeyedPickupFlagAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX, true);
+  persistWorldFloorBagClaim(setStoredFlag);
 }
 
 function hasPickedWorldGuideBookOffGroundInCurrentRoom() {
@@ -636,27 +643,12 @@ function setWorldGuideBookOffGroundPickedForCurrentRoom() {
   setRoomKeyedPickupFlagAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX, true);
 }
 
-const tutorialSessionWorldBagGroundPickedKey = "ovcTutorialSessionWorldBagGroundPickedV1";
 const tutorialSessionWorldGuideBookOffGroundKey = "ovcTutorialSessionWorldGuideBookOffGroundPickedV1";
 
 function clearTutorialSessionWorldFloorPickupFlags() {
+  clearTutorialSessionFloorBagPicked();
   try {
-    sessionStorage.removeItem(tutorialSessionWorldBagGroundPickedKey);
     sessionStorage.removeItem(tutorialSessionWorldGuideBookOffGroundKey);
-  } catch (e) {}
-}
-
-function tutorialSessionWorldBagGroundPicked() {
-  try {
-    return sessionStorage.getItem(tutorialSessionWorldBagGroundPickedKey) === "1";
-  } catch (e) {
-    return false;
-  }
-}
-
-function setTutorialSessionWorldBagGroundPicked() {
-  try {
-    sessionStorage.setItem(tutorialSessionWorldBagGroundPickedKey, "1");
   } catch (e) {}
 }
 
@@ -676,15 +668,14 @@ function setTutorialSessionWorldGuideBookOffGroundPicked() {
 
 /** 월드(index): 로컬 저장. 튜토리얼: 이번 페이지 방문(session)만 — 월드와 별도. */
 function isWorldFloorBagHiddenForCurrentView() {
-  if (isWorldDocumentEntry()) {
-    if (hasPickedWorldBagGroundInCurrentRoom()) return true;
-    // setup()이 loadGuideBookState보다 먼저 실행될 때 hasGuideBook 변수는 아직 false.
-    // 또한 방 슬러그·이전 저장 형태 차이로 worldBagGround 키만 없고 가이드 플래그만 남은 경우 바닥 가방이 부활함.
-    if (getStoredFlag(hasGuideBookKey)) return true;
-    if (roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX)) return true;
-    return false;
-  }
-  return tutorialSessionWorldBagGroundPicked();
+  return shouldHideWorldFloorBagMesh(
+    isWorldDocumentEntry,
+    getStoredFlag,
+    readTutorialSessionFloorBagPicked,
+    function worldFloorBagExtraLegacyGuideRoom() {
+      return roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
+    }
+  );
 }
 
 function isWorldFloorGuideBookHiddenForCurrentView() {
@@ -726,7 +717,11 @@ function syncGuideInventoryBar() {
     guideBookButton.hidden = true;
   }
   if (worldBagInventory) {
-    const show = Boolean(hasGuideBook);
+    const show = Boolean(
+      hasGuideBook ||
+      getStoredFlag(hasGuideBookKey) ||
+      isWorldFloorBagClaimed(getStoredFlag)
+    );
     worldBagInventory.style.display = show ? "block" : "none";
     worldBagInventory.hidden = !show;
   }
@@ -940,6 +935,7 @@ let remoteBucketUpdateAtById = {};
  */
 let multiplayerRoomSessionIdsLastSeen = Object.create(null);
 let multiplayerRoomSessionButterflyActive = Object.create(null);
+let multiplayerRoomSessionButterflyStateLastSeen = Object.create(null);
 /** Dedupe water FX when we skip rendering same-account remote avatars */
 let lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 let lastBucketTraceAtByKey = {};
@@ -2461,7 +2457,7 @@ function isNearSignBoard() {
 function isNearWorldBagPickup() {
   if (isWorldDocumentEntry()) {
     if (hasPickedWorldBagGroundInCurrentRoom()) return false;
-  } else if (tutorialSessionWorldBagGroundPicked()) {
+  } else if (readTutorialSessionFloorBagPicked()) {
     return false;
   }
   if (!worldBag) return false;
@@ -2638,7 +2634,7 @@ function resetTutorialProgressInStorage() {
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
-  removeStoredValue(worldBagFloorPickedAccountKey);
+  clearWorldFloorBagClaim(removeStoredValue);
   removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
   setStoredFlag(npcDialogueCompleteKey, false);
@@ -3384,7 +3380,7 @@ function pickUpWorldBag() {
   setGuideBookPickedForCurrentRoom();
   setWorldBagGroundPickedForCurrentRoom();
   if (isTutorialDocumentEntry()) {
-    setTutorialSessionWorldBagGroundPicked();
+    writeTutorialSessionFloorBagPicked();
   }
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
@@ -3407,12 +3403,20 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   if (currentUserId && !skipMaybeResetTutorial) {
     maybeResetTutorialForNewLoginSession();
   }
-  if (
-    isWorldDocumentEntry() &&
-    !getStoredFlag(worldBagFloorPickedAccountKey) &&
-    roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX)
-  ) {
-    setStoredFlag(worldBagFloorPickedAccountKey, true);
+  if (isWorldDocumentEntry()) {
+    const uid = currentUserId ? String(currentUserId).trim() : "";
+    hydrateWorldFloorBagClaimFromLegacy(getStoredFlag, setStoredFlag, {
+      guideBookClaimed: function () {
+        return (
+          getStoredFlag(hasGuideBookKey) ||
+          roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX)
+        );
+      },
+      anyRoomKeyedWorldBag: function () {
+        return roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
+      },
+      storageUserPrefix: uid ? "ovc-user-" + uid + ":" : ""
+    });
   }
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
   if (hasGuideBook) {
@@ -11988,6 +11992,7 @@ function pruneStaleMultiplayerRoomSessions(now) {
     if (!seen || now - seen > staleMs) {
       delete multiplayerRoomSessionIdsLastSeen[sid];
       delete multiplayerRoomSessionButterflyActive[sid];
+      delete multiplayerRoomSessionButterflyStateLastSeen[sid];
       delete lastRemoteWaterSplashAppliedAtBySession[sid];
     }
   });
@@ -11996,6 +12001,7 @@ function pruneStaleMultiplayerRoomSessions(now) {
 function clearMultiplayerRoomSessionTracking() {
   multiplayerRoomSessionIdsLastSeen = Object.create(null);
   multiplayerRoomSessionButterflyActive = Object.create(null);
+  multiplayerRoomSessionButterflyStateLastSeen = Object.create(null);
   lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 }
 
@@ -12060,10 +12066,18 @@ function isButterflyAuthority() {
   if (!currentSessionId) return false;
   if (document.hidden) return false;
   const now = Date.now();
+  const stateFreshMs = Math.max(900, butterflyBroadcastMs * 16);
   pruneStaleMultiplayerRoomSessions(now);
   const ids = [currentSessionId];
   Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
     if (multiplayerRoomSessionButterflyActive[sid] === false) return;
+    const stateSeenAt = Number(multiplayerRoomSessionButterflyStateLastSeen[sid]) || 0;
+    const presenceSeenAt = Number(multiplayerRoomSessionIdsLastSeen[sid]) || 0;
+    if (stateSeenAt) {
+      if (now - stateSeenAt > stateFreshMs) return;
+    } else if (!presenceSeenAt || now - presenceSeenAt > stateFreshMs) {
+      return;
+    }
     if (sid !== currentSessionId) ids.push(sid);
   });
   ids.sort();
@@ -12610,9 +12624,12 @@ function updateButterflies() {
     let targetX = butterfly.x;
     let targetY = butterfly.y;
     if (smoothRemoteButterflies) {
-      // Remote clients only follow the elected authority's latest sampled
-      // position. Extra extrapolation made two-tab tests look like a knockback
-      // when browser scheduling paused one tab briefly.
+      const sampleAge = Math.min(140, Math.max(0, now - (Number(butterfly._netRecvAt) || now)));
+      const maxVelocity = 0.09;
+      const vx = Math.max(-maxVelocity, Math.min(maxVelocity, Number(butterfly._netVx) || 0));
+      const vy = Math.max(-maxVelocity, Math.min(maxVelocity, Number(butterfly._netVy) || 0));
+      targetX += vx * sampleAge;
+      targetY += vy * sampleAge;
       targetX = Math.max(butterflyBoundsLeft, Math.min(butterflyBoundsRight, targetX));
       targetY = Math.max(butterflyBoundsTop, Math.min(butterflyBoundsBottom, targetY));
     }
@@ -12713,6 +12730,7 @@ function getButterflyStateForSnapshot() {
 function broadcastButterflyState(now) {
   if (!multiplayerChannel || !currentSessionId) return;
   lastButterflyBroadcastAt = now;
+  multiplayerRoomSessionButterflyStateLastSeen[currentSessionId] = now;
   lastButterflyStateChangeAt = now;
   markWorldDirty();
   Promise.resolve(multiplayerChannel.send({
@@ -12735,6 +12753,7 @@ function handleRemoteButterflyStateBroadcast(payload) {
   if (sender) {
     multiplayerRoomSessionIdsLastSeen[sender] = Date.now();
     multiplayerRoomSessionButterflyActive[sender] = true;
+    multiplayerRoomSessionButterflyStateLastSeen[sender] = Date.now();
   }
   if (isButterflyAuthority()) return;
   const snapshot = payload.butterflies || payload;
