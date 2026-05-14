@@ -1657,6 +1657,7 @@ body::-webkit-scrollbar {
 .world-chat-hint {
   color: rgba(248, 250, 252, 0.65);
   margin-bottom: 6px;
+  white-space: pre-line;
 }
 
 .world-chat-line {

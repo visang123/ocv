@@ -11122,9 +11122,9 @@ function ensureWorldSocialUi() {
   const hint = document.createElement("div");
   hint.className = "world-chat-hint";
   hint.textContent =
-    "\uC804\uCCB4 \uCC57: \u201C\uC804\uCCB4: \u201D\uB85C \uC2DC\uC791(\uC0DD\uB7B5 \uC2DC \uC804\uCCB4). " +
-    "\uADC8\uB9D0: \u201C\uC774\uB984: \u201D \uB610\uB294 \u201C\uC774\uB9841, \uC774\uB9842: \u201D. " +
-    "\uC811\uC18D \uC720\uC800\uC5D0\uC11C \uC774\uB984\uC744 \uB123\uC73C\uBA74 \uC790\uB3D9 \uC785\uB825\uB429\uB2C8\uB2E4.";
+    '\uC804\uCCB4 \uCC57: "\uC804\uCCB4: "\uC785\uB825 \uD6C4 \uCC57\uC305 or \uADF8\uB0E5 \uC785\uB825\n' +
+    ' \uADC8\uB9D0: "(\uC774\uB984):", \uB2E4\uC218\uB294 "(\uC774\uB984),(\uC774\uB984):"\n' +
+    ' \uAC04\uD3B8\uD558\uAC8C \uC811\uC18D\uD55C \uC720\uC800 \uBC84\uD2BC \uD074\uB9AD \uD6C4, \uC774\uB984 \uD074\uB9AD\uD574\uC11C\uB3C4 \uAC00\uB2A5';
   worldChatLogEl.appendChild(hint);
   worldChatInputWrapEl = document.createElement("div");
   worldChatInputWrapEl.className = "world-chat-input-wrap";
