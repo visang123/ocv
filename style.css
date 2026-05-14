@@ -158,10 +158,10 @@ body::-webkit-scrollbar {
 }
 
 .world-plant-index-hud {
-  position: absolute;
+  position: fixed;
   top: 12px;
   right: 14px;
-  z-index: 25;
+  z-index: 260;
   display: none;
   pointer-events: none;
   font: 900 26px/1.05 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
@@ -2614,7 +2614,7 @@ body #world-bag-inventory {
     inset 0 0 26px rgba(0, 0, 0, 0.5),
     inset 0 0 10px rgba(255, 255, 255, 0.03);
   opacity: 0.96;
-  filter: blur(0.45px);
+  filter: blur(0.85px);
 }
 
 .world-plant-fog-strip--top {

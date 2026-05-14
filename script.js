@@ -796,6 +796,18 @@ function getPlantFogClearRectForCurrentScore() {
   return getPlantFogClearRectWorldPx(stage);
 }
 
+/** 시각용 맑은 구역보다 이동 허용을 약간 넓혀 닿기 전에 막히는 느낌을 줄임 */
+function getPlantFogClearRectForMovementClamp() {
+  const r = getPlantFogClearRectForCurrentScore();
+  const pad = 8;
+  return {
+    left: r.left - pad,
+    top: r.top - pad,
+    right: r.right + pad,
+    bottom: r.bottom + pad
+  };
+}
+
 function isPlantFogMovementClampActive() {
   if (!isWorldDocumentEntry()) return false;
   if (getTotalPlantIndexScore() >= PLANT_INDEX_SCORE_CAP) return false;
@@ -868,7 +880,7 @@ function syncWorldPlantFogVisuals() {
   const R = rect.right;
   const B = rect.bottom;
   const midH = Math.max(0, B - T);
-  const o = 7;
+  const o = 20;
 
   if (topEl) {
     if (T > 0) {
@@ -1831,7 +1843,7 @@ document.addEventListener("keydown", function (event) {
 
   if (key === "q" && !event.repeat) {
     event.preventDefault();
-    if (isBucketWaterActionAvailableNow()) {
+    if (heldItem === HELD_ITEM_BUCKET) {
       useHeldItem();
       return;
     }
@@ -6810,7 +6822,10 @@ function isPlantAwaitingPlayerFirstPour(plant) {
   if (gs <= 0) return false;
   if (plant.lastWateredAt != null && Number(plant.lastWateredAt) > 0) return false;
   const wl = plant.wateredAtList;
-  if (!Array.isArray(wl) || wl.length !== 1) return false;
+  if (!Array.isArray(wl)) return false;
+  /** 심은 직후 로컬 상태는 wateredAtList가 비어 있음. stabilizeFirstWaterHintFlags는 머지 시에만 호출됨. */
+  if (wl.length === 0) return true;
+  if (wl.length !== 1) return false;
   return Math.abs(Number(wl[0]) - gs) < 20000;
 }
 
@@ -7878,8 +7893,8 @@ function updatePlayerPosition() {
     playerDepth = previousPlayerDepth;
     jumpY = previousJumpY;
   } else if (isPlantFogMovementClampActive()) {
-    const clearRect = getPlantFogClearRectForCurrentScore();
-    if (!isPlayerBoxFullyInsidePlantFogClearRect(getPlayerHeadFogProbeBox(), clearRect, 0.5)) {
+    const clearRect = getPlantFogClearRectForMovementClamp();
+    if (!isPlayerBoxFullyInsidePlantFogClearRect(getPlayerHeadFogProbeBox(), clearRect, 2.5)) {
       playerX = previousPlayerX;
       playerDepth = previousPlayerDepth;
       jumpY = previousJumpY;
@@ -8719,7 +8734,8 @@ function plantSpotOverlapsExpandedRect(plantX, plantY, ox, oy, ow, oh, pad) {
   return isOverlappingRect(pr, br);
 }
 
-function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY) {
+function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, rockPad) {
+  const pad = Number.isFinite(Number(rockPad)) ? Number(rockPad) : 0;
   if (!isWorldDocumentEntry()) return false;
   if (!Array.isArray(appleState.worldRocks)) return false;
   const pickedIds = Array.isArray(appleState.worldRockPickedIds)
@@ -8731,7 +8747,7 @@ function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
-    return plantSpotOverlapsExpandedRect(plantX, plantY, rx, ry, sz, sz, 0);
+    return plantSpotOverlapsExpandedRect(plantX, plantY, rx, ry, sz, sz, pad);
   });
 }
 
@@ -8751,8 +8767,8 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uB098\uBB34");
   }
 
-  if (isPlantSpotOverlappingVisibleWorldRock(plantX, plantY)) {
-    return "\uB3CC \uC704\uC5D0\uB294 \uC2DD\uBB3C\uC744 \uC2EC\uC744 \uC5C6\uC2B5\uB2C8\uB2E4.";
+  if (isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, 2)) {
+    return "\uB3CC\uC704\uC5D0\uB294 \uC2EC\uC9C0 \uBABB\uD569\uB2C8\uB2E4.";
   }
 
   const wellPad = 1;
@@ -8853,10 +8869,6 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   });
   if (blockedByLooseSeed) {
     return plantProximityPhraseForNoun("\uC528\uC557");
-  }
-
-  if (isPlantSpotOverlappingVisibleWorldRock(plantX, plantY)) {
-    return plantProximityPhraseForNoun("\uB3CC");
   }
 
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
@@ -9004,19 +9016,6 @@ function useHeldItem() {
   if (heldItem === HELD_ITEM_BUCKET) {
     useBucket();
   }
-}
-
-function isBucketWaterActionAvailableNow() {
-  if (heldItem !== HELD_ITEM_BUCKET) return false;
-  if (plantRuntime.isPlanting || appleState.isEating) return false;
-  const wellReachForScoop =
-    isNearWellIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
-  const wellReachForPour =
-    isNearWellForPouringIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
-  if (!isBucketFull) {
-    return Boolean(wellReachForScoop && wellState.water > 0);
-  }
-  return getNearestWateringTarget() !== null || wellReachForPour;
 }
 
 function useBucket() {
