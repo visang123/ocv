@@ -774,6 +774,8 @@ const WORLD_HEART_FX_MS = 2200;
 /** 슬퍼요 버튼과 이펙트 첫 알갱이에 동일하게 쓰는 이모지(😢) */
 const WORLD_SAD_BUTTON_EMOJI = "\uD83D\uDE22";
 const WORLD_CHAT_MAX_CHARS = 120;
+/** 전체 채팅 접두(이 뒤는 모두에게 표시). */
+const WORLD_CHAT_GLOBAL_PREFIX = "\uC804\uCCB4:";
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
 const WORLD_CHAT_NAMEPLATE_PAD_V = 1;
 const WORLD_CHAT_NAMEPLATE_PAD_H = 3;
@@ -792,6 +794,10 @@ let worldChatToggleBtn = null;
 let worldChatPanelEl = null;
 let worldChatLogEl = null;
 let worldChatInputEl = null;
+let worldChatUsersBtn = null;
+let worldChatUserPickerEl = null;
+let worldChatInputWrapEl = null;
+let worldChatUsersPickerOpen = false;
 let worldChatSendBtn = null;
 let playerChatBubbleEl = null;
 let worldSocialUiReady = false;
@@ -9583,7 +9589,8 @@ function updatePlayerAlert() {
   const alertWidth = playerAlert.offsetWidth || 10;
   const alertHeight = playerAlert.offsetHeight || 10;
   const x = toScreenX(playerBox.left + playerBox.width / 2) - alertWidth / 2;
-  const y = toScreenY(playerBox.top) - alertHeight - 4;
+  const yOffset = playerAlert.classList.contains("is-butterfly-catch") ? 2 : 4;
+  const y = toScreenY(playerBox.top) - alertHeight - yOffset;
   playerAlert.style.transform = "translate(" + x + "px, " + y + "px)";
 }
 
@@ -10360,6 +10367,9 @@ function isWorldChatBlockingGameInput() {
 
 function setWorldChatPanelOpen(nextOpen) {
   worldChatPanelOpen = Boolean(nextOpen);
+  if (!worldChatPanelOpen) {
+    closeWorldChatUserPicker();
+  }
   if (!worldChatPanelEl) return;
   worldChatPanelEl.classList.toggle("is-open", worldChatPanelOpen);
   worldChatPanelEl.setAttribute("aria-hidden", worldChatPanelOpen ? "false" : "true");
@@ -10382,22 +10392,218 @@ function sanitizeWorldChatText(raw) {
   return s;
 }
 
-function appendWorldChatLine(name, text, sessionId, sentAt) {
+/**
+ * @returns {{ kind: "world", body: string } | { kind: "whisper", recipientNames: string[], body: string } | null}
+ */
+function parseWorldChatComposition(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  if (s.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
+    return { kind: "world", body: s.slice(WORLD_CHAT_GLOBAL_PREFIX.length).trim() };
+  }
+  const colon = s.indexOf(":");
+  if (colon <= 0) {
+    return { kind: "world", body: s };
+  }
+  const left = s.slice(0, colon).trim();
+  const right = s.slice(colon + 1).trim();
+  const parts = left
+    .split(",")
+    .map(function (p) {
+      return p.trim();
+    })
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return { kind: "world", body: s };
+  }
+  if (parts.length === 1 && parts[0] === "\uC804\uCCB4") {
+    return { kind: "world", body: right };
+  }
+  return { kind: "whisper", recipientNames: parts, body: right };
+}
+
+function resolveWhisperTargetSessionIds(recipientNames) {
+  const out = [];
+  const seen = Object.create(null);
+  const myName = nameForIngameUiDisplay(accountDisplayNameForUi());
+  const mySid = currentSessionId ? String(currentSessionId) : "";
+  (recipientNames || []).forEach(function (nm) {
+    const want = nameForIngameUiDisplay(nm);
+    if (want === myName && mySid) {
+      if (!seen[mySid]) {
+        seen[mySid] = true;
+        out.push(mySid);
+      }
+      return;
+    }
+    Object.keys(remotePlayers).forEach(function (rid) {
+      const rp = remotePlayers[rid];
+      const rn = nameForIngameUiDisplay(rp && rp.name ? rp.name : "");
+      if (rn === want && !seen[rid]) {
+        seen[rid] = true;
+        out.push(rid);
+      }
+    });
+  });
+  return out;
+}
+
+function setWorldChatUserPickerOpen(open) {
+  worldChatUsersPickerOpen = Boolean(open);
+  if (worldChatUserPickerEl) {
+    worldChatUserPickerEl.classList.toggle("is-open", worldChatUsersPickerOpen);
+    worldChatUserPickerEl.setAttribute(
+      "aria-hidden",
+      worldChatUsersPickerOpen ? "false" : "true"
+    );
+  }
+}
+
+function closeWorldChatUserPicker() {
+  setWorldChatUserPickerOpen(false);
+}
+
+function fillWorldChatUserPickerFromServer() {
+  if (!worldChatUserPickerEl) return;
+  worldChatUserPickerEl.innerHTML = "";
+  const room =
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
+      ? window.OVC_ONLINE_CONFIG.multiplayerRoom
+      : "ovc-main-room";
+  if (!window.OVCOnline || typeof window.OVCOnline.listPresence !== "function") {
+    const err = document.createElement("div");
+    err.className = "world-chat-user-picker-empty";
+    err.textContent = "\uC5F0\uACB0 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC5B4\uC694.";
+    worldChatUserPickerEl.appendChild(err);
+    return;
+  }
+  const loading = document.createElement("div");
+  loading.className = "world-chat-user-picker-empty";
+  loading.textContent = "\uBD88\uB7EC\uC624\uB294 \uC911...";
+  worldChatUserPickerEl.appendChild(loading);
+  window.OVCOnline.listPresence(room).then(function (rows) {
+    if (!worldChatUserPickerEl) return;
+    worldChatUserPickerEl.innerHTML = "";
+    const list = (rows || []).filter(function (row) {
+      return row && row.id && String(row.id) !== String(currentSessionId || "");
+    });
+    list.sort(function (a, b) {
+      const na = nameForIngameUiDisplay((a && a.name) || "");
+      const nb = nameForIngameUiDisplay((b && b.name) || "");
+      return na.localeCompare(nb, "ko");
+    });
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "world-chat-user-picker-empty";
+      empty.textContent = "\uB2E4\uB978 \uC811\uC18D \uC720\uC800\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      worldChatUserPickerEl.appendChild(empty);
+      return;
+    }
+    list.forEach(function (row) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "world-chat-user-picker-item";
+      const label = nameForIngameUiDisplay(row.name || "OVC");
+      btn.textContent = label;
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        appendWhisperRecipientToWorldChatInput(label);
+        closeWorldChatUserPicker();
+        if (worldChatInputEl) worldChatInputEl.focus();
+      });
+      worldChatUserPickerEl.appendChild(btn);
+    });
+  }).catch(function () {
+    if (!worldChatUserPickerEl) return;
+    worldChatUserPickerEl.innerHTML = "";
+    const err = document.createElement("div");
+    err.className = "world-chat-user-picker-empty";
+    err.textContent = "\uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.";
+    worldChatUserPickerEl.appendChild(err);
+  });
+}
+
+function toggleWorldChatUserPicker() {
+  if (!worldChatUserPickerEl) return;
+  if (worldChatUsersPickerOpen) {
+    closeWorldChatUserPicker();
+    return;
+  }
+  setWorldChatUserPickerOpen(true);
+  fillWorldChatUserPickerFromServer();
+}
+
+/**
+ * "홍길동:" → "홍길동, 사람인:" 형태로 수신자 접두를 누적. `전체:` 가 있으면 제거 후 귓말 접두로 전환.
+ */
+function appendWhisperRecipientToWorldChatInput(pickedName) {
+  if (!worldChatInputEl) return;
+  const pick = String(pickedName || "").trim();
+  if (!pick) return;
+  let v = worldChatInputEl.value || "";
+  const lead = v.replace(/^\s+/, "");
+  if (lead.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
+    v = lead.slice(WORLD_CHAT_GLOBAL_PREFIX.length).replace(/^\s+/, "");
+  }
+  const colonIdx = v.indexOf(":");
+  let recipients = [];
+  let rest = "";
+  if (colonIdx >= 0) {
+    rest = v.slice(colonIdx + 1);
+    recipients = v
+      .slice(0, colonIdx)
+      .split(",")
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  } else {
+    rest = "";
+    const t = v.trim();
+    if (t) recipients = [t];
+  }
+  const normPick = nameForIngameUiDisplay(pick);
+  const already = recipients.some(function (r) {
+    return nameForIngameUiDisplay(r) === normPick;
+  });
+  if (!already) recipients.push(pick);
+  worldChatInputEl.value = recipients.join(", ") + ": " + rest.replace(/^\s*/, "");
+  try {
+    const len = worldChatInputEl.value.length;
+    worldChatInputEl.setSelectionRange(len, len);
+  } catch (eSel) {}
+}
+
+function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
   const entry = {
     name: name || "OVC",
     text: text || "",
     sid: sessionId || "",
-    t: Number(sentAt) || Date.now()
+    t: Number(sentAt) || Date.now(),
+    chatKind: meta && meta.chatKind ? meta.chatKind : "world",
+    whisperToLabel: meta && meta.whisperToLabel ? meta.whisperToLabel : ""
   };
   worldChatLog.push(entry);
   if (worldChatLog.length > WORLD_CHAT_LOG_CAP) worldChatLog.shift();
   if (!worldChatLogEl) return;
   const row = document.createElement("div");
   row.className = "world-chat-line";
+  if (entry.chatKind === "whisper") {
+    row.classList.add("is-whisper");
+  }
   const d = new Date(entry.t);
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  row.textContent = "[" + hh + ":" + mm + "] " + entry.name + ": " + entry.text;
+  let prefix = "[" + hh + ":" + mm + "] ";
+  if (entry.chatKind === "whisper") {
+    prefix +=
+      "[\uADC8\uB9D0" +
+      (entry.whisperToLabel ? " \u2192 " + entry.whisperToLabel : "") +
+      "] ";
+  } else {
+    prefix += "[\uC804\uCCB4] ";
+  }
+  row.textContent = prefix + entry.name + ": " + entry.text;
   worldChatLogEl.appendChild(row);
   worldChatLogEl.scrollTop = worldChatLogEl.scrollHeight;
 }
@@ -10442,19 +10648,13 @@ function removeRemoteChatBubbleEl(sessionId) {
   delete remoteChatBubbles[sessionId];
 }
 
-function broadcastWorldChat(text) {
+function broadcastWorldChat(payload) {
   if (!isWorldSocialRealtimeReady()) return false;
   Promise.resolve(
     multiplayerChannel.send({
       type: "broadcast",
       event: "world_chat",
-      payload: {
-        id: currentSessionId,
-        userId: currentUserId || "",
-        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
-        text: text,
-        t: Date.now()
-      }
+      payload: payload
     })
   ).catch(function () {});
   return true;
@@ -10500,15 +10700,41 @@ function broadcastWorldSad() {
   return true;
 }
 
+function shouldShowIncomingWorldChatPayload(payload) {
+  const kind = payload.chatKind === "whisper" ? "whisper" : "world";
+  if (kind !== "whisper") return true;
+  const ids = payload.whisperToIds;
+  const mySid = currentSessionId ? String(currentSessionId) : "";
+  if (Array.isArray(ids) && mySid && ids.some(function (id) { return String(id) === mySid; })) {
+    return true;
+  }
+  const names = payload.whisperToNames;
+  const myName = nameForIngameUiDisplay(accountDisplayNameForUi());
+  if (Array.isArray(names) && names.some(function (n) { return nameForIngameUiDisplay(n) === myName; })) {
+    return true;
+  }
+  return false;
+}
+
 function handleWorldChatBroadcast(payload) {
   if (!payload || !payload.id) return;
   const sid = String(payload.id);
   if (sid === String(currentSessionId)) return;
+  if (!shouldShowIncomingWorldChatPayload(payload)) return;
   const text = sanitizeWorldChatText(payload.text);
   if (!text) return;
   const name = nameForIngameUiDisplay(payload.name || "OVC");
   const t = Number(payload.t) || Date.now();
-  appendWorldChatLine(name, text, sid, t);
+  const isWhisper = payload.chatKind === "whisper";
+  const whisperLabel = isWhisper
+    ? (Array.isArray(payload.whisperToNames)
+      ? payload.whisperToNames.map(function (n) { return nameForIngameUiDisplay(n); }).join(", ")
+      : "")
+    : "";
+  appendWorldChatLine(name, text, sid, t, {
+    chatKind: isWhisper ? "whisper" : "world",
+    whisperToLabel: whisperLabel
+  });
   setRemoteChatBubble(sid, text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
 }
 
@@ -10653,9 +10879,12 @@ function updateWorldSocialChatUiEnabled() {
   const ok = isWorldSocialRealtimeReady();
   if (worldChatInputEl) {
     worldChatInputEl.disabled = !ok;
-    worldChatInputEl.placeholder = ok ? "\uBA54\uC2DC\uC9C0..." : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
+    worldChatInputEl.placeholder = ok
+      ? "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADC8\uB9D0..."
+      : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
   }
   if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
+  if (worldChatUsersBtn) worldChatUsersBtn.disabled = !ok;
   if (worldHeartBtn) worldHeartBtn.disabled = !ok;
   if (worldSadBtn) worldSadBtn.disabled = !ok;
 }
@@ -10768,18 +10997,44 @@ function updateRemoteChatBubbleOverlays() {
 
 function sendWorldChatFromUi() {
   if (!worldChatInputEl) return;
-  const text = sanitizeWorldChatText(worldChatInputEl.value);
+  const raw = worldChatInputEl.value;
+  const parsed = parseWorldChatComposition(raw);
   worldChatInputEl.value = "";
-  if (!text) return;
+  if (!parsed) return;
+  const body = sanitizeWorldChatText(parsed.body);
+  if (!body) return;
   if (!isWorldSocialRealtimeReady()) return;
-  appendWorldChatLine(
-    nameForIngameUiDisplay(accountDisplayNameForUi()),
-    text,
-    currentSessionId,
-    Date.now()
-  );
-  setLocalChatBubble(text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
-  broadcastWorldChat(text);
+  const senderName = nameForIngameUiDisplay(accountDisplayNameForUi());
+  const basePayload = {
+    id: currentSessionId,
+    userId: currentUserId || "",
+    name: senderName,
+    text: body,
+    t: Date.now()
+  };
+  if (parsed.kind === "whisper") {
+    const displayNames = parsed.recipientNames.map(function (n) {
+      return nameForIngameUiDisplay(n);
+    });
+    const whisperToIds = resolveWhisperTargetSessionIds(parsed.recipientNames);
+    const whisperLabel = displayNames.join(", ");
+    appendWorldChatLine(senderName, body, currentSessionId, basePayload.t, {
+      chatKind: "whisper",
+      whisperToLabel: whisperLabel
+    });
+    setLocalChatBubble(body, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+    broadcastWorldChat(
+      Object.assign({}, basePayload, {
+        chatKind: "whisper",
+        whisperToIds: whisperToIds,
+        whisperToNames: displayNames
+      })
+    );
+    return;
+  }
+  appendWorldChatLine(senderName, body, currentSessionId, basePayload.t, { chatKind: "world" });
+  setLocalChatBubble(body, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+  broadcastWorldChat(Object.assign({}, basePayload, { chatKind: "world" }));
 }
 
 function onWorldHeartClick() {
@@ -10835,8 +11090,15 @@ function ensureWorldSocialUi() {
   const hint = document.createElement("div");
   hint.className = "world-chat-hint";
   hint.textContent =
-    "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uC804\uC124 \uCC57\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC5B4\uC694.";
+    "\uC804\uCCB4 \uCC57: \u201C\uC804\uCCB4: \u201D\uB85C \uC2DC\uC791(\uC0DD\uB7B5 \uC2DC \uC804\uCCB4). " +
+    "\uADC8\uB9D0: \u201C\uC774\uB984: \u201D \uB610\uB294 \u201C\uC774\uB9841, \uC774\uB9842: \u201D. " +
+    "\uC811\uC18D \uC720\uC800\uC5D0\uC11C \uC774\uB984\uC744 \uB123\uC73C\uBA74 \uC790\uB3D9 \uC785\uB825\uB429\uB2C8\uB2E4.";
   worldChatLogEl.appendChild(hint);
+  worldChatInputWrapEl = document.createElement("div");
+  worldChatInputWrapEl.className = "world-chat-input-wrap";
+  worldChatUserPickerEl = document.createElement("div");
+  worldChatUserPickerEl.className = "world-chat-user-picker";
+  worldChatUserPickerEl.setAttribute("aria-hidden", "true");
   const inpRow = document.createElement("div");
   inpRow.className = "world-chat-input-row";
   worldChatInputEl = document.createElement("input");
@@ -10844,14 +11106,22 @@ function ensureWorldSocialUi() {
   worldChatInputEl.className = "world-chat-input";
   worldChatInputEl.maxLength = WORLD_CHAT_MAX_CHARS;
   worldChatInputEl.autocomplete = "off";
+  worldChatUsersBtn = document.createElement("button");
+  worldChatUsersBtn.type = "button";
+  worldChatUsersBtn.className = "world-chat-users-btn";
+  worldChatUsersBtn.textContent = "\uC811\uC18D\uD55C \uC720\uC800";
+  worldChatUsersBtn.title = "\uC11C\uBC84 \uC811\uC18D \uC720\uC800 \uBAA9\uB85D";
   worldChatSendBtn = document.createElement("button");
   worldChatSendBtn.type = "button";
   worldChatSendBtn.className = "world-chat-send";
   worldChatSendBtn.textContent = "\uC804\uC1A1";
   inpRow.appendChild(worldChatInputEl);
+  inpRow.appendChild(worldChatUsersBtn);
   inpRow.appendChild(worldChatSendBtn);
+  worldChatInputWrapEl.appendChild(worldChatUserPickerEl);
+  worldChatInputWrapEl.appendChild(inpRow);
   worldChatPanelEl.appendChild(worldChatLogEl);
-  worldChatPanelEl.appendChild(inpRow);
+  worldChatPanelEl.appendChild(worldChatInputWrapEl);
   document.body.appendChild(worldChatPanelEl);
 
   playerChatBubbleEl = document.createElement("div");
@@ -10871,6 +11141,13 @@ function ensureWorldSocialUi() {
   });
   worldChatSendBtn.addEventListener("click", function () {
     sendWorldChatFromUi();
+  });
+  worldChatUsersBtn.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    toggleWorldChatUserPicker();
+  });
+  worldChatInputEl.addEventListener("focus", function () {
+    closeWorldChatUserPicker();
   });
   worldChatInputEl.addEventListener("keydown", function (ev) {
     if (ev.key === "Enter") {
@@ -12509,6 +12786,13 @@ function handleRemoteButterflyCatchBroadcast(payload) {
   // Even if this client already dropped it, keep world-state clocks aligned.
   stripButterflyFromSharedList(butterflyId, evtAt);
   finalizeButterflyRemovalEffects(evtAt);
+  const remote = remotePlayers[payload.from];
+  if (remote && remote.statusElement) {
+    remote.statusElement.textContent = "나비 catch";
+    remote.statusElement.style.display = "block";
+    remote.lastActionAt = now;
+    remote.lastShownAction = "butterfly_catch";
+  }
   addSyncDebugLog("butterfly_catch_apply", {
     eventId: payload.eventId || "",
     butterflyId: butterflyId,
@@ -12538,10 +12822,11 @@ function tryCatchButterfly() {
   broadcastButterflyCatch(caught.id);
   finalizeButterflyRemovalEffects(now);
   showPlayerAlert({
-    message: "나비 catch",
+    message: "\uB098\uBE44 catch",
     durationMs: 2400,
     butterflyCatch: true
   });
+  sendMultiplayerPresence(true);
   updateBagInventorySlots();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 18) {
     onboardingFlowStep = 19;

@@ -33,7 +33,7 @@
     })();
   </script>
   <title>온라인 비상 커뮤니티 – 튜토리얼</title>
-  <link rel="stylesheet" href="style.css?v=20260512z">
+  <link rel="stylesheet" href="style.css?v=20260512aa">
 </head>
 <body class="ovc-page-tutorial">
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -218,6 +218,30 @@
       draggable="false"
     >
   </button>
+  <div id="plant-progress-gauge" class="plant-progress-gauge" aria-hidden="true">
+    <div class="plant-progress-meter">
+      <div class="plant-progress-fill"></div>
+      <div class="plant-progress-seed" aria-hidden="true"></div>
+    </div>
+    <div class="plant-progress-rewards">
+      <div class="plant-progress-reward" data-step="4">
+        <span class="plant-progress-fog-icon" aria-hidden="true"></span>
+        <span>안개 걷힘</span>
+      </div>
+      <div class="plant-progress-reward" data-step="3">
+        <span class="plant-progress-fog-icon" aria-hidden="true"></span>
+        <span>안개 걷힘</span>
+      </div>
+      <div class="plant-progress-reward" data-step="2">
+        <span class="plant-progress-fog-icon" aria-hidden="true"></span>
+        <span>안개 걷힘</span>
+      </div>
+      <div class="plant-progress-reward" data-step="1">
+        <span class="plant-progress-fog-icon" aria-hidden="true"></span>
+        <span>안개 걷힘</span>
+      </div>
+    </div>
+  </div>
   <div id="bag-inventory-panel" class="bag-inventory-panel" style="display: none" aria-hidden="true">
     <div class="bag-inventory-panel-header">
       <button type="button" id="bag-inventory-close" class="bag-inventory-close" aria-label="닫기">
@@ -350,7 +374,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "tutorial";</script>
-  <script type="module" src="src/tutorial-main.js?v=20260512av"></script>
+  <script type="module" src="src/tutorial-main.js?v=20260512aw"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

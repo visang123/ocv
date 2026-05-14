@@ -14,7 +14,7 @@ export function getRemoteStatusText(action) {
   if (action === "magic_powder") return "마법의 가루 생성 중...";
   if (action === "planting") return "씨앗 심는중...";
   if (action === "eating") return "사과먹는중...";
-  if (action === "butterfly_catch") return "나비 잡음";
+  if (action === "butterfly_catch") return "나비 catch";
   if (action === "rock_pickup") return "돌 수집";
   return "";
 }
