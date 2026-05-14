@@ -2530,17 +2530,30 @@ function getPlayerBox() {
 
 /** 안개 막힘 판정: 발보다 머리(위쪽)가 안개에 닿을 때까지 이동 허용 */
 function getPlayerHeadFogProbeBox() {
-  const full = getPlayerBox();
-  const h = full.bottom - full.top;
+  return getPlayerHeadFogProbeBoxForPose(playerX, playerDepth, jumpY);
+}
+
+function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
+  const top = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - pd + jy;
+  const bottom = GROUND_WORLD_HEIGHT - pd + jy;
+  const h = bottom - top;
   const headH = Math.min(24, Math.max(10, h * 0.38));
   return {
-    left: full.left,
-    top: full.top,
-    right: full.right,
-    bottom: full.top + headH,
-    width: full.width,
+    left: px,
+    top: top,
+    right: px + PLAYER_WIDTH,
+    bottom: top + headH,
+    width: PLAYER_WIDTH,
     height: headH
   };
+}
+
+function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) {
+  return isPlayerBoxFullyInsidePlantFogClearRect(
+    getPlayerHeadFogProbeBoxForPose(px, pd, jy),
+    rect,
+    eps
+  );
 }
 
 function getSeedSize() {
@@ -7901,10 +7914,18 @@ function updatePlayerPosition() {
     jumpY = previousJumpY;
   } else if (isPlantFogMovementClampActive()) {
     const clearRect = getPlantFogClearRectForMovementClamp();
-    if (!isPlayerBoxFullyInsidePlantFogClearRect(getPlayerHeadFogProbeBox(), clearRect, 2.5)) {
-      playerX = previousPlayerX;
-      playerDepth = previousPlayerDepth;
-      jumpY = previousJumpY;
+    const eps = 2.5;
+    if (!isPlayerHeadFogClearForPose(playerX, playerDepth, jumpY, clearRect, eps)) {
+      if (isPlayerHeadFogClearForPose(previousPlayerX, playerDepth, jumpY, clearRect, eps)) {
+        playerX = previousPlayerX;
+      } else if (isPlayerHeadFogClearForPose(playerX, previousPlayerDepth, previousJumpY, clearRect, eps)) {
+        playerDepth = previousPlayerDepth;
+        jumpY = previousJumpY;
+      } else {
+        playerX = previousPlayerX;
+        playerDepth = previousPlayerDepth;
+        jumpY = previousJumpY;
+      }
     }
   }
 
