@@ -253,9 +253,9 @@ export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
 export const pickupDistance = 28;
 export const guideInteractDistance = 60;
-export const npcInteractDistance = 60;
+export const npcInteractDistance = 42;
 /** 우물에서 물 퍼오기·되붓기 판정 거리(짧을수록 우물에 더 붙어야 함) */
-export const wellUseDistance = 28;
+export const wellUseDistance = 17;
 export const wellPourDistance = wellUseDistance;
 export const plantWaterDistance = 40;
 /** 포인터 기준 식물 호버: 월드 식물 중심과 이 거리 안이면 후보 */
