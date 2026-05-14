@@ -2,6 +2,22 @@ export const WORLD_WIDTH = 960;
 export const WORLD_HEIGHT = 540;
 export const GROUND_WORLD_HEIGHT = WORLD_HEIGHT * 0.6;
 
+/** 식물 지수 합산 상한 */
+export const PLANT_INDEX_SCORE_CAP = 1000;
+/** 식물 1개당 단계별 기여 점수(말라썩음 등 비정상은 0으로 처리) */
+export const PLANT_INDEX_SEEDED_SOIL = 5;
+export const PLANT_INDEX_SPROUT_STAGE_1 = 10;
+export const PLANT_INDEX_SPROUT_STAGE_2 = 25;
+export const PLANT_INDEX_SPROUT_STAGE_3 = 50;
+export const PLANT_INDEX_GRASS_STAGE_4 = 100;
+export const PLANT_INDEX_GRASS_STAGE_5 = 150;
+
+/** 테스트: 맵 우하단 안개(월드 좌표, 플레이어 박스와 겹치면 진입 불가) */
+export const WORLD_FOG_TEST_WIDTH = 200;
+export const WORLD_FOG_TEST_HEIGHT = 88;
+export const WORLD_FOG_TEST_X = WORLD_WIDTH - WORLD_FOG_TEST_WIDTH;
+export const WORLD_FOG_TEST_Y = GROUND_WORLD_HEIGHT - WORLD_FOG_TEST_HEIGHT;
+
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;
 export const SEED_SIZE = 10;

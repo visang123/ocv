@@ -29,6 +29,17 @@ import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   GROUND_WORLD_HEIGHT,
+  PLANT_INDEX_SCORE_CAP,
+  PLANT_INDEX_SEEDED_SOIL,
+  PLANT_INDEX_SPROUT_STAGE_1,
+  PLANT_INDEX_SPROUT_STAGE_2,
+  PLANT_INDEX_SPROUT_STAGE_3,
+  PLANT_INDEX_GRASS_STAGE_4,
+  PLANT_INDEX_GRASS_STAGE_5,
+  WORLD_FOG_TEST_WIDTH,
+  WORLD_FOG_TEST_HEIGHT,
+  WORLD_FOG_TEST_X,
+  WORLD_FOG_TEST_Y,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   SEED_SIZE,
@@ -211,6 +222,7 @@ import {
   treeAppleElements,
   world,
   ground,
+  worldFogTest,
   onboardingCallout,
   onboardingCalloutText,
   movementTutorialOverlay,
@@ -748,18 +760,48 @@ function syncGuideInventoryBar() {
   updatePlantProgressGauge();
 }
 
-function getPlantedPlantProgressCount() {
-  let count = 0;
-  if (plantRuntime && plantRuntime.isSeedPlanted && plantRuntime.status !== "dry") {
-    count += 1;
+function getPlantIndexPointsForSinglePlant(plant) {
+  if (!plant || plant.removed) return 0;
+  if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return 0;
+  if (!plant.isSeedPlanted) return 0;
+  if (!plant.isSproutGrown) return PLANT_INDEX_SEEDED_SOIL;
+  const st = getSproutStageFromPlant(plant);
+  if (st <= 0) return PLANT_INDEX_SEEDED_SOIL;
+  if (st === 1) return PLANT_INDEX_SPROUT_STAGE_1;
+  if (st === 2) return PLANT_INDEX_SPROUT_STAGE_2;
+  if (st === 3) return PLANT_INDEX_SPROUT_STAGE_3;
+  if (st === 4) return PLANT_INDEX_GRASS_STAGE_4;
+  return PLANT_INDEX_GRASS_STAGE_5;
+}
+
+function getTotalPlantIndexScore() {
+  let sum = 0;
+  if (plantRuntime && plantRuntime.isSeedPlanted) {
+    sum += getPlantIndexPointsForSinglePlant(plantRuntime);
   }
   if (appleState && Array.isArray(appleState.extraPlants)) {
-    appleState.extraPlants.forEach(function (plant) {
-      if (!plant || plant.removed || plant.status === "dry") return;
-      count += 1;
+    appleState.extraPlants.forEach(function (p) {
+      if (!p || p.removed) return;
+      sum += getPlantIndexPointsForSinglePlant(p);
     });
   }
-  return Math.max(0, count);
+  return Math.min(PLANT_INDEX_SCORE_CAP, Math.max(0, sum));
+}
+
+function getWorldFogTestRect() {
+  return {
+    left: WORLD_FOG_TEST_X,
+    top: WORLD_FOG_TEST_Y,
+    right: WORLD_FOG_TEST_X + WORLD_FOG_TEST_WIDTH,
+    bottom: WORLD_FOG_TEST_Y + WORLD_FOG_TEST_HEIGHT
+  };
+}
+
+function isPlayerOverlappingWorldFogTestZone() {
+  if (!isWorldDocumentEntry() || !worldFogTest || worldFogTest.style.display === "none") {
+    return false;
+  }
+  return isOverlappingRect(getWorldFogTestRect(), getPlayerBox());
 }
 
 function updatePlantProgressGauge() {
@@ -771,13 +813,13 @@ function updatePlantProgressGauge() {
   ensurePlantProgressSproutToggleBound();
   if (!visible) return;
 
-  const count = getPlantedPlantProgressCount();
-  const max = 4;
-  const progress = Math.max(0, Math.min(1, count / max));
+  const score = getTotalPlantIndexScore();
+  const progress = score / PLANT_INDEX_SCORE_CAP;
   gauge.style.setProperty("--plant-progress", Math.round(progress * 100) + "%");
   gauge.querySelectorAll(".plant-progress-reward").forEach(function (reward) {
-    const step = Math.max(1, Number(reward.getAttribute("data-step")) || 1);
-    reward.classList.toggle("is-unlocked", count >= step);
+    const t = Number(reward.getAttribute("data-threshold"));
+    if (!Number.isFinite(t)) return;
+    reward.classList.toggle("is-unlocked", score >= t);
   });
 }
 
@@ -7585,6 +7627,9 @@ function updatePlayerPosition() {
 
   if (playerX < 0) playerX = 0;
   if (playerX > maxX) playerX = maxX;
+  if (isPlayerOverlappingWorldFogTestZone()) {
+    playerX = previousPlayerX;
+  }
 
   const isInCanopy = isPlayerInTreeCanopy();
   const isNearTrunk = isPlayerNearTreeTrunk();
@@ -13392,6 +13437,11 @@ function setup() {
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+  if (worldFogTest) {
+    setWorldSize(worldFogTest, WORLD_FOG_TEST_WIDTH, WORLD_FOG_TEST_HEIGHT);
+    setWorldPosition(worldFogTest, WORLD_FOG_TEST_X, WORLD_FOG_TEST_Y);
+    worldFogTest.style.display = isWorldDocumentEntry() ? "block" : "none";
+  }
   updateWellImage();
   updateSeedPosition();
   updateBucketPosition();
