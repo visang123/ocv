@@ -283,6 +283,7 @@ import {
   isTutorialDocumentEntry,
   isWorldDocumentEntry
 } from "./src/app/ovc-page-entry.js";
+import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen
@@ -333,8 +334,6 @@ let hasGuideBook = false;
 let isGuideBookOpen = false;
 let isGuideDismissedAtSign = false;
 let isGuideBookClickPromptActive = false;
-let movementTutorialPhase = 0;
-let movementTutorialBaseline = null;
 let onboardingFlowStep = 1;
 let onboardingJumpLatch = false;
 let onboardingNpcGuideEscHintShown = false;
@@ -834,6 +833,46 @@ let isPresenceDbSyncing = false;
 let isPresenceDbPolling = false;
 let isLoggingOut = false;
 let isTabSessionSuperseded = false;
+const movementTutorial = createMovementTutorial({
+  movementTutorialCompleteKey,
+  getStoredFlag,
+  setStoredFlag,
+  isTutorialDocumentEntry,
+  hasCurrentUser: function () {
+    return Boolean(currentUserId);
+  },
+  getHasSpawnedCharacter: function () {
+    return hasSpawnedCharacter;
+  },
+  getIsCharacterSelecting: function () {
+    return isCharacterSelecting;
+  },
+  getIsTabSessionSuperseded: function () {
+    return isTabSessionSuperseded;
+  },
+  getHasGuideBook: function () {
+    return hasGuideBook;
+  },
+  getOnboardingFlowStep: function () {
+    return onboardingFlowStep;
+  },
+  isNearWorldBagPickup: isNearWorldBagPickup,
+  dom: {
+    overlay: movementTutorialOverlay,
+    lineMove: movementTutorialLineMove,
+    lineBook: movementTutorialLineBook,
+    keys: movementTutorialKeys,
+    guideBook: guideBook,
+    worldBag: worldBag
+  },
+  getPlayerPose: function () {
+    return {
+      x: playerX,
+      depth: playerDepth,
+      jumpY: jumpY
+    };
+  }
+});
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
 let isWorldPolling = false;
@@ -1532,6 +1571,10 @@ document.addEventListener("visibilitychange", function () {
     sendMultiplayerPresence(true);
     saveGameSnapshot();
     resetInputKeys(keys);
+  } else {
+    // 백그라운드 복귀 직후 한 프레임에만 쓰이는 wallDelta가 비정상적으로 커지면
+    // 비권한 나비 보간·최대 스텝 캡이 한 번 튀는 것을 막음.
+    lastButterflyWallClockMs = 0;
   }
 });
 
@@ -4910,6 +4953,28 @@ function sanitizePrematureRemotePlantDryState(plant, now) {
     plant.waterLevel > 0 ? null : Math.max(1, now - Math.max(0, ageAtSnapshot - tickMs));
 }
 
+function shouldIgnoreEmptyRemoteMainPlant(incomingPlant) {
+  if (!plantRuntime.isSeedPlanted || !incomingPlant || incomingPlant.isSeedPlanted) {
+    return false;
+  }
+  if (isReloadingForWorldReset || Date.now() - Number(lastWorldResetAt || 0) < 20000) {
+    return false;
+  }
+  const status = plantRuntime.status || "normal";
+  if (status === "normal" || status === "wet") {
+    return true;
+  }
+  if (status === "dry") {
+    const dryAt = Number(plantRuntime.drySoilAt);
+    return !Number.isFinite(dryAt) || Date.now() - dryAt < plantDrySoilClearMs;
+  }
+  if (status === "rotten" || plantRuntime.isOverwatered) {
+    const rottenAt = Number(plantRuntime.rottenAt);
+    return !Number.isFinite(rottenAt) || Date.now() - rottenAt < plantRotClearMs;
+  }
+  return true;
+}
+
 function snapWellRefillToGrid(nowMs) {
   const t = Number(nowMs);
   if (!Number.isFinite(t) || t <= 0) {
@@ -5298,6 +5363,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         !incomingPlant.isSeedPlanted
       ) {
         incomingPlant = null;
+      }
+      if (shouldIgnoreEmptyRemoteMainPlant(incomingPlant)) {
+        incomingPlant = null;
+        markWorldDirty();
       }
       if (incomingPlant) {
         if (
@@ -12687,17 +12756,12 @@ function updateButterflies() {
       drawX = nx;
       drawY = ny;
     } else {
-      if (typeof butterfly._renderX !== "number" || typeof butterfly._renderY !== "number") {
-        butterfly._renderX = butterfly.x;
-        butterfly._renderY = butterfly.y;
-      }
-      const dt = Math.max(1, wallDelta);
-      const authFollow = 1 - Math.exp(-dt / 52);
-      const authAlpha = Math.min(0.88, Math.max(0.22, authFollow));
-      butterfly._renderX += (butterfly.x - butterfly._renderX) * authAlpha;
-      butterfly._renderY += (butterfly.y - butterfly._renderY) * authAlpha;
-      drawX = butterfly._renderX;
-      drawY = butterfly._renderY;
+      // 권한 클라이언트·오프라인: 시뮬 좌표가 곧 진실값. 여기서 한 번 더 보간하면
+      // 매 프레임 갱신되는 플러터·경로보다 화면만 한 박자 늦어져 버벅임처럼 보임(다창 권한 탭 포함).
+      butterfly._renderX = butterfly.x;
+      butterfly._renderY = butterfly.y;
+      drawX = butterfly.x;
+      drawY = butterfly.y;
     }
     butterfly._catchProbeCx = drawX;
     butterfly._catchProbeCy = drawY;
