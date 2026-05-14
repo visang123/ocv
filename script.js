@@ -942,8 +942,11 @@ function updatePlantProgressGauge() {
   if (!visible) return;
 
   const score = getTotalPlantIndexScore();
-  const progress = score / PLANT_INDEX_SCORE_CAP;
-  gauge.style.setProperty("--plant-progress", Math.round(progress * 100) + "%");
+  const progress =
+    PLANT_INDEX_SCORE_CAP > 0
+      ? Math.max(0, Math.min(1, score / PLANT_INDEX_SCORE_CAP))
+      : 0;
+  gauge.style.setProperty("--plant-fill", String(progress));
   gauge.querySelectorAll(".plant-progress-reward").forEach(function (reward) {
     const t = Number(reward.getAttribute("data-threshold"));
     if (!Number.isFinite(t)) return;

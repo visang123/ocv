@@ -2644,7 +2644,7 @@ body #world-bag-inventory {
 }
 
 .plant-progress-gauge {
-  --plant-progress: 0%;
+  --plant-fill: 0;
   position: fixed;
   left: 14px;
   bottom: 96px;
@@ -2735,8 +2735,9 @@ body #world-bag-inventory {
   left: 9px;
   right: 9px;
   bottom: 22px;
-  height: var(--plant-progress);
-  max-height: 318px;
+  /* 미터 높이(388px)에서 위·아래 여백(12+22)을 뺀 구간에 0~1000점 선형 매핑 — max-height 고정값은 중간부터 막힘 */
+  height: calc((100% - 34px) * var(--plant-fill, 0));
+  max-height: none;
   border-radius: 7px 7px 5px 5px;
   z-index: 1;
   background:
