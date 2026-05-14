@@ -934,9 +934,16 @@ function clearLiveButterfliesForPlantFogLock(now) {
 
 function updatePlantProgressGauge() {
   syncWorldPlantFogVisuals();
+  const score = getTotalPlantIndexScore();
+  const hud = document.getElementById("world-plant-index-hud");
+  if (hud) {
+    hud.textContent = String(score);
+    const hudVisible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
+    hud.style.display = hudVisible ? "block" : "none";
+    hud.setAttribute("aria-hidden", hudVisible ? "false" : "true");
+  }
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
-  const score = getTotalPlantIndexScore();
   const progress =
     PLANT_INDEX_SCORE_CAP > 0
       ? Math.max(0, Math.min(1, score / PLANT_INDEX_SCORE_CAP))
