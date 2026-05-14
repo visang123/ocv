@@ -808,6 +808,22 @@ const WORLD_SAD_BUTTON_EMOJI = "\uD83D\uDE22";
 const WORLD_CHAT_MAX_CHARS = 120;
 /** 전체 채팅 접두(이 뒤는 모두에게 표시). */
 const WORLD_CHAT_GLOBAL_PREFIX = "\uC804\uCCB4:";
+/** 전각 콜론(U+FF1A) 등을 반각(U+003A)으로 통일 — IME·모바일에서 귓말/전체 구문이 깨지지 않게 */
+function normalizeWorldChatColonsForParsing(str) {
+  return String(str || "").replace(/\uFF1A/g, ":");
+}
+
+/** UTF-16 서로게이트 쌍 중간에서 잘리지 않게 자름 */
+function truncateWorldChatString(s, maxLen) {
+  const n = Math.max(0, Number(maxLen) || 0);
+  if (!s || s.length <= n) return s;
+  let cut = s.slice(0, n);
+  const hi = cut.charCodeAt(cut.length - 1);
+  if (hi >= 0xd800 && hi <= 0xdbff) {
+    cut = cut.slice(0, -1);
+  }
+  return cut;
+}
 const WORLD_CHAT_NAMEPLATE_FONT_PX = 5.3;
 const WORLD_CHAT_NAMEPLATE_PAD_V = 1;
 const WORLD_CHAT_NAMEPLATE_PAD_H = 3;
@@ -10420,7 +10436,7 @@ function sanitizeWorldChatText(raw) {
   let s = String(raw || "")
     .trim()
     .replace(/[\u0000-\u001F<>]/g, "");
-  if (s.length > WORLD_CHAT_MAX_CHARS) s = s.slice(0, WORLD_CHAT_MAX_CHARS);
+  if (s.length > WORLD_CHAT_MAX_CHARS) s = truncateWorldChatString(s, WORLD_CHAT_MAX_CHARS);
   return s;
 }
 
@@ -10428,7 +10444,7 @@ function sanitizeWorldChatText(raw) {
  * @returns {{ kind: "world", body: string } | { kind: "whisper", recipientNames: string[], body: string } | null}
  */
 function parseWorldChatComposition(raw) {
-  const s = String(raw || "").trim();
+  const s = normalizeWorldChatColonsForParsing(String(raw || "").trim());
   if (!s) return null;
   if (s.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
     return { kind: "world", body: s.slice(WORLD_CHAT_GLOBAL_PREFIX.length).trim() };
@@ -10572,7 +10588,7 @@ function appendWhisperRecipientToWorldChatInput(pickedName) {
   if (!worldChatInputEl) return;
   const pick = String(pickedName || "").trim();
   if (!pick) return;
-  let v = worldChatInputEl.value || "";
+  let v = normalizeWorldChatColonsForParsing(worldChatInputEl.value || "");
   const lead = v.replace(/^\s+/, "");
   if (lead.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
     v = lead.slice(WORLD_CHAT_GLOBAL_PREFIX.length).replace(/^\s+/, "");
@@ -10629,7 +10645,7 @@ function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
   let prefix = "[" + hh + ":" + mm + "] ";
   if (entry.chatKind === "whisper") {
     prefix +=
-      "[\uADC8\uB9D0" +
+      "[\uADD3\uB9D0" +
       (entry.whisperToLabel ? " \u2192 " + entry.whisperToLabel : "") +
       "] ";
   } else {
@@ -10912,7 +10928,7 @@ function updateWorldSocialChatUiEnabled() {
   if (worldChatInputEl) {
     worldChatInputEl.disabled = !ok;
     worldChatInputEl.placeholder = ok
-      ? "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADC8\uB9D0..."
+      ? "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADD3\uB9D0..."
       : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
   }
   if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
@@ -11123,7 +11139,7 @@ function ensureWorldSocialUi() {
   hint.className = "world-chat-hint";
   hint.textContent =
     '\uC804\uCCB4 \uCC57: "\uC804\uCCB4: "\uC785\uB825 \uD6C4 \uCC57\uC305 or \uADF8\uB0E5 \uC785\uB825\n' +
-    ' \uADC8\uB9D0: "(\uC774\uB984):", \uB2E4\uC218\uB294 "(\uC774\uB984),(\uC774\uB984):"\n' +
+    ' \uADD3\uB9D0: "(\uC774\uB984):", \uB2E4\uC218\uB294 "(\uC774\uB984),(\uC774\uB984):"\n' +
     ' \uAC04\uD3B8\uD558\uAC8C \uC811\uC18D\uD55C \uC720\uC800 \uBC84\uD2BC \uD074\uB9AD \uD6C4, \uC774\uB984 \uD074\uB9AD\uD574\uC11C\uB3C4 \uAC00\uB2A5';
   worldChatLogEl.appendChild(hint);
   worldChatInputWrapEl = document.createElement("div");
