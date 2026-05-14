@@ -706,6 +706,14 @@ function saveBagInventoryOrder() {
 }
 bagInventoryItemOrder = loadBagInventoryOrder();
 
+function shouldShowWorldBagInventoryUi() {
+  return Boolean(
+    hasGuideBook ||
+    getStoredFlag(hasGuideBookKey) ||
+    isWorldFloorBagClaimed(getStoredFlag)
+  );
+}
+
 function syncWorldGuideBookGroundVisibility() {
   if (!guideBook) return;
   guideBook.style.display = isWorldFloorGuideBookHiddenForCurrentView() ? "none" : "block";
@@ -717,11 +725,7 @@ function syncGuideInventoryBar() {
     guideBookButton.hidden = true;
   }
   if (worldBagInventory) {
-    const show = Boolean(
-      hasGuideBook ||
-      getStoredFlag(hasGuideBookKey) ||
-      isWorldFloorBagClaimed(getStoredFlag)
-    );
+    const show = shouldShowWorldBagInventoryUi();
     worldBagInventory.style.display = show ? "block" : "none";
     worldBagInventory.hidden = !show;
   }
@@ -745,8 +749,9 @@ function getPlantedPlantProgressCount() {
 function updatePlantProgressGauge() {
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
-  const visible = Boolean(worldBagInventory && !worldBagInventory.hidden);
+  const visible = Boolean(worldBagInventory && shouldShowWorldBagInventoryUi());
   gauge.classList.toggle("is-visible", visible);
+  gauge.setAttribute("aria-hidden", visible ? "false" : "true");
   if (!visible) return;
 
   const count = getPlantedPlantProgressCount();
@@ -1505,11 +1510,7 @@ document.addEventListener("keydown", function (event) {
     if (!hasSpawnedCharacter) {
       return;
     }
-    if (
-      !worldBagInventory ||
-      worldBagInventory.style.display === "none" ||
-      worldBagInventory.hidden
-    ) {
+    if (!worldBagInventory || !shouldShowWorldBagInventoryUi()) {
       return;
     }
     if (

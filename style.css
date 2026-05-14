@@ -2549,7 +2549,7 @@ body #world-bag-inventory {
   position: fixed;
   left: 18px;
   bottom: 102px;
-  z-index: 12;
+  z-index: 252;
   display: none;
   width: 258px;
   height: 300px;
@@ -2739,6 +2739,7 @@ body #world-bag-inventory {
   object-fit: contain;
   object-position: center;
   flex-shrink: 0;
+  overflow: visible;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
   pointer-events: none;
   user-select: none;
