@@ -58,6 +58,11 @@ export function getPlantFogGlobalDimAlphaForStage(stage) {
   return 0.48;
 }
 
+/** 월드 세로 중 땅(324px) 위쪽 하늘 밴드 높이(216px) */
+export const WORLD_SKY_BAND_HEIGHT = WORLD_HEIGHT - GROUND_WORLD_HEIGHT;
+/** 이 단계(4 = 식물지수 750~)부터 하늘 밴드 안개 제거 */
+export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 4;
+
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;
 export const SEED_SIZE = 10;

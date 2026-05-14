@@ -52,6 +52,7 @@ const treeAppleElements = Array.from(document.querySelectorAll(".tree-apple"));
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
 const worldPlantFog = document.getElementById("world-plant-fog");
+const worldSkyFog = document.getElementById("world-sky-fog");
 const onboardingCallout = document.getElementById("onboarding-callout");
 const onboardingCalloutText = document.getElementById("onboarding-callout-text");
 const movementTutorialOverlay = document.getElementById("movement-tutorial-overlay");
@@ -112,6 +113,7 @@ export {
   world,
   ground,
   worldPlantFog,
+  worldSkyFog,
   onboardingCallout,
   onboardingCalloutText,
   movementTutorialOverlay,

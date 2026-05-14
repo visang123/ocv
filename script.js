@@ -29,6 +29,8 @@ import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   GROUND_WORLD_HEIGHT,
+  WORLD_SKY_BAND_HEIGHT,
+  PLANT_FOG_SKY_OPEN_MIN_STAGE,
   PLANT_INDEX_SCORE_CAP,
   PLANT_INDEX_SEEDED_SOIL,
   PLANT_INDEX_SPROUT_STAGE_1,
@@ -223,6 +225,7 @@ import {
   world,
   ground,
   worldPlantFog,
+  worldSkyFog,
   onboardingCallout,
   onboardingCalloutText,
   movementTutorialOverlay,
@@ -812,6 +815,7 @@ function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
 function syncWorldPlantFogVisuals() {
   if (!isWorldDocumentEntry()) {
     if (worldPlantFog) worldPlantFog.style.display = "none";
+    if (worldSkyFog) worldSkyFog.style.display = "none";
     if (world) world.style.filter = "";
     return;
   }
@@ -822,6 +826,15 @@ function syncWorldPlantFogVisuals() {
     else if (stage === 3) world.style.filter = "brightness(0.86)";
     else if (stage === 2) world.style.filter = "brightness(0.78)";
     else world.style.filter = "brightness(0.68)";
+  }
+  if (worldSkyFog) {
+    if (stage >= PLANT_FOG_SKY_OPEN_MIN_STAGE) {
+      worldSkyFog.style.display = "none";
+    } else {
+      worldSkyFog.style.display = "block";
+      setWorldSize(worldSkyFog, WORLD_WIDTH, WORLD_SKY_BAND_HEIGHT);
+      setWorldPosition(worldSkyFog, 0, -WORLD_SKY_BAND_HEIGHT);
+    }
   }
   if (!worldPlantFog) return;
   worldPlantFog.style.display = "block";
