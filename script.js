@@ -788,7 +788,8 @@ function getTotalPlantIndexScore() {
       sum += getPlantIndexPointsForSinglePlant(p);
     });
   }
-  return Math.min(PLANT_INDEX_SCORE_CAP, Math.max(0, sum));
+  const bonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
+  return Math.min(PLANT_INDEX_SCORE_CAP, Math.max(0, sum + bonus));
 }
 
 function getPlantFogClearRectForCurrentScore() {
@@ -1151,6 +1152,8 @@ const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 const magicPowderCountKey = "magicPowderCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
+/** 관리자 디버그: 식물지수 표시·안개 등에만 가산(실제 작물 합산과 별개) */
+let adminDebugPlantIndexBonus = 0;
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
 let lastPresenceDbPollAt = 0;
@@ -2242,13 +2245,20 @@ networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
 networkDebugButton.setAttribute("aria-label", "로그");
 document.body.appendChild(networkDebugButton);
-const testWhiteButterflyButton = document.createElement("button");
-testWhiteButterflyButton.id = "test-white-butterfly-button";
-testWhiteButterflyButton.type = "button";
-testWhiteButterflyButton.textContent = "";
-testWhiteButterflyButton.setAttribute("aria-label", "흰나비 10마리 테스트");
-testWhiteButterflyButton.setAttribute("title", "흰나비 +10 (테스트)");
-document.body.appendChild(testWhiteButterflyButton);
+const adminDevMagicPowderButton = document.createElement("button");
+adminDevMagicPowderButton.id = "admin-dev-magic-powder-button";
+adminDevMagicPowderButton.type = "button";
+adminDevMagicPowderButton.textContent = "";
+adminDevMagicPowderButton.setAttribute("aria-label", "마법의 가루 즉석 제작 (테스트)");
+adminDevMagicPowderButton.setAttribute("title", "마법의 가루 +10 (관리자 테스트)");
+document.body.appendChild(adminDevMagicPowderButton);
+const adminDevPlantIndexPlusButton = document.createElement("button");
+adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
+adminDevPlantIndexPlusButton.type = "button";
+adminDevPlantIndexPlusButton.textContent = "+";
+adminDevPlantIndexPlusButton.setAttribute("aria-label", "식물지수 +100 (테스트)");
+adminDevPlantIndexPlusButton.setAttribute("title", "식물지수 +100 (관리자 테스트)");
+document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
 magicPowderInventory.id = "magic-powder-inventory";
@@ -2260,8 +2270,14 @@ const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-c
 magicPowderInventory.addEventListener("click", function () {
   tryUseMagicPowder();
 });
-testWhiteButterflyButton.addEventListener("click", function () {
-  addWhiteButterfliesForTest();
+adminDevMagicPowderButton.addEventListener("click", function () {
+  magicPowderCount = Math.max(0, Math.floor(magicPowderCount)) + 10;
+  saveMagicPowderCount();
+  updateMagicPowderInventoryUi();
+});
+adminDevPlantIndexPlusButton.addEventListener("click", function () {
+  adminDebugPlantIndexBonus = Math.max(0, Math.floor(adminDebugPlantIndexBonus)) + 100;
+  updatePlantProgressGauge();
 });
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
@@ -12596,12 +12612,6 @@ function getTotalCaughtButterflies() {
   return butterflyColors.reduce(function (total, color) {
     return total + Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
   }, 0);
-}
-
-function addWhiteButterfliesForTest() {
-  butterflyState.caughtCounts.white = (butterflyState.caughtCounts.white || 0) + 10;
-  saveButterflyCaughtCounts();
-  updateBagInventorySlots();
 }
 
 function pickRandomButterflyColor() {
