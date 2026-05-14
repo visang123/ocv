@@ -725,6 +725,7 @@ function syncWorldBagGroundVisibility() {
   if (worldBag) {
     if (isWorldFloorBagHiddenForCurrentView() && !hasGuideBook) {
       hasGuideBook = true;
+      setWorldBagGroundPickedForCurrentRoom();
       setGuideBookPickedForCurrentRoom();
     }
     worldBag.style.display = isWorldFloorBagHiddenForCurrentView() ? "none" : "block";

@@ -54,6 +54,15 @@ export function migrateUnscopedUserPickupFlagsToUserScope(userId) {
         localStorage.setItem(destG, "true");
       }
     }
+    const plainKeysToScope = ["ovcBagInventoryOrderV1"];
+    for (let p = 0; p < plainKeysToScope.length; p++) {
+      const pk = plainKeysToScope[p];
+      const destP = userPrefix + pk;
+      if (localStorage.getItem(destP) != null) continue;
+      const raw = localStorage.getItem(pk);
+      if (raw == null || raw === "") continue;
+      localStorage.setItem(destP, raw);
+    }
   } catch (e) {}
 }
 

@@ -41,6 +41,17 @@ export function normalizeBagInventoryOrderByCounts(order, previousCounts, counts
   }
 
   if (!previousCounts) {
+    const allCountsZero = BAG_SLOT_ITEM_KEYS.every(function (key) {
+      return Number(counts[key] || 0) <= 0;
+    });
+    // 첫 프레임(appleState·가이드 등 미적재)에 카운트만 0이면 순서를 비워 저장해 재로그인 시 가방이 초기화됨
+    if (allCountsZero && order.length > 0) {
+      return {
+        order: order.slice(),
+        previousCounts: Object.assign({}, counts),
+        changed: false
+      };
+    }
     BAG_SLOT_ITEM_KEYS.forEach(function (key) {
       if (Number(counts[key] || 0) <= 0) return;
       if (nextOrder.includes(key)) return;
