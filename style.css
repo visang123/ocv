@@ -2591,9 +2591,6 @@ body #world-bag-inventory {
   pointer-events: none;
   color: #f8e8a6;
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
-  transition:
-    height 0.24s ease,
-    bottom 0.24s ease;
 }
 
 .plant-progress-gauge.is-visible {
@@ -2601,8 +2598,8 @@ body #world-bag-inventory {
 }
 
 .plant-progress-gauge.is-collapsed {
-  height: 48px;
-  bottom: 20px;
+  height: 52px;
+  overflow: hidden;
 }
 
 .plant-progress-gauge-panel {
@@ -3085,6 +3082,10 @@ body #world-bag-inventory {
     0 0 48px rgba(251, 146, 60, 0.35);
 }
 
+#world-bag-inventory.is-first-seed-focus {
+  z-index: 260;
+}
+
 #world-bag-inventory.is-first-seed-focus::before {
   content: "새 씨앗!";
   position: fixed;
@@ -3097,7 +3098,7 @@ body #world-bag-inventory {
   color: #111;
   font: 900 13px/1 Arial, sans-serif;
   white-space: nowrap;
-  z-index: 70;
+  z-index: 261;
   animation: first-seed-callout 820ms ease-in-out infinite;
 }
 
@@ -3112,7 +3113,7 @@ body #world-bag-inventory {
   box-shadow: 0 0 0 0 rgba(255, 230, 109, 0.82);
   animation: first-seed-pulse 900ms ease-out infinite;
   pointer-events: none;
-  z-index: 69;
+  z-index: 260;
 }
 
 @keyframes first-seed-callout {
