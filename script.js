@@ -925,7 +925,34 @@ let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
 let hasHydratedSharedWorldFromServer = false;
 let pendingWorldResetToken = "";
-let lastAppliedWorldResetToken = sessionStorage.getItem("ovcLastWorldResetTokenV1") || "";
+/** 세션만 쓰면 새 탭에서 비어 공유 리셋으로 오인 → appStorageKeysSharedWorldReset으로 가방 플래그까지 지워짐. local과 동기화. */
+const ovcLastWorldResetTokenStorageKey = "ovcLastWorldResetTokenV1";
+
+function readOvcLastAppliedWorldResetTokenFromStores() {
+  try {
+    const fromSession = (sessionStorage.getItem(ovcLastWorldResetTokenStorageKey) || "").trim();
+    const fromLocal = (localStorage.getItem(ovcLastWorldResetTokenStorageKey) || "").trim();
+    if (fromSession && !fromLocal) {
+      localStorage.setItem(ovcLastWorldResetTokenStorageKey, fromSession);
+    } else if (fromLocal && !fromSession) {
+      sessionStorage.setItem(ovcLastWorldResetTokenStorageKey, fromLocal);
+    }
+    return fromSession || fromLocal;
+  } catch (e) {
+    return "";
+  }
+}
+
+function persistOvcLastAppliedWorldResetToken(token) {
+  const t = String(token || "").trim();
+  if (!t) return;
+  try {
+    sessionStorage.setItem(ovcLastWorldResetTokenStorageKey, t);
+    localStorage.setItem(ovcLastWorldResetTokenStorageKey, t);
+  } catch (e2) {}
+}
+
+let lastAppliedWorldResetToken = readOvcLastAppliedWorldResetTokenFromStores();
 let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
@@ -3451,7 +3478,7 @@ function resetGameForTesting() {
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
   lastWorldResetAt = Date.now();
-  sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
+  persistOvcLastAppliedWorldResetToken(lastAppliedWorldResetToken);
   applyDefaultState({ sharedWorldResetOnly: true });
   persistDefaultStateAfterReset();
   restartPlayerPositionOnly();
@@ -5211,7 +5238,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     lastAppliedWorldResetToken = snapshotResetToken;
     lastWorldResetAt = syncedNow;
     ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
-    sessionStorage.setItem("ovcLastWorldResetTokenV1", lastAppliedWorldResetToken);
+    persistOvcLastAppliedWorldResetToken(lastAppliedWorldResetToken);
     // 공유 세계만: 로컬 월드 캐시 삭제 + 맵·자원 기본값(튜토리얼 세션/온보딩 키는 유지)
     clearStoredKeys(appStorageKeysSharedWorldReset);
     isWorldDirty = false;
