@@ -12595,8 +12595,8 @@ function updateButterflies() {
   /** 프레임 간격에 맞춘 지수 보간(짧은 dt에서도 곡선이 끊기지 않게). */
   const butterflyRemoteLerpAlpha = (function () {
     const dt = Math.max(1, wallDelta);
-    const a = 1 - Math.exp(-dt / 92);
-    return Math.min(0.44, Math.max(0.11, a));
+    const a = 1 - Math.exp(-dt / 118);
+    return Math.min(0.34, Math.max(0.08, a));
   })();
   /** 과도한 단발 점프만 막음(이전 낮은 캡은 계단처럼 보이기 쉬움). */
   const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 160 : 120;
@@ -12642,8 +12642,9 @@ function updateButterflies() {
       }
       const rdx = targetX - butterfly._renderX;
       const rdy = targetY - butterfly._renderY;
+      const remaining = Math.hypot(rdx, rdy);
       const t = butterflyRemoteLerpAlpha;
-      const smoothT = t * t * (3 - 2 * t);
+      const smoothT = remaining < 0.55 ? t * 0.35 : t * t * (3 - 2 * t);
       let nx = butterfly._renderX + rdx * smoothT;
       let ny = butterfly._renderY + rdy * smoothT;
       let mx = nx - butterfly._renderX;
@@ -12765,10 +12766,11 @@ function handleRemoteButterflyStateBroadcast(payload) {
 function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
   if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
   const now = Date.now();
-  const recvAt =
+  const sampleAt =
     Number.isFinite(Number(networkSampleAtMs)) && Number(networkSampleAtMs) > 0
       ? Number(networkSampleAtMs)
       : now;
+  const recvAt = now;
   // Purge old tombstones so the map stays bounded.
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     if (now - butterflyLocalCatchTombstoneById[id] > BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS) {
@@ -12833,22 +12835,23 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       butterfly.color = raw.color || butterfly.color;
       const prevX = Number.isFinite(Number(butterfly.x)) ? butterfly.x : null;
       const prevY = Number.isFinite(Number(butterfly.y)) ? butterfly.y : null;
-      const prevRecv = butterfly._netRecvAt;
+      const prevSampleAt = butterfly._netSampleAt;
       const newX = getNumericButterflyValue(raw.x, prevX != null ? prevX : butterflyBoundsLeft);
       const newY = getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop);
-      if (prevX != null && prevY != null && Number.isFinite(prevRecv) && prevRecv > 0) {
-        const dtMs = Math.max(16, recvAt - prevRecv);
+      if (prevX != null && prevY != null && Number.isFinite(prevSampleAt) && prevSampleAt > 0) {
+        const dtMs = Math.max(16, sampleAt - prevSampleAt);
         const rawVx = (newX - prevX) / dtMs;
         const rawVy = (newY - prevY) / dtMs;
         const prevVx = Number(butterfly._netVx) || 0;
         const prevVy = Number(butterfly._netVy) || 0;
-        const blend = 0.4;
+        const blend = 0.26;
         butterfly._netVx = prevVx * (1 - blend) + rawVx * blend;
         butterfly._netVy = prevVy * (1 - blend) + rawVy * blend;
       } else {
         butterfly._netVx = 0;
         butterfly._netVy = 0;
       }
+      butterfly._netSampleAt = sampleAt;
       butterfly._netRecvAt = recvAt;
       butterfly.x = newX;
       butterfly.y = newY;
