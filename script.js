@@ -6866,7 +6866,7 @@ function restorePlantHoverLabelToWorldDom() {
 function showUiShortcutHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   ensurePlantHoverLabelOnBodyForFixedUi();
-  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete");
+  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete", "is-well-dock");
   plantHoverLabel.classList.add("is-ui-shortcut-hint");
   plantHoverLabel.textContent = text;
   plantHoverLabel.style.display = "block";
@@ -8424,6 +8424,7 @@ function hidePlantHoverLabel() {
     plantHoverLabel.classList.remove("is-seed-inventory-hint");
     plantHoverLabel.classList.remove("is-stage3-complete");
     plantHoverLabel.classList.remove("is-ui-shortcut-hint");
+    plantHoverLabel.classList.remove("is-well-dock");
     plantHoverLabel.style.position = "";
     plantHoverLabel.style.left = "";
     plantHoverLabel.style.top = "";
@@ -8436,13 +8437,19 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
-  restorePlantHoverLabelToWorldDom();
-  plantHoverLabel.classList.remove("is-ui-shortcut-hint");
-  plantHoverLabel.style.position = "";
-  plantHoverLabel.style.left = "";
+  if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
+    hidePlantHoverLabel();
+    return;
+  }
+  ensurePlantHoverLabelOnBodyForFixedUi();
+  plantHoverLabel.classList.remove("is-ui-shortcut-hint", "is-seed-inventory-hint");
+  plantHoverLabel.classList.add("is-well-dock");
+  plantHoverLabel.style.position = "fixed";
+  plantHoverLabel.style.left = "auto";
   plantHoverLabel.style.top = "";
-  plantHoverLabel.style.zIndex = "";
-  plantHoverLabel.classList.remove("is-seed-inventory-hint");
+  plantHoverLabel.style.right = "";
+  plantHoverLabel.style.transform = "none";
+  plantHoverLabel.style.zIndex = "11";
   const px = plant.spotX != null ? plant.spotX : plant.x;
   const py = plant.spotY != null ? plant.spotY : plant.y;
   if (px == null || py == null) return;
@@ -8453,17 +8460,7 @@ function showPlantHoverForPlant(plant) {
   }
   plantHoverLabel.classList.remove("is-stage3-complete");
   plantHoverLabel.textContent = label;
-  plantHoverLabel.style.display = "block";
-  function placeHoverLabelCentered() {
-    const anchor = getPlantHoverAnchorWorld(plant);
-    const w = plantHoverLabel.offsetWidth || 1;
-    const h = plantHoverLabel.offsetHeight || 1;
-    const sx = toScreenX(anchor.cxWorld) - w / 2;
-    const sy = toScreenY(anchor.cyWorld) - h / 2;
-    plantHoverLabel.style.transform = "translate(" + sx + "px, " + sy + "px)";
-  }
-  void plantHoverLabel.offsetWidth;
-  placeHoverLabelCentered();
+  plantHoverLabel.style.display = "flex";
 }
 
 function plantProximityRectFromXYWH(x, y, w, h) {
@@ -9473,6 +9470,7 @@ function updatePlantCard() {
       }
       plantCard.style.display = "block";
       renderPlantCardForPlant(plant);
+      hidePlantHoverLabel();
       return;
     }
 
@@ -9487,6 +9485,7 @@ function updatePlantCard() {
 
     plantCard.style.display = "block";
     renderPlantCardForPlant(plantRuntime);
+    hidePlantHoverLabel();
     return;
   }
 

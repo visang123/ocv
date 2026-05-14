@@ -214,7 +214,39 @@ body::-webkit-scrollbar {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
 }
 
-/** 고정 UI(설정·채팅·하트·슬퍼요) 단축키 — 월드 4px 스케일과 별도로 읽기 좋은 크기 */
+/** 고정 UI 단축키 | 식물 이름(우물 카드 왼쪽 열) */
+#plant-hover-label.is-well-dock {
+  position: fixed;
+  left: auto;
+  right: 270px;
+  top: 0;
+  width: 270px;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: none;
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  word-break: keep-all;
+  color: #14532d;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-right: none;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
+  z-index: 11;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+}
+
 #plant-hover-label.is-ui-shortcut-hint {
   font-size: 12px;
   font-weight: 800;
@@ -699,7 +731,7 @@ body::-webkit-scrollbar {
 
 #plant-card {
   position: fixed;
-  right: 540px;
+  right: 270px;
   top: 0;
   display: none;
   width: 270px;
@@ -707,7 +739,7 @@ body::-webkit-scrollbar {
   padding: 18px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.14);
-  border-radius: 8px;
+  border-radius: 8px 0 0 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
   user-select: none;
   pointer-events: none;
