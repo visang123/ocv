@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="48" height="40" aria-hidden="true">
+  <defs>
+    <linearGradient id="fogGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f4fbff"/>
+      <stop offset="40%" stop-color="#cfe9f7"/>
+      <stop offset="100%" stop-color="#8fb4cc"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#fogGrad)" opacity="0.95"/>
+  <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#fogGrad)" opacity="0.9"/>
+  <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"/>
+  <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"/>
+  <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"/>
+</svg>
