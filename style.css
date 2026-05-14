@@ -2543,6 +2543,171 @@ body #world-bag-inventory {
   height: 72px;
 }
 
+.plant-progress-gauge {
+  --plant-progress: 0%;
+  position: fixed;
+  left: 18px;
+  bottom: 100px;
+  z-index: 12;
+  display: none;
+  width: 250px;
+  height: 292px;
+  pointer-events: none;
+  color: #f8e8a6;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+}
+
+.plant-progress-gauge.is-visible {
+  display: block;
+}
+
+.plant-progress-meter {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 276px;
+  border-radius: 24px;
+  background:
+    linear-gradient(90deg, #7b421e 0 12%, #d58a36 22%, #7a3c18 38%, #2e180d 50%, #bb7128 78%, #5c2b13 100%);
+  box-shadow:
+    0 2px 0 rgba(255, 220, 128, 0.35) inset,
+    0 -3px 0 rgba(22, 10, 4, 0.55) inset,
+    0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.plant-progress-meter::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  top: 14px;
+  bottom: 23px;
+  border-radius: 15px 15px 9px 9px;
+  background:
+    linear-gradient(180deg, rgba(9, 29, 13, 0.96), rgba(26, 67, 16, 0.92)),
+    radial-gradient(circle at 50% 100%, rgba(134, 255, 41, 0.35), transparent 45%);
+  box-shadow:
+    0 0 0 2px rgba(26, 13, 6, 0.75) inset,
+    0 0 16px rgba(143, 255, 42, 0.16) inset;
+}
+
+.plant-progress-fill {
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 26px;
+  height: var(--plant-progress);
+  max-height: 224px;
+  border-radius: 10px 10px 6px 6px;
+  background:
+    linear-gradient(90deg, rgba(210, 255, 95, 0.98), #83e414 30%, #42b608 100%);
+  box-shadow:
+    0 0 12px rgba(139, 255, 34, 0.78),
+    0 0 22px rgba(128, 255, 34, 0.32);
+  transition: height 280ms ease-out;
+}
+
+.plant-progress-seed {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 80%, #5a3419 0 36%, transparent 38%),
+    radial-gradient(ellipse at 38% 48%, #b4f45a 0 17%, transparent 18%),
+    radial-gradient(ellipse at 62% 48%, #9be642 0 17%, transparent 18%),
+    linear-gradient(180deg, #16310f, #071405);
+  box-shadow: 0 0 0 2px rgba(54, 25, 9, 0.85) inset;
+}
+
+.plant-progress-rewards {
+  position: absolute;
+  left: 68px;
+  top: 11px;
+  display: grid;
+  gap: 37px;
+}
+
+.plant-progress-reward {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  gap: 9px;
+  width: 160px;
+  height: 42px;
+  padding: 0 13px 0 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 160, 85, 0.46);
+  background: linear-gradient(160deg, rgba(42, 33, 20, 0.95), rgba(14, 12, 9, 0.96));
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.32),
+    0 8px 18px rgba(0, 0, 0, 0.25);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.72;
+}
+
+.plant-progress-reward.is-unlocked {
+  opacity: 1;
+  border-color: rgba(189, 255, 116, 0.58);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.32),
+    0 0 14px rgba(134, 255, 43, 0.22),
+    0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.plant-progress-reward::before {
+  content: "";
+  position: absolute;
+  left: -52px;
+  top: 50%;
+  width: 46px;
+  border-top: 2px dashed rgba(232, 203, 126, 0.72);
+}
+
+.plant-progress-reward::after {
+  content: "";
+  position: absolute;
+  left: -58px;
+  top: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ead28e;
+  box-shadow: 0 0 7px rgba(244, 221, 145, 0.6);
+}
+
+.plant-progress-fog-icon {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 26px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 31% 62%, rgba(226, 242, 255, 0.95) 0 25%, transparent 27%),
+    radial-gradient(circle at 53% 42%, rgba(211, 231, 244, 0.95) 0 31%, transparent 33%),
+    radial-gradient(circle at 73% 63%, rgba(176, 204, 222, 0.92) 0 24%, transparent 26%),
+    linear-gradient(180deg, rgba(218, 235, 247, 0.9), rgba(127, 158, 177, 0.72));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.plant-progress-fog-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 3px;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(244, 250, 255, 0.72);
+}
+
 #world-bag-inventory:focus,
 #world-bag-inventory:focus-visible {
   outline: none;

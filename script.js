@@ -725,6 +725,38 @@ function syncGuideInventoryBar() {
     worldBagInventory.style.display = show ? "block" : "none";
     worldBagInventory.hidden = !show;
   }
+  updatePlantProgressGauge();
+}
+
+function getPlantedPlantProgressCount() {
+  let count = 0;
+  if (plantRuntime && plantRuntime.isSeedPlanted && plantRuntime.status !== "dry") {
+    count += 1;
+  }
+  if (appleState && Array.isArray(appleState.extraPlants)) {
+    appleState.extraPlants.forEach(function (plant) {
+      if (!plant || plant.removed || plant.status === "dry") return;
+      count += 1;
+    });
+  }
+  return Math.max(0, count);
+}
+
+function updatePlantProgressGauge() {
+  const gauge = document.getElementById("plant-progress-gauge");
+  if (!gauge) return;
+  const visible = Boolean(worldBagInventory && !worldBagInventory.hidden);
+  gauge.classList.toggle("is-visible", visible);
+  if (!visible) return;
+
+  const count = getPlantedPlantProgressCount();
+  const max = 4;
+  const progress = Math.max(0, Math.min(1, count / max));
+  gauge.style.setProperty("--plant-progress", Math.round(progress * 100) + "%");
+  gauge.querySelectorAll(".plant-progress-reward").forEach(function (reward) {
+    const step = Math.max(1, Number(reward.getAttribute("data-step")) || 1);
+    reward.classList.toggle("is-unlocked", count >= step);
+  });
 }
 
 function syncWorldBagGroundVisibility() {
@@ -13234,6 +13266,7 @@ function gameLoop() {
   updatePlantState();
   updateNpcPosition();
   updateGuideCard();
+  updatePlantProgressGauge();
   updateOnboardingFlowUI();
   pruneStaleRemotePlayers();
   updatePlayerAlert();
