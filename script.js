@@ -935,18 +935,19 @@ function updatePlantProgressGauge() {
   syncWorldPlantFogVisuals();
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
-  const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
-  gauge.classList.toggle("is-visible", visible);
-  gauge.setAttribute("aria-hidden", visible ? "false" : "true");
-  ensurePlantProgressSproutToggleBound();
-  if (!visible) return;
-
   const score = getTotalPlantIndexScore();
   const progress =
     PLANT_INDEX_SCORE_CAP > 0
       ? Math.max(0, Math.min(1, score / PLANT_INDEX_SCORE_CAP))
       : 0;
   gauge.style.setProperty("--plant-fill", String(progress));
+
+  const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
+  gauge.classList.toggle("is-visible", visible);
+  gauge.setAttribute("aria-hidden", visible ? "false" : "true");
+  ensurePlantProgressSproutToggleBound();
+  if (!visible) return;
+
   gauge.querySelectorAll(".plant-progress-reward").forEach(function (reward) {
     const t = Number(reward.getAttribute("data-threshold"));
     if (!Number.isFinite(t)) return;
