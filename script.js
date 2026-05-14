@@ -706,6 +706,22 @@ function saveBagInventoryOrder() {
 }
 bagInventoryItemOrder = loadBagInventoryOrder();
 
+let plantProgressSproutToggleBound = false;
+function ensurePlantProgressSproutToggleBound() {
+  if (plantProgressSproutToggleBound) return;
+  const btn = document.getElementById("plant-progress-sprout-toggle");
+  if (!btn) return;
+  plantProgressSproutToggleBound = true;
+  btn.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const g = document.getElementById("plant-progress-gauge");
+    if (!g) return;
+    const nowCollapsed = g.classList.toggle("is-collapsed");
+    btn.setAttribute("aria-expanded", nowCollapsed ? "false" : "true");
+  });
+}
+
 function shouldShowWorldBagInventoryUi() {
   return Boolean(
     hasGuideBook ||
@@ -749,9 +765,10 @@ function getPlantedPlantProgressCount() {
 function updatePlantProgressGauge() {
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
-  const visible = Boolean(worldBagInventory && shouldShowWorldBagInventoryUi());
+  const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
   gauge.classList.toggle("is-visible", visible);
   gauge.setAttribute("aria-hidden", visible ? "false" : "true");
+  ensurePlantProgressSproutToggleBound();
   if (!visible) return;
 
   const count = getPlantedPlantProgressCount();

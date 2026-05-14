@@ -2547,48 +2547,72 @@ body #world-bag-inventory {
 .plant-progress-gauge {
   --plant-progress: 0%;
   position: fixed;
-  left: 18px;
-  bottom: 102px;
+  left: 16px;
+  bottom: 96px;
   z-index: 252;
   display: none;
-  width: 258px;
-  height: 300px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  width: 196px;
+  height: 392px;
   pointer-events: none;
   color: #f8e8a6;
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  transition:
+    height 0.24s ease,
+    bottom 0.24s ease;
 }
 
 .plant-progress-gauge.is-visible {
-  display: block;
+  display: flex;
+}
+
+.plant-progress-gauge.is-collapsed {
+  height: 48px;
+  bottom: 20px;
+}
+
+.plant-progress-gauge-panel {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100px;
+  margin-bottom: -10px;
+  pointer-events: none;
+}
+
+.plant-progress-gauge.is-collapsed .plant-progress-gauge-panel {
+  display: none;
 }
 
 .plant-progress-meter {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 52px;
-  height: 284px;
-  border-radius: 26px 26px 50% 50%;
+  width: 38px;
+  height: 332px;
+  border-radius: 19px 19px 50% 50%;
   background:
-    linear-gradient(90deg, #5c3014 0 10%, #c87a28 22%, #e8a84a 38%, #7a3c18 52%, #a86422 72%, #3d1c0a 100%);
+    linear-gradient(90deg, #4a2810 0 10%, #b86e22 22%, #d8943a 38%, #6a3214 52%, #945418 72%, #2e1406 100%);
   box-shadow:
-    0 2px 0 rgba(255, 220, 128, 0.32) inset,
+    0 2px 0 rgba(255, 220, 128, 0.28) inset,
     0 -4px 0 rgba(18, 8, 3, 0.55) inset,
-    0 8px 22px rgba(0, 0, 0, 0.42);
+    0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
 .plant-progress-vines {
   position: absolute;
-  left: -2px;
-  bottom: 10px;
-  width: 22px;
-  height: 52px;
+  left: -3px;
+  bottom: 8px;
+  width: 18px;
+  height: 46px;
   z-index: 4;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 10px 18px at 40% 70%, rgba(46, 120, 38, 0.95) 0 45%, transparent 48%),
-    radial-gradient(ellipse 8px 14px at 70% 55%, rgba(62, 140, 48, 0.88) 0 42%, transparent 46%),
-    radial-gradient(ellipse 7px 12px at 25% 40%, rgba(80, 160, 56, 0.75) 0 40%, transparent 44%);
+    radial-gradient(ellipse 8px 15px at 40% 72%, rgba(40, 110, 34, 0.96) 0 45%, transparent 48%),
+    radial-gradient(ellipse 6px 12px at 72% 56%, rgba(52, 128, 42, 0.9) 0 42%, transparent 46%),
+    radial-gradient(ellipse 5px 10px at 28% 42%, rgba(68, 145, 50, 0.78) 0 40%, transparent 44%);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
   opacity: 0.92;
 }
@@ -2596,44 +2620,44 @@ body #world-bag-inventory {
 .plant-progress-meter::before {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 16px;
-  bottom: 28px;
-  border-radius: 16px 16px 10px 10px;
+  left: 9px;
+  right: 9px;
+  top: 14px;
+  bottom: 24px;
+  border-radius: 13px 13px 9px 9px;
   background:
-    linear-gradient(180deg, rgba(8, 22, 10, 0.98), rgba(18, 48, 16, 0.94)),
-    radial-gradient(circle at 50% 100%, rgba(120, 255, 48, 0.28), transparent 48%);
+    linear-gradient(180deg, rgba(6, 18, 8, 0.98), rgba(14, 40, 14, 0.94)),
+    radial-gradient(circle at 50% 100%, rgba(110, 255, 40, 0.26), transparent 48%);
   box-shadow:
-    0 0 0 2px rgba(26, 13, 6, 0.78) inset,
-    0 0 18px rgba(100, 255, 40, 0.12) inset;
+    0 0 0 2px rgba(22, 11, 5, 0.78) inset,
+    0 0 16px rgba(90, 255, 36, 0.1) inset;
   z-index: 0;
 }
 
 .plant-progress-fill {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 30px;
+  left: 11px;
+  right: 11px;
+  bottom: 26px;
   height: var(--plant-progress);
-  max-height: 228px;
-  border-radius: 11px 11px 7px 7px;
+  max-height: 268px;
+  border-radius: 9px 9px 6px 6px;
   z-index: 1;
   background:
     linear-gradient(180deg, rgba(240, 255, 180, 0.55) 0 8%, transparent 22%),
-    linear-gradient(90deg, rgba(220, 255, 120, 0.98), #7ae014 35%, #2ea006 100%);
+    linear-gradient(90deg, rgba(210, 255, 110, 0.98), #6ad012 38%, #248805 100%);
   box-shadow:
-    0 0 14px rgba(120, 255, 40, 0.75),
-    0 0 26px rgba(100, 255, 30, 0.28);
+    0 0 12px rgba(110, 255, 36, 0.72),
+    0 0 22px rgba(90, 255, 28, 0.26);
   transition: height 280ms ease-out;
 }
 
 .plant-progress-ticks {
   position: absolute;
-  right: 5px;
-  top: 18px;
-  bottom: 34px;
-  width: 12px;
+  right: 0;
+  top: 12px;
+  bottom: 28px;
+  width: 36px;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -2642,58 +2666,88 @@ body #world-bag-inventory {
   pointer-events: none;
 }
 
-.plant-progress-ticks span {
-  display: block;
-  width: 9px;
-  height: 2px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, rgba(140, 255, 70, 0.35), #b8ff5a 40%, #7beb3a 100%);
-  box-shadow: 0 0 5px rgba(130, 255, 60, 0.45);
+.plant-progress-tick-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
 }
 
-.plant-progress-seed {
-  position: absolute;
-  left: 7px;
-  bottom: 5px;
-  width: 36px;
-  height: 34px;
-  z-index: 5;
+.plant-progress-tick-mark {
+  display: block;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(130, 255, 60, 0.35), #b0ff52 42%, #6bdb32 100%);
+  box-shadow: 0 0 4px rgba(120, 255, 55, 0.4);
+  flex-shrink: 0;
+}
+
+.plant-progress-tick-pct {
+  font-size: 7px;
+  font-weight: 900;
+  color: #d4ff9e;
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, 0.85),
+    0 1px 2px rgba(0, 0, 0, 0.9);
+  letter-spacing: -0.04em;
+  min-width: 22px;
+  text-align: right;
+  line-height: 1;
+}
+
+.plant-progress-sprout-toggle {
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  margin: 0;
+  border: none;
   border-radius: 50%;
-  background:
-    radial-gradient(ellipse at 50% 88%, #4a2a14 0 38%, transparent 40%),
-    radial-gradient(ellipse at 38% 42%, #c8f86e 0 18%, transparent 20%),
-    radial-gradient(ellipse at 62% 44%, #a8e848 0 16%, transparent 18%),
-    radial-gradient(ellipse at 50% 28%, #d8ff9a 0 12%, transparent 14%),
-    linear-gradient(180deg, #1a3d12, #071a08);
-  box-shadow:
-    0 0 0 2px rgba(54, 25, 9, 0.88) inset,
-    0 2px 4px rgba(0, 0, 0, 0.35);
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.plant-progress-sprout-toggle:focus-visible {
+  outline: 3px solid rgba(190, 255, 120, 0.95);
+  outline-offset: 3px;
+}
+
+.plant-progress-sprout-svg {
+  display: block;
+  width: 44px;
+  height: 44px;
 }
 
 .plant-progress-rewards {
   position: absolute;
-  left: 72px;
-  top: 10px;
+  left: 54px;
+  top: 4px;
   display: grid;
-  gap: 38px;
+  gap: 32px;
 }
 
 .plant-progress-reward {
   position: relative;
   display: grid;
-  grid-template-columns: 32px 1fr;
+  grid-template-columns: 28px 1fr;
   align-items: center;
-  gap: 10px;
-  width: 168px;
-  height: 44px;
-  padding: 0 12px 0 8px;
-  border-radius: 9px;
+  gap: 8px;
+  width: 138px;
+  height: 40px;
+  padding: 0 10px 0 6px;
+  border-radius: 8px;
   border: 1px solid rgba(201, 160, 85, 0.5);
   background: linear-gradient(165deg, rgba(48, 38, 22, 0.96), rgba(12, 10, 8, 0.97));
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.35),
-    0 8px 18px rgba(0, 0, 0, 0.28);
-  font-size: 14px;
+    0 6px 14px rgba(0, 0, 0, 0.28);
+  font-size: 13px;
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -2702,40 +2756,44 @@ body #world-bag-inventory {
   color: #f5e6c4;
 }
 
+.plant-progress-reward[data-step="1"] {
+  transform: translateY(-36px);
+}
+
 .plant-progress-reward.is-unlocked {
   opacity: 1;
   border-color: rgba(189, 255, 116, 0.58);
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.32),
-    0 0 14px rgba(134, 255, 43, 0.22),
-    0 8px 18px rgba(0, 0, 0, 0.25);
+    0 0 12px rgba(134, 255, 43, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.25);
 }
 
 .plant-progress-reward::before {
   content: "";
   position: absolute;
-  left: -54px;
+  left: -42px;
   top: 50%;
-  width: 48px;
+  width: 36px;
   border-top: 2px dashed rgba(232, 203, 126, 0.68);
 }
 
 .plant-progress-reward::after {
   content: "";
   position: absolute;
-  left: -60px;
+  left: -48px;
   top: calc(50% - 5px);
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #ead28e;
-  box-shadow: 0 0 7px rgba(244, 221, 145, 0.55);
+  box-shadow: 0 0 6px rgba(244, 221, 145, 0.55);
 }
 
 .plant-progress-fog-icon {
   display: block;
-  width: 30px;
-  height: 26px;
+  width: 28px;
+  height: 24px;
   object-fit: contain;
   object-position: center;
   flex-shrink: 0;

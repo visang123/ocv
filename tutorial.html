@@ -219,84 +219,145 @@
     >
   </button>
   <div id="plant-progress-gauge" class="plant-progress-gauge" aria-hidden="true">
-    <div class="plant-progress-meter">
-      <div class="plant-progress-vines" aria-hidden="true"></div>
-      <div class="plant-progress-fill"></div>
-      <div class="plant-progress-ticks" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
+    <div id="plant-progress-gauge-panel" class="plant-progress-gauge-panel" role="group" aria-label="식물 지수">
+      <div class="plant-progress-meter">
+        <div class="plant-progress-vines" aria-hidden="true"></div>
+        <div class="plant-progress-fill"></div>
+        <div class="plant-progress-ticks" aria-hidden="true">
+          <div class="plant-progress-tick-row"><span class="plant-progress-tick-mark"></span><span class="plant-progress-tick-pct">100%</span></div>
+          <div class="plant-progress-tick-row"><span class="plant-progress-tick-mark"></span><span class="plant-progress-tick-pct">75%</span></div>
+          <div class="plant-progress-tick-row"><span class="plant-progress-tick-mark"></span><span class="plant-progress-tick-pct">50%</span></div>
+          <div class="plant-progress-tick-row"><span class="plant-progress-tick-mark"></span><span class="plant-progress-tick-pct">25%</span></div>
+          <div class="plant-progress-tick-row"><span class="plant-progress-tick-mark"></span><span class="plant-progress-tick-pct">0%</span></div>
+        </div>
       </div>
-      <div class="plant-progress-seed" aria-hidden="true"></div>
+      <div class="plant-progress-rewards">
+        <div class="plant-progress-reward" data-step="4">
+          <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="28" height="24" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="tut-pp-fog-4" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f4fbff"></stop>
+                <stop offset="40%" stop-color="#cfe9f7"></stop>
+                <stop offset="100%" stop-color="#8fb4cc"></stop>
+              </linearGradient>
+            </defs>
+            <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#tut-pp-fog-4)" opacity="0.95"></ellipse>
+            <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#tut-pp-fog-4)" opacity="0.9"></ellipse>
+            <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
+            <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
+            <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
+          </svg>
+          <span>안개걷힘</span>
+        </div>
+        <div class="plant-progress-reward" data-step="3">
+          <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="28" height="24" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="tut-pp-fog-3" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f4fbff"></stop>
+                <stop offset="40%" stop-color="#cfe9f7"></stop>
+                <stop offset="100%" stop-color="#8fb4cc"></stop>
+              </linearGradient>
+            </defs>
+            <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#tut-pp-fog-3)" opacity="0.95"></ellipse>
+            <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#tut-pp-fog-3)" opacity="0.9"></ellipse>
+            <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
+            <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
+            <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
+          </svg>
+          <span>안개걷힘</span>
+        </div>
+        <div class="plant-progress-reward" data-step="2">
+          <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="28" height="24" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="tut-pp-fog-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f4fbff"></stop>
+                <stop offset="40%" stop-color="#cfe9f7"></stop>
+                <stop offset="100%" stop-color="#8fb4cc"></stop>
+              </linearGradient>
+            </defs>
+            <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#tut-pp-fog-2)" opacity="0.95"></ellipse>
+            <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#tut-pp-fog-2)" opacity="0.9"></ellipse>
+            <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
+            <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
+            <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
+          </svg>
+          <span>안개걷힘</span>
+        </div>
+        <div class="plant-progress-reward" data-step="1">
+          <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="28" height="24" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="tut-pp-fog-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f4fbff"></stop>
+                <stop offset="40%" stop-color="#cfe9f7"></stop>
+                <stop offset="100%" stop-color="#8fb4cc"></stop>
+              </linearGradient>
+            </defs>
+            <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#tut-pp-fog-1)" opacity="0.95"></ellipse>
+            <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#tut-pp-fog-1)" opacity="0.9"></ellipse>
+            <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
+            <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
+            <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
+          </svg>
+          <span>안개걷힘</span>
+        </div>
+      </div>
     </div>
-    <div class="plant-progress-rewards">
-      <div class="plant-progress-reward" data-step="4">
-        <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="30" height="26" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="pp-fog-4" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#f4fbff"></stop>
-              <stop offset="40%" stop-color="#cfe9f7"></stop>
-              <stop offset="100%" stop-color="#8fb4cc"></stop>
-            </linearGradient>
-          </defs>
-          <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#pp-fog-4)" opacity="0.95"></ellipse>
-          <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#pp-fog-4)" opacity="0.9"></ellipse>
-          <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
-          <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
-          <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
-        </svg>
-        <span>안개걷힘</span>
-      </div>
-      <div class="plant-progress-reward" data-step="3">
-        <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="30" height="26" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="pp-fog-3" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#f4fbff"></stop>
-              <stop offset="40%" stop-color="#cfe9f7"></stop>
-              <stop offset="100%" stop-color="#8fb4cc"></stop>
-            </linearGradient>
-          </defs>
-          <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#pp-fog-3)" opacity="0.95"></ellipse>
-          <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#pp-fog-3)" opacity="0.9"></ellipse>
-          <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
-          <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
-          <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
-        </svg>
-        <span>안개걷힘</span>
-      </div>
-      <div class="plant-progress-reward" data-step="2">
-        <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="30" height="26" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="pp-fog-2" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#f4fbff"></stop>
-              <stop offset="40%" stop-color="#cfe9f7"></stop>
-              <stop offset="100%" stop-color="#8fb4cc"></stop>
-            </linearGradient>
-          </defs>
-          <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#pp-fog-2)" opacity="0.95"></ellipse>
-          <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#pp-fog-2)" opacity="0.9"></ellipse>
-          <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
-          <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
-          <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
-        </svg>
-        <span>안개걷힘</span>
-      </div>
-      <div class="plant-progress-reward" data-step="1">
-        <svg class="plant-progress-fog-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="30" height="26" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="pp-fog-1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#f4fbff"></stop>
-              <stop offset="40%" stop-color="#cfe9f7"></stop>
-              <stop offset="100%" stop-color="#8fb4cc"></stop>
-            </linearGradient>
-          </defs>
-          <ellipse cx="17" cy="24" rx="15" ry="11" fill="url(#pp-fog-1)" opacity="0.95"></ellipse>
-          <ellipse cx="30" cy="21" rx="13" ry="10" fill="url(#pp-fog-1)" opacity="0.9"></ellipse>
-          <ellipse cx="36" cy="27" rx="9" ry="7" fill="#9ebfcf" opacity="0.88"></ellipse>
-          <ellipse cx="21" cy="17" rx="11" ry="8" fill="#eaf6ff" opacity="0.72"></ellipse>
-          <ellipse cx="12" cy="20" rx="7" ry="6" fill="#d8ecf7" opacity="0.65"></ellipse>
-        </svg>
-        <span>안개걷힘</span>
-      </div>
-    </div>
+    <button
+      type="button"
+      id="plant-progress-sprout-toggle"
+      class="plant-progress-sprout-toggle"
+      aria-expanded="true"
+      aria-controls="plant-progress-gauge-panel"
+      title="식물 지수 접기·펼치기"
+    >
+      <svg class="plant-progress-sprout-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true" focusable="false">
+        <defs>
+          <radialGradient id="tutSprSoil" cx="50%" cy="35%" r="65%">
+            <stop offset="0%" stop-color="#5a3d28"></stop>
+            <stop offset="55%" stop-color="#2c1810"></stop>
+            <stop offset="100%" stop-color="#120905"></stop>
+          </radialGradient>
+          <linearGradient id="tutSprLeaf" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#e8ffc8"></stop>
+            <stop offset="35%" stop-color="#7ad24a"></stop>
+            <stop offset="100%" stop-color="#1a6e22"></stop>
+          </linearGradient>
+          <linearGradient id="tutSprLeafHi" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#f6ffde"></stop>
+            <stop offset="100%" stop-color="#3aa828"></stop>
+          </linearGradient>
+        </defs>
+        <circle cx="24" cy="24" r="21" fill="#3d2414" opacity="0.95"></circle>
+        <circle cx="24" cy="24" r="18.5" fill="none" stroke="#8b5a2e" stroke-width="1.8"></circle>
+        <circle cx="24" cy="24" r="16" fill="none" stroke="#c49a5c" stroke-width="0.9" opacity="0.55"></circle>
+        <ellipse cx="24" cy="27.5" rx="11" ry="6.5" fill="url(#tutSprSoil)"></ellipse>
+        <ellipse cx="24" cy="26" rx="9" ry="4" fill="#1a0d08" opacity="0.35"></ellipse>
+        <path
+          d="M24 26.5 Q23.5 20 23 14.5"
+          fill="none"
+          stroke="#2a5a18"
+          stroke-width="2.2"
+          stroke-linecap="round"
+        ></path>
+        <path
+          d="M23 15.5 C16 11 11 16 13.5 21.5 C16 20.5 19.5 18 23 17.2"
+          fill="url(#tutSprLeaf)"
+          stroke="#1f4a14"
+          stroke-width="0.6"
+          stroke-linejoin="round"
+        ></path>
+        <path d="M17 14.5 Q19 12 22 14" fill="none" stroke="url(#tutSprLeafHi)" stroke-width="1.2" stroke-linecap="round" opacity="0.65"></path>
+        <path
+          d="M24.2 15.8 C32 10 39 17 36 23.5 C33 22 28.5 19.5 24.5 18"
+          fill="url(#tutSprLeaf)"
+          stroke="#1f4a14"
+          stroke-width="0.6"
+          stroke-linejoin="round"
+        ></path>
+        <path d="M30 13.5 Q32.5 12 34.5 15" fill="none" stroke="url(#tutSprLeafHi)" stroke-width="1.1" stroke-linecap="round" opacity="0.55"></path>
+        <ellipse cx="24" cy="12.5" rx="2.2" ry="3.2" fill="#5ad040" opacity="0.9"></ellipse>
+      </svg>
+    </button>
   </div>
   <div id="bag-inventory-panel" class="bag-inventory-panel" style="display: none" aria-hidden="true">
     <div class="bag-inventory-panel-header">
