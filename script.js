@@ -810,14 +810,21 @@ function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
 }
 
 function syncWorldPlantFogVisuals() {
-  if (!worldPlantFog) return;
   if (!isWorldDocumentEntry()) {
-    worldPlantFog.style.display = "none";
+    if (worldPlantFog) worldPlantFog.style.display = "none";
+    if (world) world.style.filter = "";
     return;
   }
+  const stage = getPlantFogWorldStageFromScore(getTotalPlantIndexScore());
+  if (world) {
+    if (stage >= 5) world.style.filter = "";
+    else if (stage === 4) world.style.filter = "brightness(0.94)";
+    else if (stage === 3) world.style.filter = "brightness(0.86)";
+    else if (stage === 2) world.style.filter = "brightness(0.78)";
+    else world.style.filter = "brightness(0.68)";
+  }
+  if (!worldPlantFog) return;
   worldPlantFog.style.display = "block";
-  const score = getTotalPlantIndexScore();
-  const stage = getPlantFogWorldStageFromScore(score);
   const rect = getPlantFogClearRectWorldPx(stage);
   const W = WORLD_WIDTH;
   const H = GROUND_WORLD_HEIGHT;
