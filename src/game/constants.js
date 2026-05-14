@@ -278,6 +278,8 @@ export const lastWellRefillKey = "lastWellRefillAtV3";
 export const seedCreatedAtKey = "seedCreatedAtV1";
 export const seedPlantedStateKey = "seedPlantedStateV1";
 export const hasGuideBookKey = "hasGuideBookV1";
+/** 멀티 방 키와 무관하게, 월드에서 바닥 가방을 줍었는지(새 탭·슬러그 변동에도 유지) */
+export const worldBagFloorPickedAccountKey = "ovcWorldBagFloorPickedV1";
 export const npcDialogueCompleteKey = "npcDialogueCompleteV1";
 export const guidePlantPageUnlockedKey = "guidePlantPageUnlockedV1";
 export const appleStateKey = "appleStateV1";
@@ -302,6 +304,7 @@ export const appStorageKeys = [
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
+  worldBagFloorPickedAccountKey,
   npcDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,

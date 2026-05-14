@@ -3,7 +3,8 @@ import {
   WORLD_LOOSE_SEED_Y,
   WORLD_LOOSE_ROCK_COUNT,
   WORLD_ROCK_SIZE,
-  hasGuideBookKey
+  hasGuideBookKey,
+  worldBagFloorPickedAccountKey
 } from "./constants.js";
 
 let storagePrefix = "";
@@ -27,7 +28,7 @@ export function migrateUnscopedUserPickupFlagsToUserScope(userId) {
     "worldGuideBookOffGroundPickedRoomV1:",
     "mainSeedPickedRoomV1:"
   ];
-  const globalKeys = [hasGuideBookKey];
+  const globalKeys = [hasGuideBookKey, worldBagFloorPickedAccountKey];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

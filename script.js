@@ -136,6 +136,7 @@ import {
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
+  worldBagFloorPickedAccountKey,
   npcDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
@@ -266,7 +267,7 @@ import {
 } from "./src/multiplayer/timing.js";
 import {
   getNumericButterflyValue as getNumericButterflyValueCore,
-  simulateButterflyAuthorityStep as simulateButterflyAuthorityStepCore
+  createButterflyMotionController
 } from "./src/multiplayer/butterflyMotion.js";
 import {
   isWorldPointInsideRect as isWorldPointInsideRectCore,
@@ -423,6 +424,15 @@ function readOvcTabSessionUserName() {
     return "";
   }
 }
+
+(function syncOvcSessionUserIdFromLocalForNewTab() {
+  try {
+    if (sessionStorage.getItem(ovcSessionUserIdKey)) return;
+    const fromLocal = (localStorage.getItem(currentUserIdKey) || "").trim();
+    if (!fromLocal) return;
+    sessionStorage.setItem(ovcSessionUserIdKey, fromLocal);
+  } catch (eSync) {}
+})();
 
 function getEffectiveOvcSessionToken() {
   try {
@@ -609,10 +619,12 @@ function setGuideBookPickedForCurrentRoom() {
 }
 
 function hasPickedWorldBagGroundInCurrentRoom() {
+  if (getStoredFlag(worldBagFloorPickedAccountKey)) return true;
   return roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
 }
 
 function setWorldBagGroundPickedForCurrentRoom() {
+  setStoredFlag(worldBagFloorPickedAccountKey, true);
   setRoomKeyedPickupFlagAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX, true);
 }
 
@@ -831,6 +843,26 @@ const butterflyState = {
   lastSpawnAt: 0,
   caughtCounts: { brown: 0, yellow: 0, white: 0 }
 };
+const butterflyMotion = createButterflyMotionController({
+  bounds: {
+    left: butterflyBoundsLeft,
+    right: butterflyBoundsRight,
+    top: butterflyBoundsTop,
+    bottom: butterflyBoundsBottom
+  },
+  colors: butterflyColors,
+  maxAlive: butterflyMaxAlive,
+  minLeg: 56,
+  maxLeg: 158,
+  speed: butterflySpeed,
+  legMaxMs: butterflyLegMaxMs,
+  flutter: {
+    periodHorizontalMs: butterflyFlutterPeriodHorizontalMs,
+    periodVerticalMs: butterflyFlutterPeriodVerticalMs,
+    amplitudeX: butterflyFlutterAmplitudeX,
+    amplitudeY: butterflyFlutterAmplitudeY
+  }
+});
 let hasSeededInitialButterflies = false;
 const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 const magicPowderCountKey = "magicPowderCountV1";
@@ -2606,7 +2638,9 @@ function resetTutorialProgressInStorage() {
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
   setStoredFlag(hasGuideBookKey, false);
+  removeStoredValue(worldBagFloorPickedAccountKey);
   removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
+  removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
   setStoredFlag(npcDialogueCompleteKey, false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
@@ -3372,6 +3406,13 @@ function pickUpGuideBook() {
 function loadGuideBookState(skipMaybeResetTutorial) {
   if (currentUserId && !skipMaybeResetTutorial) {
     maybeResetTutorialForNewLoginSession();
+  }
+  if (
+    isWorldDocumentEntry() &&
+    !getStoredFlag(worldBagFloorPickedAccountKey) &&
+    roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX)
+  ) {
+    setStoredFlag(worldBagFloorPickedAccountKey, true);
   }
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
   if (hasGuideBook) {
@@ -11914,129 +11955,30 @@ function addWhiteButterfliesForTest() {
   updateBagInventorySlots();
 }
 
-function generateButterflyId() {
-  return "butterfly-" + Date.now().toString(36) + "-" + Math.random().toString(16).slice(2, 8);
-}
-
 function pickRandomButterflyColor() {
-  return butterflyColors[Math.floor(Math.random() * butterflyColors.length)];
+  return butterflyMotion.pickColor();
 }
 
 function pickRandomButterflySpawnPoint() {
-  const x = butterflyBoundsLeft + Math.random() * (butterflyBoundsRight - butterflyBoundsLeft);
-  const y = butterflyBoundsTop + Math.random() * (butterflyBoundsBottom - butterflyBoundsTop);
-  return { x, y };
-}
-
-function pickButterflyWaypoint(fromX, fromY) {
-  // Prefer local legs around current position to avoid "teleport-thinking"
-  // path changes on remote clients when snapshots arrive out of phase.
-  const minLeg = 56;
-  const maxLeg = 158;
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const leg = minLeg + Math.random() * (maxLeg - minLeg);
-    const target = {
-      x: Math.max(
-        butterflyBoundsLeft,
-        Math.min(butterflyBoundsRight, fromX + Math.cos(angle) * leg)
-      ),
-      y: Math.max(
-        butterflyBoundsTop,
-        Math.min(butterflyBoundsBottom, fromY + Math.sin(angle) * leg)
-      )
-    };
-    const dx = target.x - fromX;
-    const dy = target.y - fromY;
-    if (dx * dx + dy * dy >= minLeg * minLeg) {
-      return target;
-    }
-  }
-  return pickRandomButterflySpawnPoint();
+  return butterflyMotion.pickSpawnPoint();
 }
 
 function createButterfly(now, options) {
-  const spawn = (options && options.spawn) || pickRandomButterflySpawnPoint();
-  const color = (options && options.color) || pickRandomButterflyColor();
-  const id = (options && options.id) || generateButterflyId();
-  return {
-    id,
-    color,
-    x: spawn.x,
-    y: spawn.y,
-    dirX: Math.random() < 0.5 ? -1 : 1,
-    spawnedAt: now
-  };
+  return butterflyMotion.create(now, options);
 }
 
 /** 스냅샷·병합 버그로 같은 id가 두 번 들어오는 경우 방지 */
 function dedupeButterfliesByIdStable(list) {
-  if (!list || list.length <= 1) return list || [];
-  const seen = Object.create(null);
-  for (let i = 0; i < list.length; i += 1) {
-    const b = list[i];
-    if (!b || b.id == null) {
-      const sNull = Object.create(null);
-      return list.filter(function (bb) {
-        if (!bb || bb.id == null) return false;
-        const id = String(bb.id);
-        if (sNull[id]) return false;
-        sNull[id] = true;
-        return true;
-      });
-    }
-    const sid = String(b.id);
-    if (seen[sid]) {
-      const out = [];
-      const s2 = Object.create(null);
-      for (let j = 0; j < list.length; j += 1) {
-        const bb = list[j];
-        if (!bb || bb.id == null) continue;
-        const id = String(bb.id);
-        if (s2[id]) continue;
-        s2[id] = true;
-        out.push(bb);
-      }
-      return out;
-    }
-    seen[sid] = true;
-  }
-  return list;
+  return butterflyMotion.dedupe(list);
 }
 
 /** 공유 상한(butterflyMaxAlive) 초과 시 오래된 개체부터 제거 */
 function trimButterflyListToMaxCap(list) {
-  if (!list || list.length <= butterflyMaxAlive) return list || [];
-  const scored = list.map(function (b, idx) {
-    return {
-      b: b,
-      idx: idx,
-      t: Number(b.spawnedAt) || 0
-    };
-  });
-  scored.sort(function (a, b) {
-    if (b.t !== a.t) return b.t - a.t;
-    return a.idx - b.idx;
-  });
-  const keep = Object.create(null);
-  for (let i = 0; i < butterflyMaxAlive; i += 1) {
-    if (scored[i] && scored[i].b && scored[i].b.id != null) {
-      keep[String(scored[i].b.id)] = true;
-    }
-  }
-  return list.filter(function (b) {
-    return b && b.id != null && keep[String(b.id)];
-  });
+  return butterflyMotion.trim(list);
 }
 
 function pruneButterflyAuthorityWaypointsToList() {
-  const alive = Object.create(null);
-  butterflyState.list.forEach(function (b) {
-    if (b && b.id != null) alive[String(b.id)] = true;
-  });
-  Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
-    if (!alive[wid]) delete butterflyAuthorityWaypointById[wid];
-  });
+  butterflyMotion.pruneWaypoints(butterflyState.list, butterflyAuthorityWaypointById);
 }
 
 function pruneStaleMultiplayerRoomSessions(now) {
@@ -12133,6 +12075,8 @@ function getNumericButterflyValue(value, fallback) {
 }
 
 function ensureButterflyWaypoint(butterfly, now) {
+  return butterflyMotion.ensureWaypoint(butterfly, now, butterflyAuthorityWaypointById);
+/*
   let waypoint = butterflyAuthorityWaypointById[butterfly.id];
   if (!waypoint || now >= waypoint.endAt) {
     const target = pickButterflyWaypoint(butterfly.x, butterfly.y);
@@ -12157,25 +12101,11 @@ function ensureButterflyWaypoint(butterfly, now) {
     butterflyAuthorityWaypointById[butterfly.id] = waypoint;
   }
   return waypoint;
+*/
 }
 
 function simulateButterflyAuthorityStep(butterfly, now) {
-  simulateButterflyAuthorityStepCore(butterfly, now, {
-    waypointMap: butterflyAuthorityWaypointById,
-    ensureWaypoint: ensureButterflyWaypoint,
-    bounds: {
-      left: butterflyBoundsLeft,
-      right: butterflyBoundsRight,
-      top: butterflyBoundsTop,
-      bottom: butterflyBoundsBottom
-    },
-    flutter: {
-      periodHorizontalMs: butterflyFlutterPeriodHorizontalMs,
-      periodVerticalMs: butterflyFlutterPeriodVerticalMs,
-      amplitudeX: butterflyFlutterAmplitudeX,
-      amplitudeY: butterflyFlutterAmplitudeY
-    }
-  });
+  butterflyMotion.simulate(butterfly, now, butterflyAuthorityWaypointById);
 }
 
 function authoritySpawnButterfliesIfNeeded(now) {
@@ -12680,12 +12610,9 @@ function updateButterflies() {
     let targetX = butterfly.x;
     let targetY = butterfly.y;
     if (smoothRemoteButterflies) {
-      const ar = typeof butterfly._netRecvAt === "number" ? butterfly._netRecvAt : now;
-      const lag = Math.min(150, Math.max(0, now - ar));
-      const vx = Number(butterfly._netVx) || 0;
-      const vy = Number(butterfly._netVy) || 0;
-      targetX = butterfly.x + vx * lag;
-      targetY = butterfly.y + vy * lag;
+      // Remote clients only follow the elected authority's latest sampled
+      // position. Extra extrapolation made two-tab tests look like a knockback
+      // when browser scheduling paused one tab briefly.
       targetX = Math.max(butterflyBoundsLeft, Math.min(butterflyBoundsRight, targetX));
       targetY = Math.max(butterflyBoundsTop, Math.min(butterflyBoundsBottom, targetY));
     }
@@ -12775,24 +12702,12 @@ function updateButterflies() {
 }
 
 function getButterflyStateForSnapshot() {
-  const list = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(butterflyState.list));
-  if (list !== butterflyState.list) {
-    butterflyState.list = list;
+  const before = butterflyState.list;
+  const snapshot = butterflyMotion.snapshotFromState(butterflyState);
+  if (before !== butterflyState.list) {
     pruneButterflyAuthorityWaypointsToList();
   }
-  return {
-    lastSpawnAt: butterflyState.lastSpawnAt,
-    list: list.map(function (butterfly) {
-      return {
-        id: butterfly.id,
-        color: butterfly.color,
-        x: Math.round(butterfly.x * 10000) / 10000,
-        y: Math.round(butterfly.y * 10000) / 10000,
-        dirX: butterfly.dirX > 0 ? 1 : -1,
-        spawnedAt: butterfly.spawnedAt || null
-      };
-    })
-  };
+  return snapshot;
 }
 
 function broadcastButterflyState(now) {
@@ -12841,16 +12756,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       delete butterflyLocalCatchTombstoneById[id];
     }
   });
-  const incomingRaw = Array.isArray(snapshotButterflies.list) ? snapshotButterflies.list : [];
-  const incomingSeen = Object.create(null);
-  const incomingList = [];
-  incomingRaw.forEach(function (raw) {
-    if (!raw || !raw.id) return;
-    const sid = String(raw.id);
-    if (incomingSeen[sid]) return;
-    incomingSeen[sid] = true;
-    incomingList.push(raw);
-  });
+  const incomingList = butterflyMotion.normalizeSnapshotList(snapshotButterflies.list);
   if (incomingList.length > 0) {
     hasSeededInitialButterflies = true;
   }
