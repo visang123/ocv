@@ -665,7 +665,12 @@ function setTutorialSessionWorldGuideBookOffGroundPicked() {
 /** 월드(index): 로컬 저장. 튜토리얼: 이번 페이지 방문(session)만 — 월드와 별도. */
 function isWorldFloorBagHiddenForCurrentView() {
   if (isWorldDocumentEntry()) {
-    return hasPickedWorldBagGroundInCurrentRoom();
+    if (hasPickedWorldBagGroundInCurrentRoom()) return true;
+    // setup()이 loadGuideBookState보다 먼저 실행될 때 hasGuideBook 변수는 아직 false.
+    // 또한 방 슬러그·이전 저장 형태 차이로 worldBagGround 키만 없고 가이드 플래그만 남은 경우 바닥 가방이 부활함.
+    if (getStoredFlag(hasGuideBookKey)) return true;
+    if (roomKeyedPickupFlagTrueAnySlug(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX)) return true;
+    return false;
   }
   return tutorialSessionWorldBagGroundPicked();
 }
@@ -748,7 +753,10 @@ const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
-const WORLD_ROCK_PICKUP_ACTION_MS = 1500;
+/** 로컬·멀티 presence의 돌 수집 상태 표시 길이(원격은 rock_pickup 종료 후 hold 별도) */
+const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
+/** 원격 플레이어: rock_pickup 액션이 끊긴 뒤 상태 텍스트를 유지할 ms(다른 액션은 REMOTE_ACTION_STATUS_HOLD_MS) */
+const WORLD_ROCK_REMOTE_STATUS_TAIL_MS = 0;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
@@ -799,6 +807,7 @@ const butterflyRenderById = {};
  */
 const butterflyAuthorityWaypointById = {};
 let lastButterflyBroadcastAt = 0;
+let lastButterflyRealtimeStateAt = 0;
 let lastLocalButterflyCatchAt = 0;
 let lastLocalButterflyCatchActionAt = 0;
 let lastLocalWorldRockPickupAt = 0;
@@ -897,6 +906,7 @@ let remoteBucketUpdateAtById = {};
  * Includes same-login tabs so butterfly authority is a single elected client.
  */
 let multiplayerRoomSessionIdsLastSeen = Object.create(null);
+let multiplayerRoomSessionButterflyActive = Object.create(null);
 /** Dedupe water FX when we skip rendering same-account remote avatars */
 let lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 let lastBucketTraceAtByKey = {};
@@ -1575,6 +1585,7 @@ document.addEventListener("visibilitychange", function () {
     // 백그라운드 복귀 직후 한 프레임에만 쓰이는 wallDelta가 비정상적으로 커지면
     // 비권한 나비 보간·최대 스텝 캡이 한 번 튀는 것을 막음.
     lastButterflyWallClockMs = 0;
+    sendMultiplayerPresence(true);
   }
 });
 
@@ -3365,6 +3376,9 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   if (hasGuideBook) {
     setStoredFlag(movementTutorialCompleteKey, true);
     movementTutorial.resetMotionState();
+    if (isWorldDocumentEntry() && !hasPickedWorldBagGroundInCurrentRoom()) {
+      setWorldBagGroundPickedForCurrentRoom();
+    }
   }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
@@ -5619,7 +5633,10 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     // guard would drop removals because the authority bumps lastButterflyStateChangeAt
     // every movement broadcast while non-authority catches use an older savedAt.
     if (snapshot.butterflies) {
-      applyButterflySnapshot(snapshot.butterflies, snapshotSavedAt || Date.now());
+      const butterflySnapshotAt = snapshotSavedAt || Date.now();
+      if (!lastButterflyRealtimeStateAt || butterflySnapshotAt >= lastButterflyRealtimeStateAt - 500) {
+        applyButterflySnapshot(snapshot.butterflies, butterflySnapshotAt);
+      }
       if (snapshotSavedAt) {
         lastButterflyStateChangeAt = Math.max(
           lastButterflyStateChangeAt,
@@ -10978,6 +10995,7 @@ function sendMultiplayerPresence(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();
+  const butterflyActive = !document.hidden;
   const shouldShowWorldRockPickupAction =
     isWorldDocumentEntry() &&
     now - Number(lastLocalWorldRockPickupAt || 0) <= WORLD_ROCK_PICKUP_ACTION_MS;
@@ -11004,6 +11022,7 @@ function sendMultiplayerPresence(forceSend) {
     waterSplashAt: lastWaterSplashAt,
     waterSplashX: lastWaterSplashX,
     waterSplashY: lastWaterSplashY,
+    butterflyActive,
     updatedAt: now
   };
   const stateKey = [
@@ -11180,6 +11199,8 @@ function pollPresenceDatabase() {
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
       multiplayerRoomSessionIdsLastSeen[String(state.id)] = now;
+      multiplayerRoomSessionButterflyActive[String(state.id)] =
+        state.butterflyActive !== false;
       if (isRemotePresenceSameLoggedInAccount(state)) {
         maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
         return;
@@ -11245,8 +11266,10 @@ function renderRemotePlayersFromPresence(presenceState) {
 
     const latestPresence = presences[presences.length - 1];
     if (!latestPresence || !latestPresence.id || latestPresence.id === currentSessionId) return;
+    multiplayerRoomSessionIdsLastSeen[String(latestPresence.id)] = Date.now();
+    multiplayerRoomSessionButterflyActive[String(latestPresence.id)] =
+      latestPresence.butterflyActive !== false;
     if (isRemotePresenceSameLoggedInAccount(latestPresence)) {
-      multiplayerRoomSessionIdsLastSeen[String(latestPresence.id)] = Date.now();
       return;
     }
 
@@ -11266,11 +11289,13 @@ function handleRemotePlayerBroadcast(state) {
   if (state.action === "leave") {
     delete remoteBucketUpdateAtById[state.id];
     delete multiplayerRoomSessionIdsLastSeen[state.id];
+    delete multiplayerRoomSessionButterflyActive[state.id];
     delete lastRemoteWaterSplashAppliedAtBySession[state.id];
     removeRemotePlayer(state.id);
     return;
   }
   multiplayerRoomSessionIdsLastSeen[String(state.id)] = Date.now();
+  multiplayerRoomSessionButterflyActive[String(state.id)] = state.butterflyActive !== false;
   if (isRemotePresenceSameLoggedInAccount(state)) {
     maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
     return;
@@ -11331,13 +11356,19 @@ function renderRemotePlayerState(state, source) {
       remotePlayer.statusElement.textContent = nextStatusText;
       remotePlayer.statusElement.style.display = "block";
       remotePlayer.lastActionAt = Date.now();
+      remotePlayer.lastShownAction = statusAction;
     }
   } else {
-    const keepUntil = Number(remotePlayer.lastActionAt || 0) + REMOTE_ACTION_STATUS_HOLD_MS;
+    const holdAfter =
+      remotePlayer.lastShownAction === "rock_pickup"
+        ? WORLD_ROCK_REMOTE_STATUS_TAIL_MS
+        : REMOTE_ACTION_STATUS_HOLD_MS;
+    const keepUntil = Number(remotePlayer.lastActionAt || 0) + holdAfter;
     if (Date.now() >= keepUntil) {
       remotePlayer.statusElement.textContent = "";
       remotePlayer.statusElement.style.display = "none";
       remotePlayer.lastActionAt = 0;
+      remotePlayer.lastShownAction = "";
     }
   }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
@@ -11412,6 +11443,7 @@ function createRemotePlayer(remoteId) {
     lastStateSourceRank: 0,
     lastWaterSplashAt: 0,
     lastActionAt: 0,
+    lastShownAction: "",
     lastSeenAt: Date.now()
   };
   return remotePlayers[remoteId];
@@ -12012,6 +12044,7 @@ function pruneStaleMultiplayerRoomSessions(now) {
     const seen = multiplayerRoomSessionIdsLastSeen[sid];
     if (!seen || now - seen > staleMs) {
       delete multiplayerRoomSessionIdsLastSeen[sid];
+      delete multiplayerRoomSessionButterflyActive[sid];
       delete lastRemoteWaterSplashAppliedAtBySession[sid];
     }
   });
@@ -12019,6 +12052,7 @@ function pruneStaleMultiplayerRoomSessions(now) {
 
 function clearMultiplayerRoomSessionTracking() {
   multiplayerRoomSessionIdsLastSeen = Object.create(null);
+  multiplayerRoomSessionButterflyActive = Object.create(null);
   lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 }
 
@@ -12081,10 +12115,12 @@ function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
 
 function isButterflyAuthority() {
   if (!currentSessionId) return false;
+  if (document.hidden) return false;
   const now = Date.now();
   pruneStaleMultiplayerRoomSessions(now);
   const ids = [currentSessionId];
   Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
+    if (multiplayerRoomSessionButterflyActive[sid] === false) return;
     if (sid !== currentSessionId) ids.push(sid);
   });
   ids.sort();
@@ -12442,8 +12478,9 @@ function handleRemoteWorldRockPickupBroadcast(payload) {
     remote.statusElement.textContent = "\uB3CC \uC218\uC9D1";
     remote.statusElement.style.display = "block";
     remote.lastActionAt = Date.now();
+    remote.lastShownAction = "rock_pickup";
   } else {
-    showPlayerAlert({ message: "\uB3CC \uC218\uC9D1", durationMs: 2200 });
+    showPlayerAlert({ message: "\uB3CC \uC218\uC9D1", durationMs: WORLD_ROCK_PICKUP_ACTION_MS });
   }
 }
 
@@ -12626,8 +12663,10 @@ function updateButterflies() {
   }
   if (smoothRemoteButterflies && wallDelta > 380) {
     butterflyState.list.forEach(function (b) {
-      b._renderX = b.x;
-      b._renderY = b.y;
+      if (typeof b._renderX !== "number" || typeof b._renderY !== "number") {
+        b._renderX = b.x;
+        b._renderY = b.y;
+      }
     });
   }
 
@@ -12779,10 +12818,12 @@ function handleRemoteButterflyStateBroadcast(payload) {
   const sender = String(payload.id || "").trim();
   if (sender) {
     multiplayerRoomSessionIdsLastSeen[sender] = Date.now();
+    multiplayerRoomSessionButterflyActive[sender] = true;
   }
   if (isButterflyAuthority()) return;
   const snapshot = payload.butterflies || payload;
   const sentAt = Number(payload.sentAt) || Date.now();
+  lastButterflyRealtimeStateAt = Math.max(lastButterflyRealtimeStateAt, sentAt);
   applyButterflySnapshot(snapshot, sentAt);
 }
 
