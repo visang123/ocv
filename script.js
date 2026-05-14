@@ -814,6 +814,12 @@ function isPlantFogMovementClampActive() {
   return true;
 }
 
+/** 식물지수 250+(안개 월드 2)부터 땅 돌 E 줍기 허용 */
+function isWorldRockPickupUnlocked() {
+  if (!isWorldDocumentEntry()) return false;
+  return getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= 2;
+}
+
 function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
   const e = eps == null ? 0.35 : eps;
   return (
@@ -4477,6 +4483,7 @@ function getNearestPickableExtraSeed() {
 
 function getNearestPickableWorldRock() {
   if (!isWorldDocumentEntry()) return null;
+  if (!isWorldRockPickupUnlocked()) return null;
   if (!Array.isArray(appleState.worldRocks) || !Array.isArray(appleState.worldRockPickedIds)) {
     return null;
   }

@@ -2839,11 +2839,6 @@ body #world-bag-inventory {
 
 .plant-progress-reward.is-unlocked {
   opacity: 1;
-  border-color: rgba(189, 255, 116, 0.58);
-  box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.32),
-    0 0 12px rgba(134, 255, 43, 0.22),
-    0 6px 14px rgba(0, 0, 0, 0.25);
 }
 
 .plant-progress-reward::before {
