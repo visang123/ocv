@@ -36,10 +36,10 @@ import {
   PLANT_INDEX_SPROUT_STAGE_3,
   PLANT_INDEX_GRASS_STAGE_4,
   PLANT_INDEX_GRASS_STAGE_5,
-  WORLD_FOG_TEST_WIDTH,
-  WORLD_FOG_TEST_HEIGHT,
-  WORLD_FOG_TEST_X,
-  WORLD_FOG_TEST_Y,
+  PLANT_FOG_BUTTERFLY_MIN_SCORE,
+  getPlantFogWorldStageFromScore,
+  getPlantFogClearRectWorldPx,
+  getPlantFogGlobalDimAlphaForStage,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   SEED_SIZE,
@@ -222,7 +222,7 @@ import {
   treeAppleElements,
   world,
   ground,
-  worldFogTest,
+  worldPlantFog,
   onboardingCallout,
   onboardingCalloutText,
   movementTutorialOverlay,
@@ -788,23 +788,131 @@ function getTotalPlantIndexScore() {
   return Math.min(PLANT_INDEX_SCORE_CAP, Math.max(0, sum));
 }
 
-function getWorldFogTestRect() {
-  return {
-    left: WORLD_FOG_TEST_X,
-    top: WORLD_FOG_TEST_Y,
-    right: WORLD_FOG_TEST_X + WORLD_FOG_TEST_WIDTH,
-    bottom: WORLD_FOG_TEST_Y + WORLD_FOG_TEST_HEIGHT
-  };
+function getPlantFogClearRectForCurrentScore() {
+  const stage = getPlantFogWorldStageFromScore(getTotalPlantIndexScore());
+  return getPlantFogClearRectWorldPx(stage);
 }
 
-function isPlayerOverlappingWorldFogTestZone() {
-  if (!isWorldDocumentEntry() || !worldFogTest || worldFogTest.style.display === "none") {
-    return false;
+function isPlantFogMovementClampActive() {
+  if (!isWorldDocumentEntry()) return false;
+  if (getTotalPlantIndexScore() >= PLANT_INDEX_SCORE_CAP) return false;
+  return true;
+}
+
+function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
+  const e = eps == null ? 0.35 : eps;
+  return (
+    playerBox.left >= rect.left - e &&
+    playerBox.right <= rect.right + e &&
+    playerBox.top >= rect.top - e &&
+    playerBox.bottom <= rect.bottom + e
+  );
+}
+
+function syncWorldPlantFogVisuals() {
+  if (!worldPlantFog) return;
+  if (!isWorldDocumentEntry()) {
+    worldPlantFog.style.display = "none";
+    return;
   }
-  return isOverlappingRect(getWorldFogTestRect(), getPlayerBox());
+  worldPlantFog.style.display = "block";
+  const score = getTotalPlantIndexScore();
+  const stage = getPlantFogWorldStageFromScore(score);
+  const rect = getPlantFogClearRectWorldPx(stage);
+  const W = WORLD_WIDTH;
+  const H = GROUND_WORLD_HEIGHT;
+  setWorldSize(worldPlantFog, W, H);
+  setWorldPosition(worldPlantFog, 0, 0);
+
+  const dim = worldPlantFog.querySelector(".world-plant-fog-dim");
+  const topEl = worldPlantFog.querySelector('[data-fog-strip="top"]');
+  const bottomEl = worldPlantFog.querySelector('[data-fog-strip="bottom"]');
+  const leftEl = worldPlantFog.querySelector('[data-fog-strip="left"]');
+  const rightEl = worldPlantFog.querySelector('[data-fog-strip="right"]');
+
+  const dimAlpha = getPlantFogGlobalDimAlphaForStage(stage);
+  if (dim) {
+    setWorldSize(dim, W, H);
+    setWorldPosition(dim, 0, 0);
+    dim.style.opacity = String(dimAlpha);
+  }
+
+  const showFog = stage < 5;
+  [topEl, bottomEl, leftEl, rightEl].forEach(function (el) {
+    if (el) el.style.display = showFog ? "block" : "none";
+  });
+  if (!showFog) return;
+
+  const L = rect.left;
+  const T = rect.top;
+  const R = rect.right;
+  const B = rect.bottom;
+  const midH = Math.max(0, B - T);
+
+  if (topEl) {
+    if (T > 0) {
+      setWorldSize(topEl, W, T);
+      setWorldPosition(topEl, 0, 0);
+    } else {
+      setWorldSize(topEl, 0, 0);
+      setWorldPosition(topEl, 0, 0);
+    }
+  }
+  if (bottomEl) {
+    if (B < H) {
+      setWorldSize(bottomEl, W, H - B);
+      setWorldPosition(bottomEl, 0, B);
+    } else {
+      setWorldSize(bottomEl, 0, 0);
+      setWorldPosition(bottomEl, 0, 0);
+    }
+  }
+  if (leftEl) {
+    if (L > 0 && midH > 0) {
+      setWorldSize(leftEl, L, midH);
+      setWorldPosition(leftEl, 0, T);
+    } else {
+      setWorldSize(leftEl, 0, 0);
+      setWorldPosition(leftEl, 0, 0);
+    }
+  }
+  if (rightEl) {
+    if (R < W && midH > 0) {
+      setWorldSize(rightEl, W - R, midH);
+      setWorldPosition(rightEl, R, T);
+    } else {
+      setWorldSize(rightEl, 0, 0);
+      setWorldPosition(rightEl, 0, 0);
+    }
+  }
+}
+
+function areButterfliesUnlockedForPlantFogWorld() {
+  return isWorldDocumentEntry() && getTotalPlantIndexScore() >= PLANT_FOG_BUTTERFLY_MIN_SCORE;
+}
+
+function clearLiveButterfliesForPlantFogLock(now) {
+  if (!butterflyState.list.length) return false;
+  butterflyState.list.forEach(function (b) {
+    if (b && b.id != null) removeButterflyRenderEntry(b.id);
+  });
+  butterflyState.list = [];
+  butterflyState.lastSpawnAt = 0;
+  hasSeededInitialButterflies = false;
+  Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
+    delete butterflyAuthorityWaypointById[wid];
+  });
+  lastButterflyStateChangeAt = Date.now();
+  markWorldDirty();
+  const ts = now != null ? now : Date.now();
+  if (isButterflyAuthority() && multiplayerChannel && currentSessionId) {
+    broadcastButterflyState(ts);
+  }
+  return true;
 }
 
 function updatePlantProgressGauge() {
+  syncWorldPlantFogVisuals();
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
   const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
@@ -7627,9 +7735,6 @@ function updatePlayerPosition() {
 
   if (playerX < 0) playerX = 0;
   if (playerX > maxX) playerX = maxX;
-  if (isPlayerOverlappingWorldFogTestZone()) {
-    playerX = previousPlayerX;
-  }
 
   const isInCanopy = isPlayerInTreeCanopy();
   const isNearTrunk = isPlayerNearTreeTrunk();
@@ -7703,6 +7808,13 @@ function updatePlayerPosition() {
     playerX = previousPlayerX;
     playerDepth = previousPlayerDepth;
     jumpY = previousJumpY;
+  } else if (isPlantFogMovementClampActive()) {
+    const clearRect = getPlantFogClearRectForCurrentScore();
+    if (!isPlayerBoxFullyInsidePlantFogClearRect(getPlayerBox(), clearRect, 0.35)) {
+      playerX = previousPlayerX;
+      playerDepth = previousPlayerDepth;
+      jumpY = previousJumpY;
+    }
   }
 
   setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
@@ -12980,22 +13092,28 @@ function updateButterflies() {
   const sharedHydrated = hasHydratedSharedWorldFromServer || !onlineAvailable;
 
   if (sharedHydrated && isButterflyAuthority()) {
-    // Authority: 스폰·저장 주기만. 이동 시뮬은 아래에서 권한 클라이언트만 수행.
-    if (
-      !hasSeededInitialButterflies &&
-      butterflyState.list.length === 0 &&
-      !butterflyState.lastSpawnAt
-    ) {
-      // First time this world has had a butterfly authority - fill the cap so
-      // the player always sees the requested 5 butterflies on arrival.
-      authorityFillToCapInstantly(now);
-      hasSeededInitialButterflies = true;
-      lastButterflyStateChangeAt = now;
-      markWorldDirty();
-    }
-    if (authoritySpawnButterfliesIfNeeded(now)) {
-      lastButterflyStateChangeAt = now;
-      markWorldDirty();
+    if (!areButterfliesUnlockedForPlantFogWorld()) {
+      if (clearLiveButterfliesForPlantFogLock(now)) {
+        lastButterflyStateChangeAt = now;
+        markWorldDirty();
+      }
+    } else {
+      if (
+        !hasSeededInitialButterflies &&
+        butterflyState.list.length === 0 &&
+        !butterflyState.lastSpawnAt
+      ) {
+        // First time this world has had a butterfly authority - fill the cap so
+        // the player always sees the requested 5 butterflies on arrival.
+        authorityFillToCapInstantly(now);
+        hasSeededInitialButterflies = true;
+        lastButterflyStateChangeAt = now;
+        markWorldDirty();
+      }
+      if (authoritySpawnButterfliesIfNeeded(now)) {
+        lastButterflyStateChangeAt = now;
+        markWorldDirty();
+      }
     }
   }
   // 나비 위치 시뮬은 권한 클라이언트(가장 낮은 sessionId)만 수행. 비권한 탭이
@@ -13187,6 +13305,16 @@ function handleRemoteButterflyStateBroadcast(payload) {
 
 function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
   if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
+  if (!areButterfliesUnlockedForPlantFogWorld()) {
+    if (butterflyState.list.length > 0) {
+      butterflyState.list.forEach(function (b) {
+        if (b && b.id != null) removeButterflyRenderEntry(b.id);
+      });
+      butterflyState.list = [];
+      pruneButterflyAuthorityWaypointsToList();
+    }
+    return;
+  }
   const now = Date.now();
   const sampleAt =
     Number.isFinite(Number(networkSampleAtMs)) && Number(networkSampleAtMs) > 0
@@ -13437,10 +13565,8 @@ function setup() {
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
-  if (worldFogTest) {
-    setWorldSize(worldFogTest, WORLD_FOG_TEST_WIDTH, WORLD_FOG_TEST_HEIGHT);
-    setWorldPosition(worldFogTest, WORLD_FOG_TEST_X, WORLD_FOG_TEST_Y);
-    worldFogTest.style.display = isWorldDocumentEntry() ? "block" : "none";
+  if (worldPlantFog) {
+    syncWorldPlantFogVisuals();
   }
   updateWellImage();
   updateSeedPosition();

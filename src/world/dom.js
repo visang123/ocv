@@ -51,7 +51,7 @@ const plantHoverLabel = document.getElementById("plant-hover-label");
 const treeAppleElements = Array.from(document.querySelectorAll(".tree-apple"));
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
-const worldFogTest = document.getElementById("world-fog-test");
+const worldPlantFog = document.getElementById("world-plant-fog");
 const onboardingCallout = document.getElementById("onboarding-callout");
 const onboardingCalloutText = document.getElementById("onboarding-callout-text");
 const movementTutorialOverlay = document.getElementById("movement-tutorial-overlay");
@@ -111,7 +111,7 @@ export {
   treeAppleElements,
   world,
   ground,
-  worldFogTest,
+  worldPlantFog,
   onboardingCallout,
   onboardingCalloutText,
   movementTutorialOverlay,

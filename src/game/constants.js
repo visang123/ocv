@@ -12,11 +12,51 @@ export const PLANT_INDEX_SPROUT_STAGE_3 = 50;
 export const PLANT_INDEX_GRASS_STAGE_4 = 100;
 export const PLANT_INDEX_GRASS_STAGE_5 = 150;
 
-/** 테스트: 맵 우하단 안개(월드 좌표, 플레이어 박스와 겹치면 진입 불가) */
-export const WORLD_FOG_TEST_WIDTH = 200;
-export const WORLD_FOG_TEST_HEIGHT = 88;
-export const WORLD_FOG_TEST_X = WORLD_WIDTH - WORLD_FOG_TEST_WIDTH;
-export const WORLD_FOG_TEST_Y = GROUND_WORLD_HEIGHT - WORLD_FOG_TEST_HEIGHT;
+/** 식물지수 500 이상(월드 3)부터 나비 스폰·시뮬 허용 */
+export const PLANT_FOG_BUTTERFLY_MIN_SCORE = 500;
+
+/**
+ * 식물지수 구간 → 월드 1~5 (안개 해제 단계).
+ * 1: 250 미만, 2: 250~499, 3: 500~749, 4: 750~999, 5: 1000
+ */
+export function getPlantFogWorldStageFromScore(score) {
+  const s = Math.max(0, Math.min(PLANT_INDEX_SCORE_CAP, Number(score) || 0));
+  if (s >= 1000) return 5;
+  if (s >= 750) return 4;
+  if (s >= 500) return 3;
+  if (s >= 250) return 2;
+  return 1;
+}
+
+/**
+ * 해당 단계에서 플레이어가 이동 가능한 맑은 구역(월드 좌표, 땅 기준).
+ * 단계가 올라갈수록 사각형이 커짐.
+ */
+export function getPlantFogClearRectWorldPx(stage) {
+  const W = WORLD_WIDTH;
+  const H = GROUND_WORLD_HEIGHT;
+  const st = Math.max(1, Math.min(5, Math.floor(Number(stage)) || 1));
+  if (st >= 5) return { left: 0, top: 0, right: W, bottom: H };
+  if (st === 4) return { left: 0, top: 16, right: W, bottom: H };
+  if (st === 3) return { left: 0, top: 56, right: W, bottom: H };
+  if (st === 2) return { left: 0, top: Math.floor(H * 0.5), right: W, bottom: H };
+  return {
+    left: 0,
+    top: Math.floor(H * 0.5),
+    right: Math.floor(W * 0.5),
+    bottom: H
+  };
+}
+
+/** 맑은 구역 위에 덮는 전역 딤(0 = 없음, 높을수록 어두움) */
+export function getPlantFogGlobalDimAlphaForStage(stage) {
+  const st = Math.max(1, Math.min(5, Math.floor(Number(stage)) || 1));
+  if (st >= 5) return 0;
+  if (st === 4) return 0.08;
+  if (st === 3) return 0.18;
+  if (st === 2) return 0.32;
+  return 0.48;
+}
 
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;
