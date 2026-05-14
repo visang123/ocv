@@ -856,14 +856,14 @@ const movementTutorial = createMovementTutorial({
   getOnboardingFlowStep: function () {
     return onboardingFlowStep;
   },
-  isNearWorldBagPickup: isNearWorldBagPickup,
+  isNearWorldBagPickup,
   dom: {
     overlay: movementTutorialOverlay,
     lineMove: movementTutorialLineMove,
     lineBook: movementTutorialLineBook,
     keys: movementTutorialKeys,
-    guideBook: guideBook,
-    worldBag: worldBag
+    guideBook,
+    worldBag
   },
   getPlayerPose: function () {
     return {
@@ -1980,7 +1980,7 @@ function skipTutorialFromSettings() {
   onboardingFlowStep = 0;
   setStoredValue(onboardingFlowStepKey, "0");
   persistOnboardingStep();
-  completeMovementTutorial();
+  movementTutorial.complete();
   setStoredFlag(hasGuideBookKey, true);
   setGuideBookPickedForCurrentRoom();
   setWorldBagGroundPickedForCurrentRoom();
@@ -2442,99 +2442,6 @@ function isNearGuideBook() {
   return (
     getCenterDistance(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT) < pickupDistance
   );
-}
-
-function shouldRunMovementTutorial() {
-  return (
-    isTutorialDocumentEntry() &&
-    Boolean(currentUserId) &&
-    hasSpawnedCharacter &&
-    !isCharacterSelecting &&
-    !isTabSessionSuperseded &&
-    !getStoredFlag(movementTutorialCompleteKey) &&
-    !hasGuideBook &&
-    !(onboardingFlowStep === 1 && isNearWorldBagPickup())
-  );
-}
-
-function hideMovementTutorialOverlay() {
-  if (!movementTutorialOverlay) return;
-  movementTutorialOverlay.style.display = "none";
-  if (movementTutorialLineBook) {
-    movementTutorialLineBook.hidden = true;
-    movementTutorialLineBook.textContent = "";
-  }
-  if (movementTutorialKeys) movementTutorialKeys.style.display = "";
-  if (guideBook) guideBook.classList.remove("is-movement-tutorial-target");
-  if (worldBag) worldBag.classList.remove("is-movement-tutorial-target");
-}
-
-function completeMovementTutorial() {
-  setStoredFlag(movementTutorialCompleteKey, true);
-  movementTutorialPhase = 0;
-  movementTutorialBaseline = null;
-  hideMovementTutorialOverlay();
-}
-
-function prepareMovementTutorialBeforeMove() {
-  if (!shouldRunMovementTutorial()) {
-    if (movementTutorialPhase !== 0) {
-      movementTutorialPhase = 0;
-      movementTutorialBaseline = null;
-    }
-    hideMovementTutorialOverlay();
-    return;
-  }
-  if (movementTutorialPhase === 0) {
-    movementTutorialPhase = 1;
-    movementTutorialBaseline = {
-      x: playerX,
-      depth: playerDepth,
-      j: jumpY
-    };
-  }
-}
-
-function advanceMovementTutorialAfterMove() {
-  if (!shouldRunMovementTutorial()) return;
-  if (movementTutorialPhase === 1 && movementTutorialBaseline) {
-    const b = movementTutorialBaseline;
-    if (
-      Math.abs(playerX - b.x) > 2.5 ||
-      Math.abs(playerDepth - b.depth) > 2.5 ||
-      Math.abs(jumpY - b.j) > 4
-    ) {
-      movementTutorialPhase = 2;
-    }
-  }
-  syncMovementTutorialOverlay();
-}
-
-function syncMovementTutorialOverlay() {
-  if (
-    !movementTutorialOverlay ||
-    !movementTutorialLineMove ||
-    !movementTutorialLineBook ||
-    !movementTutorialKeys
-  ) {
-    return;
-  }
-  if (!shouldRunMovementTutorial() || movementTutorialPhase < 1) return;
-
-  movementTutorialOverlay.style.display = "block";
-  movementTutorialLineMove.textContent =
-    "\uC774\uB3D9\uC740 \uBC29\uD5A5\uD0A4 \uB610\uB294 WSAD";
-  if (movementTutorialPhase === 2) {
-    movementTutorialLineBook.textContent = "\uAC00\uBC29 \uCABD\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694!";
-    movementTutorialLineBook.hidden = false;
-  } else {
-    movementTutorialLineBook.textContent = "";
-    movementTutorialLineBook.hidden = true;
-  }
-  movementTutorialKeys.style.display = "flex";
-  if (worldBag) {
-    worldBag.classList.toggle("is-movement-tutorial-target", movementTutorialPhase === 2);
-  }
 }
 
 function clearOnboardingHighlights() {
@@ -3101,7 +3008,7 @@ function updateOnboardingFlowUI() {
   if (isWorldDocumentEntry()) {
     setOnboardingCalloutVisible(false, "");
     clearOnboardingHighlights();
-    hideMovementTutorialOverlay();
+    movementTutorial.hideOverlay();
     updateSettingsTutorialButtons();
     return;
   }
@@ -3125,7 +3032,7 @@ function updateOnboardingFlowUI() {
   switch (onboardingFlowStep) {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
-        hideMovementTutorialOverlay();
+        movementTutorial.hideOverlay();
         setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
@@ -3437,7 +3344,7 @@ function pickUpWorldBag() {
   syncGuideInventoryBar();
   updateGuideCard();
   updateBagInventorySlots();
-  completeMovementTutorial();
+  movementTutorial.complete();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 1) {
     onboardingFlowStep = 2;
     persistOnboardingStep();
@@ -3457,9 +3364,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   hasGuideBook = hasPickedGuideBookInCurrentRoom();
   if (hasGuideBook) {
     setStoredFlag(movementTutorialCompleteKey, true);
-    movementTutorialPhase = 0;
-    movementTutorialBaseline = null;
-    hideMovementTutorialOverlay();
+    movementTutorial.resetMotionState();
   }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
@@ -3620,8 +3525,7 @@ function applyDefaultState(options) {
     hasGuideBook = false;
     isGuideBookOpen = false;
     isGuideBookClickPromptActive = false;
-    movementTutorialPhase = 0;
-    movementTutorialBaseline = null;
+    movementTutorial.resetMotionState();
     onboardingFlowStep = 1;
     onboardingJumpLatch = false;
     onboardingNpcGuideEscHintShown = false;
@@ -3651,8 +3555,7 @@ function applyDefaultState(options) {
     isNpcDialogueRunning = false;
     isGuideBookOpen = false;
     isGuideBookClickPromptActive = false;
-    movementTutorialPhase = 0;
-    movementTutorialBaseline = null;
+    movementTutorial.resetMotionState();
     guidePageIndex = 0;
   }
   isTreeFalling = false;
@@ -3868,7 +3771,7 @@ function startPlantMasterDialogue() {
         }
         persistOnboardingStep();
       }
-      completeMovementTutorial();
+      movementTutorial.complete();
     }
     updateNpcPosition();
     updateGuideCard();
@@ -10194,6 +10097,7 @@ function openCharacterSelectIfNeeded() {
   playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
 
   if (hasSpawnedCharacter) {
+    syncLocalPlayerVisibility();
     player.classList.remove("is-hidden-before-spawn");
     function runAfterPlayerBaseReady() {
       applyTutorialWorldResetIfPending();
@@ -10262,7 +10166,7 @@ function finishCharacterSelect() {
     localStorage.setItem(currentUserScopedHasChosenColorKey, "true");
   }
   characterSelectOverlay.classList.remove("is-open");
-  player.classList.remove("is-hidden-before-spawn");
+  syncLocalPlayerVisibility();
   applyPlayerColor(selectedPlayerColor);
 
   syncPlayerColorToServer(true);
@@ -10336,6 +10240,21 @@ function updatePlayerName() {
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
   playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
+}
+
+function syncLocalPlayerVisibility() {
+  if (!player || !localPlayerRoot) return;
+  localPlayerRoot.style.display = "block";
+  if (hasSpawnedCharacter) {
+    player.classList.remove("is-hidden-before-spawn");
+    player.style.display = "block";
+    if (!player.getAttribute("src")) {
+      player.src = "이미지/player-white.png";
+    }
+    return;
+  }
+  player.style.display = "";
+  player.classList.add("is-hidden-before-spawn");
 }
 
 function isWorldSocialRealtimeReady() {
@@ -13011,6 +12930,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
 
 function gameLoop() {
   if (isTabSessionSuperseded) return;
+  syncLocalPlayerVisibility();
   gameLoopCyclesForTutorialSync += 1;
   if (gameLoopCyclesForTutorialSync >= 420) {
     gameLoopCyclesForTutorialSync = 0;
@@ -13018,10 +12938,10 @@ function gameLoop() {
   }
   respawnApplesIfNeeded();
   refillWellIfNeeded();
-  prepareMovementTutorialBeforeMove();
+  movementTutorial.prepareBeforeMove();
   updatePlayerPosition();
   onboardingCheckJumpFinish();
-  advanceMovementTutorialAfterMove();
+  movementTutorial.advanceAfterMove();
   updateSeedPosition();
   updateExtraSeedsAndPlants();
   updateSeedInventory();
