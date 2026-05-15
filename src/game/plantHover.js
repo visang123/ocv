@@ -37,3 +37,12 @@ export function getPlantVisibleHoverRectsWorld(plant, options) {
 
   return rects;
 }
+
+/** @param {object} plant */
+export function getPlantWorldAnchorXY(plant) {
+  if (!plant) return null;
+  const x = plant.spotX != null ? plant.spotX : plant.x;
+  const y = plant.spotY != null ? plant.spotY : plant.y;
+  if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return null;
+  return { x: Number(x), y: Number(y) };
+}

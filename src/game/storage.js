@@ -315,6 +315,20 @@ function normalizeSavedWorldRocks(saved, createRandomWorldRocks, rockSpawnContex
   return { worldRocks, worldRockPickedIds };
 }
 
+function normalizeSavedWorldExtraBuckets(saved) {
+  if (!saved || !Array.isArray(saved.worldExtraBuckets)) return [];
+  return saved.worldExtraBuckets
+    .filter(Boolean)
+    .map(function (bucketData, index) {
+      return {
+        id: String(bucketData.id || "world-bucket-" + (index + 1)),
+        x: Number(bucketData.x) || 0,
+        y: Number(bucketData.y) || 0,
+        isFull: Boolean(bucketData.isFull)
+      };
+    });
+}
+
 export function loadAppleStateFromStorage(config) {
   const savedRaw = getStoredValue(config.appleStateKey);
 
@@ -338,7 +352,8 @@ export function loadAppleStateFromStorage(config) {
         nextSpawnAt: 0
       },
       worldRocks: rocksEmpty.worldRocks,
-      worldRockPickedIds: rocksEmpty.worldRockPickedIds
+      worldRockPickedIds: rocksEmpty.worldRockPickedIds,
+      worldExtraBuckets: []
     };
   }
 
@@ -487,7 +502,8 @@ export function loadAppleStateFromStorage(config) {
         : [],
       worldLooseSeed,
       worldRocks: worldRockParts.worldRocks,
-      worldRockPickedIds: worldRockParts.worldRockPickedIds
+      worldRockPickedIds: worldRockParts.worldRockPickedIds,
+      worldExtraBuckets: normalizeSavedWorldExtraBuckets(saved)
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
@@ -510,7 +526,8 @@ export function loadAppleStateFromStorage(config) {
         nextSpawnAt: 0
       },
       worldRocks: rocksCatch.worldRocks,
-      worldRockPickedIds: rocksCatch.worldRockPickedIds
+      worldRockPickedIds: rocksCatch.worldRockPickedIds,
+      worldExtraBuckets: []
     };
   }
 }
@@ -609,6 +626,14 @@ export function saveAppleStateToStorage(config) {
         };
       }),
       worldRockPickedIds: Array.isArray(config.worldRockPickedIds) ? config.worldRockPickedIds : [],
+      worldExtraBuckets: (config.worldExtraBuckets || []).map(function (bucket) {
+        return {
+          id: String(bucket.id),
+          x: Number(bucket.x) || 0,
+          y: Number(bucket.y) || 0,
+          isFull: Boolean(bucket.isFull)
+        };
+      }),
       worldLooseSeed: worldLooseSeedOut
     })
   );
