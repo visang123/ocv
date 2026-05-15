@@ -2831,18 +2831,22 @@ function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
 /** rock-ground.svg(64×48) — CSS `center bottom / contain` 과 동일하게 히트박스 산출 */
 const ROCK_GROUND_SVG_W = 64;
 const ROCK_GROUND_SVG_H = 48;
-const ROCK_GROUND_HIT_LEFT = 8;
-const ROCK_GROUND_HIT_RIGHT = 56;
-const ROCK_GROUND_HIT_TOP = 8;
-const ROCK_GROUND_HIT_BOTTOM = 42;
+/** viewBox 상단 빈 여백 제외 — 돌 덩어리·잔디만(대략 y 18~44) */
+const ROCK_GROUND_HIT_LEFT = 10;
+const ROCK_GROUND_HIT_RIGHT = 54;
+const ROCK_GROUND_HIT_TOP = 19;
+const ROCK_GROUND_HIT_BOTTOM = 44;
 
 function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) {
-  const renderH = boxH * (ROCK_GROUND_SVG_H / ROCK_GROUND_SVG_W);
-  const imageTop = boxTop + (boxH - renderH);
+  const boxBottom = boxTop + boxH;
+  const renderW = Math.min(boxW, boxH * (ROCK_GROUND_SVG_W / ROCK_GROUND_SVG_H));
+  const renderH = Math.min(boxH, boxW * (ROCK_GROUND_SVG_H / ROCK_GROUND_SVG_W));
+  const imageLeft = boxLeft + (boxW - renderW) * 0.5;
+  const imageTop = boxBottom - renderH;
   return {
-    left: boxLeft + (ROCK_GROUND_HIT_LEFT / ROCK_GROUND_SVG_W) * boxW,
+    left: imageLeft + (ROCK_GROUND_HIT_LEFT / ROCK_GROUND_SVG_W) * renderW,
     top: imageTop + (ROCK_GROUND_HIT_TOP / ROCK_GROUND_SVG_H) * renderH,
-    right: boxLeft + (ROCK_GROUND_HIT_RIGHT / ROCK_GROUND_SVG_W) * boxW,
+    right: imageLeft + (ROCK_GROUND_HIT_RIGHT / ROCK_GROUND_SVG_W) * renderW,
     bottom: imageTop + (ROCK_GROUND_HIT_BOTTOM / ROCK_GROUND_SVG_H) * renderH
   };
 }
