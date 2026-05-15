@@ -7,7 +7,7 @@ import {
   subtractRecipeInputsFromCounter
 } from "./trade-exchange.js";
 
-const TRADEABLE_KEYS = new Set(["rock", "seed", "apple", "magicPowder"]);
+const TRADEABLE_KEYS = new Set(["rock", "seed", "overgrowthSeed", "apple", "magicPowder"]);
 
 /** @type {Record<string, any>} */
 let host = null;

@@ -15,6 +15,7 @@ export function createAppleState(initialApples) {
     count: 0,
     /** 월드 허브 땅 씨 줍기 누적 — 튜토 extraSeeds와 별개(groundSeed.js). */
     seedCount: 0,
+    overgrowthSeedCount: 0,
     pickedIds: [],
     isEating: false,
     nextSeedOffset: 0,
@@ -65,6 +66,7 @@ export function createPlantState() {
     plantedAt: null,
     ownerUserId: "",
     ownerDisplayName: "",
+    soilOrdinal: 0,
     sproutOrdinal: 0,
     grassOrdinal: null,
     /** 마른 땅(작물 고사) 이후에는 물만으로 새싹 타이머가 다시 시작되지 않음 — 새로 심을 때만 false */

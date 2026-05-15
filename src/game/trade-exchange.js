@@ -7,6 +7,12 @@ export const TRADE_RECIPES = [
     inputs: { rock: 3 },
     outputs: { seed: 1 },
     label: "\uC528\uC557 1\uAC1C"
+  },
+  {
+    id: "seed10_overgrowth1",
+    inputs: { seed: 10 },
+    outputs: { overgrowthSeed: 1 },
+    label: "\uACFC\uC131\uC7A5 \uC528\uC557 1\uAC1C"
   }
 ];
 

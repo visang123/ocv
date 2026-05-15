@@ -2284,6 +2284,13 @@ if (bagInventoryPanel) {
       plantInventorySeed(firstInv.id);
       return;
     }
+    if (kind === "overgrowthSeed") {
+      if ((Number(appleState.overgrowthSeedCount) || 0) <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      plantWorldOvergrowthSeedCount();
+      return;
+    }
     if (kind === "apple") {
       if (appleState.count <= 0) return;
       event.preventDefault();
@@ -2819,19 +2826,42 @@ function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
   };
 }
 
-/** rock-ground.svg 상단 여백 제외 — 발·이동 막힘은 돌 본체만 */
-function getVisibleWorldRockCollisionRect(rx, ry, sz) {
-  const size = Number(sz) || WORLD_ROCK_SIZE;
-  const sideInset = Math.max(2, size * 0.22);
-  const bottomInset = Math.max(1, size * 0.06);
-  /** SVG 상단 빈 여백·잔디 — 위쪽 이동 막힘을 줄이려면 비율을 키움 */
-  const topTrim = Math.max(6, size * 0.68);
+/** rock-ground.svg(64×48) — CSS `center bottom / contain` 과 동일하게 히트박스 산출 */
+const ROCK_GROUND_SVG_W = 64;
+const ROCK_GROUND_SVG_H = 48;
+const ROCK_GROUND_HIT_LEFT = 8;
+const ROCK_GROUND_HIT_RIGHT = 56;
+const ROCK_GROUND_HIT_TOP = 8;
+const ROCK_GROUND_HIT_BOTTOM = 42;
+
+function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) {
+  const renderH = boxH * (ROCK_GROUND_SVG_H / ROCK_GROUND_SVG_W);
+  const imageTop = boxTop + (boxH - renderH);
   return {
-    left: rx + sideInset,
-    top: ry + bottomInset,
-    right: rx + size - sideInset,
-    bottom: ry + size - topTrim
+    left: boxLeft + (ROCK_GROUND_HIT_LEFT / ROCK_GROUND_SVG_W) * boxW,
+    top: imageTop + (ROCK_GROUND_HIT_TOP / ROCK_GROUND_SVG_H) * renderH,
+    right: boxLeft + (ROCK_GROUND_HIT_RIGHT / ROCK_GROUND_SVG_W) * boxW,
+    bottom: imageTop + (ROCK_GROUND_HIT_BOTTOM / ROCK_GROUND_SVG_H) * renderH
   };
+}
+
+/** ry = 돌 요소 윗선(월드). rockEl 있으면 실제 렌더 박스 기준(줌·CSS 일치) */
+function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) {
+  const size = Number(sz) || WORLD_ROCK_SIZE;
+  if (rockEl && ground && typeof rockEl.getBoundingClientRect === "function") {
+    const gRect = ground.getBoundingClientRect();
+    const rRect = rockEl.getBoundingClientRect();
+    if (gRect.width > 0 && gRect.height > 0 && rRect.width > 0.5 && rRect.height > 0.5) {
+      const wx = WORLD_WIDTH / gRect.width;
+      const wy = GROUND_WORLD_HEIGHT / gRect.height;
+      const boxLeft = (rRect.left - gRect.left) * wx;
+      const boxTop = (rRect.top - gRect.top) * wy;
+      const boxW = rRect.width * wx;
+      const boxH = rRect.height * wy;
+      return getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH);
+    }
+  }
+  return getVisibleWorldRockCollisionRectFromBox(rx, ry, size, size);
 }
 
 function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
@@ -2847,7 +2877,7 @@ function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
-    return isOverlappingRect(playerFeet, getVisibleWorldRockCollisionRect(rx, ry, sz));
+    return isOverlappingRect(playerFeet, getVisibleWorldRockCollisionRect(rx, ry, sz, rock._el));
   });
 }
 
@@ -4274,6 +4304,7 @@ function applyDefaultState(options) {
   wasPlayerInTree = false;
   appleState.count = 0;
   appleState.seedCount = 0;
+  appleState.overgrowthSeedCount = 0;
   appleState.pickedIds = [];
   appleState.isEating = false;
   appleState.nextSeedOffset = 0;
@@ -5332,6 +5363,7 @@ function loadAppleState() {
 
   appleState.count = loaded.appleCount;
   appleState.seedCount = Math.max(0, Number(loaded.seedCount) || 0);
+  appleState.overgrowthSeedCount = Math.max(0, Number(loaded.overgrowthSeedCount) || 0);
   appleState.apples = loaded.apples;
   appleState.pickedIds = loaded.pickedAppleIds;
   appleState.nextSeedOffset = loaded.nextAppleSeedOffset;
@@ -5379,6 +5411,7 @@ function loadAppleState() {
         appleStateKey,
         appleCount: appleState.count,
         seedCount: appleState.seedCount,
+        overgrowthSeedCount: appleState.overgrowthSeedCount,
         apples: appleState.apples,
         pickedAppleIds: appleState.pickedIds,
         nextAppleSeedOffset: appleState.nextSeedOffset,
@@ -5411,6 +5444,7 @@ function saveAppleState() {
     appleStateKey,
     appleCount: appleState.count,
     seedCount: appleState.seedCount,
+    overgrowthSeedCount: appleState.overgrowthSeedCount,
     apples: appleState.apples,
     pickedAppleIds: appleState.pickedIds,
     nextAppleSeedOffset: appleState.nextSeedOffset,
@@ -7815,6 +7849,7 @@ function getBagInventoryCountsByKey() {
   return {
     book: hasGuideBookItemInBagCounts() ? 1 : 0,
     seed: getBagInventorySeedCount(),
+    overgrowthSeed: Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0)),
     apple: Math.max(0, Number(appleState.count) || 0),
     rock: Math.max(0, appleState.worldRockPickedIds ? appleState.worldRockPickedIds.length : 0),
     magicPowder: Math.max(0, Math.floor(magicPowderCount) || 0),
@@ -7849,6 +7884,13 @@ function removeOneBagItemForTrade(itemKey) {
     });
     if (seedIndex < 0) return false;
     discardInventorySeed(appleState.extraSeeds[seedIndex].id);
+    return true;
+  }
+  if (itemKey === "overgrowthSeed") {
+    if ((Number(appleState.overgrowthSeedCount) || 0) <= 0) return false;
+    appleState.overgrowthSeedCount = Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0) - 1);
+    updateSeedInventory();
+    saveAppleState();
     return true;
   }
   if (itemKey === "apple") {
@@ -7896,6 +7938,13 @@ function addBagItemsForTrade(itemKey, amount) {
         });
       }
     }
+    updateSeedInventory();
+    saveAppleState();
+    return;
+  }
+  if (itemKey === "overgrowthSeed") {
+    appleState.overgrowthSeedCount =
+      Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0)) + n;
     updateSeedInventory();
     saveAppleState();
     return;
@@ -8947,8 +8996,10 @@ function createExtraPlant(id, x, y) {
     powderUpgradeStartedAt: null,
     powderUpgradeDurationMs: 0,
     grassAuto5EligibleAt: null,
+    seedKind: "",
     ownerUserId: "",
     ownerDisplayName: "",
+    soilOrdinal: 0,
     sproutOrdinal: 0,
     grassOrdinal: null,
     blockSproutRegrowthAfterDry: false,
@@ -9102,6 +9153,7 @@ function assignSproutIdentityToNewPlant(plant) {
   const oname = getPlanterDisplayName();
   plant.ownerUserId = oid;
   plant.ownerDisplayName = oname;
+  plant.soilOrdinal = 0;
   plant.sproutOrdinal = 0;
   plant.grassOrdinal = null;
 }
@@ -9253,7 +9305,7 @@ function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, rockPad) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
-    const rockBox = getVisibleWorldRockCollisionRect(rx, ry, sz);
+    const rockBox = getVisibleWorldRockCollisionRect(rx, ry, sz, rock._el);
     return plantSpotOverlapsExpandedRect(
       plantX,
       plantY,

@@ -331,6 +331,7 @@ export function loadAppleStateFromStorage(config) {
       extraSeeds: [],
       extraPlants: [],
       seedCount: 0,
+      overgrowthSeedCount: 0,
       worldLooseSeed: {
         x: WORLD_LOOSE_SEED_X,
         y: WORLD_LOOSE_SEED_Y,
@@ -387,6 +388,7 @@ export function loadAppleStateFromStorage(config) {
       parseFailed: false,
       appleCount: Math.max(0, Number(saved.appleCount) || 0),
       seedCount: Math.max(0, Number(saved.seedCount) || 0),
+      overgrowthSeedCount: Math.max(0, Number(saved.overgrowthSeedCount) || 0),
       apples,
       pickedAppleIds,
       nextAppleSeedOffset: Math.max(0, Number(saved.nextAppleSeedOffset) || 0),
@@ -401,7 +403,8 @@ export function loadAppleStateFromStorage(config) {
               planted: Boolean(seedData.planted),
               inInventory: Boolean(seedData.inInventory),
               label: seedData.label || config.defaultSeedLabel,
-              isStarter: Boolean(seedData.isStarter)
+              isStarter: Boolean(seedData.isStarter),
+              seedKind: seedData.seedKind ? String(seedData.seedKind) : ""
             };
           })
         : [],
@@ -457,6 +460,8 @@ export function loadAppleStateFromStorage(config) {
                 plantData.ownerDisplayName != null
                   ? String(plantData.ownerDisplayName)
                   : "",
+              seedKind: plantData.seedKind ? String(plantData.seedKind) : "",
+              soilOrdinal: Math.max(0, Number(plantData.soilOrdinal) || 0),
               sproutOrdinal: Math.max(0, Number(plantData.sproutOrdinal) || 0),
               grassOrdinal:
                 plantData.grassOrdinal != null &&
@@ -492,6 +497,7 @@ export function loadAppleStateFromStorage(config) {
       parseFailed: true,
       appleCount: 0,
       seedCount: 0,
+      overgrowthSeedCount: 0,
       apples: config.createRandomApples(5),
       pickedAppleIds: [],
       nextAppleSeedOffset: 0,
@@ -527,6 +533,7 @@ export function saveAppleStateToStorage(config) {
     JSON.stringify({
       appleCount: config.appleCount,
       seedCount: Math.max(0, Number(config.seedCount) || 0),
+      overgrowthSeedCount: Math.max(0, Number(config.overgrowthSeedCount) || 0),
       apples: config.apples.map(function (apple) {
         return {
           id: apple.id,
@@ -546,7 +553,8 @@ export function saveAppleStateToStorage(config) {
           planted: extraSeed.planted,
           inInventory: extraSeed.inInventory,
           label: extraSeed.label,
-          isStarter: Boolean(extraSeed.isStarter)
+          isStarter: Boolean(extraSeed.isStarter),
+          seedKind: extraSeed.seedKind || ""
         };
       }),
       extraPlants: config.extraPlants.map(function (plant) {
@@ -577,6 +585,8 @@ export function saveAppleStateToStorage(config) {
           grassAuto5EligibleAt: plant.grassAuto5EligibleAt != null ? plant.grassAuto5EligibleAt : null,
           ownerUserId: plant.ownerUserId || "",
           ownerDisplayName: plant.ownerDisplayName || "",
+          seedKind: plant.seedKind || "",
+          soilOrdinal: plant.soilOrdinal || 0,
           sproutOrdinal: plant.sproutOrdinal || 0,
           grassOrdinal:
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
