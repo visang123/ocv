@@ -4,6 +4,10 @@ export const GROUND_WORLD_HEIGHT = WORLD_HEIGHT * 0.6;
 
 /** 식물 지수 합산 상한 */
 export const PLANT_INDEX_SCORE_CAP = 1000;
+/** 안개 월드 단계 — NPC 등장(식물지수 구간과 동일) */
+export const PLANT_FOG_TRADE_MASTER_MIN_STAGE = 2;
+export const PLANT_FOG_ALCHEMY_MASTER_MIN_STAGE = 3;
+
 /** 식물 1개당 단계별 기여 점수(말라썩음 등 비정상은 0으로 처리) */
 export const PLANT_INDEX_SEEDED_SOIL = 5;
 export const PLANT_INDEX_SPROUT_STAGE_1 = 10;
@@ -75,8 +79,8 @@ export const SPROUT_WIDTH = 5;
 export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
-export const NPC_WIDTH = 13;
-export const NPC_HEIGHT = 26;
+export const NPC_WIDTH = Math.round(13 * 1.7);
+export const NPC_HEIGHT = Math.round(26 * 1.7);
 
 /** Right-anchored tree, shifted left (several × tree width) from the original corner. */
 export const BIG_TREE_X =
@@ -93,6 +97,12 @@ export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108;
 
 export const WELL_START_X = 405;
 export const WELL_START_Y = 190;
+/** 우물 오른쪽 땅 — 거래의 달인(상인), 월드 2(식물지수 250+)부터 */
+export const TRADE_MASTER_START_X = WELL_START_X + WELL_SIZE + 22;
+export const TRADE_MASTER_START_Y = WELL_START_Y + 44;
+/** 거래의 달인보다 오른쪽·위 — 연금술의 달인, 월드 3(500+)부터 */
+export const ALCHEMY_MASTER_START_X = TRADE_MASTER_START_X + NPC_WIDTH + 34;
+export const ALCHEMY_MASTER_START_Y = TRADE_MASTER_START_Y - 38;
 /** 안내판 — 책·씨앗·NPC와 간격을 두기 위해 약간 왼쪽·위로 */
 export const SIGN_START_X = 138;
 export const SIGN_START_Y = 268;

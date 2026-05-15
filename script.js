@@ -39,6 +39,8 @@ import {
   PLANT_INDEX_GRASS_STAGE_4,
   PLANT_INDEX_GRASS_STAGE_5,
   PLANT_FOG_BUTTERFLY_MIN_SCORE,
+  PLANT_FOG_TRADE_MASTER_MIN_STAGE,
+  PLANT_FOG_ALCHEMY_MASTER_MIN_STAGE,
   getPlantFogWorldStageFromScore,
   getPlantFogClearRectWorldPx,
   getPlantFogGlobalDimAlphaForStage,
@@ -68,6 +70,10 @@ import {
   TREE_CANOPY_BOTTOM,
   WELL_START_X,
   WELL_START_Y,
+  TRADE_MASTER_START_X,
+  TRADE_MASTER_START_Y,
+  ALCHEMY_MASTER_START_X,
+  ALCHEMY_MASTER_START_Y,
   SIGN_START_X,
   SIGN_START_Y,
   SIGN_WIDTH,
@@ -182,6 +188,8 @@ import {
   plantSpot,
   sprout,
   plantMaster,
+  tradeMaster,
+  alchemyMaster,
   npcBubble,
   playerBubble,
   playerAlert,
@@ -851,6 +859,20 @@ function isPlantFogMovementClampActive() {
 function isWorldRockPickupUnlocked() {
   if (!isWorldDocumentEntry()) return false;
   return getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= 2;
+}
+
+function isTradeMasterVisible() {
+  if (!isWorldDocumentEntry()) return false;
+  return (
+    getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= PLANT_FOG_TRADE_MASTER_MIN_STAGE
+  );
+}
+
+function isAlchemyMasterVisible() {
+  if (!isWorldDocumentEntry()) return false;
+  return (
+    getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= PLANT_FOG_ALCHEMY_MASTER_MIN_STAGE
+  );
 }
 
 function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
@@ -4868,6 +4890,28 @@ function collectWorldRockAvoidZones(ctx) {
   zones.push(expandWorldRockAvoidRect(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT, p));
   zones.push(expandWorldRockAvoidRect(worldBagX, worldBagY, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT, p));
   zones.push(expandWorldRockAvoidRect(npcX, npcY, NPC_WIDTH, NPC_HEIGHT, p));
+  if (isTradeMasterVisible()) {
+    zones.push(
+      expandWorldRockAvoidRect(
+        TRADE_MASTER_START_X,
+        TRADE_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        p
+      )
+    );
+  }
+  if (isAlchemyMasterVisible()) {
+    zones.push(
+      expandWorldRockAvoidRect(
+        ALCHEMY_MASTER_START_X,
+        ALCHEMY_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        p
+      )
+    );
+  }
   zones.push(expandWorldRockAvoidRect(seedX, seedY, SEED_SIZE, SEED_SIZE, p));
   const bucketSz = getBucketSize();
   const bx =
@@ -8954,6 +8998,38 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     }
   }
 
+  if (isTradeMasterVisible()) {
+    if (
+      plantSpotOverlapsExpandedRect(
+        plantX,
+        plantY,
+        TRADE_MASTER_START_X,
+        TRADE_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        0
+      )
+    ) {
+      return plantProximityPhraseForNoun("\uC0C1\uC778");
+    }
+  }
+
+  if (isAlchemyMasterVisible()) {
+    if (
+      plantSpotOverlapsExpandedRect(
+        plantX,
+        plantY,
+        ALCHEMY_MASTER_START_X,
+        ALCHEMY_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        0
+      )
+    ) {
+      return plantProximityPhraseForNoun("\uC5F0\uAE08\uC220\uC758 \uB2EC\uC778");
+    }
+  }
+
   if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
     const seedPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
@@ -9950,16 +10026,33 @@ function updateSproutPosition() {
 
 function updateNpcPosition() {
   if (!isPlantMasterVisible()) {
-    plantMaster.style.display = "none";
+    if (plantMaster) plantMaster.style.display = "none";
     npcBubble.style.display = "none";
-    return;
+  } else {
+    plantMaster.style.display = "block";
+    setWorldPosition(plantMaster, npcX, npcY);
+    if (npcBubble.style.display === "block") {
+      layoutNpcSpeechBubble();
+    }
+    updateNpcPrompt();
   }
 
-  plantMaster.style.display = "block";
-  setWorldPosition(plantMaster, npcX, npcY);
+  if (tradeMaster) {
+    if (isTradeMasterVisible()) {
+      tradeMaster.style.display = "block";
+      setWorldPosition(tradeMaster, TRADE_MASTER_START_X, TRADE_MASTER_START_Y);
+    } else {
+      tradeMaster.style.display = "none";
+    }
+  }
 
-  if (npcBubble.style.display === "block") {
-    layoutNpcSpeechBubble();
+  if (alchemyMaster) {
+    if (isAlchemyMasterVisible()) {
+      alchemyMaster.style.display = "block";
+      setWorldPosition(alchemyMaster, ALCHEMY_MASTER_START_X, ALCHEMY_MASTER_START_Y);
+    } else {
+      alchemyMaster.style.display = "none";
+    }
   }
 
   if (playerBubble.style.display === "block") {
@@ -9967,8 +10060,6 @@ function updateNpcPosition() {
   } else {
     playerBubble.classList.remove("is-in-front-of-name");
   }
-
-  updateNpcPrompt();
 }
 
 function updatePlayerBubblePosition() {
@@ -13739,6 +13830,8 @@ function setup() {
   setWorldSize(sprout, SPROUT_WIDTH, SPROUT_HEIGHT);
   setWorldSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
+  if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
+  if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);
   setWorldSize(signBoard, SIGN_WIDTH, SIGN_HEIGHT);
   setWorldSize(guideBook, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT);
   if (worldBag) setWorldSize(worldBag, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT);

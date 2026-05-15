@@ -6,6 +6,8 @@ const bigTree = document.getElementById("big-tree");
 const plantSpot = document.getElementById("plant-spot");
 const sprout = document.getElementById("sprout");
 const plantMaster = document.getElementById("plant-master");
+const tradeMaster = document.getElementById("trade-master");
+const alchemyMaster = document.getElementById("alchemy-master");
 const npcBubble = document.getElementById("npc-bubble");
 const playerBubble = document.getElementById("player-bubble");
 const playerAlert = document.getElementById("player-alert");
@@ -69,6 +71,8 @@ export {
   plantSpot,
   sprout,
   plantMaster,
+  tradeMaster,
+  alchemyMaster,
   npcBubble,
   playerBubble,
   playerAlert,

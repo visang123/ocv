@@ -533,22 +533,19 @@ body::-webkit-scrollbar {
   top: 83px;
 }
 
-#plant-master {
+.world-npc {
   position: absolute;
   left: 0;
   top: 0;
   z-index: 28;
-  width: 13px;
-  height: 26px;
+  width: 22px;
+  height: 44px;
   object-fit: contain;
   object-position: center bottom;
-  transform: scale(0.53);
-  transform-origin: 50% 100%;
   display: none;
   user-select: none;
   pointer-events: none;
   image-rendering: auto;
-  /* PNG uses transparency; outline only (no white halo). */
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
 }
 
