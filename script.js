@@ -1504,7 +1504,7 @@ const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 1;
  */
 const NPC_HEAD_TOP_TRIM_WORLD = 6;
 /** NPC 말풍선만: 양수일수록 아래(머리 쪽). 과하면 머리에 겹침 */
-const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 3;
+const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 14;
 /** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
@@ -2709,6 +2709,42 @@ function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
     width: PLAYER_WIDTH - feetInsetX * 2,
     height: feetH
   };
+}
+
+function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
+  const footY = GROUND_WORLD_HEIGHT - pd + jy;
+  const feetInsetX = 5;
+  const feetH = 9;
+  return {
+    left: px + feetInsetX,
+    top: footY - feetH,
+    right: px + PLAYER_WIDTH - feetInsetX,
+    bottom: footY + 1,
+    width: PLAYER_WIDTH - feetInsetX * 2,
+    height: feetH + 1
+  };
+}
+
+function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
+  if (!isWorldDocumentEntry()) return false;
+  if (!Array.isArray(appleState.worldRocks)) return false;
+  const pickedIds = Array.isArray(appleState.worldRockPickedIds)
+    ? appleState.worldRockPickedIds
+    : [];
+  const playerFeet = getPlayerWorldRockCollisionBoxForPose(px, pd, jy);
+  return appleState.worldRocks.some(function (rock) {
+    if (!rock || pickedIds.includes(String(rock.id))) return false;
+    const rx = Number(rock.x);
+    const ry = Number(rock.y);
+    const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+    if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
+    return isOverlappingRect(playerFeet, {
+      left: rx,
+      top: ry,
+      right: rx + sz,
+      bottom: ry + sz
+    });
+  });
 }
 
 function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) {
@@ -8126,6 +8162,19 @@ function updatePlayerPosition() {
         playerDepth = previousPlayerDepth;
         jumpY = previousJumpY;
       }
+    }
+  }
+
+  if (isPlayerCollidingVisibleWorldRockForPose(playerX, playerDepth, jumpY)) {
+    if (!isPlayerCollidingVisibleWorldRockForPose(previousPlayerX, playerDepth, jumpY)) {
+      playerX = previousPlayerX;
+    } else if (!isPlayerCollidingVisibleWorldRockForPose(playerX, previousPlayerDepth, previousJumpY)) {
+      playerDepth = previousPlayerDepth;
+      jumpY = previousJumpY;
+    } else {
+      playerX = previousPlayerX;
+      playerDepth = previousPlayerDepth;
+      jumpY = previousJumpY;
     }
   }
 
