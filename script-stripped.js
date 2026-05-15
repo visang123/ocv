@@ -1433,7 +1433,7 @@ playerBaseImage.addEventListener("load", function () {
     applyPlayerColor(selectedPlayerColor);
   }
 });
-playerBaseImage.src = "이미지/player-white.png";
+playerBaseImage.src = "??지/player-white.png";
 if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
 }
@@ -2536,14 +2536,14 @@ adminDevPlantIndexPlusButton.addEventListener("click", function () {
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
-controlsButton.textContent = "조작법";
+controlsButton.textContent = "조작?;
 settingsModal.insertBefore(controlsButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong></div>' +
+  '<div class="controls-header"><strong>조작?/strong></div>' +
   '<div class="controls-list">' +
   '<div><span>W / \u2191</span><p>?로 ?동</p></div>' +
   '<div><span>A / \u2190</span><p>?쪽?로 ?동</p></div>' +
@@ -2551,8 +2551,8 @@ controlsOverlay.innerHTML =
   '<div><span>D / \u2192</span><p>?른쪽으??동</p></div>' +
   '<div><span>Space</span><p>?프</p></div>' +
   '<div><span>E</span><p>줍기 / ?려?기</p></div>' +
-  '<div><span>Q</span><p>사용 / 대화</p></div>' +
-  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>Q</span><p>?용 / ???/p></div>' +
+  '<div><span>마우????/span><p>?? / 축소</p></div>' +
   '<div><span>Esc</span><p>?정 ?기 / ?기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
@@ -5436,7 +5436,7 @@ function rebuildWorldExtraBucketDom() {
     const el = document.createElement("img");
     el.className = "world-extra-bucket";
     el.dataset.bucketId = entry.id;
-    el.src = entry.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+    el.src = entry.isFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
     el.alt = "";
     el.setAttribute("aria-hidden", "true");
     el.draggable = false;
@@ -5457,7 +5457,7 @@ function updateWorldExtraBuckets() {
     if (!entry || !entry._el) return;
     setWorldSize(entry._el, bucketSz.width, bucketSz.height);
     setWorldPosition(entry._el, entry.x, entry.y);
-    entry._el.src = entry.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+    entry._el.src = entry.isFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
   });
 }
 
@@ -5479,7 +5479,7 @@ function spawnWorldBucketBelowTradeMaster() {
   const el = document.createElement("img");
   el.className = "world-extra-bucket";
   el.dataset.bucketId = entry.id;
-  el.src = "이미지/bucket-empty.png";
+  el.src = "??지/bucket-empty.png";
   el.alt = "";
   el.setAttribute("aria-hidden", "true");
   el.draggable = false;
@@ -6984,7 +6984,7 @@ function updateSeedPosition() {
   if (!showMainSeedSprite) {
     isHoveringMainSeed = false;
   }
-  seed.src = plantRuntime.isSeedDry ? "이미지/seed-dry.png" : "이미지/seed.png";
+  seed.src = plantRuntime.isSeedDry ? "??지/seed-dry.png" : "??지/seed.png";
 
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
     heldItem = null;
@@ -7040,7 +7040,7 @@ function updateExtraSeedsAndPlants() {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
       worldLooseSeedElement.alt = "world loose seed";
-      worldLooseSeedElement.src = "이미지/seed.png";
+      worldLooseSeedElement.src = "??지/seed.png";
       setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
       ground.appendChild(worldLooseSeedElement);
     }
@@ -7106,7 +7106,7 @@ function updateExtraSeedsAndPlants() {
   appleState.extraSeeds.forEach(function (extraSeed) {
     ensureExtraSeedElement(extraSeed);
     const isDry = isExtraSeedDry(extraSeed, now);
-    extraSeed.element.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
+    extraSeed.element.src = isDry ? "??지/seed-dry.png" : "??지/seed.png";
     const hideGroundOverlap = shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed);
     extraSeed.element.style.display =
       extraSeed.planted || extraSeed.inInventory || hideGroundOverlap ? "none" : "block";
@@ -8048,10 +8048,10 @@ function updateExtraPlantWaterLevel(plant, now) {
 }
 
 function getPlantSoilSrc(plant) {
-  if (plant.status === "rotten" || plant.isOverwatered) return "이미지/soil-rotten.png";
-  if (plant.status === "wet") return "이미지/soil-wet.png";
-  if (plant.status === "dry") return "이미지/soil-dry.png";
-  return "이미지/tilled-soil.png";
+  if (plant.status === "rotten" || plant.isOverwatered) return "??지/soil-rotten.png";
+  if (plant.status === "wet") return "??지/soil-wet.png";
+  if (plant.status === "dry") return "??지/soil-dry.png";
+  return "??지/tilled-soil.png";
 }
 
 function getBagInventorySeedCount() {
@@ -8315,7 +8315,7 @@ function ensureExtraSeedElement(extraSeed) {
   const element = document.createElement("img");
   element.className = "extra-seed";
   element.alt = "extra seed";
-  element.src = "이미지/seed.png";
+  element.src = "??지/seed.png";
   setWorldSize(element, SEED_SIZE);
   ground.appendChild(element);
   extraSeed.element = element;
@@ -8349,21 +8349,21 @@ function ensureExtraPlantElements(plant) {
   const spotElement = document.createElement("img");
   spotElement.className = "extra-plant-spot";
   spotElement.alt = "extra plant spot";
-  spotElement.src = "이미지/tilled-soil.png";
+  spotElement.src = "??지/tilled-soil.png";
   setWorldSize(spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   ground.appendChild(spotElement);
 
   const sproutElement = document.createElement("img");
   sproutElement.className = "extra-sprout";
   sproutElement.alt = "extra sprout";
-  sproutElement.src = "이미지/sprout.png";
+  sproutElement.src = "??지/sprout.png";
   setWorldSize(sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   ground.appendChild(sproutElement);
 
   const waterNeededElement = document.createElement("img");
   waterNeededElement.className = "extra-water-needed";
   waterNeededElement.alt = "water needed";
-  waterNeededElement.src = "이미지/water-needed.png";
+  waterNeededElement.src = "??지/water-needed.png";
   setWorldSize(waterNeededElement, WATER_NEEDED_SIZE);
   ground.appendChild(waterNeededElement);
 
@@ -8446,9 +8446,9 @@ function pruneGroundExtraSeedsShadowedByPlants(extraSeeds, extraPlants) {
 }
 
 function updateBucketPosition() {
-  bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+  bucket.src = isBucketFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
   playerBucketOverlay.style.backgroundImage =
-    'url("' + (isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png") + '")';
+    'url("' + (isBucketFull ? "??지/bucket-full.png" : "??지/bucket-empty.png") + '")';
   const isBucketHeldByRemotePlayer =
     Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
     window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
@@ -10167,7 +10167,7 @@ function useBucket() {
       updateWellCard();
       onboardingHookFilledBucketAtWell();
     } else if (wellReachForScoop && wellState.water <= 0) {
-      flashPlantProximityWarning("\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      flashPlantProximityWarning("?물??물이 ?습?다.");
       updatePlayerStatus();
     }
     return;
@@ -10713,13 +10713,13 @@ function updatePlantState() {
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
 
   if (mainSoilRotten) {
-    plantSpot.src = "이미지/soil-rotten.png";
+    plantSpot.src = "??지/soil-rotten.png";
   } else if (plantRuntime.status === "wet") {
-    plantSpot.src = "이미지/soil-wet.png";
+    plantSpot.src = "??지/soil-wet.png";
   } else if (plantRuntime.status === "dry") {
-    plantSpot.src = "이미지/soil-dry.png";
+    plantSpot.src = "??지/soil-dry.png";
   } else {
-    plantSpot.src = "이미지/tilled-soil.png";
+    plantSpot.src = "??지/tilled-soil.png";
   }
 
   if (mainSoilRotten) {
@@ -11132,13 +11132,13 @@ function refillWellIfNeeded() {
 }
 
 function updateWellImage() {
-  well.src = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
+  well.src = wellState.water > 0 ? "??지/well.png" : "??지/well-empty.png";
 }
 
 function updateWellCard() {
   const isVisible = isNearWell();
   const waterRatio = wellState.water / maxWellWater;
-  const wellImage = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
+  const wellImage = wellState.water > 0 ? "??지/well.png" : "??지/well-empty.png";
 
   wellCard.style.display = isVisible ? "flex" : "none";
   wellCardImage.src = wellImage;
@@ -11526,7 +11526,7 @@ function getTintedPlayerSrc(color) {
   }
 
   if (!playerBaseImageReady || !playerBaseImage.naturalWidth || !playerBaseImage.naturalHeight) {
-    return "이미지/player-white.png";
+    return "??지/player-white.png";
   }
 
   const canvas = document.createElement("canvas");
@@ -11534,7 +11534,7 @@ function getTintedPlayerSrc(color) {
   canvas.height = playerBaseImage.naturalHeight;
   const context = canvas.getContext("2d");
   if (!context) {
-    return "이미지/player-white.png";
+    return "??지/player-white.png";
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
@@ -11763,7 +11763,7 @@ function syncLocalPlayerVisibility() {
     player.classList.remove("is-hidden-before-spawn");
     player.style.display = "block";
     if (!player.getAttribute("src")) {
-      player.src = "이미지/player-white.png";
+      player.src = "??지/player-white.png";
     }
     return;
   }
@@ -12606,7 +12606,7 @@ function setupMultiplayer() {
   if (isSharedWorldSyncPausedForTutorial()) {
     teardownMultiplayerForTutorial();
     updateMultiplayerStatus(
-      "튜토리얼: 다른 플레이어/세상 비공유 · 멀티 미연결"
+      "?토리얼: ?른 ?레?어/?상 비공??· 멀??미연?
     );
     addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
@@ -13248,10 +13248,10 @@ function updateMultiplayerStatus(statusText) {
   if (!multiplayerStatus) return;
 
   const statusLabel =
-    multiplayerStatusText === "연결됨" ||
-    multiplayerStatusText === "연결중" ||
-    multiplayerStatusText === "캐릭터 선택 전" ||
-    multiplayerStatusText === "초기화 중" ||
+    multiplayerStatusText === "?결?? ||
+    multiplayerStatusText === "?결? ||
+    multiplayerStatusText === "캐릭???택 ?? ||
+    multiplayerStatusText === "초기??? ||
     (typeof multiplayerStatusText === "string" &&
       multiplayerStatusText.indexOf("?토리얼") !== -1)
       ? multiplayerStatusText

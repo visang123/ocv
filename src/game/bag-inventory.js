@@ -108,7 +108,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uACFC\uC131\uC7A5 \uC528\uC557",
       iconHtml:
-        '<img class="bag-slot-icon" src="\uC774\uBBF8\uC9C0/overgrowth-seed-icon.png?v=20260515a" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon" src="\uC774\uBBF8\uC9C0/overgrowth-seed-icon.png?v=20260516a" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "apple") {

@@ -15,8 +15,8 @@ export const TRADE_RECIPES = [
     label: "\uC591\uB3D9\uC774"
   },
   {
-    id: "seed5_overgrowth1",
-    inputs: { seed: 5 },
+    id: "seed7_overgrowth1",
+    inputs: { seed: 7 },
     outputs: { overgrowthSeed: 1 },
     label: "\uACFC\uC131\uC7A5 \uC528\uC557 1\uAC1C"
   }

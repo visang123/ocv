@@ -1433,7 +1433,7 @@ playerBaseImage.addEventListener("load", function () {
     applyPlayerColor(selectedPlayerColor);
   }
 });
-playerBaseImage.src = "이미지/player-white.png";
+playerBaseImage.src = "??지/player-white.png";
 if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
 }
@@ -2119,20 +2119,20 @@ document.addEventListener("visibilitychange", function () {
     sendMultiplayerPresence(true);
   }
 });
-
+});
 window.addEventListener(
   "wheel",
   function (event) {
     event.preventDefault();
-
+    event.preventDefault();
     if (isOnboardingLinearGateActive() && onboardingFlowStep < 19) {
       return;
     }
-
+    }
     if (isWorldChatBlockingGameInput()) {
       return;
     }
-
+    }
     const direction = event.deltaY > 0 ? -1 : 1;
     zoomLevel = clampZoom(zoomLevel + direction * zoomStep);
     updateCamera();
@@ -2153,7 +2153,7 @@ window.addEventListener(
   },
   { passive: false }
 );
-
+);
 function onGuideInventoryToggleClick() {
   if (isTradeExchangeOpen()) {
     return;
@@ -2173,14 +2173,14 @@ function onGuideInventoryToggleClick() {
     updateOnboardingFlowUI();
   }
 }
-
+}
 function setBagInventoryPanelOpen(open) {
   bagInventoryPanelOpen = Boolean(open);
   if (!bagInventoryPanel) return;
   bagInventoryPanel.style.display = bagInventoryPanelOpen ? "flex" : "none";
   bagInventoryPanel.setAttribute("aria-hidden", bagInventoryPanelOpen ? "false" : "true");
 }
-
+}
 function closeBagInventoryPanel() {
   if (isTradeExchangeOpen()) {
     closeTradeExchangePanel();
@@ -2189,7 +2189,7 @@ function closeBagInventoryPanel() {
   setBagInventoryPanelOpen(false);
   updateOnboardingFlowUI();
 }
-
+}
 function toggleBagInventoryPanelFromBagClick() {
   if (isTradeExchangeOpen()) {
     return;
@@ -2212,13 +2212,13 @@ function toggleBagInventoryPanelFromBagClick() {
   }
   updateOnboardingFlowUI();
 }
-
+}
 function onWorldBagInventoryClick(event) {
   event.preventDefault();
   event.stopPropagation();
   toggleBagInventoryPanelFromBagClick();
 }
-
+}
 guideBookButton.addEventListener("click", onGuideInventoryToggleClick);
 if (worldBagInventory) worldBagInventory.addEventListener("click", onWorldBagInventoryClick);
 if (bagInventoryClose) {
@@ -2228,7 +2228,7 @@ if (bagInventoryClose) {
     closeBagInventoryPanel();
   });
 }
-
+}
 if (bagInventoryPanel) {
   bagInventoryPanel.addEventListener("click", function (event) {
     if (worldSocialUiReady && worldChatPanelOpen) {
@@ -2312,7 +2312,7 @@ if (bagInventoryPanel) {
     }
   });
 }
-
+}
 bindTradeMaster({
   plantMaster: plantMaster,
   tradeMaster: tradeMaster,
@@ -2353,7 +2353,7 @@ bindTradeMaster({
     return isNpcDialogueRunning;
   }
 });
-
+});
 signBoard.addEventListener("click", function () {
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
@@ -2363,13 +2363,13 @@ signBoard.addEventListener("click", function () {
   isGuideBookOpen = true;
   updateGuideCard();
 });
-
+});
 function dismissGuideBookClickPrompt() {
   if (!isGuideBookClickPromptActive) return;
   isGuideBookClickPromptActive = false;
   setStoredFlag(guideBookClickPromptDismissedKey, true);
 }
-
+}
 function maybeAdvanceOnboardingAfterGuideBookClosed() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   if (onboardingFlowStep === 3) {
@@ -2383,7 +2383,7 @@ function maybeAdvanceOnboardingAfterGuideBookClosed() {
     persistOnboardingStep();
   }
 }
-
+}
 function closeGuideCardFromClick() {
   isGuideBookOpen = false;
   if (isNearSignBoard()) {
@@ -2394,17 +2394,17 @@ function closeGuideCardFromClick() {
   maybeAdvanceOnboardingAfterGuideBookClosed();
   updateOnboardingFlowUI();
 }
-
+}
 guideCard.addEventListener("pointerdown", function (event) {
   if (event.target.closest("#guide-nav")) return;
   closeGuideCardFromClick();
 });
-
+});
 guideCloseButton.addEventListener("click", function (event) {
   event.stopPropagation();
   closeGuideCardFromClick();
 });
-
+});
 document.addEventListener("click", function (event) {
   if (guideCard.style.display !== "block") return;
   if (guideCard.contains(event.target)) return;
@@ -2413,18 +2413,18 @@ document.addEventListener("click", function (event) {
     return;
   if (bagInventoryPanel && (event.target === bagInventoryPanel || bagInventoryPanel.contains(event.target)))
     return;
-
+    return;
   closeGuideCardFromClick();
 }, true);
-
+}, true);
 seed.addEventListener("mouseenter", function () {
   isHoveringMainSeed = true;
 });
-
+});
 seed.addEventListener("mouseleave", function () {
   isHoveringMainSeed = false;
 });
-
+});
 /* 가?버튼(#world-bag-inventory) ?버??document ?인?로 ?기 ?트? ?기??*/
 if (plantHoverLabel) {
   document.addEventListener("pointermove", function (e) {
@@ -2435,7 +2435,7 @@ document.addEventListener("pointerup", function (e) {
   if (e.button !== 0) return;
   tryWaterPlantByPointerClick(e.clientX, e.clientY);
 });
-
+  if (guidePageIndex > 0) {
 guidePrev.addEventListener("click", function (event) {
   event.stopPropagation();
   if (guidePageIndex > 0) {
@@ -2443,7 +2443,7 @@ guidePrev.addEventListener("click", function (event) {
   }
   updateGuidePages();
 });
-
+  const maxPage = getGuideMaxPage();
 guideNext.addEventListener("click", function (event) {
   event.stopPropagation();
   const maxPage = getGuideMaxPage();
@@ -2452,11 +2452,11 @@ guideNext.addEventListener("click", function (event) {
   }
   updateGuidePages();
 });
-
+});
 characterSelectButton.addEventListener("click", function () {
   finishCharacterSelect();
 });
-
+const settingsModal = document.getElementById("settings-modal");
 const settingsButton = document.getElementById("settings-button");
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsModal = document.getElementById("settings-modal");
@@ -2536,14 +2536,14 @@ adminDevPlantIndexPlusButton.addEventListener("click", function () {
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
-controlsButton.textContent = "조작법";
+controlsOverlay.id = "controls-overlay";
 settingsModal.insertBefore(controlsButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong></div>' +
+  '<div><span>A / \u2190</span><p>왼쪽으로 이동</p></div>' +
   '<div class="controls-list">' +
   '<div><span>W / \u2191</span><p>?로 ?동</p></div>' +
   '<div><span>A / \u2190</span><p>?쪽?로 ?동</p></div>' +
@@ -2551,13 +2551,13 @@ controlsOverlay.innerHTML =
   '<div><span>D / \u2192</span><p>?른쪽으??동</p></div>' +
   '<div><span>Space</span><p>?프</p></div>' +
   '<div><span>E</span><p>줍기 / ?려?기</p></div>' +
-  '<div><span>Q</span><p>사용 / 대화</p></div>' +
-  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '</div></div>';
+document.body.appendChild(controlsOverlay);
   '<div><span>Esc</span><p>?정 ?기 / ?기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
-
+    tutorialExitButton,
 function updateSettingsTutorialButtons() {
   updateSettingsTutorialButtonsUi({
     tutorialExitButton,
@@ -2568,18 +2568,18 @@ function updateSettingsTutorialButtons() {
     onboardingFlowStep
   });
 }
-
+  updateSettingsTutorialButtons();
 function openSettingsOverlay() {
   setSettingsOverlayOpen(settingsOverlay, true);
   updateSettingsTutorialButtons();
 }
-
+  setSettingsOverlayOpen(settingsOverlay, false);
 function closeSettingsOverlayFromBackdrop() {
   onboardingStep26OpenedSettingsWithEsc = false;
   setSettingsOverlayOpen(settingsOverlay, false);
   updateSettingsTutorialButtons();
 }
-
+  setSettingsOverlayOpen(settingsOverlay, false);
 function closeSettingsOverlayFromEscape() {
   const hadEscOpenCycle = onboardingStep26OpenedSettingsWithEsc;
   setSettingsOverlayOpen(settingsOverlay, false);
@@ -2594,7 +2594,7 @@ function closeSettingsOverlayFromEscape() {
     onboardingStep26OpenedSettingsWithEsc = false;
   }
 }
-
+    return;
 function skipTutorialFromSettings() {
   if (!window.confirm("?토리얼??건너?고 ?유? ?레?할까요?")) {
     return;
@@ -2657,7 +2657,7 @@ function skipTutorialFromSettings() {
   }
   proceedSkipToWorld();
 }
-
+    !window.confirm(
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
@@ -2691,44 +2691,44 @@ function replayTutorialFromSettings() {
   isReloadingForWorldReset = true;
   window.location.replace(ovcTutorialPageUrl());
 }
-
+});
 settingsButton.addEventListener("click", function () {
   openSettingsOverlay();
 });
-
+    closeSettingsOverlayFromBackdrop();
 settingsOverlay.addEventListener("click", function (event) {
   if (event.target === settingsOverlay) {
     closeSettingsOverlayFromBackdrop();
   }
 });
-
+  setSettingsOverlayOpen(settingsOverlay, false);
 controlsButton.addEventListener("click", function () {
   onboardingStep26OpenedSettingsWithEsc = false;
   setSettingsOverlayOpen(settingsOverlay, false);
   controlsOverlay.classList.add("is-open");
   controlsOverlay.setAttribute("aria-hidden", "false");
 });
-
+    controlsOverlay.classList.remove("is-open");
 controlsOverlay.addEventListener("click", function (event) {
   if (event.target === controlsOverlay) {
     controlsOverlay.classList.remove("is-open");
     controlsOverlay.setAttribute("aria-hidden", "true");
   }
 });
-
+});
 logoutButton.addEventListener("click", function () {
   openLogoutConfirm();
 });
-
+});
 logoutConfirmCancel.addEventListener("click", function () {
   closeLogoutConfirm();
 });
-
+  logout();
 logoutConfirmOk.addEventListener("click", function () {
   closeLogoutConfirm();
   logout();
 });
-
+    skipTutorialFromSettings();
 if (tutorialExitButton) {
   tutorialExitButton.addEventListener("click", function () {
     skipTutorialFromSettings();
@@ -2739,55 +2739,55 @@ if (tutorialReplayButton) {
     replayTutorialFromSettings();
   });
 }
-
+    closeLogoutConfirm();
 logoutConfirmOverlay.addEventListener("click", function (event) {
   if (event.target === logoutConfirmOverlay) {
     closeLogoutConfirm();
   }
 });
-
+});
 changeColorButton.addEventListener("click", function () {
   openCharacterColorChange();
 });
-
+});
 adminOpenButton.addEventListener("dblclick", function () {
   openAdminPanel();
 });
-
+  networkDebugDomStale = true;
 networkDebugButton.addEventListener("dblclick", function () {
   networkDebugPanel.classList.toggle("is-visible");
   networkDebugDomStale = true;
   refreshNetworkDebugPanelDom();
 });
-
+    refreshNetworkDebugPanelDom();
 document.addEventListener("selectionchange", function () {
   if (networkDebugDomStale) {
     refreshNetworkDebugPanelDom();
   }
 });
-
+});
 adminCloseButton.addEventListener("click", function () {
   closeAdminPanel();
 });
-
+    closeAdminPanel();
 adminOverlay.addEventListener("click", function (event) {
   if (event.target === adminOverlay) {
     closeAdminPanel();
   }
 });
-
+});
 adminRefreshButton.addEventListener("click", function () {
   loadAdminAccounts();
 });
-
+}
 function applyGuideTexts() {
   // Guide copy lives in index.html / tutorial.html so the sign and book keep the same wording.
 }
-
+  const bottom = GROUND_WORLD_HEIGHT - playerDepth + jumpY;
 function getPlayerBox() {
   const top = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - playerDepth + jumpY;
   const bottom = GROUND_WORLD_HEIGHT - playerDepth + jumpY;
-
+    top,
   return {
     left: playerX,
     top,
@@ -2797,12 +2797,12 @@ function getPlayerBox() {
     height: PLAYER_HEIGHT
   };
 }
-
+  return getPlayerHeadFogProbeBoxForPose(playerX, playerDepth, jumpY);
 /** ?개 막힘 ?정: 발보??머리(?쪽)가 ?개???을 ?까지 ?동 ?용 */
 function getPlayerHeadFogProbeBox() {
   return getPlayerHeadFogProbeBoxForPose(playerX, playerDepth, jumpY);
 }
-
+  const feetInsetX = 3;
 function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
   const footY = GROUND_WORLD_HEIGHT - pd + jy;
   const feetInsetX = 3;
@@ -2816,7 +2816,7 @@ function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
     height: feetH
   };
 }
-
+  const feetInsetX = 5;
 function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
   const footY = GROUND_WORLD_HEIGHT - pd + jy;
   const feetInsetX = 5;
@@ -2830,7 +2830,7 @@ function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
     height: feetH + 1
   };
 }
-
+const ROCK_GROUND_SVG_H = 48;
 /** rock-ground.svg(64×48) ??CSS `center bottom / contain` ??일?게 ?트박스 ?출 */
 const ROCK_GROUND_SVG_W = 64;
 const ROCK_GROUND_SVG_H = 48;
@@ -2839,7 +2839,7 @@ const ROCK_GROUND_HIT_LEFT = 10;
 const ROCK_GROUND_HIT_RIGHT = 54;
 const ROCK_GROUND_HIT_TOP = 19;
 const ROCK_GROUND_HIT_BOTTOM = 44;
-
+  const renderW = Math.min(boxW, boxH * (ROCK_GROUND_SVG_W / ROCK_GROUND_SVG_H));
 function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) {
   const boxBottom = boxTop + boxH;
   const renderW = Math.min(boxW, boxH * (ROCK_GROUND_SVG_W / ROCK_GROUND_SVG_H));
@@ -2853,7 +2853,7 @@ function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) {
     bottom: imageTop + (ROCK_GROUND_HIT_BOTTOM / ROCK_GROUND_SVG_H) * renderH
   };
 }
-
+  const size = Number(sz) || WORLD_ROCK_SIZE;
 /** ry = ???소 ?선(?드). rockEl ?으??제 ?더 박스 기?(줌·CSS ?치) */
 function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) {
   const size = Number(sz) || WORLD_ROCK_SIZE;
@@ -2872,7 +2872,7 @@ function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) {
   }
   return getVisibleWorldRockCollisionRectFromBox(rx, ry, size, size);
 }
-
+  if (!Array.isArray(appleState.worldRocks)) return false;
 function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
   if (!isWorldDocumentEntry()) return false;
   if (!Array.isArray(appleState.worldRocks)) return false;
@@ -2889,7 +2889,7 @@ function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
     return isOverlappingRect(playerFeet, getVisibleWorldRockCollisionRect(rx, ry, sz, rock._el));
   });
 }
-
+    getPlayerHeadFogProbeBoxForPose(px, pd, jy),
 function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) {
   return isPlayerBoxFullyInsidePlantFogClearRect(
     getPlayerHeadFogProbeBoxForPose(px, pd, jy),
@@ -2897,35 +2897,35 @@ function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) {
     eps
   );
 }
-
+    width: SEED_SIZE,
 function getSeedSize() {
   return {
     width: SEED_SIZE,
     height: SEED_SIZE
   };
 }
-
+    width: BUCKET_SIZE,
 function getBucketSize() {
   return {
     width: BUCKET_SIZE,
     height: BUCKET_SIZE
   };
 }
-
+    width: WELL_SIZE,
 function getWellSize() {
   return {
     width: WELL_SIZE,
     height: WELL_SIZE
   };
 }
-
+}
 function getCenterDistance(x, y, width, height) {
   return getCenterDistanceUtil(getPlayerBox(), x, y, width, height);
 }
 
 function getHandPosition(itemWidth, itemHeight) {
   const playerBox = getPlayerBox();
-
+    y: playerBox.top + playerBox.height * 0.68 - itemHeight / 2
   return {
     x: playerBox.left + playerBox.width * 0.82 - itemWidth / 2,
     y: playerBox.top + playerBox.height * 0.68 - itemHeight / 2
@@ -2937,7 +2937,7 @@ function isNearSeed() {
 
   return getCenterDistance(seedX, seedY, seedSize.width, seedSize.height) < pickupDistance;
 }
-
+  return (
 function canPickUpSeed() {
   updateSeedDryState();
   return (
@@ -2945,14 +2945,14 @@ function canPickUpSeed() {
     !plantRuntime.isSeedDry
   );
 }
-
+    window.clearTimeout(tutorialMainSeedRespawnTimerId);
 function clearTutorialMainSeedRespawnTimer() {
   if (tutorialMainSeedRespawnTimerId !== null) {
     window.clearTimeout(tutorialMainSeedRespawnTimerId);
     tutorialMainSeedRespawnTimerId = null;
   }
 }
-
+  clearTutorialMainSeedRespawnTimer();
 function scheduleTutorialMainSeedRespawnFromGround() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   clearTutorialMainSeedRespawnTimer();
@@ -2963,7 +2963,7 @@ function scheduleTutorialMainSeedRespawnFromGround() {
     tutorialRespawnMainSeedOnGround();
   }, TUTORIAL_MAIN_SEED_RESPAWN_MS);
 }
-
+  return appleState.extraSeeds.some(function (s) {
 function hasTutorialStarterSeedInPlay() {
   if (heldItem === HELD_ITEM_SEED) return true;
   return appleState.extraSeeds.some(function (s) {
@@ -2971,7 +2971,7 @@ function hasTutorialStarterSeedInPlay() {
     return s.id === "starter-seed" || s.isStarter;
   });
 }
-
+ */
 /**
  * 메인 ?물 미심?데 '줍힘'??고 ?앗 추적???으????앗?????옴 ???래그·건??태 ?리
  */
@@ -2990,7 +2990,7 @@ function recoverWorldMainSeedIfOnboardingStuck() {
   dryMainSeedVisibleSince = 0;
   setStoredFlag(mainDrySeedHandledKey, false);
 }
-
+  clearMainSeedPickedForCurrentRoom();
 function tutorialRespawnMainSeedOnGround() {
   tutorialMainSeedRegenCompleted = true;
   clearMainSeedPickedForCurrentRoom();
@@ -3019,11 +3019,11 @@ function tutorialRespawnMainSeedOnGround() {
   markWorldDirty();
   syncWorldState(true);
 }
-
+  if (hasPickedMainSeedInCurrentRoom()) return null;
 /** Tutorial ?용: ??#seed ??extraSeeds ???? ?드 ?브?서???출?면 ????(groundSeed.js). */
 function createStarterSeedInventoryItem() {
   if (hasPickedMainSeedInCurrentRoom()) return null;
-
+    x: seedX,
   const starterSeed = {
     id: "starter-seed",
     x: seedX,
@@ -3062,7 +3062,7 @@ function isMainBucketOnGroundForPickup() {
   if (heldBy && heldBy !== currentSessionId) return false;
   return true;
 }
-
+  return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellUseDistance;
 function getNearestGroundBucketPickInfo() {
   const bucketSize = getBucketSize();
   let best = null;
@@ -3085,24 +3085,24 @@ function getNearestGroundBucketPickInfo() {
   });
   return best;
 }
-
+    wellUseDistance + 2
 function isNearBucket() {
   const info = getNearestGroundBucketPickInfo();
   return Boolean(info && info.distance < pickupDistance);
 }
-
+  if (isNearWellForPouring()) return true;
 function isNearWell() {
   const wellSize = getWellSize();
-
+  const bucketSize = getBucketSize();
   return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellUseDistance;
 }
-
+    top: bucketY,
 function isNearWellForPouring() {
   const wellSize = getWellSize();
-
+  };
   return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellPourDistance;
 }
-
+    wellPourDistance + 2
 /** ?에 ???동??중심???물????가까운???레?어 발만?로??거리 밖으?????경우 */
 function isNearWellIncludingBucketReach() {
   if (isNearWell()) return true;
@@ -3120,7 +3120,7 @@ function isNearWellIncludingBucketReach() {
     wellUseDistance + 2
   );
 }
-
+  };
 function isNearWellForPouringIncludingBucketReach() {
   if (isNearWellForPouring()) return true;
   if (heldItem !== HELD_ITEM_BUCKET) return false;
@@ -3137,9 +3137,9 @@ function isNearWellForPouringIncludingBucketReach() {
     wellPourDistance + 2
   );
 }
-
+  }
 /**
- * ?동???각?과 ?물 ?각?이 ?제?겹치??(?유 px). 중심거리??면 ?·통???물 ?쪽?로 ?어? * ?레?에?도 '멀????? ?기 ?패 ??같? ?레?에 Q가 뿌리???? 분기?가??문제가 ??.
+}
  */
 function isBucketOverlappingWellForInteraction(padPx) {
   if (heldItem !== HELD_ITEM_BUCKET) return false;
@@ -3160,7 +3160,7 @@ function isBucketOverlappingWellForInteraction(padPx) {
   };
   return isOverlappingRect(bucketRect, wellRect);
 }
-
+  } else if (tutorialSessionWorldGuideBookOffGroundPicked()) {
 function isNearSignBoard() {
   if (!signBoard) {
     return false;
@@ -3171,7 +3171,7 @@ function isNearSignBoard() {
   }
   return getCenterDistance(signX, signY, SIGN_WIDTH, SIGN_HEIGHT) < guideInteractDistance;
 }
-
+function clearOnboardingHighlights() {
 function isNearWorldBagPickup() {
   if (isWorldDocumentEntry()) {
     if (hasPickedWorldBagGroundInCurrentRoom()) return false;
@@ -3187,7 +3187,7 @@ function isNearWorldBagPickup() {
     getCenterDistance(worldBagX, worldBagY, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT) < pickupDistance
   );
 }
-
+  });
 function isNearGuideBook() {
   if (isWorldDocumentEntry()) {
     if (hasPickedWorldGuideBookOffGroundInCurrentRoom()) return false;
@@ -3201,7 +3201,7 @@ function isNearGuideBook() {
     getCenterDistance(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT) < pickupDistance
   );
 }
-
+  }
 function clearOnboardingHighlights() {
   [
     guideBook,
@@ -3240,7 +3240,7 @@ function clearOnboardingHighlights() {
     }
   });
 }
-
+    }
 function setOnboardingCalloutVisible(show, text) {
   if (!onboardingCallout || !onboardingCalloutText) return;
   if (show && isWorldDocumentEntry()) {
@@ -3255,13 +3255,13 @@ function setOnboardingCalloutVisible(show, text) {
   onboardingCallout.style.display = "block";
   onboardingCalloutText.textContent = text || "";
 }
-
+    .then(function (result) {
 function persistOnboardingStep() {
   setStoredValue(onboardingFlowStepKey, String(onboardingFlowStep));
 }
-
+        } catch (eOk) {}
 let lastAccountTutorialDoneRequestAt = 0;
-
+    })
 /** ?크????로컬?토리?가 비어???버??tutorial_done???으?index?보내??해 계정???기??*/
 function requestAccountTutorialDoneSync(options) {
   const force = Boolean(options && options.force);
@@ -3295,7 +3295,7 @@ function requestAccountTutorialDoneSync(options) {
     })
     .catch(function () {});
 }
-
+function restoreWorldHubIfVeteranWithoutActiveReplay() {
 /**
  * ?토리얼????번이?도 ?낸 계정? 로컬???료 ?태가 ?아???다(리로?·탭 종료·로그?웃/로그???에???드).
  * done ?래그만 ?실??경우 ????텝?로 복구?다.
@@ -3321,7 +3321,7 @@ function repairOnboardingCompletionFromStoredStep() {
     requestAccountTutorialDoneSync({ force: true });
   }
 }
-
+  clearWorldFloorBagClaim(removeStoredValue);
 /**
  * ??번이?도 ?드????계정: ?튜?리???기???션???니??토리얼 미완??태? * 본게?으??돌린다(리로?·로그아??로그?·탭 ?환 ?에???드).
  */
@@ -3344,7 +3344,7 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
   setStoredValue(onboardingFlowStepKey, "0");
   requestAccountTutorialDoneSync({ force: true });
 }
-
+  clearMultiplayerReconnectTimeout();
 function resetTutorialProgressInStorage() {
   clearTutorialMainSeedRespawnTimer();
   setOnboardingFlowDoneStored(false);
@@ -3360,19 +3360,19 @@ function resetTutorialProgressInStorage() {
   clearMainSeedPickedForCurrentRoom();
   tutorialWorldNeedsFullReset = true;
 }
-
+        ? window.OVCOnline.getClient()
 function isSharedWorldSyncPausedForTutorial() {
   if (isWorldDocumentEntry()) return false;
   return !getStoredFlag(onboardingFlowDoneKey);
 }
-
+  });
 /** index ?드 + ?보???료 + ?버 ?기?? 메인 ?롯???? ?으??고 ?기??extraPlants로만 추? */
 function isSharedWorldMultiPlantMode() {
   if (!isWorldDocumentEntry()) return false;
   if (!getStoredFlag(onboardingFlowDoneKey)) return false;
   return isWorldServerSyncAvailable();
 }
-
+      pendingWorld = true;
 function teardownMultiplayerForTutorial() {
   clearMultiplayerReconnectTimeout();
   Object.keys(remotePlayers).forEach(function (remoteId) {
@@ -3397,7 +3397,7 @@ function teardownMultiplayerForTutorial() {
     }
   });
 }
-
+  saveAppleState();
 function applyTutorialWorldResetIfPending() {
   let pendingWorld = tutorialWorldNeedsFullReset;
   try {
@@ -3457,7 +3457,7 @@ function maybeResetTutorialForNewLoginSession() {
   }
   setStoredValue(onboardingTutorialBindSessionKey, sid);
 }
-
+  onboardingEscHintTimerId = window.setTimeout(function () {
 function onboardingClearEscHintTimer() {
   if (onboardingEscHintTimerId) {
     window.clearTimeout(onboardingEscHintTimerId);
@@ -3484,7 +3484,7 @@ function onboardingClearAllOnboardingTimers() {
     onboardingFruitIntroTimerId = null;
   }
 }
-
+    try {
 function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
   onboardingClearEscHintTimer();
   onboardingEscHintTimerId = window.setTimeout(function () {
@@ -3494,13 +3494,13 @@ function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
     updateOnboardingFlowUI();
   }, 2000);
 }
-
+      isReloadingForWorldReset = true;
 function scheduleOnboardingNpcGuideEscHint() {
   scheduleOnboardingGuideEscHintLine(10, function () {
     onboardingNpcGuideEscHintShown = true;
   });
 }
-
+    } catch (eFinalTok) {}
 function onboardingScheduleTutorialCompleteHide() {
   if (onboardingFinalHideTimerId) {
     window.clearTimeout(onboardingFinalHideTimerId);
@@ -3540,7 +3540,7 @@ function onboardingScheduleTutorialCompleteHide() {
     proceedFinalToWorld();
   }, 7000);
 }
-
+  });
 function isPlayerNearTutorialTreeArea() {
   const cx = BIG_TREE_X + BIG_TREE_WIDTH / 2;
   const cy = BIG_TREE_Y + BIG_TREE_HEIGHT / 2;
@@ -3548,7 +3548,7 @@ function isPlayerNearTutorialTreeArea() {
   const py = getPlayerFootY() - (player.offsetHeight || PLAYER_HEIGHT) / 2;
   return Math.hypot(px - cx, py - cy) < 100;
 }
-
+function isOnboardingLinearGateActive() {
 function isNearAnyUnpickedAppleTutorial() {
   return appleState.apples.some(function (apple) {
     if (appleState.pickedIds.includes(apple.id)) return false;
@@ -3557,7 +3557,7 @@ function isNearAnyUnpickedAppleTutorial() {
     );
   });
 }
-
+function flashOnboardingOrderHint(message) {
 function highlightUnpickedApplesForTutorial() {
   const visibleById = {};
   appleState.apples.forEach(function (apple) {
@@ -3577,7 +3577,7 @@ function isMainGameTutorialInProgress() {
   if (isWorldDocumentEntry()) return false;
   return !getStoredFlag(onboardingFlowDoneKey);
 }
-
+    onboardingFlowStep = 2;
 function isOnboardingLinearGateActive() {
   return (
     isMainGameTutorialInProgress() &&
@@ -3586,23 +3586,23 @@ function isOnboardingLinearGateActive() {
     !isTabSessionSuperseded
   );
 }
-
+    onboardingFlowStep >= 5
 function flashOnboardingOrderHint(message) {
   flashPlantProximityWarning(message || "\uC21C\uC11C\uB300\uB85C \uC9C4\uD589\uD574 \uC8FC\uC138\uC694.");
   updatePlayerStatus();
 }
-
+  if (
 function onboardingAllowsBucketQUse() {
   // 13: ?물?서 긷기, 14~15: 메인 ?물??붓기, 16+: ?비·?정 ???후?도 ?반 물주?가??
   // ?전?는 13·15??용??14?서 붓기/16 ?후 Q가 무반?처??보이??문제가 ?었??
   return onboardingFlowStep >= 13;
 }
-
+    changed = true;
 function onboardingAllowsGuideBookButtonToggle() {
   const s = onboardingFlowStep;
   return s === 2 || s === 3 || s === 10 || s >= 16;
 }
-
+    onboardingFlowStep < 10 &&
 function syncOnboardingFlowProgressFromWorld() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   let changed = false;
@@ -3642,7 +3642,7 @@ function syncOnboardingFlowProgressFromWorld() {
     persistOnboardingStep();
   }
 }
-
+  if (onboardingFlowStep === 25) {
 function loadOnboardingFlowState() {
   onboardingJumpLatch = false;
   onboardingNpcGuideEscHintShown = false;
@@ -3684,7 +3684,7 @@ function loadOnboardingFlowState() {
     scheduleOnboardingNpcGuideEscHint();
   }
 }
-
+    persistOnboardingStep();
 function onboardingNotifyMainPlantPlanted() {
   clearTutorialMainSeedRespawnTimer();
   if (getStoredFlag(onboardingFlowDoneKey)) return;
@@ -3693,10 +3693,10 @@ function onboardingNotifyMainPlantPlanted() {
     persistOnboardingStep();
   }
 }
-
+    onboardingFlowStep = 15;
 function onboardingAutoAdvanceSteps() {
   if (getStoredFlag(onboardingFlowDoneKey) || !hasSpawnedCharacter) return;
-
+  if (onboardingFlowStep === 21 && isPlayerNearTutorialTreeArea()) {
   if (onboardingFlowStep === 5 && isNearSeed()) {
     onboardingFlowStep = 6;
     persistOnboardingStep();
@@ -3742,7 +3742,7 @@ function onboardingAutoAdvanceSteps() {
     persistOnboardingStep();
   }
 }
-
+    setOnboardingCalloutVisible(false, "");
 function updateOnboardingFlowUI() {
   if (!onboardingCallout || !onboardingCalloutText) {
     updateSettingsTutorialButtons();
@@ -3767,17 +3767,17 @@ function updateOnboardingFlowUI() {
     updateSettingsTutorialButtons();
     return;
   }
-
+      break;
   onboardingAutoAdvanceSteps();
-
+    case 2: {
   clearOnboardingHighlights();
-
+      if (worldBagInventory) {
   const guideOpen = guideCard && guideCard.style.display === "block";
-
+        worldBagInventory.classList.add("onboarding-highlight-book-inv");
   if (onboardingFlowStep === 10 && guideOpen && !onboardingEscHintTimerId && !onboardingNpcGuideEscHintShown) {
     scheduleOnboardingNpcGuideEscHint();
   }
-
+    case 3: {
   switch (onboardingFlowStep) {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
@@ -3998,7 +3998,7 @@ function updateOnboardingFlowUI() {
   }
   updateSettingsTutorialButtons();
 }
-
+    window.clearTimeout(onboardingCongratsTimerId);
 function onboardingCheckJumpFinish() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 4) return;
   if (jumpY < -0.12) {
@@ -4011,7 +4011,7 @@ function onboardingCheckJumpFinish() {
     updateOnboardingFlowUI();
   }
 }
-
+      updateOnboardingFlowUI();
 function onboardingHookWateredMainPlantFromTutorial() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 15) return;
   onboardingFlowStep = 16;
@@ -4036,14 +4036,14 @@ function onboardingHookWateredMainPlantFromTutorial() {
   }, 1500);
   updateOnboardingFlowUI();
 }
-
+  if (!isNearGuideBook()) return false;
 function onboardingHookFilledBucketAtWell() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 13) return;
   onboardingFlowStep = 14;
   persistOnboardingStep();
   updateOnboardingFlowUI();
 }
-
+  }
 function onboardingHookDroppedBucketForTutorial() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 17) return;
   onboardingFlowStep = 18;
@@ -4051,7 +4051,7 @@ function onboardingHookDroppedBucketForTutorial() {
   persistOnboardingStep();
   updateOnboardingFlowUI();
 }
-
+function pickUpWorldBag() {
 function pickUpWorldGuideBookNoHold() {
   if (isOnboardingLinearGateActive()) {
     return false;
@@ -4070,18 +4070,18 @@ function pickUpWorldGuideBookNoHold() {
   updateBagInventorySlots();
   return true;
 }
-
+  syncGuideInventoryBar();
 function pickUpWorldBag() {
   if (isOnboardingLinearGateActive()) {
     if (hasGuideBook) return false;
     if (onboardingFlowStep !== 1 && onboardingFlowStep !== 2) return false;
   }
   if (!isNearWorldBagPickup()) return false;
-
+  }
   if (worldSocialUiReady && worldChatPanelOpen) {
     setWorldChatPanelOpen(false);
   }
-
+/** 구: 월드 책 E줍기 — 가이드 소지 없이 바닥에서만 제거. */
   hasGuideBook = true;
   isGuideBookOpen = false;
   setGuideBookPickedForCurrentRoom();
@@ -4100,12 +4100,12 @@ function pickUpWorldBag() {
   }
   return true;
 }
-
+        return roomKeyedPickupFlagTrueAnySlug(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
 /** ? ?드 ?E줍기 ??가?드 ?? ?이 바닥?서??거. */
 function pickUpGuideBook() {
   return pickUpWorldGuideBookNoHold();
 }
-
+  hasGuideBook = hasPickedGuideBookInCurrentRoom();
 function loadGuideBookState(skipMaybeResetTutorial) {
   if (currentUserId && !skipMaybeResetTutorial) {
     maybeResetTutorialForNewLoginSession();
@@ -4147,7 +4147,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   updateNpcPosition();
   loadOnboardingFlowState();
 }
-
+  savePlayerPosition(true);
 function resetGameForTesting() {
   showAppLoadingScreen("Resetting...");
   isReloadingForWorldReset = true;
@@ -4165,7 +4165,7 @@ function resetGameForTesting() {
   restartPlayerPositionOnly();
   saveSharedWorldAndReload({ reloadUrl: ovcWorldIndexUrl() });
 }
-
+  resetInputKeys(keys);
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
   saveWellState();
@@ -4173,7 +4173,7 @@ function persistDefaultStateAfterReset() {
   saveAppleState();
   saveBucketState();
 }
-
+  plantingInventorySeedId = null;
 function saveGameSnapshot() {
   if (isReloadingForWorldReset) return;
   savePlayerPosition(true);
@@ -4183,7 +4183,7 @@ function saveGameSnapshot() {
   saveBucketState();
   syncWorldState(true);
 }
-
+    isOnGround = true;
 function restartPlayerPositionOnly() {
   resetInputKeys(keys);
   playerX = spawnPlayerX;
@@ -4196,7 +4196,7 @@ function restartPlayerPositionOnly() {
   plantingInventorySeedId = null;
   savePlayerPosition(true);
 }
-
+  if (sharedWorldResetOnly) {
 function settlePlayerBeforeBackground() {
   const groundMaxDepth = getMaxGroundedPlayerDepth();
   if (playerDepth > groundMaxDepth && !isPlayerSupportedByTree()) {
@@ -4210,7 +4210,7 @@ function settlePlayerBeforeBackground() {
     updatePlayerColorBodyPosition();
   }
 }
-
+  npcY = NPC_START_Y;
 function applyDefaultState(options) {
   clearTutorialMainSeedRespawnTimer();
   tutorialMainSeedRegenCompleted = false;
@@ -4222,7 +4222,7 @@ function applyDefaultState(options) {
     } catch (ePending) {}
   }
   resetInputKeys(keys);
-
+  plantRuntime.isSeedDry = false;
   playerX = spawnPlayerX;
   playerDepth = spawnPlayerDepth;
   jumpY = 0;
@@ -4231,7 +4231,7 @@ function applyDefaultState(options) {
   wasPlayerInTree = false;
   npcX = NPC_START_X;
   npcY = NPC_START_Y;
-
+    removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   seedX = SEED_START_X;
   seedY = SEED_START_Y;
   signX = SIGN_START_X;
@@ -4261,7 +4261,7 @@ function applyDefaultState(options) {
   plantRuntime.isPlanting = false;
   heldItem = null;
   plantingInventorySeedId = null;
-
+  plantRuntime.powderUpgradeTargetTier = 0;
   plantRuntime.spotX = 0;
   plantRuntime.spotY = 0;
   plantRuntime.lastWateredAt = null;
@@ -4288,7 +4288,7 @@ function applyDefaultState(options) {
   plantRuntime.plantedAt = null;
   plantRuntime.blockSproutRegrowthAfterDry = false;
   plantRuntime.drySoilAt = null;
-
+    setStoredFlag(mainDrySeedHandledKey, false);
   if (!sharedWorldResetOnly) {
     hasGuideBook = false;
     isGuideBookOpen = false;
@@ -4349,7 +4349,7 @@ function applyDefaultState(options) {
   appleState.worldExtraBuckets = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
-
+  isBucketFull = false;
   // Reset butterflies: drop any visible butterflies and zero out the player's
   // collected counts so the world starts fresh.
   Object.keys(butterflyRenderById).forEach(removeButterflyRenderEntry);
@@ -4367,13 +4367,13 @@ function applyDefaultState(options) {
   saveMagicPowderCount();
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
-
+  syncGuideInventoryBar();
   wellState.water = maxWellWater;
   wellState.lastRefillAt = Date.now();
   isBucketFull = false;
   bucketX = wellX - BUCKET_SIZE - 8;
   bucketY = wellY + WELL_SIZE - BUCKET_SIZE;
-
+  if (playerAlertHideTimerId) {
   plantSpot.style.display = "none";
   waterNeeded.style.display = "none";
   growthCard.style.display = "none";
@@ -4421,14 +4421,14 @@ function applyDefaultState(options) {
 
 function isNearPlantSpot() {
   if (!plantRuntime.isSeedPlanted) return false;
-
+  if (!isNpcDialogueComplete) {
   return isNearPlantSpotWithin(pickupDistance);
 }
-
+  /** 온보딩 중에는 대화 반복을 위해 항상 표시 */
 function isNearPlantSpotForWatering() {
   return getNearestWateringTarget() !== null;
 }
-
+  /** 본편: 첫 대화 후에도 메인 작물 심기 전에는 찾을 수 있게 */
 function isNearPlantSpotWithin(distance) {
   return (
     getCenterDistance(
@@ -4439,7 +4439,7 @@ function isNearPlantSpotWithin(distance) {
     ) < distance
   );
 }
-
+  return getCenterDistance(npcX, npcY, NPC_WIDTH, NPC_HEIGHT) < npcInteractDistance;
 function isPlantMasterVisible() {
   if (isNpcDialogueRunning) return true;
   if (!isNpcDialogueComplete) {
@@ -4456,13 +4456,13 @@ function isPlantMasterVisible() {
   /** 마른 ?에?도 ?인???라졌다 ???다 ?? ?게(?냅?·UI ?치) */
   return plantRuntime.status !== "rotten";
 }
-
+  const isFirstTalk = !isNpcDialogueComplete;
 function isNearPlantMaster() {
   if (!isPlantMasterVisible()) return false;
-
+        { speaker: "npc", text: "\uC790\uB124....", delayAfterMs: 1000 },
   return getCenterDistance(npcX, npcY, NPC_WIDTH, NPC_HEIGHT) < npcInteractDistance;
 }
-
+        { speaker: "player", text: "\uC798 \uBAA8\uB974\uACA0\uC2B5\uB2C8\uB2E4...", delayAfterMs: 2500 },
 function tryTalkToPlantMaster() {
   if (!isNearPlantMaster() || isNpcDialogueRunning) {
     return false;
@@ -4471,7 +4471,7 @@ function tryTalkToPlantMaster() {
     flashOnboardingOrderHint("");
     return false;
   }
-
+          text: "\uAD81\uAE08\uD55C\uAC8C \uC788\uB098? \uC544\uC9C1 \uB54C\uAC00 \uC544\uB2D0\uC138..",
   startPlantMasterDialogue();
   return true;
 }
@@ -4496,12 +4496,12 @@ function startPlantMasterDialogue() {
           delayAfterMs: 1400
         }
       ];
-
+      isGuidePlantPageUnlocked = true;
   isNpcDialogueRunning = true;
   npcBubble.style.display = "none";
   playerBubble.style.display = "none";
   window.clearTimeout(npcPromptHideTimeout);
-
+      syncWorldBagGroundVisibility();
   let timelineMs = 0;
   lines.forEach(function (lineInfo) {
     window.setTimeout(function () {
@@ -4509,7 +4509,7 @@ function startPlantMasterDialogue() {
     }, timelineMs);
     timelineMs += Math.max(0, Number(lineInfo.delayAfterMs) || 650);
   });
-
+      isGuideBookOpen = true;
   window.setTimeout(function () {
     npcBubble.style.display = "none";
     playerBubble.style.display = "none";
@@ -4548,17 +4548,17 @@ function startPlantMasterDialogue() {
     updateOnboardingFlowUI();
   }, timelineMs + 250);
 }
-
+  if (playerAlertHideTimerId) {
 function showDialogueLine(lineInfo) {
   npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
   playerBubble.style.display = lineInfo.speaker === "player" ? "block" : "none";
-
+  playerAlert.textContent = message;
   if (lineInfo.speaker === "npc") {
     npcBubble.textContent = lineInfo.text;
     updateNpcPosition();
     return;
   }
-
+    playerAlert.style.display = "none";
   playerBubble.textContent = lineInfo.text;
   updatePlayerBubblePosition();
 }
@@ -4583,12 +4583,12 @@ function showPlayerAlert(options) {
     playerAlert.classList.remove("is-butterfly-catch");
   }, durationMs);
 }
-
+  markWorldDirty();
 function toggleSeed() {
   if (plantRuntime.isPlanting || heldItem) return;
   pickUpNearestItem();
 }
-
+      onboardingFlowStep = 13;
 function tryPickSharedBucket(bucketDistance) {
   const bucketSize = getBucketSize();
   const pickInfo = getNearestGroundBucketPickInfo();
@@ -4632,7 +4632,7 @@ function tryPickSharedBucket(bucketDistance) {
   }
   return true;
 }
-
+  if (
 /**
  * World hub: worldLooseSeed(?성 ?보) + extraSeeds + ????+ ?동??
  */
@@ -4641,7 +4641,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
   const extraDist = nearest ? nearest.distance : Infinity;
   const nearestRock = getNearestPickableWorldRock();
   const rockDist = nearestRock ? nearestRock.distance : Infinity;
-
+      appleState.seedCount += 1;
   if (
     nearestRock &&
     rockDist < extraDist &&
@@ -4668,7 +4668,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     sendMultiplayerPresence(true);
     return;
   }
-
+    triggerFirstSeedFocus();
   if (
     nearest &&
     extraDist <= pickupDistance &&
@@ -4710,7 +4710,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
   }
   tryPickSharedBucket(bucketDistance);
 }
-
+      flashOnboardingOrderHint("");
 /**
  * Tutorial / ?보???index: ??#seed(?토 메인) ?????? ???extraSeeds, ?동??
  */
@@ -4722,7 +4722,7 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
   const extraDist = nearest ? nearest.distance : Infinity;
   const nearestRock = getNearestPickableWorldRock();
   const rockDist = nearestRock ? nearestRock.distance : Infinity;
-
+    updateBagInventorySlots();
   if (
     tutorialMainDist <= pickupDistance &&
     tutorialMainDist <= bucketDistance &&
@@ -4739,7 +4739,7 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     triggerFirstSeedFocus();
     return;
   }
-
+    updateExtraSeedsAndPlants();
   if (
     nearestRock &&
     rockDist < extraDist &&
@@ -4766,7 +4766,7 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     sendMultiplayerPresence(true);
     return;
   }
-
+  firstSeedFocusTimeout = window.setTimeout(function () {
   if (nearest && extraDist <= pickupDistance && extraDist <= bucketDistance) {
     if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
       flashOnboardingOrderHint("");
@@ -4781,25 +4781,25 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     triggerFirstSeedFocus();
     return;
   }
-
+  if (!holderIsActive) {
   tryPickSharedBucket(bucketDistance);
 }
-
+    markWorldDirty();
 function pickUpNearestItem() {
   const seedSize = getSeedSize();
   const bucketPick = getNearestGroundBucketPickInfo();
   const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
-
+  addBucketTrace("pickup", "blocked by active holder=" + heldBy, 500);
   if (usesWorldLooseSeedMode()) {
     pickUpNearestItemWorldHub(bucketDistance);
   } else {
     pickUpNearestItemTutorialFlow(seedSize, bucketDistance);
   }
 }
-
+  const now = Date.now();
 function triggerFirstSeedFocus() {
   if (hasShownFirstSeedFocus) return;
-
+    usesWorldLooseSeedMode() &&
   hasShownFirstSeedFocus = true;
   if (worldBagInventory) worldBagInventory.classList.add("is-first-seed-focus");
   window.clearTimeout(firstSeedFocusTimeout);
@@ -4807,17 +4807,17 @@ function triggerFirstSeedFocus() {
     if (worldBagInventory) worldBagInventory.classList.remove("is-first-seed-focus");
   }, 6500);
 }
-
+      seed: {
 function canPickUpSharedBucket() {
   const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
   if (!heldBy || heldBy === currentSessionId) return true;
-
+        worldLoosePick: true
   const holder = remotePlayers[heldBy];
   const holderIsActive =
     holder &&
     Number.isFinite(holder.lastSeenAt) &&
     Date.now() - holder.lastSeenAt < 5000;
-
+  appleState.extraSeeds.forEach(function (extraSeed) {
   if (!holderIsActive) {
     // Recover from stale holder ownership that blocks pickup forever.
     window.OVC_SHARED_BUCKET_HELD_BY = "";
@@ -4825,11 +4825,11 @@ function canPickUpSharedBucket() {
     addBucketTrace("pickup", "recovered stale holder=" + heldBy, 0);
     return true;
   }
-
+      nearest = {
   addBucketTrace("pickup", "blocked by active holder=" + heldBy, 500);
   return false;
 }
-
+    }
 /** Tutorial: extraSeeds? World hub: 보이???안 ?성 worldLoose ?보가 ?선(같? 좌표 ?책? groundSeed.js). */
 function getNearestPickableExtraSeed() {
   let nearest = null;
@@ -4853,13 +4853,13 @@ function getNearestPickableExtraSeed() {
       distance
     };
   }
-
+}
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.planted || isExtraSeedDry(extraSeed)) return;
     if (usesWorldLooseSeedMode() && !extraSeed.inInventory) {
       return;
     }
-
+  });
     const distance = getCenterDistance(extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE);
     if (!nearest || distance < nearest.distance) {
       nearest = {
@@ -4868,10 +4868,10 @@ function getNearestPickableExtraSeed() {
       };
     }
   });
-
+    const el = document.createElement("div");
   return nearest;
 }
-
+    el.setAttribute("aria-hidden", "true");
 function getNearestPickableWorldRock() {
   if (!isWorldDocumentEntry()) return null;
   if (!isWorldRockPickupUnlocked()) return null;
@@ -4891,7 +4891,7 @@ function getNearestPickableWorldRock() {
   });
   return nearest;
 }
-
+      setWorldPosition(rock._el, rock.x, rock.y);
 function rebuildWorldRockDom() {
   if (!ground) return;
   ground.querySelectorAll(".world-ground-rock").forEach(function (node) {
@@ -4918,7 +4918,7 @@ function rebuildWorldRockDom() {
   });
   updateWorldRocks();
 }
-
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 23) {
 function updateWorldRocks() {
   if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldRocks)) return;
   appleState.worldRocks.forEach(function (rock) {
@@ -4932,7 +4932,7 @@ function updateWorldRocks() {
     }
   });
 }
-
+  };
 function pickApple() {
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 23) {
     return false;
@@ -4946,7 +4946,7 @@ function pickApple() {
       candidate.size
     );
   });
-
+      return candidate.id === appleElement.dataset.appleId;
   if (!apple) return false;
 
   appleState.pickedIds.push(apple.id);
@@ -4962,7 +4962,7 @@ function pickApple() {
   }
   return true;
 }
-
+}
 function isPlayerOverlappingRect(x, y, width, height) {
   const playerRect = {
     left: playerX,
@@ -4978,43 +4978,43 @@ function isPlayerOverlappingRect(x, y, width, height) {
   };
   return isOverlappingRect(playerRect, targetRect);
 }
-
+  window.setTimeout(function () {
 function updateApples() {
   respawnApplesIfNeeded();
   treeAppleElements.forEach(function (appleElement) {
     const apple = appleState.apples.find(function (candidate) {
       return candidate.id === appleElement.dataset.appleId;
     });
-
+      onboardingSeedTutorialSecondLine = false;
     if (apple) {
       appleElement.style.left = apple.localX + "px";
       appleElement.style.top = apple.localY + "px";
     }
-
+      }
     appleElement.style.display = !apple || appleState.pickedIds.includes(appleElement.dataset.appleId)
       ? "none"
       : "block";
   });
-
+        updateOnboardingFlowUI();
   syncGuideInventoryBar();
   updateBagInventorySlots();
   updateWorldRocks();
 }
-
+      onboardingTreeLeaveHintTimerId = window.setTimeout(function () {
 function eatApple() {
   if (appleState.count <= 0 || appleState.isEating || plantRuntime.isPlanting || isNpcDialogueRunning) return;
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 24) {
     flashOnboardingOrderHint("");
     return;
   }
-
+    }
   appleState.count -= 1;
   appleState.isEating = true;
   playerStatus.textContent = "\uC0AC\uACFC\uBA39\uB294\uC911...";
   saveAppleState();
   updateApples();
   sendMultiplayerPresence(true);
-
+    updateExtraSeedsAndPlants();
   window.setTimeout(function () {
     appleState.isEating = false;
     sendMultiplayerPresence(true);
@@ -5060,7 +5060,7 @@ function createSeedFromApple() {
   const seedXFromApple = playerBox.left + playerBox.width / 2 - SEED_SIZE / 2;
   const seedYFromApple = playerBox.bottom - SEED_SIZE + appleState.nextSeedOffset;
   const seedNumber = getNextSeedNumber();
-
+  while (isAppleInTrunkArea(localX, localY, size) && attempts < 16) {
   appleState.nextSeedOffset += 2;
   const newSeed = {
     id: "apple-seed-" + Date.now() + "-" + appleState.extraSeeds.length,
@@ -5073,36 +5073,36 @@ function createSeedFromApple() {
     isStarter: false
   };
   assignExtraSeedInventoryOwner(newSeed);
-
+  };
   appleState.extraSeeds.push(newSeed);
 
   updateExtraSeedsAndPlants();
   updateSeedInventory();
   saveAppleState();
 }
-
+  return {
 function getNextSeedNumber() {
   return appleState.extraSeeds.length + 1;
 }
-
+    bottom: top + h + pad
 function createRandomApples(count) {
   return Array.from({ length: count }, function (_, index) {
     return createRandomApple("apple-" + (index + 1));
   });
 }
-
+}
 function createRandomApple(id) {
   const size = 10;
   let localX = 18 + Math.floor(Math.random() * 104);
   let localY = 16 + Math.floor(Math.random() * 76);
   let attempts = 0;
-
+    }
   while (isAppleInTrunkArea(localX, localY, size) && attempts < 16) {
     localX = 18 + Math.floor(Math.random() * 104);
     localY = 16 + Math.floor(Math.random() * 76);
     attempts += 1;
   }
-
+  const px = Number(plant && (plant.x != null ? plant.x : plant.spotX));
   return {
     id,
     localX,
@@ -5112,10 +5112,10 @@ function createRandomApple(id) {
     size
   };
 }
-
+    right: centerX + radius,
 /** ?과 ?드 UI(?물·NPC·?탈 ?? ?이 최소 ?백 */
 const WORLD_ROCK_UI_CLEAR_PAD = 10;
-
+}
 function expandWorldRockAvoidRect(left, top, w, h, pad) {
   return {
     left: left - pad,
@@ -5124,11 +5124,11 @@ function expandWorldRockAvoidRect(left, top, w, h, pad) {
     bottom: top + h + pad
   };
 }
-
+    expandWorldRockAvoidRect(spawnPortalX, spawnPortalY, spawnPortalWidth, spawnPortalHeight, p)
 function worldRockRect(x, y, size) {
   return { left: x, top: y, right: x + size, bottom: y + size };
 }
-
+  zones.push(expandWorldRockAvoidRect(worldBagX, worldBagY, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT, p));
 function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
   for (let i = 0; i < zones.length; i += 1) {
     if (isOverlappingRect(rockRect, zones[i])) {
@@ -5137,7 +5137,7 @@ function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
   }
   return false;
 }
-
+      p
 function addPlantWorldRockAvoidZone(zones, plant, pad) {
   const px = Number(plant && (plant.x != null ? plant.x : plant.spotX));
   const py = Number(plant && (plant.y != null ? plant.y : plant.spotY));
@@ -5153,7 +5153,7 @@ function addPlantWorldRockAvoidZone(zones, plant, pad) {
     bottom: centerY + radius
   });
 }
-
+  const by =
 function collectWorldRockAvoidZones(ctx) {
   const p = WORLD_ROCK_UI_CLEAR_PAD;
   const zones = [];
@@ -5201,7 +5201,7 @@ function collectWorldRockAvoidZones(ctx) {
       );
     }
   );
-
+    const ly = Number(ctx.worldLooseSeed.y);
   const canopyInset = 6;
   zones.push(
     expandWorldRockAvoidRect(
@@ -5233,7 +5233,7 @@ function collectWorldRockAvoidZones(ctx) {
       p
     )
   );
-
+    extraSeeds: appleState.extraSeeds,
   const apples = (ctx && ctx.apples) || [];
   apples.forEach(function (a) {
     if (!a) return;
@@ -5243,7 +5243,7 @@ function collectWorldRockAvoidZones(ctx) {
     if (!Number.isFinite(ax) || !Number.isFinite(ay)) return;
     zones.push(expandWorldRockAvoidRect(ax, ay, sz, sz, p));
   });
-
+            growthTier: plantRuntime.growthTier,
   if (ctx && ctx.worldLooseSeed) {
     const lx = Number(ctx.worldLooseSeed.x);
     const ly = Number(ctx.worldLooseSeed.y);
@@ -5260,20 +5260,20 @@ function collectWorldRockAvoidZones(ctx) {
     if (!Number.isFinite(ex) || !Number.isFinite(ey)) return;
     zones.push(expandWorldRockAvoidRect(ex, ey, SEED_SIZE, SEED_SIZE, p));
   });
-
+  const list = Array.isArray(existingRocks) ? existingRocks : [];
   const extraPlants = (ctx && ctx.extraPlants) || [];
   extraPlants.forEach(function (plant) {
     if (!plant || plant.removed) return;
     addPlantWorldRockAvoidZone(zones, plant, p);
   });
-
+      if (!other) return false;
   if (ctx && ctx.plantSpot) {
     addPlantWorldRockAvoidZone(zones, ctx.plantSpot, p);
   }
-
+    return { x: x, y: y };
   return zones;
 }
-
+}
 function buildWorldRockSpawnContext() {
   return {
     apples: appleState.apples,
@@ -5296,7 +5296,7 @@ function buildWorldRockSpawnContext() {
         : null
   };
 }
-
+  });
 function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) {
   const rockSize = Number(size) || WORLD_ROCK_SIZE;
   const margin = WORLD_ROCK_SPAWN_X_MARGIN;
@@ -5319,7 +5319,7 @@ function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) {
   }
   return null;
 }
-
+        ? localPlayerRoot
 function getUnpickedWorldRockCount() {
   if (!Array.isArray(appleState.worldRocks)) return 0;
   const picked = new Set((appleState.worldRockPickedIds || []).map(String));
@@ -5327,22 +5327,22 @@ function getUnpickedWorldRockCount() {
     return rock && !picked.has(String(rock.id));
   }).length;
 }
-
+    if (insertBeforeEl) {
 function tryRespawnOneWorldRockIfBelowCap() {
   if (!isWorldDocumentEntry() || !isWorldRockPickupUnlocked()) return false;
   if (!Array.isArray(appleState.worldRocks)) appleState.worldRocks = [];
   if (!Array.isArray(appleState.worldRockPickedIds)) appleState.worldRockPickedIds = [];
   if (getUnpickedWorldRockCount() >= WORLD_LOOSE_ROCK_COUNT) return false;
-
+  }
   const size = WORLD_ROCK_SIZE;
   const pos = pickRandomWorldRockSpawnPosition(size, buildWorldRockSpawnContext(), appleState.worldRocks);
   if (!pos) return false;
-
+  markWorldDirty();
   const pickedSet = new Set(appleState.worldRockPickedIds.map(String));
   let rock = appleState.worldRocks.find(function (r) {
     return r && pickedSet.has(String(r.id));
   });
-
+  if (!isWorldDocumentEntry() || !isWorldRockPickupUnlocked()) return;
   if (!rock) {
     if (appleState.worldRocks.length >= WORLD_LOOSE_ROCK_COUNT) return false;
     rock = {
@@ -5353,14 +5353,14 @@ function tryRespawnOneWorldRockIfBelowCap() {
     };
     appleState.worldRocks.push(rock);
   }
-
+function createRandomWorldRocks(ctx) {
   rock.x = pos.x;
   rock.y = pos.y;
   rock.size = size;
   appleState.worldRockPickedIds = appleState.worldRockPickedIds.filter(function (id) {
     return String(id) !== String(rock.id);
   });
-
+      id: "ground-rock-" + (i + 1),
   if (!rock._el && ground) {
     const insertBeforeEl =
       localPlayerRoot && localPlayerRoot.parentNode === ground
@@ -5379,13 +5379,13 @@ function tryRespawnOneWorldRockIfBelowCap() {
     }
     rock._el = el;
   }
-
+  updateBucketPosition();
   updateWorldRocks();
   saveAppleState();
   markWorldDirty();
   return true;
 }
-
+    saved.bucketX = bucketX;
 function tickWorldRockRespawn(now) {
   if (!isWorldDocumentEntry() || !isWorldRockPickupUnlocked()) return;
   const t = now != null ? now : Date.now();
@@ -5397,7 +5397,7 @@ function tickWorldRockRespawn(now) {
   lastWorldRockRespawnAt = t;
   tryRespawnOneWorldRockIfBelowCap();
 }
-
+  const yPadding = 10;
 function createRandomWorldRocks(ctx) {
   const size = WORLD_ROCK_SIZE;
   const rocks = [];
@@ -5413,7 +5413,7 @@ function createRandomWorldRocks(ctx) {
   }
   return rocks;
 }
-
+    const pickedAt = Number(localApplePickedAtById[appleId] || 0);
 function getWorldExtraBucketInsertBeforeEl() {
   if (localPlayerRoot && localPlayerRoot.parentNode === ground) {
     return localPlayerRoot;
@@ -5423,7 +5423,7 @@ function getWorldExtraBucketInsertBeforeEl() {
   }
   return null;
 }
-
+      return apple.id;
 function rebuildWorldExtraBucketDom() {
   if (!ground) return;
   ground.querySelectorAll(".world-extra-bucket").forEach(function (node) {
@@ -5436,7 +5436,7 @@ function rebuildWorldExtraBucketDom() {
     const el = document.createElement("img");
     el.className = "world-extra-bucket";
     el.dataset.bucketId = entry.id;
-    el.src = entry.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+    el.src = entry.isFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
     el.alt = "";
     el.setAttribute("aria-hidden", "true");
     el.draggable = false;
@@ -5457,10 +5457,10 @@ function updateWorldExtraBuckets() {
     if (!entry || !entry._el) return;
     setWorldSize(entry._el, bucketSz.width, bucketSz.height);
     setWorldPosition(entry._el, entry.x, entry.y);
-    entry._el.src = entry.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+    entry._el.src = entry.isFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
   });
 }
-
+      plantRuntime.isSeedPlanted &&
 /** 거래 교환: 기존 ?동?는 ?고 맵에 ?동?? ?나 ??배치 */
 function spawnWorldBucketBelowTradeMaster() {
   if (!ground || !isWorldDocumentEntry()) return;
@@ -5479,7 +5479,7 @@ function spawnWorldBucketBelowTradeMaster() {
   const el = document.createElement("img");
   el.className = "world-extra-bucket";
   el.dataset.bucketId = entry.id;
-  el.src = "이미지/bucket-empty.png";
+  el.src = "??지/bucket-empty.png";
   el.alt = "";
   el.setAttribute("aria-hidden", "true");
   el.draggable = false;
@@ -5494,7 +5494,7 @@ function spawnWorldBucketBelowTradeMaster() {
   markWorldDirty();
   saveAppleState();
 }
-
+  ensureWorldLooseSeedShape();
 function isAppleInTrunkArea(localX, localY, size) {
   const trunkLocalLeft = TREE_TRUNK_X - BIG_TREE_X;
   const trunkLocalRight = trunkLocalLeft + TREE_TRUNK_WIDTH;
@@ -5505,14 +5505,14 @@ function isAppleInTrunkArea(localX, localY, size) {
   const appleRight = localX + size;
   const appleTop = localY;
   const appleBottom = localY + size;
-
+    });
   return (
     appleRight >= trunkLocalLeft - xPadding &&
     appleLeft <= trunkLocalRight + xPadding &&
     appleBottom >= trunkTopLocalY - yPadding
   );
 }
-
+    });
 function respawnApplesIfNeeded() {
   const now = Date.now();
   Object.keys(localApplePickedAtById).forEach(function (appleId) {
@@ -5528,7 +5528,7 @@ function respawnApplesIfNeeded() {
     .map(function (apple) {
       return apple.id;
     });
-
+      });
   if (availableIds.length === 0) {
     appleState.lastSpawnAt = now;
     return;
@@ -5536,7 +5536,7 @@ function respawnApplesIfNeeded() {
 
   const elapsedSpawns = Math.floor((now - appleState.lastSpawnAt) / appleRespawnMs);
   if (elapsedSpawns <= 0) return;
-
+  }
   const spawnCount = Math.min(elapsedSpawns, availableIds.length);
   for (let index = 0; index < spawnCount; index += 1) {
     const id = availableIds[index];
@@ -5548,11 +5548,11 @@ function respawnApplesIfNeeded() {
       return pickedId !== id;
     });
   }
-
+    appleStateKey,
   appleState.lastSpawnAt += spawnCount * appleRespawnMs;
   saveAppleState();
 }
-
+    apples: appleState.apples,
 function loadAppleState() {
   const loaded = loadAppleStateFromStorage({
     appleStateKey,
@@ -5570,7 +5570,7 @@ function loadAppleState() {
         ? { x: plantRuntime.spotX, y: plantRuntime.spotY }
         : null
   });
-
+    const saved = JSON.parse(savedRaw);
   appleState.count = loaded.appleCount;
   appleState.seedCount = Math.max(0, Number(loaded.seedCount) || 0);
   appleState.overgrowthSeedCount = Math.max(0, Number(loaded.overgrowthSeedCount) || 0);
@@ -5638,20 +5638,20 @@ function loadAppleState() {
       });
     }
   }
-
+  };
   syncMainSeedPickedStateFromLoadedExtraSeeds();
-
+    const v = bump(plant[key]);
   if (loaded.parseFailed) {
     clearExtraSeedAndPlantElements();
   }
-
+  maybe("becameEmptyAt");
   rebuildWorldRockDom();
   rebuildWorldExtraBucketDom();
   updateApples();
   updateExtraSeedsAndPlants();
   updateSeedPosition();
 }
-
+  maybe("powderUpgradeStartedAt");
 function saveAppleState() {
   lastAppleStateChangeAt = Date.now();
   ensureWorldLooseSeedShape();
@@ -5680,11 +5680,11 @@ function saveAppleState() {
   });
   markWorldDirty();
 }
-
+  if (w > 0) {
 function loadBucketState() {
   const savedRaw = getStoredValue(bucketStateKey);
   if (!savedRaw) return;
-
+    } else {
   try {
     const saved = JSON.parse(savedRaw);
     isBucketFull = Boolean(saved.isBucketFull);
@@ -5704,7 +5704,7 @@ function loadBucketState() {
     removeStoredValue(bucketStateKey);
   }
 }
-
+function sanitizePrematureRemotePlantDryState(plant, now) {
 function saveBucketState() {
   setStoredValue(
     bucketStateKey,
@@ -5718,12 +5718,12 @@ function saveBucketState() {
   );
   markWorldDirty();
 }
-
+  ) {
 function markWorldDirty() {
   if (isApplyingWorldState) return;
   isWorldDirty = true;
 }
-
+  plant.needsFirstWater = false;
 function applyServerWorldRowTimestamps(row) {
   if (!row || !row.updated_at) return;
   lastWorldUpdatedAt = row.updated_at;
@@ -5734,7 +5734,7 @@ function applyServerWorldRowTimestamps(row) {
   lastWellStateChangeAt = Math.max(lastWellStateChangeAt, parsed);
   lastMainSeedStateChangeAt = Math.max(lastMainSeedStateChangeAt, parsed);
 }
-
+    return false;
 /**
  * Plant timestamps in snapshots use the saver's Date.now(). Another client's clock
  * skew makes `now - waterLevelUpdatedAt` huge so decay drains all water and soil
@@ -5777,7 +5777,7 @@ function rebasePlantModelTimestampsToLocalNow(plant, localNow, refTime) {
     });
   }
 }
-
+      applyPlantWaterDecay(plantRuntime, now);
 /**
  * After a remote world snapshot, passive decay should use the same clock as
  * `rebasePlantModelTimestampsToLocalNow` (`getSynchronizedNow()` when shared merge
@@ -5791,11 +5791,11 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
     return;
   }
   if (plant.status === "rotten" || plant.status === "dry") return;
-
+    }
   const w = Math.max(0, Number(plant.waterLevel) || 0);
   const tickMs = getPlantWaterLevelTickMsForPlant(plant);
   if (!Number.isFinite(tickMs) || tickMs <= 0) return;
-
+function getSharedWorldSnapshot() {
   if (w > 0) {
     let wu = Number(plant.waterLevelUpdatedAt);
     if (!Number.isFinite(wu) || wu <= 0 || wu > now) {
@@ -5809,7 +5809,7 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
     plant.becameEmptyAt = null;
     return;
   }
-
+    well: {
   const be = Number(plant.becameEmptyAt);
   if (plant.becameEmptyAt != null && Number.isFinite(be)) {
     const dryAfter = getDryAfterEmptyMs(plant, now);
@@ -5818,7 +5818,7 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
     }
   }
 }
-
+      isDryHandled: hasHandledDryMainSeed,
 /** ?물 ?시?리필 ?과 맞춰 ?른 ?라? lastRefillAt ?석???긋?????기가 반복?는 것을 줄임 */
 function sanitizePrematureRemotePlantDryState(plant, now) {
   if (!plant || plant.status !== "dry") return;
@@ -5837,7 +5837,7 @@ function sanitizePrematureRemotePlantDryState(plant, now) {
   ) {
     return;
   }
-
+      extraSeeds: usesWorldLooseSeedMode()
   plant.status = "normal";
   plant.needsFirstWater = false;
   plant.blockSproutRegrowthAfterDry = false;
@@ -5847,7 +5847,7 @@ function sanitizePrematureRemotePlantDryState(plant, now) {
   plant.becameEmptyAt =
     plant.waterLevel > 0 ? null : Math.max(1, now - Math.max(0, ageAtSnapshot - tickMs));
 }
-
+                createdAt: extraSeed.createdAt,
 function shouldIgnoreEmptyRemoteMainPlant(incomingPlant) {
   if (!plantRuntime.isSeedPlanted || !incomingPlant || incomingPlant.isSeedPlanted) {
     return false;
@@ -5869,7 +5869,7 @@ function shouldIgnoreEmptyRemoteMainPlant(incomingPlant) {
   }
   return true;
 }
-
+                isStarter: Boolean(extraSeed.isStarter),
 function snapWellRefillToGrid(nowMs) {
   const t = Number(nowMs);
   if (!Number.isFinite(t) || t <= 0) {
@@ -5877,7 +5877,7 @@ function snapWellRefillToGrid(nowMs) {
   }
   return Math.floor(t / wellRefillMs) * wellRefillMs;
 }
-
+            return {
 /**
  * 공유 ?드 ???직전: ?시??감소·?물 리필???재 ?각까? 반영?? * ?래???분/?물 값이 ?냅?에 ?리지 ?게 ??(멀?에??게이지가 ?쭉?쭉???인).
  */
@@ -5909,7 +5909,7 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
     }
   });
 }
-
+          powderUpgradeDurationMs: plant.powderUpgradeDurationMs || 0,
 function getSharedWorldSnapshot() {
   flushPassiveSimulationBeforeSharedSnapshot();
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
@@ -6062,7 +6062,7 @@ function getSharedWorldSnapshot() {
     butterflies: getButterflyStateForSnapshot()
   };
 }
-
+    }
 /** Re-run DOM / UI that depends on world state after `applySharedWorldSnapshot` mutates models. */
 function refreshUiAfterSharedWorldApply() {
   syncMainSeedPickedStateFromLoadedExtraSeeds();
@@ -6080,23 +6080,23 @@ function refreshUiAfterSharedWorldApply() {
   updateMagicPowderInventoryUi();
   rebuildWorldRockDom();
 }
-
+          isMainSeedAvailable = true;
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
   const lockMs = Math.max(0, Number(ms) || 0);
   if (!lockMs) return;
   localPlantActionLockUntil = Math.max(localPlantActionLockUntil, Date.now() + lockMs);
 }
-
+      if (canApplyMainSeedState && snapshotSavedAt) {
 function holdLocalAppleStateAgainstStaleSnapshot(ms) {
   const lockMs = Math.max(0, Number(ms) || 0);
   if (!lockMs) return;
   localAppleActionLockUntil = Math.max(localAppleActionLockUntil, Date.now() + lockMs);
 }
-
+          if (Number.isFinite(nextSeedY)) seedY = nextSeedY;
 function getSynchronizedNow() {
   return getSynchronizedNowCore(serverClockOffsetMs);
 }
-
+          setStoredValue(seedCreatedAtKey, String(nextSeedCreatedAt));
 function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
   const next = syncServerClockOffsetCore(
     serverClockOffsetMs,
@@ -6108,7 +6108,7 @@ function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
   serverClockOffsetMs = next.offsetMs;
   lastServerClockSyncAt = next.syncedAtMs;
 }
-
+    if (snapshot.well) {
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
@@ -6158,7 +6158,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   isApplyingWorldState = true;
   const shouldDeferRemotePlantApply = Date.now() < localPlantActionLockUntil;
   const shouldDeferRemoteAppleApply = Date.now() < localAppleActionLockUntil;
-
+        }
   try {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
     // Apply snapshot bucket fallback only when realtime channel is not subscribed.
@@ -6178,7 +6178,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         }
       }
     }
-
+          setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
     if (snapshot.seed) {
       const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
       const nextSeedX = Number(snapshot.seed.x);
@@ -6218,7 +6218,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         }
       }
     }
-
+          return !snapshotPlantIdsEarly[String(p.id)];
     // Shared world rows are authoritative once the server reports a new updated_at.
     // Do not gate well / main plant / apples on local timestamps or client clocks ??    // that drops remote plants when lastAppleStateChangeAt / lastMainPlantStateChangeAt
     // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
@@ -6230,7 +6230,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         lastWellStateChangeAt = Math.max(lastWellStateChangeAt, snapshotSavedAt);
       }
     }
-
+      }).map(function (extraSeed) {
     // Snapshot apply rule (mainPlant):
     // - apply by default (server row is authoritative),
     // - but defer during short local action locks to avoid flicker/rollback.
@@ -6304,7 +6304,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         }
       }
     }
-
+          appleState.extraSeeds = localInventorySeeds.slice();
     // Snapshot apply rule (apples/extra seeds/plants):
     // - defer during local apples lock window,
     // - then resume full merge on subsequent polls.
@@ -6604,7 +6604,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
       }
     }
-
+      ? lastWorldUpdatedAt
     // Always merge butterfly membership from other clients' saves. A timestamp
     // guard would drop removals because the authority bumps lastButterflyStateChangeAt
     // every movement broadcast while non-authority catches use an older savedAt.
@@ -6620,13 +6620,13 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         );
       }
     }
-
+      pollWorldState(true);
     refreshUiAfterSharedWorldApply();
   } finally {
     isApplyingWorldState = false;
   }
 }
-
+    showThrottledWorldSyncToast(
 function ensureSharedPlantVisuals() {
   if (plantRuntime.isSeedPlanted) {
     plantSpot.src = getPlantSoilSrc(plantRuntime);
@@ -6635,7 +6635,7 @@ function ensureSharedPlantVisuals() {
     plantSpot.style.display =
       mainRot || !shouldHideSeparateSoilUnderBigGrass(plantRuntime) ? "block" : "none";
   }
-
+function saveSharedWorldAndReload(options) {
   appleState.extraPlants.forEach(function (plant) {
     ensureExtraPlantElements(plant);
     plant.spotElement.src = getPlantSoilSrc(plant);
@@ -6643,7 +6643,7 @@ function ensureSharedPlantVisuals() {
     plant.spotElement.style.display = shouldHideSeparateSoilUnderBigGrass(plant) ? "none" : "block";
   });
 }
-
+    return;
 function refreshSharedWaterIndicators() {
   if (plantRuntime.isSeedPlanted && shouldShowFirstWaterNeededDroplet(plantRuntime)) {
     waterNeeded.style.display = "block";
@@ -6655,7 +6655,7 @@ function refreshSharedWaterIndicators() {
   } else {
     waterNeeded.style.display = "none";
   }
-
+  saveResetSnapshot().then(function (row) {
   appleState.extraPlants.forEach(function (plant) {
     if (!plant.waterNeededElement) return;
     if (shouldShowFirstWaterNeededDroplet(plant)) {
@@ -6670,7 +6670,7 @@ function refreshSharedWaterIndicators() {
     }
   });
 }
-
+    );
 function isWorldServerSyncAvailable() {
   return Boolean(
     window.OVCOnline &&
@@ -6680,12 +6680,12 @@ function isWorldServerSyncAvailable() {
     window.OVCOnline.isConfigured()
   );
 }
-
+  const now = Date.now();
 /** Shared row is authoritative; passive local ticks must not push over others' saves. */
 function isSharedWorldMergeActive() {
   return isWorldServerSyncAvailable() && hasHydratedSharedWorldFromServer;
 }
-
+    isSharedWorldSyncPausedForTutorial() ||
 /**
  * 멀??공유 ?드: ?냅?의 `rebasePlantModelTimestampsToLocalNow`·sanitize가
  * `getSynchronizedNow()`(?버 ???각 기? ?프???로 맞춰???는??
@@ -6694,7 +6694,7 @@ function isSharedWorldMergeActive() {
 function getSharedPlantSimulationNow() {
   return isSharedWorldMergeActive() ? getSynchronizedNow() : Date.now();
 }
-
+  lastWorldPollAt = now;
 function syncWorldState(forceSave) {
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
@@ -6747,7 +6747,7 @@ function syncWorldState(forceSave) {
     isWorldSyncing = false;
   });
 }
-
+function dropSeed() {
 function saveSharedWorldAndReload(options) {
   options = options || {};
   const reloadUrl = options.reloadUrl || "";
@@ -6758,7 +6758,7 @@ function saveSharedWorldAndReload(options) {
     }, 400);
     return;
   }
-
+  if (!extraSeed) {
   isWorldSyncing = true;
   isWorldDirty = false;
   lastWorldSaveAt = Date.now();
@@ -6791,7 +6791,7 @@ function saveSharedWorldAndReload(options) {
     else window.location.reload();
   });
 }
-
+  bucketX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
 function pollWorldState(forcePoll) {
   const now = Date.now();
   if (
@@ -6805,7 +6805,7 @@ function pollWorldState(forcePoll) {
   ) {
     return;
   }
-
+  if (plantRuntime.isPlanting) return false;
   isWorldPolling = true;
   lastWorldPollAt = now;
   window.OVCOnline.loadWorldState(
@@ -6828,7 +6828,7 @@ function pollWorldState(forcePoll) {
     isWorldPolling = false;
   });
 }
-
+    (!hasPickedMainSeedInCurrentRoom() &&
 function dropHeldItem() {
   if (isOnboardingLinearGateActive()) {
     if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== 17) {
@@ -6844,38 +6844,38 @@ function dropHeldItem() {
       return;
     }
   }
-
+      dryMainSeedVisibleSince = now;
   if (heldItem === HELD_ITEM_SEED) {
     dropSeed();
     return;
   }
-
+      setStoredFlag(mainDrySeedHandledKey, true);
   if (isHeldExtraSeed(heldItem)) {
     dropExtraSeed();
     return;
   }
-
+      scheduleTutorialMainSeedRespawnFromGround();
   if (heldItem === HELD_ITEM_BUCKET) {
     dropBucket();
   }
 }
-
+  // Main seed is a fixed world object (next to the book), not a roaming synced item.
 function dropSeed() {
   const playerBox = getPlayerBox();
   const seedSize = getSeedSize();
-
+    seedY = SEED_START_Y;
   seedX = playerBox.left + playerBox.width / 2 - seedSize.width / 2;
   seedY = playerBox.bottom - seedSize.height;
   heldItem = null;
 }
-
+  if (!showMainSeedSprite) {
 function dropExtraSeed() {
   const extraSeed = getHeldExtraSeed();
   if (!extraSeed) {
     heldItem = null;
     return;
   }
-
+  }
   if (usesWorldLooseSeedMode()) {
     const seedIndex = appleState.extraSeeds.indexOf(extraSeed);
     if (seedIndex >= 0) {
@@ -6890,7 +6890,7 @@ function dropExtraSeed() {
     updateSeedInventory();
     return;
   }
-
+ * 튜토 #seed·월드 느슨 img와 legacy 슬롯이 동시에 보이는 경우 방지.
   const playerBox = getPlayerBox();
   extraSeed.x = playerBox.left + playerBox.width / 2 - SEED_SIZE / 2;
   extraSeed.y = playerBox.bottom - SEED_SIZE;
@@ -6899,11 +6899,11 @@ function dropExtraSeed() {
   heldItem = null;
   saveAppleState();
 }
-
+    return false;
 function dropBucket() {
   const playerBox = getPlayerBox();
   const bucketSize = getBucketSize();
-
+    Math.abs(extraSeed.x - WORLD_LOOSE_SEED_X) <= tol &&
   bucketX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
   bucketY = playerBox.bottom - bucketSize.height;
   heldItem = null;
@@ -6913,7 +6913,7 @@ function dropBucket() {
   syncWorldState(true);
   onboardingHookDroppedBucketForTutorial();
 }
-
+    worldLooseSeedElement.remove();
 function onboardingShouldKeepWorldMainSeedVisible() {
   if (getStoredFlag(onboardingFlowDoneKey)) return false;
   if (onboardingFlowStep < 1 || onboardingFlowStep > 6) return false;
@@ -6921,7 +6921,7 @@ function onboardingShouldKeepWorldMainSeedVisible() {
   if (plantRuntime.isPlanting) return false;
   return true;
 }
-
+  if (usesWorldLooseSeedMode()) {
 function updateSeedPosition() {
   updateSeedDryState();
   recoverWorldMainSeedIfOnboardingStuck();
@@ -6984,8 +6984,8 @@ function updateSeedPosition() {
   if (!showMainSeedSprite) {
     isHoveringMainSeed = false;
   }
-  seed.src = plantRuntime.isSeedDry ? "이미지/seed-dry.png" : "이미지/seed.png";
-
+  seed.src = plantRuntime.isSeedDry ? "??지/seed-dry.png" : "??지/seed.png";
+    }
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
     heldItem = null;
   }
@@ -6993,14 +6993,14 @@ function updateSeedPosition() {
   if (heldItem === HELD_ITEM_SEED) {
     const seedSize = getSeedSize();
     const handPosition = getHandPosition(seedSize.width, seedSize.height);
-
+    extraSeed.element.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
     seedX = handPosition.x;
     seedY = handPosition.y + 5;
   }
 
   setWorldPosition(seed, seedX, seedY);
 }
-
+        heldItem = null;
 /**
  * 지???????롯(WORLD_LOOSE_SEED_* = SEED_START)??겹친 extraSeeds ???프?이?는 ??.
  * ?토 #seed·?드 ?슨 img? legacy ?롯???시??보이??경우 방?.
@@ -7020,27 +7020,27 @@ function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) {
     Math.abs(extraSeed.y - WORLD_LOOSE_SEED_Y) <= tol
   );
 }
-
+  let didRemoveDrySoilExtraPlant = false;
 function updateExtraSeedsAndPlants() {
   const now = getSharedPlantSimulationNow();
   let didAutoRemoveDryExtraSeed = false;
-
+    updateExtraPlantState(plant, now);
   if (isTutorialDocumentEntry() && worldLooseSeedElement) {
     worldLooseSeedElement.remove();
     worldLooseSeedElement = null;
   }
-
+      now - Number(plant.drySoilAt) >= plantDrySoilClearMs
   if (usesWorldLooseSeedMode() && isHeldExtraSeed(heldItem) && !getHeldExtraSeed()) {
     heldItem = null;
   }
-
+    } else if (
   if (usesWorldLooseSeedMode()) {
     ensureWorldLooseSeedShape();
     if (!worldLooseSeedElement) {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
       worldLooseSeedElement.alt = "world loose seed";
-      worldLooseSeedElement.src = "이미지/seed.png";
+      worldLooseSeedElement.src = "??지/seed.png";
       setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
       ground.appendChild(worldLooseSeedElement);
     }
@@ -7061,7 +7061,7 @@ function updateExtraSeedsAndPlants() {
     worldLooseSeedElement.remove();
     worldLooseSeedElement = null;
   }
-
+    plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
   if (usesWorldLooseSeedMode()) {
     const heldExtraId = getHeldExtraSeedId(heldItem);
     const beforeStrip = appleState.extraSeeds.length;
@@ -7083,7 +7083,7 @@ function updateExtraSeedsAndPlants() {
       saveAppleState();
     }
   }
-
+    if (!plant.removed) return true;
   appleState.extraSeeds = appleState.extraSeeds.filter(function (extraSeed) {
     const createdAt = Number(extraSeed.createdAt);
     const shouldAutoRemoveDrySeed =
@@ -7102,15 +7102,15 @@ function updateExtraSeedsAndPlants() {
     didAutoRemoveDryExtraSeed = true;
     return false;
   });
-
+  }
   appleState.extraSeeds.forEach(function (extraSeed) {
     ensureExtraSeedElement(extraSeed);
     const isDry = isExtraSeedDry(extraSeed, now);
-    extraSeed.element.src = isDry ? "이미지/seed-dry.png" : "이미지/seed.png";
+    extraSeed.element.src = isDry ? "??지/seed-dry.png" : "??지/seed.png";
     const hideGroundOverlap = shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed);
     extraSeed.element.style.display =
       extraSeed.planted || extraSeed.inInventory || hideGroundOverlap ? "none" : "block";
-
+    }
     if (heldItem === createHeldExtraSeed(extraSeed.id)) {
       if (isDry) {
         heldItem = null;
@@ -7121,18 +7121,18 @@ function updateExtraSeedsAndPlants() {
         extraSeed.y = handPosition.y + 5;
       }
     }
-
+    plant.needsFirstWater = !plant.growthStartedAt;
     setWorldPosition(extraSeed.element, extraSeed.x, extraSeed.y);
   });
-
+  if (!Number.isFinite(plant.rottenAt)) plant.rottenAt = null;
   if (didAutoRemoveDryExtraSeed) {
     saveAppleState();
     markWorldDirty();
     syncWorldState(true);
   }
-
+  if (!Number.isFinite(plant.powderUpgradeDurationMs)) plant.powderUpgradeDurationMs = 0;
   updateSeedInventory();
-
+  if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
   let didRemoveDrySoilExtraPlant = false;
   appleState.extraPlants.forEach(function (plant) {
     ensureExtraPlantElements(plant);
@@ -7169,7 +7169,7 @@ function updateExtraSeedsAndPlants() {
       getPlantGrowthRatio(plant, now),
       getPlantSecondGrowthRatio(plant, now)
     );
-
+    plant.needsFirstWater = false;
     const isSproutGrown =
       plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry";
     const stage = getSproutStageFromPlant(plant);
@@ -7205,7 +7205,7 @@ function updateExtraSeedsAndPlants() {
     return false;
   });
 }
-
+    return;
 /** ??·스?샷???장 ms가 ?재 constants? ?르?맞춤(?? 가?2분→3초로 바꾼 ?에????duration???는 경우) */
 function clampPlantGrowthTimingToCurrentConstants(plant) {
   if (!plant) return;
@@ -7226,7 +7226,7 @@ function clampPlantGrowthTimingToCurrentConstants(plant) {
     }
   }
 }
-
+    return;
 function normalizeExtraPlantState(plant) {
   const now = Date.now();
   if (!plant.status) plant.status = "normal";
@@ -7248,7 +7248,7 @@ function normalizeExtraPlantState(plant) {
   if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
     plant.sproutEvolutionLastTickAt = null;
   }
-
+  if (!plant || !plant.isSproutGrown) return 0;
   const hadEvolutionKey = Object.prototype.hasOwnProperty.call(plant, "sproutEvolutionMs");
   if (
     !hadEvolutionKey &&
@@ -7272,7 +7272,7 @@ function normalizeExtraPlantState(plant) {
   } else {
     plant.sproutEvolutionMs = Math.max(0, plant.sproutEvolutionMs);
   }
-
+/**
   if (plant.status === "rotten" || plant.isOverwatered) {
     plant.status = "rotten";
     if (!plant.rottenAt) plant.rottenAt = now;
@@ -7295,7 +7295,7 @@ function normalizeExtraPlantState(plant) {
   ensureGrassOrdinalIfNeeded(plant);
   clampPlantGrowthTimingToCurrentConstants(plant);
 }
-
+    Math.abs(Number(wl[0]) - gs) < 20000
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
   ensureGrassAuto5EligibleForTier4Plant(plant, now);
@@ -7307,11 +7307,11 @@ function updateExtraPlantState(plant, now) {
     saveAppleState();
     syncWorldState(true);
   }
-
+  const gs = Number(plant.growthStartedAt) || 0;
   if (plant.status === "rotten") {
     return;
   }
-
+  if (!Array.isArray(wl)) return false;
   if (plant.status === "dry") {
     normalizePlantSproutFieldsWhenSoilDry(plant);
     plant.blockSproutRegrowthAfterDry = true;
@@ -7320,7 +7320,7 @@ function updateExtraPlantState(plant, now) {
     }
     return;
   }
-
+  if (!plant) return false;
   if (
     canPlantWiltFromEmptyWater(plant, now) &&
     plant.status !== "rotten" &&
@@ -7341,7 +7341,7 @@ function updateExtraPlantState(plant, now) {
     plant.isSproutSelfSustaining = false;
     return;
   }
-
+    Math.max(0, Number(plant.growthTier) || 0) >= 4
   if (
     plant.growthStartedAt !== null &&
     plant.status !== "dry" &&
@@ -7359,7 +7359,7 @@ function updateExtraPlantState(plant, now) {
     }
   }
 }
-
+}
 function getSproutStageFromPlant(plant) {
   if (!plant || !plant.isSproutGrown) return 0;
   const tier = Math.max(0, Number(plant.growthTier) || 0);
@@ -7370,13 +7370,13 @@ function getSproutStageFromPlant(plant) {
   if (ev < sproutStage1Ms) return 1;
   return 2;
 }
-
+  plant.powderUpgradeTargetTier = 0;
 function getPlantWaterCapacity(plant) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier >= 3) return 3;
   return Math.max(2, Number(plant.waterCapacity) || 2);
 }
-
+function normalizePlantSproutFieldsWhenSoilDry(plant) {
 function isPowderUpgradeInProgress(plant) {
   return (
     Number(plant.powderUpgradeTargetTier) > 0 &&
@@ -7384,7 +7384,7 @@ function isPowderUpgradeInProgress(plant) {
     Number(plant.powderUpgradeStartedAt) > 0
   );
 }
-
+  plant.isSproutSelfSustaining = false;
 /**
  * ?? 직후 ?냅?? needsFirstWater가 false?데 ?Q 물을 ?직 ??준 ?태?????음.
  * wateredAtList가 [growthStartedAt] ??번뿐?면 "???요"?본다.
@@ -7413,7 +7413,7 @@ function stabilizeFirstWaterHintFlags(plant) {
     plant.needsFirstWater = false;
   }
 }
-
+  const tier = Math.max(0, Number(plant.growthTier) || 0);
 function isPlantAwaitingPlayerFirstPour(plant) {
   if (!plant) return false;
   if (plant.status !== "normal" || plant.isOverwatered) return false;
@@ -7430,7 +7430,7 @@ function isPlantAwaitingPlayerFirstPour(plant) {
   if (wl.length !== 1) return false;
   return Math.abs(Number(wl[0]) - gs) < 20000;
 }
-
+  plant.growthTier = 5;
 /** 4·5????서????물방??UI ??(?프?이???중?에 겹쳐 보이??문제) */
 function shouldShowFirstWaterNeededDroplet(plant) {
   if (!plant) return false;
@@ -7442,7 +7442,7 @@ function shouldShowFirstWaterNeededDroplet(plant) {
   if (plant.needsFirstWater) return true;
   return isPlantAwaitingPlayerFirstPour(plant);
 }
-
+  plant.powderUpgradeTargetTier = 0;
 function getPowderUpgradeRatio(plant, now) {
   if (!isPowderUpgradeInProgress(plant)) return null;
   const startedAt = Number(plant.powderUpgradeStartedAt) || 0;
@@ -7450,14 +7450,14 @@ function getPowderUpgradeRatio(plant, now) {
   if (!startedAt || !duration) return null;
   return Math.min(1, Math.max(0, (now - startedAt) / duration));
 }
-
+    plant.status !== "dry" &&
 function isHighTierPlantCare(plant) {
   return (
     isPowderUpgradeInProgress(plant) ||
     Math.max(0, Number(plant.growthTier) || 0) >= 4
   );
 }
-
+/** 티어 4·생존·가루 진행 없음이면 자동 5단 타이머 시작(또는 유지) */
 function canPlantWiltFromEmptyWater(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (isTutorialDocumentEntry() && Math.max(0, Number(plant && plant.growthTier) || 0) === 0) {
@@ -7466,7 +7466,7 @@ function canPlantWiltFromEmptyWater(plant, now) {
   if (isSproutStage3Or5IdleNoGrowth(plant, tNow)) return false;
   return !plant.isSproutSelfSustaining || isHighTierPlantCare(plant);
 }
-
+    plant.grassAuto5EligibleAt = null;
 function getMainDryAfterEmptyMsForPlant(plant, now) {
   const tNow = now != null ? now : Date.now();
   if (!canPlantWiltFromEmptyWater(plant, tNow)) return mainPlantDryAfterEmptyMs;
@@ -7480,14 +7480,14 @@ function getExtraDryDelayMs(plant, now) {
   if (isPowderUpgradeInProgress(plant)) return plantDryMsDuringPowderMs;
   return getPlantDryAfterEmptyMsForPlantPhase(plant);
 }
-
+  return {
 function cancelPlantPowderUpgrade(plant) {
   if (!plant) return;
   plant.powderUpgradeTargetTier = 0;
   plant.powderUpgradeStartedAt = null;
   plant.powderUpgradeDurationMs = 0;
 }
-
+  return isWorldPointInsideRectCore(x, y, rect);
 /** 마른 ?인?????장 ??스?프가 ?으??주기·?링 직후 ?깐 ?라??것처??보일 ???음 */
 function normalizePlantSproutFieldsWhenSoilDry(plant) {
   if (!plant || plant.status !== "dry") return;
@@ -7499,7 +7499,7 @@ function normalizePlantSproutFieldsWhenSoilDry(plant) {
   plant.sproutEvolutionLastTickAt = null;
   plant.isSproutSelfSustaining = false;
 }
-
+  });
 function tickPowderUpgrade(plant, now) {
   if (!isPowderUpgradeInProgress(plant)) return false;
   if (plant.status === "dry" || plant.status === "rotten") {
@@ -7523,7 +7523,7 @@ function tickPowderUpgrade(plant, now) {
   }
   return true;
 }
-
+  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
 /** 4??? ?존 ??가??이 level5GrowMs ???동 5??(가루는 3??? */
 function tickGrassAutoAdvanceToTier5(plant, now) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
@@ -7548,7 +7548,7 @@ function tickGrassAutoAdvanceToTier5(plant, now) {
   plant.becameEmptyAt = null;
   return true;
 }
-
+    const r = el.getBoundingClientRect();
 /** 구세?브: 가?4?? ?거 ??진행 중이??동 5????머??? */
 function migrateLegacyPowderTier5ToAutoGrass(plant, now) {
   const tgt = Number(plant.powderUpgradeTargetTier) || 0;
@@ -7569,7 +7569,7 @@ function migrateLegacyPowderTier5ToAutoGrass(plant, now) {
     plant.grassAuto5EligibleAt = started != null && Number.isFinite(started) ? started : now;
   }
 }
-
+  }
 /** ?어 4·?존·가?진행 ?음?면 ?동 5????머 ?작(?는 ??) */
 function ensureGrassAuto5EligibleForTier4Plant(plant, now) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
@@ -7586,7 +7586,7 @@ function ensureGrassAuto5EligibleForTier4Plant(plant, now) {
     plant.grassAuto5EligibleAt = now;
   }
 }
-
+function showWorldNpcHoverLabel(text, anchorEl) {
 function groundClientToWorldXY(clientX, clientY) {
   if (!ground) return null;
   const r = ground.getBoundingClientRect();
@@ -7598,11 +7598,11 @@ function groundClientToWorldXY(clientX, clientY) {
     y: ((clientY - r.top) / h) * GROUND_WORLD_HEIGHT
   };
 }
-
+  plantHoverLabel.style.position = "fixed";
 function isWorldPointInsideRect(x, y, rect) {
   return isWorldPointInsideRectCore(x, y, rect);
 }
-
+  void plantHoverLabel.offsetWidth;
 /** ?재 보이???물 ?프?이?????싹/?)???드 박스 목록 */
 function getPlantVisibleHoverRectsWorld(plant) {
   return getPlantVisibleHoverRectsWorldCore(plant, {
@@ -7614,7 +7614,7 @@ function getPlantVisibleHoverRectsWorld(plant) {
     getSproutWorldPositionForPlant: getSproutWorldPositionForPlant
   });
 }
-
+  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete", "is-well-dock", "is-world-npc-name");
 /** ?인?? ?재 ?물 ??지 ?역 ?에 ?을 ?만 ?택(겹침 ??중심거리 가까운 ? */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
@@ -7642,7 +7642,7 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
   }
   return best;
 }
-
+  }
 function bagHasPlantableSeedsForHoverHint() {
   if (usesWorldLooseSeedMode()) {
     return appleState.seedCount > 0;
@@ -7655,7 +7655,7 @@ function bagHasPlantableSeedsForHoverHint() {
     );
   });
 }
-
+    worldBagInventory.style.display !== "none"
 /** 고정 UI(?정·채팅·?트·?퍼?? ??브라?? title ???#plant-hover-label ???로 ?축???시 */
 function pickUiShortcutHoverTarget(clientX, clientY) {
   const pad = 4;
@@ -7685,20 +7685,20 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
   }
   return null;
 }
-
+    plant.sproutEvolutionLastTickAt = now;
 /** `.world`??transform???으???의 fixed??뷰포?? ?니???드 기????어 좌표가 ?긋????UI ?트?body?*/
 function ensurePlantHoverLabelOnBodyForFixedUi() {
   if (!plantHoverLabel || !ground) return;
   if (plantHoverLabel.parentNode === document.body) return;
   document.body.appendChild(plantHoverLabel);
 }
-
+  const delta = Math.min(4000, Math.max(0, now - last));
 function restorePlantHoverLabelToWorldDom() {
   if (!plantHoverLabel || !ground) return;
   if (plantHoverLabel.parentNode === ground) return;
   ground.appendChild(plantHoverLabel);
 }
-
+    plant.isSproutSelfSustaining = true;
 function showWorldNpcHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   ensurePlantHoverLabelOnBodyForFixedUi();
@@ -7723,7 +7723,7 @@ function showWorldNpcHoverLabel(text, anchorEl) {
   plantHoverLabel.style.left = left + "px";
   plantHoverLabel.style.top = top + "px";
 }
-
+    height: Math.max(1, Math.round(baseHeight * growthScale))
 function showUiShortcutHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   ensurePlantHoverLabelOnBodyForFixedUi();
@@ -7746,24 +7746,24 @@ function showUiShortcutHoverLabel(text, anchorEl) {
   plantHoverLabel.style.left = left + "px";
   plantHoverLabel.style.top = top + "px";
 }
-
+  }
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
-
+    y: plantBaseY - sproutSize.height + footInset
   const uiShortcut = pickUiShortcutHoverTarget(clientX, clientY);
   if (uiShortcut) {
     if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
     showUiShortcutHoverLabel(uiShortcut.text, uiShortcut.anchorEl);
     return;
   }
-
+  const py = plant.spotY != null ? plant.spotY : plant.y;
   const npcHover = pickWorldNpcHover(clientX, clientY);
   if (npcHover) {
     if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
     showWorldNpcHoverLabel(npcHover.name, npcHover.anchorEl);
     return;
   }
-
+  const sz = getSproutSizeForStage(st);
   if (
     hasGuideBook &&
     bagHasPlantableSeedsForHoverHint() &&
@@ -7787,14 +7787,14 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
       return;
     }
   }
-
+  const elapsed = now - Number(t0);
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
-
+  return Math.min(1, elapsed / level5GrowMs);
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (plant) showPlantHoverSignForPlant(plant);
   else hidePlantHoverLabel();
 }
-
+  if (powderRatio !== null) return powderRatio;
 function tickSproutEvolution(plant, now) {
   if (!plant.isSproutGrown || plant.isSproutSelfSustaining) return;
   if (plant.status !== "normal" || plant.isOverwatered) {
@@ -7819,7 +7819,7 @@ function tickSproutEvolution(plant, now) {
     plant.status = "normal";
   }
 }
-
+  if (hasActiveGreenGrowthProgress(plant, now)) return false;
 function getSproutImageForStage(stage) {
   if (stage >= 5) return sproutStage5Image;
   if (stage >= 4) return sproutStage4Image;
@@ -7827,7 +7827,7 @@ function getSproutImageForStage(stage) {
   if (stage === 2) return sproutStage2Image;
   return sproutStage1Image;
 }
-
+const stage3CompleteMagicHint = "\uC131\uC7A5 \uC644\uB8CC, \uB354 \uD0A4\uC6B0\uB824\uBA74 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \uD544\uC694.";
 function getSproutSizeForStage(stage) {
   const idx = Math.min(2, Math.max(0, Math.min(stage, 3) - 1));
   const growthScale =
@@ -7839,14 +7839,14 @@ function getSproutSizeForStage(stage) {
     height: Math.max(1, Math.round(baseHeight * growthScale))
   };
 }
-
+  const shouldShowWater = showWater !== false;
 /** 4·5?계 ? PNG???? ??별도 spot)??겹쳐 보이?spot ?이?? ?다. */
 function shouldHideSeparateSoilUnderBigGrass(plant) {
   if (!plant || !plant.isSproutGrown) return false;
   if (plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) return false;
   return getSproutStageFromPlant(plant) >= 4;
 }
-
+  if (getPlantSoilBadStateTitle(plant)) {
 /**
  * ? ?프?이??발밑???? ?plantBaseY ~ +PLANT_SPOT_HEIGHT)??맞춘??
  * 4·5?계??PNG ?단 ?백 ?문??world top-left 보정.
@@ -7865,7 +7865,7 @@ function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stag
     y: plantBaseY - sproutSize.height + footInset
   };
 }
-
+  }
 /** ?버 ?벨: ???중심???니???제 ?싹/? ?프?이??기?(????서 ?치 ?긋??방?) */
 function getPlantHoverAnchorWorld(plant) {
   const px = plant.spotX != null ? plant.spotX : plant.x;
@@ -7883,13 +7883,13 @@ function getPlantHoverAnchorWorld(plant) {
     cyWorld: pos.y + Math.min(sz.height * 0.22, 10)
   };
 }
-
+  element.style.display = "block";
 function getPlantGrowthRatio(plant, now) {
   if (!plant.growthStartedAt || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return null;
   if (plant.isSproutGrown) return 1;
   return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / getPlantFirstGrowthDurationMs(plant)));
 }
-
+  plant.waterLevel = Math.max(0, Number(plant.waterLevel) || 0);
 /** ?어 4?? ?동 ?장(가??음) 구간??초록 게이지 비율; ?당 ?으?null */
 function getGrassAutoTier5GrowthRatio(plant, now) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
@@ -7904,7 +7904,7 @@ function getGrassAutoTier5GrowthRatio(plant, now) {
   if (elapsed <= 0) return 0;
   return Math.min(1, elapsed / level5GrowMs);
 }
-
+    if (now - updatedAt < tickMs) break;
 function getPlantSecondGrowthRatio(plant, now) {
   const powderRatio = getPowderUpgradeRatio(plant, now);
   if (powderRatio !== null) return powderRatio;
@@ -7918,7 +7918,7 @@ function getPlantSecondGrowthRatio(plant, now) {
   }
   return Math.min(1, Math.max(0, (ev - sproutStage1Ms) / sproutStage2GrowMs));
 }
-
+  }
 /** ?→?싹 ?는 ?싹 ?계 진행·가??장 ???드 초록 게이지가 채워지???*/
 function hasActiveGreenGrowthProgress(plant, now) {
   const g1 = getPlantGrowthRatio(plant, now);
@@ -7927,7 +7927,7 @@ function hasActiveGreenGrowthProgress(plant, now) {
   if (g2 !== null && g2 < 1) return true;
   return false;
 }
-
+    plant.waterLevelUpdatedAt = now;
 function isSproutStage3Or5IdleNoGrowth(plant, now) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
   const st = getSproutStageFromPlant(plant);
@@ -7935,13 +7935,13 @@ function isSproutStage3Or5IdleNoGrowth(plant, now) {
   if (hasActiveGreenGrowthProgress(plant, now)) return false;
   return true;
 }
-
+  if (plant.status === "rotten" || plant.isOverwatered) return "이미지/soil-rotten.png";
 function shouldPauseWaterDecayForPlant(plant, now) {
   return isSproutStage3Or5IdleNoGrowth(plant, now);
 }
-
+}
 const stage3CompleteMagicHint = "\uC131\uC7A5 \uC644\uB8CC, \uB354 \uD0A4\uC6B0\uB824\uBA74 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \uD544\uC694.";
-
+function getBagInventorySeedCount() {
 function isStage3CompleteAwaitingMagicPowder(plant) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
     return false;
@@ -7949,7 +7949,7 @@ function isStage3CompleteAwaitingMagicPowder(plant) {
   if (isPowderUpgradeInProgress(plant)) return false;
   return getSproutStageFromPlant(plant) === 3 && getNextPowderTargetTier(plant) > 0;
 }
-
+      extraSeed.id !== plantingInventorySeedId
 function syncPlantCardWaterReadoutVisibility(showWater) {
   if (!plantWaterText || !plantWaterBar) return;
   const shouldShowWater = showWater !== false;
@@ -7957,7 +7957,7 @@ function syncPlantCardWaterReadoutVisibility(showWater) {
   plantWaterText.classList.toggle("is-plant-card-hint", !shouldShowWater);
   plantWaterBar.style.display = shouldShowWater ? "grid" : "none";
 }
-
+    seed: getBagInventorySeedCount(),
 function renderPlantCardForPlant(plant) {
   if (getPlantSoilBadStateTitle(plant)) {
     plantCard.style.display = "none";
@@ -7987,7 +7987,7 @@ function renderPlantCardForPlant(plant) {
   });
   syncPlantCardWaterReadoutVisibility(true);
 }
-
+    }
 function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
   if (!element || !fill) return;
   const ratio = secondRatio !== null ? secondRatio : firstRatio;
@@ -7995,12 +7995,12 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
     element.style.display = "none";
     return;
   }
-
+  if (itemKey === "overgrowthSeed") {
   element.style.display = "block";
   fill.style.width = Math.round(ratio * 100) + "%";
   setWorldPosition(element, x + PLANT_SPOT_WIDTH / 2 - 21, y - 24);
 }
-
+    return true;
 function applyPlantWaterDecay(plant, now) {
   plant.waterLevel = Math.max(0, Number(plant.waterLevel) || 0);
   if (plant.waterLevel <= 0) {
@@ -8027,12 +8027,12 @@ function applyPlantWaterDecay(plant, now) {
   }
   plant.waterLevelUpdatedAt = updatedAt;
 }
-
+      appleState.worldRockPickedIds.push(
 function updateExtraPlantWaterLevel(plant, now) {
   if (plant.isOverwatered || plant.status === "dry" || plant.status === "rotten") {
     return;
   }
-
+    saveAppleState();
   if (shouldPauseWaterDecayForPlant(plant, now)) {
     if (plant.waterLevel > 0 && plant.becameEmptyAt != null) {
       plant.becameEmptyAt = null;
@@ -8043,17 +8043,17 @@ function updateExtraPlantWaterLevel(plant, now) {
     plant.waterLevelUpdatedAt = now;
     return;
   }
-
+          planted: false
   applyPlantWaterDecay(plant, now);
 }
-
+    }
 function getPlantSoilSrc(plant) {
-  if (plant.status === "rotten" || plant.isOverwatered) return "이미지/soil-rotten.png";
-  if (plant.status === "wet") return "이미지/soil-wet.png";
-  if (plant.status === "dry") return "이미지/soil-dry.png";
-  return "이미지/tilled-soil.png";
+  if (plant.status === "rotten" || plant.isOverwatered) return "??지/soil-rotten.png";
+  if (plant.status === "wet") return "??지/soil-wet.png";
+  if (plant.status === "dry") return "??지/soil-dry.png";
+  return "??지/tilled-soil.png";
 }
-
+      Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0)) + n;
 function getBagInventorySeedCount() {
   if (usesWorldLooseSeedMode()) {
     return Math.max(0, Number(appleState.seedCount) || 0);
@@ -8066,7 +8066,7 @@ function getBagInventorySeedCount() {
     );
   }).length;
 }
-
+    updateMagicPowderInventoryUi();
 function getBagInventoryCountsByKey() {
   return {
     book: hasGuideBookItemInBagCounts() ? 1 : 0,
@@ -8080,7 +8080,7 @@ function getBagInventoryCountsByKey() {
     "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
   };
 }
-
+  const normalized = normalizeBagInventoryOrderByCountsCore(
 function removeOneBagItemForTrade(itemKey) {
   const counts = getBagInventoryCountsByKey();
   if (Number(counts[itemKey] || 0) <= 0) return false;
@@ -8133,7 +8133,7 @@ function removeOneBagItemForTrade(itemKey) {
   }
   return false;
 }
-
+  });
 function addBagItemsForTrade(itemKey, amount) {
   const n = Math.max(0, Math.floor(Number(amount) || 0));
   if (n <= 0) return;
@@ -8191,7 +8191,7 @@ function addBagItemsForTrade(itemKey, amount) {
     }
   }
 }
-
+  saveAppleState();
 function normalizeBagInventoryOrderByCounts(counts) {
   const normalized = normalizeBagInventoryOrderByCountsCore(
     bagInventoryItemOrder,
@@ -8202,7 +8202,7 @@ function normalizeBagInventoryOrderByCounts(counts) {
   bagInventoryCountsPrev = normalized.previousCounts;
   if (normalized.changed) saveBagInventoryOrder();
 }
-
+  element.src = "이미지/seed.png";
 function updateBagInventorySlots() {
   if (!bagInventoryPanel) return;
   const counts = getBagInventoryCountsByKey();
@@ -8212,7 +8212,7 @@ function updateBagInventorySlots() {
     hasShownFirstSeedFocus = false;
   }
   normalizeBagInventoryOrderByCounts(counts);
-
+    plant.waterNeededElement &&
   const slots = Array.from(bagInventoryPanel.querySelectorAll(".bag-inventory-slot")).sort(function (a, b) {
     return Number(a.dataset.slot || 0) - Number(b.dataset.slot || 0);
   });
@@ -8247,7 +8247,7 @@ function updateBagInventorySlots() {
     slot.classList.toggle("is-empty", itemCount <= 0);
     slot.innerHTML = descriptor.iconHtml + '<span class="bag-slot-count">' + itemCount + "</span>";
   });
-
+  const waterNeededElement = document.createElement("img");
   if (bagInventoryPanel) {
     const powderUsable = magicPowderCount > 0 && isMagicPowderUsableNow();
     bagInventoryPanel.querySelectorAll('.bag-inventory-slot[data-bag-type="magicPowder"]').forEach(
@@ -8262,7 +8262,7 @@ function updateBagInventorySlots() {
     );
   }
 }
-
+function createPlantGrowthMeter() {
 function updateSeedInventory() {
   appleState.extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.inventoryElement) {
@@ -8273,13 +8273,13 @@ function updateSeedInventory() {
   });
   updateBagInventorySlots();
 }
-
+  document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .plant-growth-meter").forEach(
 function discardInventorySeed(seedId) {
   const seedIndex = appleState.extraSeeds.findIndex(function (extraSeed) {
     return extraSeed.id === seedId;
   });
   if (seedIndex < 0) return;
-
+  worldLooseSeedElement = null;
   const seedToRemove = appleState.extraSeeds[seedIndex];
   if (!seedToRemove.inInventory || seedToRemove.planted) return;
   if (
@@ -8302,25 +8302,25 @@ function discardInventorySeed(seedId) {
     markWorldDirty();
     syncWorldState(true);
   }
-
+  if (p.growthMeterElement && p.growthMeterElement.isConnected) p.growthMeterElement.remove();
   appleState.extraSeeds.splice(seedIndex, 1);
   saveAppleState();
   updateSeedInventory();
 }
-
+  p.growthMeterFill = undefined;
 function ensureExtraSeedElement(extraSeed) {
   if (extraSeed.element && document.contains(extraSeed.element)) return;
   if (extraSeed.element) extraSeed.element = undefined;
-
+  const pid = "plant-" + String(seedId);
   const element = document.createElement("img");
   element.className = "extra-seed";
   element.alt = "extra seed";
-  element.src = "이미지/seed.png";
+  element.src = "??지/seed.png";
   setWorldSize(element, SEED_SIZE);
   ground.appendChild(element);
   extraSeed.element = element;
 }
-
+    if (!p || p.id == null || p.removed) return;
 function ensureExtraPlantElements(plant) {
   const plantDomOk =
     plant.spotElement &&
@@ -8332,7 +8332,7 @@ function ensureExtraPlantElements(plant) {
     document.contains(plant.waterNeededElement) &&
     document.contains(plant.growthMeterElement);
   if (plantDomOk) return;
-
+function updateBucketPosition() {
   [plant.sproutElement, plant.waterNeededElement, plant.growthMeterElement, plant.spotElement].forEach(
     function (el) {
       if (el && el !== mainPlantGrowthMeter.element && typeof el.remove === "function") {
@@ -8345,28 +8345,28 @@ function ensureExtraPlantElements(plant) {
   plant.waterNeededElement = undefined;
   plant.growthMeterElement = undefined;
   plant.growthMeterFill = undefined;
-
+      addBucketTrace("stale", "clear holder=" + holderId + " age=" + (Date.now() - lastUpdateAt), 0);
   const spotElement = document.createElement("img");
   spotElement.className = "extra-plant-spot";
   spotElement.alt = "extra plant spot";
-  spotElement.src = "이미지/tilled-soil.png";
+  spotElement.src = "??지/tilled-soil.png";
   setWorldSize(spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   ground.appendChild(spotElement);
-
+    remotePlayer.element.classList.remove("is-carrying-bucket");
   const sproutElement = document.createElement("img");
   sproutElement.className = "extra-sprout";
   sproutElement.alt = "extra sprout";
-  sproutElement.src = "이미지/sprout.png";
+  sproutElement.src = "??지/sprout.png";
   setWorldSize(sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   ground.appendChild(sproutElement);
-
+    bucketX = handPosition.x;
   const waterNeededElement = document.createElement("img");
   waterNeededElement.className = "extra-water-needed";
   waterNeededElement.alt = "water needed";
-  waterNeededElement.src = "이미지/water-needed.png";
+  waterNeededElement.src = "??지/water-needed.png";
   setWorldSize(waterNeededElement, WATER_NEEDED_SIZE);
   ground.appendChild(waterNeededElement);
-
+  } else if (isBucketHeldByRemotePlayer) {
   plant.spotElement = spotElement;
   plant.sproutElement = sproutElement;
   plant.waterNeededElement = waterNeededElement;
@@ -8374,7 +8374,7 @@ function ensureExtraPlantElements(plant) {
   plant.growthMeterElement = growthMeter.element;
   plant.growthMeterFill = growthMeter.fill;
 }
-
+  } else {
 function createPlantGrowthMeter() {
   const element = document.createElement("div");
   const fill = document.createElement("div");
@@ -8384,7 +8384,7 @@ function createPlantGrowthMeter() {
   ground.appendChild(element);
   return { element, fill };
 }
-
+    bucketX = wellX - bucketSize.width - 8;
 function clearExtraSeedAndPlantElements() {
   document.querySelectorAll(".extra-seed, .extra-plant-spot, .extra-sprout, .extra-water-needed, .plant-growth-meter").forEach(
     function (element) {
@@ -8394,7 +8394,7 @@ function clearExtraSeedAndPlantElements() {
   );
   worldLooseSeedElement = null;
 }
-
+          : isBucketHeldByRemotePlayer
 function invalidateGroundSeedElementRefsOnly(seeds) {
   if (!Array.isArray(seeds)) return;
   seeds.forEach(function (s) {
@@ -8402,14 +8402,14 @@ function invalidateGroundSeedElementRefsOnly(seeds) {
     s.element = undefined;
   });
 }
-
+          "[bucket:render] mode=" +
 /** 공유 ?냅?? ???앗 ?드??거(?물/게이지????·?연결로 깜빡??방?) */
 function clearGroundExtraSeedElementsOnly() {
   document.querySelectorAll(".extra-seed:not(.world-loose-seed)").forEach(function (element) {
     element.remove();
   });
 }
-
+      }
 function teardownExtraPlantDom(p) {
   if (!p) return;
   if (p.spotElement && p.spotElement.isConnected) p.spotElement.remove();
@@ -8422,14 +8422,14 @@ function teardownExtraPlantDom(p) {
   p.growthMeterElement = undefined;
   p.growthMeterFill = undefined;
 }
-
+  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) {
 function extraSeedHasCorrespondingExtraPlant(seedId, plants) {
   const pid = "plant-" + String(seedId);
   return plants.some(function (p) {
     return p && !p.removed && String(p.id) === pid;
   });
 }
-
+  if (isWorldChatBlockingGameInput()) {
 function pruneGroundExtraSeedsShadowedByPlants(extraSeeds, extraPlants) {
   const plantLinkedSeedIds = Object.create(null);
   extraPlants.forEach(function (p) {
@@ -8446,9 +8446,9 @@ function pruneGroundExtraSeedsShadowedByPlants(extraSeeds, extraPlants) {
 }
 
 function updateBucketPosition() {
-  bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+  bucket.src = isBucketFull ? "??지/bucket-full.png" : "??지/bucket-empty.png";
   playerBucketOverlay.style.backgroundImage =
-    'url("' + (isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png") + '")';
+    'url("' + (isBucketFull ? "??지/bucket-full.png" : "??지/bucket-empty.png") + '")';
   const isBucketHeldByRemotePlayer =
     Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
     window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
@@ -8461,7 +8461,7 @@ function updateBucketPosition() {
       addBucketTrace("stale", "clear holder=" + holderId + " age=" + (Date.now() - lastUpdateAt), 0);
     }
   }
-
+  if (keys.ArrowRight || keys.d) {
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.element) return;
@@ -8471,7 +8471,7 @@ function updateBucketPosition() {
   if (heldItem === HELD_ITEM_BUCKET) {
     const bucketSize = getBucketSize();
     const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
-
+  let shouldClampToTree = isInTree;
     bucketX = handPosition.x;
     bucketY = handPosition.y;
     markWorldDirty();
@@ -8494,13 +8494,13 @@ function updateBucketPosition() {
     // This helps recover peers that missed a pickup/drop edge event.
     broadcastBucketState(false);
   }
-
+    isOnGround = true;
   if (bucket.style.display === "block" && (!Number.isFinite(bucketX) || !Number.isFinite(bucketY))) {
     const bucketSize = getBucketSize();
     bucketX = wellX - bucketSize.width - 8;
     bucketY = wellY + WELL_SIZE - bucketSize.height;
   }
-
+      shouldClampToTree = false;
   if (bucket.style.display === "block") {
     setWorldPosition(bucket, bucketX, bucketY);
     if (BUCKET_DEBUG_TRACE) {
@@ -8527,7 +8527,7 @@ function updateBucketPosition() {
   }
   updateWorldExtraBuckets();
 }
-
+  }
 function updatePlayerPosition() {
   if (isCharacterSelecting || !hasSpawnedCharacter) {
     lastMovementTickMs = performance.now();
@@ -8542,14 +8542,14 @@ function updatePlayerPosition() {
     updatePlayerColorBodyPosition();
     return;
   }
-
+    const eps = 0.35;
   if (isWorldChatBlockingGameInput()) {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
     return;
   }
-
+      } else {
   const nowMs = performance.now();
   if (lastMovementTickMs <= 0) {
     lastMovementTickMs = nowMs - 1000 / MOVEMENT_REFERENCE_HZ;
@@ -8558,7 +8558,7 @@ function updatePlayerPosition() {
   lastMovementTickMs = nowMs;
   dtSec = Math.min(MOVEMENT_DT_CAP_SEC, Math.max(0, dtSec));
   const frameScale = dtSec * MOVEMENT_REFERENCE_HZ;
-
+    if (!isPlayerCollidingVisibleWorldRockForPose(previousPlayerX, playerDepth, jumpY)) {
   const previousPlayerX = playerX;
   const previousPlayerDepth = playerDepth;
   const previousJumpY = jumpY;
@@ -8570,7 +8570,7 @@ function updatePlayerPosition() {
     !isTreeFalling && (preNearTrunk || preInCanopy || wasPlayerInTree)
       ? treeMoveSpeed
       : speed;
-
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   if (keys.ArrowLeft || keys.a) {
     playerX -= speedSide * frameScale;
   }
@@ -8578,15 +8578,15 @@ function updatePlayerPosition() {
   if (keys.ArrowRight || keys.d) {
     playerX += speedSide * frameScale;
   }
-
+  return (
   if (playerX < 0) playerX = 0;
   if (playerX > maxX) playerX = maxX;
-
+    footY >= wellY + WELL_SIZE * 0.55 &&
   const isInCanopy = isPlayerInTreeCanopy();
   const isNearTrunk = isPlayerNearTreeTrunk();
   const isInTree = !isTreeFalling && (isInCanopy || isNearTrunk);
   let shouldClampToTree = isInTree;
-
+function updatePlayerColorBodyPosition() {
   const shouldTreeFall =
     playerDepth > groundMaxDepth &&
     (isTreeFalling || !isPlayerSupportedByTree());
@@ -8609,7 +8609,7 @@ function updatePlayerPosition() {
     jumpY = 0;
     velocityY = 0;
     isOnGround = true;
-
+  return player.offsetHeight || PLAYER_HEIGHT;
     const wantsTreeDown = keys.ArrowDown || keys.s;
     const isAtTreeBase = !isInCanopy && playerDepth <= groundMaxDepth + treeClimbSpeed * frameScale + 2;
     if (wantsTreeDown && isAtTreeBase) {
@@ -8625,31 +8625,31 @@ function updatePlayerPosition() {
     if (keys.ArrowUp || keys.w) {
       playerDepth += speed * frameScale;
     }
-
+    BIG_TREE_Y +
     if (keys.ArrowDown || keys.s) {
       playerDepth -= speed * frameScale;
     }
     velocityY += gravity * frameScale;
     jumpY += velocityY * frameScale;
   }
-
+    left: playerX + feetInset,
   if (playerDepth < getMinGroundedPlayerDepth()) {
     playerDepth = getMinGroundedPlayerDepth();
   }
   // Do not hard-snap to ground depth here; if the player is above ground and
   // outside tree support we want a smooth fall, not an instant teleport.
-
+  const rootsRect = {
   if (shouldClampToTree) {
     clampPlayerToTreeOutline();
   }
-
+    bottom: rootsBottom
   if (jumpY > 0) {
     jumpY = 0;
     velocityY = 0;
     isOnGround = true;
     isTreeFalling = false;
   }
-
+    return true;
   if (isPlayerInWellWaterArea()) {
     playerX = previousPlayerX;
     playerDepth = previousPlayerDepth;
@@ -8683,12 +8683,12 @@ function updatePlayerPosition() {
       jumpY = previousJumpY;
     }
   }
-
+function isPlayerSupportedByTree() {
   setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   wasPlayerInTree = shouldClampToTree || (isTreeFalling && playerDepth > groundMaxDepth);
 }
-
+  playerDepth += deltaDepth;
 function isPlayerInWellWaterArea() {
   const footX = getPlayerCenterX();
   const footY = getPlayerFootY();
@@ -8699,41 +8699,41 @@ function isPlayerInWellWaterArea() {
     footY <= wellY + WELL_SIZE - 6
   );
 }
-
+  const target = Math.max(minD, Math.min(maxD, playerDepth));
 function updatePlayerColorBodyPosition() {
   // Keep legacy overlay disabled; color is rendered directly on #player image.
   playerColorBody.style.display = "none";
   if (!hasSpawnedCharacter || player.classList.contains("is-hidden-before-spawn")) return;
 }
-
+    playerDepth = target;
 function getMaxGroundedPlayerDepth() {
   return GROUND_WORLD_HEIGHT - groundFootInset;
 }
-
+function getPlayerWorldY() {
 function getMinGroundedPlayerDepth() {
   return 0;
 }
-
+function startPlanting() {
 function getMaxTreePlayerDepth() {
   return GROUND_WORLD_HEIGHT - TREE_CANOPY_TOP - 2;
 }
-
+    flashOnboardingOrderHint("");
 function getMinTreePlayerDepth() {
   return getMaxGroundedPlayerDepth();
 }
-
+  if (heldItem !== HELD_ITEM_SEED || plantRuntime.isPlanting || !isOnGround || plantRuntime.isSeedDry) return;
 function getPlayerRenderedHeight() {
   return player.offsetHeight || PLAYER_HEIGHT;
 }
-
+  const spotHeight = PLANT_SPOT_HEIGHT;
 function getPlayerCenterX() {
   return playerX + PLAYER_WIDTH / 2;
 }
-
+  if (!canPlantAt(targetPlantSpotX, targetPlantSpotY)) {
 function getPlayerFootY() {
   return GROUND_WORLD_HEIGHT - playerDepth + jumpY;
 }
-
+    }
 function isPlayerNearTreeTrunk() {
   if (isTreeFalling) return false;
   const centerX = getPlayerCenterX();
@@ -8777,18 +8777,18 @@ function isPlayerNearTreeTrunk() {
     isOverlappingRect(feetRect, trunkRect)
   );
 }
-
+      saveAppleState();
 function isPlayerInTreeSpace() {
   return (
     !isTreeFalling &&
     (isPlayerNearTreeTrunk() || isPlayerInTreeCanopy())
   );
 }
-
+    plantRuntime.isSeedPlanted = true;
 function isPlayerInTreeCanopy() {
   const centerX = getPlayerCenterX();
   const footY = getPlayerFootY();
-
+    plantRuntime.waterLevel = 1;
   return (
     centerX >= TREE_CANOPY_LEFT &&
     centerX <= TREE_CANOPY_RIGHT &&
@@ -8796,11 +8796,11 @@ function isPlayerInTreeCanopy() {
     footY <= TREE_CANOPY_BOTTOM
   );
 }
-
+    plantRuntime.isSproutGrown = false;
 function isPlayerSupportedByTree() {
   return !isTreeFalling && (isPlayerNearTreeTrunk() || isPlayerInTreeCanopy());
 }
-
+    plantRuntime.isSproutSelfSustaining = false;
 function movePlayerVerticallyInTree(deltaDepth) {
   playerDepth += deltaDepth;
   jumpY = 0;
@@ -8809,7 +8809,7 @@ function movePlayerVerticallyInTree(deltaDepth) {
   isTreeFalling = false;
   clampPlayerToTreeOutline();
 }
-
+    ensureGrassOrdinalIfNeeded(plantRuntime);
 function clampPlayerToTreeOutline() {
   const minD = getMinTreePlayerDepth();
   const maxD = getMaxTreePlayerDepth();
@@ -8822,25 +8822,25 @@ function clampPlayerToTreeOutline() {
     playerDepth = target;
   }
 }
-
+}
 function getPlayerWorldY() {
   return -playerDepth + jumpY;
 }
-
+    flashOnboardingOrderHint("");
 function startPlanting() {
   updateSeedDryState();
-
+  const extraSeed = getHeldExtraSeed();
   if (isOnboardingLinearGateActive() && onboardingFlowStep !== 7) {
     flashOnboardingOrderHint("");
     return;
   }
-
+  const playerBox = getPlayerBox();
   if (heldItem !== HELD_ITEM_SEED || plantRuntime.isPlanting || !isOnGround || plantRuntime.isSeedDry) return;
-
+  const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
   const playerBox = getPlayerBox();
   const spotWidth = PLANT_SPOT_WIDTH;
   const spotHeight = PLANT_SPOT_HEIGHT;
-
+      flashPlantProximityWarning(lastPlantProximityBlockMessage);
   const targetPlantSpotX = playerBox.left + playerBox.width / 2 - spotWidth / 2;
   const targetPlantSpotY = playerBox.bottom - spotHeight / 2;
   if (!canPlantAt(targetPlantSpotX, targetPlantSpotY)) {
@@ -8857,14 +8857,14 @@ function startPlanting() {
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
   sendMultiplayerPresence(true);
-
+    ensureGrassOrdinalIfNeeded(newPlant);
   window.setTimeout(function () {
     const plantedAt = getSharedPlantSimulationNow();
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
     const spotX = plantRuntime.spotX;
     const spotY = plantRuntime.spotY;
-
+  }, plantActionMs);
     if (isSharedWorldMultiPlantMode() && plantRuntime.isSeedPlanted) {
       const ownerKey = String(currentUserId || currentSessionId || "guest");
       const newPlant = createExtraPlant(
@@ -8897,7 +8897,7 @@ function startPlanting() {
       onboardingNotifyMainPlantPlanted();
       return;
     }
-
+      updatePlayerStatus();
     plantRuntime.isSeedPlanted = true;
     plantRuntime.lastWateredAt = null;
     plantRuntime.wateredAtList = [];
@@ -8937,7 +8937,7 @@ function startPlanting() {
     onboardingNotifyMainPlantPlanted();
   }, plantActionMs);
 }
-
+      plantRuntime.growthTier = 0;
 function startPlantingExtraSeed() {
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
     flashOnboardingOrderHint("");
@@ -8947,11 +8947,11 @@ function startPlantingExtraSeed() {
   if (!extraSeed || plantRuntime.isPlanting || !isOnGround) {
     return;
   }
-
+      plantRuntime.drySoilAt = null;
   const playerBox = getPlayerBox();
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
-
+      updateNpcPosition();
   if (!canPlantAt(plantX, plantY)) {
     if (lastPlantProximityBlockMessage) {
       flashPlantProximityWarning(lastPlantProximityBlockMessage);
@@ -8959,12 +8959,12 @@ function startPlantingExtraSeed() {
     }
     return;
   }
-
+      ensureGrassOrdinalIfNeeded(invPlant);
   heldItem = null;
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
   sendMultiplayerPresence(true);
-
+    }
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
@@ -8992,7 +8992,7 @@ function plantWorldSeedCount() {
     updateSeedInventory();
     return;
   }
-
+  ) {
   if (
     plantRuntime.isPlanting ||
     appleState.isEating ||
@@ -9002,12 +9002,12 @@ function plantWorldSeedCount() {
     updateSeedInventory();
     return;
   }
-
+  if (!canPlantAt(plantX, plantY)) {
   const syntheticId = "w-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   const playerBox = getPlayerBox();
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
-
+    updateSeedInventory();
   if (!canPlantAt(plantX, plantY)) {
     if (lastPlantProximityBlockMessage) {
       flashPlantProximityWarning(lastPlantProximityBlockMessage);
@@ -9016,20 +9016,20 @@ function plantWorldSeedCount() {
     updateSeedInventory();
     return;
   }
-
+  sendMultiplayerPresence(true);
   plantingInventorySeedId = syntheticId;
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uC528\uC557 \uC2EC\uB294\uC911...";
   updateSeedInventory();
   saveAppleState();
   sendMultiplayerPresence(true);
-
+      Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0) - 1);
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
     plantingInventorySeedId = null;
     appleState.seedCount = Math.max(0, appleState.seedCount - 1);
-
+      plantRuntime.isSeedPlanted = true;
     if (!plantRuntime.isSeedPlanted) {
       const plantedAt = getSharedPlantSimulationNow();
       plantRuntime.spotX = plantX;
@@ -9079,7 +9079,7 @@ function plantWorldSeedCount() {
       holdLocalPlantStateAgainstStaleSnapshot(3000);
       holdLocalAppleStateAgainstStaleSnapshot(3000);
     }
-
+    saveAppleState();
     playerStatus.textContent = "";
     updateSeedInventory();
     holdLocalAppleStateAgainstStaleSnapshot(3000);
@@ -9088,19 +9088,19 @@ function plantWorldSeedCount() {
     syncWorldState(true);
   }, plantActionMs);
 }
-
+  });
 function plantWorldOvergrowthSeedCount() {
   if ((Number(appleState.overgrowthSeedCount) || 0) <= 0) {
     updateSeedInventory();
     return;
   }
-
+      updateSeedInventory();
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
     flashOnboardingOrderHint("");
     updateSeedInventory();
     return;
   }
-
+      return;
   if (
     plantRuntime.isPlanting ||
     appleState.isEating ||
@@ -9110,12 +9110,12 @@ function plantWorldOvergrowthSeedCount() {
     updateSeedInventory();
     return;
   }
-
+    isNpcDialogueRunning ||
   const syntheticId = "og-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   const playerBox = getPlayerBox();
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
-
+  }
   if (!canPlantAt(plantX, plantY)) {
     if (lastPlantProximityBlockMessage) {
       flashPlantProximityWarning(lastPlantProximityBlockMessage);
@@ -9124,21 +9124,21 @@ function plantWorldOvergrowthSeedCount() {
     updateSeedInventory();
     return;
   }
-
+      updatePlayerStatus();
   plantingInventorySeedId = syntheticId;
   plantRuntime.isPlanting = true;
   playerStatus.textContent = "\uACFC\uC131\uC7A5 \uC528\uC557 \uC2EC\uB294\uC911...";
   updateSeedInventory();
   saveAppleState();
   sendMultiplayerPresence(true);
-
+  plantRuntime.isPlanting = true;
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
     plantingInventorySeedId = null;
     appleState.overgrowthSeedCount =
       Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0) - 1);
-
+    plantRuntime.isPlanting = false;
     if (!plantRuntime.isSeedPlanted) {
       const plantedAt = getSharedPlantSimulationNow();
       plantRuntime.spotX = plantX;
@@ -9198,12 +9198,12 @@ function plantWorldOvergrowthSeedCount() {
     syncWorldState(true);
   }, plantActionMs);
 }
-
+  return {
 function plantInventorySeed(seedId) {
   const inventorySeed = appleState.extraSeeds.find(function (extraSeed) {
     return extraSeed.id === seedId;
   });
-
+    lastWateredAt: null,
   if (isOnboardingLinearGateActive() && inventorySeed) {
     const isStarter = inventorySeed.id === "starter-seed" || inventorySeed.isStarter;
     if (isStarter && onboardingFlowStep !== 7) {
@@ -9217,7 +9217,7 @@ function plantInventorySeed(seedId) {
       return;
     }
   }
-
+    isSproutSelfSustaining: false,
   if (
     !inventorySeed ||
     !inventorySeed.inInventory ||
@@ -9230,7 +9230,7 @@ function plantInventorySeed(seedId) {
     updateSeedInventory();
     return;
   }
-
+    blockSproutRegrowthAfterDry: false,
   const playerBox = getPlayerBox();
   const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
   const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
@@ -9250,7 +9250,7 @@ function plantInventorySeed(seedId) {
   updateSeedInventory();
   saveAppleState();
   sendMultiplayerPresence(true);
-
+}
   window.setTimeout(function () {
     plantRuntime.isPlanting = false;
     sendMultiplayerPresence(true);
@@ -9303,13 +9303,13 @@ function plantInventorySeed(seedId) {
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
     }
-
+  const oid = String(ownerId || "").trim();
     playerStatus.textContent = "";
     updateSeedInventory();
     saveAppleState();
   }, plantActionMs);
 }
-
+  if (!oid && !oname && !pid && !pname) return true;
 function createExtraPlant(id, x, y) {
   const now = getSharedPlantSimulationNow();
   return {
@@ -9348,11 +9348,11 @@ function createExtraPlant(id, x, y) {
     drySoilAt: null
   };
 }
-
+/** 살아 있는 식물만, 심은 시각 기준: 새싹(티어 4 미만)과 풀(티어 4 이상)을 소유자별로 따로 번호 부여. */
 function getPlanterOwnerId() {
   return String(currentUserId || "").trim();
 }
-
+    plant.sproutOrdinal = 0;
 function getPlanterDisplayName() {
   const n = String(currentUserName || "").trim();
   return n || "\uD50C\uB808\uC774\uC5B4";
@@ -9361,17 +9361,17 @@ function getPlanterDisplayName() {
 function getLocalExtraSeedOwnerUserId() {
   return String(currentUserId || "").trim();
 }
-
+    const tier = Math.max(0, Number(plant.growthTier) || 0);
 function getLocalExtraSeedOwnerSessionId() {
   return String(currentSessionId || "").trim();
 }
-
+    }
 function assignExtraSeedInventoryOwner(seed) {
   if (!seed) return;
   seed.ownerUserId = getLocalExtraSeedOwnerUserId();
   seed.ownerSessionId = getLocalExtraSeedOwnerSessionId();
 }
-
+      groups[k].grasses.push(entry);
 function isExtraSeedOwnedByLocalPlayer(seed) {
   const uid = getLocalExtraSeedOwnerUserId();
   const sid = getLocalExtraSeedOwnerSessionId();
@@ -9383,12 +9383,12 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
   if (oUid && !uid && oSid && sid) return oSid === sid;
   return false;
 }
-
+    });
 /** ?냅??병합: ?유??비어 ?으?false(?원 로컬?취급?? ?음) ???격 ?거? 충돌 ???령 ?앗 ?제 */
 function isOvergrowthSeedPlant(plant) {
   return String(plant && plant.seedKind || "") === "overgrowth";
 }
-
+      e.plant.sproutOrdinal = i + 1;
 function makePlantStableStage3FromOvergrowthSeed(plant, now) {
   if (!isOvergrowthSeedPlant(plant)) return false;
   plant.isSproutGrown = true;
@@ -9404,7 +9404,7 @@ function makePlantStableStage3FromOvergrowthSeed(plant, now) {
   plant.needsFirstWater = false;
   return true;
 }
-
+}
 function isExtraSeedSessionOwnedByLocal(seed) {
   if (!seed) return false;
   const uid = getLocalExtraSeedOwnerUserId();
@@ -9415,7 +9415,7 @@ function isExtraSeedSessionOwnedByLocal(seed) {
   if (oUid && uid && oUid === uid) return true;
   return false;
 }
-
+  if (plant.status === "rotten" || plant.isOverwatered) {
 function plantOwnerMatches(plant, ownerId, ownerName) {
   const oid = String(ownerId || "").trim();
   const oname = String(ownerName || "").trim();
@@ -9426,7 +9426,7 @@ function plantOwnerMatches(plant, ownerId, ownerName) {
   if (!oid && !oname && !pid && !pname) return true;
   return false;
 }
-
+  const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
 function isPlantAliveForWorldOrdinal(plant) {
   return (
     plant &&
@@ -9435,7 +9435,7 @@ function isPlantAliveForWorldOrdinal(plant) {
     !plant.isOverwatered
   );
 }
-
+      }
 function plantOrdinalGroupKey(plant) {
   return (
     String(plant.ownerUserId || "").trim() +
@@ -9443,13 +9443,13 @@ function plantOrdinalGroupKey(plant) {
     String(plant.ownerDisplayName || "").trim()
   );
 }
-
+  if (tier >= 4 && grassOrd > 0) {
 function plantWorldOrdinalSortTime(plant) {
   const a = Number(plant.plantedAt) || 0;
   if (a > 0) return a;
   return Number(plant.growthStartedAt) || 0;
 }
-
+  if (sproutOrd > 0) {
 /** 브라?? 기본 title(지?? ???CSS data-ovc-tip?로 바로 ?는 ?명 */
 function setInstantHoverTip(el, text) {
   if (!el) return;
@@ -9461,7 +9461,7 @@ function setInstantHoverTip(el, text) {
     el.removeAttribute("aria-label");
   }
 }
-
+  return null;
 /** ?아 ?는 ?물? ?? ?각 기?: ?싹(?어 4 미만)??(?어 4 ?상)???유?별??로 번호 부?? */
 function refreshPlantIdentityOrdinals() {
   function clearOrdinals(plant) {
@@ -9471,7 +9471,7 @@ function refreshPlantIdentityOrdinals() {
   }
   clearOrdinals(plantRuntime);
   appleState.extraPlants.forEach(clearOrdinals);
-
+    plantHoverLabel.classList.remove("is-well-dock");
   const groups = Object.create(null);
   function consider(plant) {
     if (!plant || !isPlantAliveForWorldOrdinal(plant)) return;
@@ -9492,7 +9492,7 @@ function refreshPlantIdentityOrdinals() {
     consider(plantRuntime);
   }
   appleState.extraPlants.forEach(consider);
-
+  plantHoverLabel.style.left = "";
   Object.keys(groups).forEach(function (k) {
     const g = groups[k];
     g.sprouts.sort(function (a, b) {
@@ -9509,7 +9509,7 @@ function refreshPlantIdentityOrdinals() {
     });
   });
 }
-
+  const lw = groundScreenPxToWorldX(plantHoverLabel.offsetWidth || 28);
 function assignSproutIdentityToNewPlant(plant) {
   const oid = getPlanterOwnerId();
   const oname = getPlanterDisplayName();
@@ -9519,11 +9519,11 @@ function assignSproutIdentityToNewPlant(plant) {
   plant.sproutOrdinal = 0;
   plant.grassOrdinal = null;
 }
-
+    top: y,
 function ensureGrassOrdinalIfNeeded(plant) {
   void plant;
 }
-
+}
 function getPlantSoilBadStateTitle(plant) {
   if (!plant) return "";
   if (plant.status === "dry") {
@@ -9534,7 +9534,7 @@ function getPlantSoilBadStateTitle(plant) {
   }
   return "";
 }
-
+function plantSpotOverlapsExpandedRect(plantX, plantY, ox, oy, ow, oh, pad) {
 function getPlantWorldLabel(plant) {
   if (!plant) return "";
   if (getPlantSoilBadStateTitle(plant)) return "";
@@ -9568,7 +9568,7 @@ function getPlantWorldLabel(plant) {
   }
   return name + "\uC758 \uC0C8\uC2F9";
 }
-
+  const code = ch.charCodeAt(0);
 function extraPlantFromDomElement(el) {
   for (let i = 0; i < appleState.extraPlants.length; i++) {
     const p = appleState.extraPlants[i];
@@ -9577,7 +9577,7 @@ function extraPlantFromDomElement(el) {
   }
   return null;
 }
-
+function getPlantProximityBlockMessage(plantX, plantY) {
 function clearPlantHoverVisuals() {
   if (ground) {
     ground
@@ -9588,7 +9588,7 @@ function clearPlantHoverVisuals() {
       });
   }
 }
-
+    return plantProximityPhraseForNoun("\uC6B0\uBB3C");
 function getPlantHoverDomElements(plant) {
   const els = [];
   if (!plant) return els;
@@ -9621,11 +9621,11 @@ function getPlayerDistanceToPlant(plant) {
     PLANT_SPOT_HEIGHT
   );
 }
-
+  }
 function isPlayerNearPlantWorld(plant) {
   return getPlayerDistanceToPlant(plant) <= plantWaterDistance;
 }
-
+    guideBook &&
 function canWaterPlantByClick(plant) {
   if (!plant) return false;
   if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return false;
@@ -9635,21 +9635,21 @@ function canWaterPlantByClick(plant) {
   if (shouldSuppressPlantWaterCardForSelfSustaining(plant)) return false;
   return true;
 }
-
+    )
 function plantShowsThirstyHoverEmphasis(plant) {
   if (!canWaterPlantByClick(plant)) return false;
   if (!isPlayerNearPlantWorld(plant)) return false;
   const cap = getPlantWaterCapacity(plant);
   return (Number(plant.waterLevel) || 0) < cap;
 }
-
+    if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
 function plantToWateringTarget(plant) {
   if (plant === plantRuntime) {
     return { type: "main", plant: plantRuntime };
   }
   return { type: "extra", plant: plant };
 }
-
+      plantSpotOverlapsExpandedRect(
 function applyPlantHoverVisuals(plant) {
   clearPlantHoverVisuals();
   if (!plant) return;
@@ -9668,7 +9668,7 @@ function applyPlantHoverVisuals(plant) {
     }
   });
 }
-
+        ALCHEMY_MASTER_START_X,
 function hidePlantHoverLabel() {
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   clearPlantHoverVisuals();
@@ -9692,7 +9692,7 @@ function hidePlantHoverLabel() {
     restorePlantHoverLabelToWorldDom();
   }
 }
-
+      plantX,
 function showPlantHoverSignForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
   restorePlantHoverLabelToWorldDom();
@@ -9703,7 +9703,7 @@ function showPlantHoverSignForPlant(plant) {
     hidePlantHoverLabel();
     return;
   }
-
+  appleState.extraSeeds.forEach(function (extraSeed) {
   plantHoverLabel.classList.remove(
     "is-ui-shortcut-hint",
     "is-seed-inventory-hint",
@@ -9718,13 +9718,13 @@ function showPlantHoverSignForPlant(plant) {
   plantHoverLabel.style.right = "";
   plantHoverLabel.style.transform = "";
   plantHoverLabel.style.zIndex = "85";
-
+  if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
   plantHoverLabel.textContent = "";
   const titleEl = document.createElement("div");
   titleEl.className = "plant-world-sign-title";
   titleEl.textContent = label;
   plantHoverLabel.appendChild(titleEl);
-
+  }
   const badTitle = getPlantSoilBadStateTitle(plant);
   const detailEl = document.createElement("div");
   detailEl.className = "plant-world-sign-water";
@@ -9742,7 +9742,7 @@ function showPlantHoverSignForPlant(plant) {
       waterCapacity;
   }
   plantHoverLabel.appendChild(detailEl);
-
+  function overlap(ax1, ay1, ax2, ay2) {
   plantHoverLabel.style.display = "flex";
   void plantHoverLabel.offsetWidth;
   const lw = groundScreenPxToWorldX(plantHoverLabel.offsetWidth || 36);
@@ -9752,7 +9752,7 @@ function showPlantHoverSignForPlant(plant) {
   setWorldPosition(plantHoverLabel, lx, ly);
   applyPlantHoverVisuals(plant);
 }
-
+      TREE_CANOPY_BOTTOM - canopyInset
 function tryWaterPlantByPointerClick(clientX, clientY) {
   if (heldItem !== HELD_ITEM_BUCKET || !isBucketFull) return false;
   if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
@@ -9761,11 +9761,11 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
     flashOnboardingOrderHint("");
     return false;
   }
-
+  /** 줄기·뿌리가 그려진 높이만 막음(이전엔 trunkBottom이 지면 끝까지 가서 같은 x열 전체 y에서 심기 불가였음) */
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (!plant || !canWaterPlantByClick(plant)) return false;
   if (!isPlayerNearPlantWorld(plant)) return false;
-
+    return true;
   const target = plantToWateringTarget(plant);
   const anchor = getPlantWorldAnchorXY(plant);
   if (
@@ -9791,7 +9791,7 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
   updateExtraSeedsAndPlants();
   return true;
 }
-
+  if (plantRuntime.isSeedPlanted) {
 function plantProximityRectFromXYWH(x, y, w, h) {
   return {
     left: x,
@@ -9800,7 +9800,7 @@ function plantProximityRectFromXYWH(x, y, w, h) {
     bottom: y + h
   };
 }
-
+  }
 function plantProximityExpandRect(r, pad) {
   return {
     left: r.left - pad,
@@ -9809,13 +9809,13 @@ function plantProximityExpandRect(r, pad) {
     bottom: r.bottom + pad
   };
 }
-
+    });
 function plantSpotOverlapsExpandedRect(plantX, plantY, ox, oy, ow, oh, pad) {
   const pr = plantProximityRectFromXYWH(plantX, plantY, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   const br = plantProximityExpandRect(plantProximityRectFromXYWH(ox, oy, ow, oh), pad);
   return isOverlappingRect(pr, br);
 }
-
+  const tooClose = plantCenters.some(function (center) {
 function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, rockPad) {
   const pad = Number.isFinite(Number(rockPad)) ? Number(rockPad) : 0;
   if (!isWorldDocumentEntry()) return false;
@@ -9841,7 +9841,7 @@ function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, rockPad) {
     );
   });
 }
-
+  if (plantRuntime.isPlanting || appleState.isEating) return;
 function plantProximityPhraseForNoun(noun) {
   const ch = noun.length ? noun[noun.length - 1] : "";
   const code = ch.charCodeAt(0);
@@ -9852,21 +9852,21 @@ function plantProximityPhraseForNoun(noun) {
   const particle = hasBatchim ? "\uACFC" : "\uC640";
   return noun + particle + " \uB108\uBB34 \uAC00\uAE4C\uC2B5\uB2C8\uB2E4!";
 }
-
+    return;
 function getPlantProximityBlockMessage(plantX, plantY) {
   if (isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY)) {
     return plantProximityPhraseForNoun("\uB098\uBB34");
   }
-
+    return;
   if (isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, 2)) {
     return "\uB3CC\uC704\uC5D0\uB294 \uC2EC\uC9C0 \uBABB\uD569\uB2C8\uB2E4.";
   }
-
+    useBucket();
   const wellPad = 1;
   if (plantSpotOverlapsExpandedRect(plantX, plantY, wellX, wellY, WELL_SIZE, WELL_SIZE, wellPad)) {
     return plantProximityPhraseForNoun("\uC6B0\uBB3C");
   }
-
+  refillWellIfNeeded();
   const portalPad = 0;
   if (
     plantSpotOverlapsExpandedRect(
@@ -9881,7 +9881,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   ) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
-
+  if (!isBucketFull) {
   const bagPad = 0;
   if (
     worldBag &&
@@ -9898,7 +9898,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   ) {
     return plantProximityPhraseForNoun("\uAC00\uBC29");
   }
-
+  const wellSize = getWellSize();
   const bookPad = 0;
   if (
     guideBook &&
@@ -9915,14 +9915,14 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   ) {
     return plantProximityPhraseForNoun("\uCC45");
   }
-
+    isBucketFull = false;
   if (isPlantMasterVisible()) {
     const npcPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, npcPad)) {
       return plantProximityPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
     }
   }
-
+    isBucketFull = false;
   if (isTradeMasterVisible()) {
     if (
       plantSpotOverlapsExpandedRect(
@@ -9938,7 +9938,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
       return plantProximityPhraseForNoun("\uC0C1\uC778");
     }
   }
-
+}
   if (isAlchemyMasterVisible()) {
     if (
       plantSpotOverlapsExpandedRect(
@@ -9954,14 +9954,14 @@ function getPlantProximityBlockMessage(plantX, plantY) {
       return plantProximityPhraseForNoun("\uC5F0\uAE08\uC220\uC758 \uB2EC\uC778");
     }
   }
-
+      );
   if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
     const seedPad = 0;
     if (plantSpotOverlapsExpandedRect(plantX, plantY, seedX, seedY, SEED_SIZE, SEED_SIZE, seedPad)) {
       return plantProximityPhraseForNoun("\uC528\uC557");
     }
   }
-
+    if (!plant || plant.status === "dry" || plant.status === "rotten") return;
   let blockedByLooseSeed = false;
   const nowLoose = Date.now();
   if (
@@ -9993,7 +9993,7 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   if (blockedByLooseSeed) {
     return plantProximityPhraseForNoun("\uC528\uC557");
   }
-
+  if (isOnboardingLinearGateActive()) return false;
   if (heldItem !== HELD_ITEM_BUCKET && bucket && bucket.style.display === "block") {
     const bsz = getBucketSize();
     const bucketPad = 0;
@@ -10004,12 +10004,12 @@ function getPlantProximityBlockMessage(plantX, plantY) {
 
   return "";
 }
-
+    flashOnboardingOrderHint("");
 function flashPlantProximityWarning(message) {
   plantProximityWarnUntil = Date.now() + 2800;
   playerStatus.textContent = message || "";
 }
-
+  if (!target) return false;
 function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   const pw = PLANT_SPOT_WIDTH;
   const ph = PLANT_SPOT_HEIGHT;
@@ -10017,11 +10017,11 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   const right = plantX + pw;
   const top = plantY;
   const bottom = plantY + ph;
-
+  } else {
   function overlap(ax1, ay1, ax2, ay2) {
     return left < ax2 && right > ax1 && top < ay2 && bottom > ay1;
   }
-
+  }
   const canopyInset = 6;
   if (
     overlap(
@@ -10033,7 +10033,7 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   ) {
     return true;
   }
-
+  lastWaterSplashAt = Date.now();
   const trunkInset = 3;
   const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE + trunkInset;
   const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE - trunkInset;
@@ -10045,7 +10045,7 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   }
   return false;
 }
-
+  }
 /**
  * growthTier??면 ?싹??커도 ?랫?안 0?라 반경?????어????각 ?계(getSproutStage)? 같이 ?.
  * ?거???물? ?보?서 빼고, maturity??0????
@@ -10056,7 +10056,7 @@ function getPlantMaturityLevelForPlantingSpacing(plant) {
   const stage = plant.isSproutGrown ? getSproutStageFromPlant(plant) : 0;
   return Math.min(5, Math.max(gt, stage));
 }
-
+    plantRuntime.status !== "dry" &&
 function canPlantAt(x, y) {
   pollWorldState(true);
   lastPlantProximityBlockMessage = "";
@@ -10066,7 +10066,7 @@ function canPlantAt(x, y) {
     return false;
   }
   const plantCenters = [];
-
+      nearest = {
   if (plantRuntime.isSeedPlanted) {
     const maturity = getPlantMaturityLevelForPlantingSpacing(plantRuntime);
     if (maturity != null) {
@@ -10077,7 +10077,7 @@ function canPlantAt(x, y) {
       });
     }
   }
-
+    if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
   appleState.extraPlants.forEach(function (plant) {
     const maturity = getPlantMaturityLevelForPlantingSpacing(plant);
     if (maturity == null) return;
@@ -10087,10 +10087,10 @@ function canPlantAt(x, y) {
       maturity: maturity
     });
   });
-
+}
   const targetX = x + PLANT_SPOT_WIDTH / 2;
   const targetY = y + PLANT_SPOT_HEIGHT / 2;
-
+  const viewport = document.querySelector(".viewport");
   const tooClose = plantCenters.some(function (center) {
     const need = getMinPlantCenterClearanceWorld(center.maturity);
     return Math.hypot(center.x - targetX, center.y - targetY) < need;
@@ -10101,7 +10101,7 @@ function canPlantAt(x, y) {
   }
   return true;
 }
-
+      baseTop = br.top + br.height * 0.66;
 function getHeldExtraSeed() {
   const id = getHeldExtraSeedId(heldItem);
   if (!id) return null;
@@ -10109,7 +10109,7 @@ function getHeldExtraSeed() {
     return extraSeed.id === id;
   }) || null;
 }
-
+    setWorldPosition(anchor, startX, startY);
 function isExtraSeedDry(extraSeed, now) {
   void extraSeed;
   void now;
@@ -10118,29 +10118,29 @@ function isExtraSeedDry(extraSeed, now) {
 
 function useHeldItem() {
   if (plantRuntime.isPlanting || appleState.isEating) return;
-
+    const fallX = (index - 3.5) * 11;
   if (isOnboardingLinearGateActive()) {
     if (heldItem === HELD_ITEM_BUCKET && !onboardingAllowsBucketQUse()) {
       flashOnboardingOrderHint("");
       return;
     }
   }
-
+      (baseLeft + spread) +
   if (heldItem === HELD_ITEM_SEED) {
     startPlanting();
     return;
   }
-
+    const drop = document.createElement("div");
   if (isHeldExtraSeed(heldItem)) {
     startPlantingExtraSeed();
     return;
   }
-
+    viewport.appendChild(holder);
   if (heldItem === HELD_ITEM_BUCKET) {
     useBucket();
   }
 }
-
+      }
 function useBucket() {
   refillWellIfNeeded();
   // ???력? 보통 ?음 updateBucketPosition보다 먼? ??????좌표가 ?레?어 ???레?????  // ?물 '?음' ?정???긋????인?????분기(뿌리???어가???.
@@ -10155,7 +10155,7 @@ function useBucket() {
     isNearWellIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
   const wellReachForPour =
     isNearWellForPouringIncludingBucketReach() || isBucketOverlappingWellForInteraction(10);
-
+  const waterCapacity = getPlantWaterCapacity(plantRuntime);
   if (!isBucketFull) {
     if (wellReachForScoop && wellState.water > 0) {
       isBucketFull = true;
@@ -10167,12 +10167,12 @@ function useBucket() {
       updateWellCard();
       onboardingHookFilledBucketAtWell();
     } else if (wellReachForScoop && wellState.water <= 0) {
-      flashPlantProximityWarning("\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      flashPlantProximityWarning("?물??물이 ?습?다.");
       updatePlayerStatus();
     }
     return;
   }
-
+      return now - wateredAt <= overwaterWindowMs;
   const wellSize = getWellSize();
   const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
   const wateringTarget = getNearestWateringTarget();
@@ -10193,8 +10193,8 @@ function useBucket() {
     isBucketFull = false;
     return;
   }
-
-
+    } else {
+      // Already at the cap. Pouring more water rots the plant: the soil flips to
   // ??동?인??급수???물???고 ?물??가?? ?붓?불? ?내 + ?플?시??드?
   if (nearWellPour && wellState.water >= maxWellWater) {
     triggerWaterSplash();
@@ -10204,11 +10204,11 @@ function useBucket() {
     updatePlayerStatus();
     return;
   }
-
+      plantRuntime.sproutEvolutionLastTickAt = null;
   triggerWaterSplash();
   isBucketFull = false;
 }
-
+  } else {
 function getNearestPlantForMagicPowder() {
   let nearest = null;
   const powderDistance = MAGIC_POWDER_USE_DISTANCE;
@@ -10240,13 +10240,13 @@ function getNearestPlantForMagicPowder() {
   });
   return nearest;
 }
-
+    plant.growthStartedAt = now;
 function getNextPowderTargetTier(plant) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier !== 3) return 0;
   return 4;
 }
-
+    })
 function applyMagicPowderToPlant(plant) {
   const nextTier = getNextPowderTargetTier(plant);
   if (!nextTier || isPowderUpgradeInProgress(plant)) return false;
@@ -10259,7 +10259,7 @@ function applyMagicPowderToPlant(plant) {
   plant.grassAuto5EligibleAt = null;
   return true;
 }
-
+    plant.status = "normal";
 /** ?릭 ???제?가루? ?비?는지(거리·?어·진행 ???? ?일 조건 */
 function isMagicPowderUsableNow() {
   if (isOnboardingLinearGateActive()) return false;
@@ -10270,7 +10270,7 @@ function isMagicPowderUsableNow() {
   if (!nextTier || isPowderUpgradeInProgress(target.plant)) return false;
   return true;
 }
-
+      plant.isSproutGrown = false;
 function tryUseMagicPowder() {
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
@@ -10280,7 +10280,7 @@ function tryUseMagicPowder() {
   const target = getNearestPlantForMagicPowder();
   if (!target) return false;
   if (!applyMagicPowderToPlant(target.plant)) return false;
-
+    plant.status = "normal";
   magicPowderCount = Math.max(0, magicPowderCount - 1);
   saveMagicPowderCount();
   if (target.type === "main") {
@@ -10297,7 +10297,7 @@ function tryUseMagicPowder() {
   updateExtraSeedsAndPlants();
   return true;
 }
-
+    plantRuntime.status === "dry" ||
 function triggerWaterSplash() {
   const bucketSize = getBucketSize();
   const splashX = bucketX + bucketSize.width / 2;
@@ -10318,7 +10318,7 @@ function triggerWaterSplash() {
   createWaterSplashAt(splashX, splashY, refEl);
   sendMultiplayerPresence(true);
 }
-
+  if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
 function getNearestWateringTarget() {
   let nearest = null;
 
@@ -10342,7 +10342,7 @@ function getNearestWateringTarget() {
       };
     }
   }
-
+      mainPlantGrowthMeter.element.style.display = "none";
   appleState.extraPlants.forEach(function (plant) {
     if (plant.status === "rotten" || plant.isOverwatered || plant.status === "dry") return;
     const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
@@ -10354,16 +10354,16 @@ function getNearestWateringTarget() {
       };
     }
   });
-
+    if (Number.isFinite(rotAt) && now - rotAt >= plantRotClearMs) {
   return nearest;
 }
-
+      syncWorldState(true);
 function createWaterSplashAt(startX, startY, refElement) {
   const viewport = document.querySelector(".viewport");
   if (!viewport) {
     return;
   }
-
+    const dryAt = Number(plantRuntime.drySoilAt);
   let baseLeft;
   let baseTop;
   if (refElement && typeof refElement.getBoundingClientRect === "function") {
@@ -10384,12 +10384,12 @@ function createWaterSplashAt(startX, startY, refElement) {
     baseLeft = r.left + r.width / 2;
     baseTop = r.top + r.height / 2;
   }
-
+  if (tickPowderUpgrade(plantRuntime, now)) {
   for (let index = 0; index < 8; index += 1) {
     const spread = (index - 3.5) * 8;
     const fallX = (index - 3.5) * 11;
     const fallY = 32 + (index % 3) * 12;
-
+    saveSeedState();
     const holder = document.createElement("div");
     holder.className = "water-splash-holder";
     holder.style.cssText =
@@ -10398,14 +10398,14 @@ function createWaterSplashAt(startX, startY, refElement) {
       "px;top:" +
       baseTop +
       "px;pointer-events:none;z-index:450;";
-
+    plantRuntime.growthStartedAt != null &&
     const drop = document.createElement("div");
     drop.className = "water-drop";
     drop.style.setProperty("--drop-x", fallX + "px");
     drop.style.setProperty("--drop-y", fallY + "px");
     holder.appendChild(drop);
     viewport.appendChild(holder);
-
+    if (!makePlantStableStage3FromOvergrowthSeed(plantRuntime, now)) {
     window.setTimeout(function () {
       if (holder.parentNode) {
         holder.parentNode.removeChild(holder);
@@ -10413,24 +10413,24 @@ function createWaterSplashAt(startX, startY, refElement) {
     }, 720);
   }
 }
-
+      bumpMergeGuard: false,
 function waterPlant(target) {
   if (target && target.type === "extra") {
     waterExtraPlant(target.plant);
     return;
   }
-
+    plantRuntime.status !== "dry" &&
   const now = getSharedPlantSimulationNow();
-
+    plantRuntime.status !== "rotten" &&
   updatePlantWaterLevel();
-
+    now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   const waterCapacity = getPlantWaterCapacity(plantRuntime);
-
+    // 마른 땅(말라 죽은 작물): 싹 비움 · 물 주기 불가 · plantDrySoilClearMs 후 칸 제거
   const isFirstWater = plantRuntime.needsFirstWater || plantRuntime.growthStartedAt === null;
-
+    plantRuntime.isOverwatered = false;
   plantRuntime.lastWateredAt = now;
   plantRuntime.needsFirstWater = false;
-
+    plantRuntime.drySoilAt = now;
   if (
     plantRuntime.growthStartedAt === null &&
     !plantRuntime.isSproutGrown &&
@@ -10438,20 +10438,20 @@ function waterPlant(target) {
   ) {
     plantRuntime.growthStartedAt = now;
   }
-
+    saveSeedState();
   plantRuntime.wateredAtList = plantRuntime.wateredAtList
     .filter(function (wateredAt) {
       return now - wateredAt <= overwaterWindowMs;
     })
     .concat(now);
-
+    plantSpot.src = "이미지/soil-rotten.png";
   if (plantRuntime.isOverwatered || plantRuntime.status === "rotten") {
     saveSeedState();
     syncWorldState(true);
     updatePlantState();
     return;
   }
-
+  }
   if (isFirstWater || plantRuntime.waterLevel <= 0) {
     plantRuntime.waterLevel = 1;
     plantRuntime.isOverwatered = false;
@@ -10482,28 +10482,28 @@ function waterPlant(target) {
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   }
-
+function removeMainPlant() {
   plantRuntime.waterLevelUpdatedAt = now;
   plantRuntime.becameEmptyAt = null;
   holdLocalPlantStateAgainstStaleSnapshot(1200);
-
+  plantRuntime.spotY = 0;
   saveSeedState();
   syncWorldState(true);
   updatePlantState();
   onboardingHookWateredMainPlantFromTutorial();
 }
-
+  plantRuntime.becameEmptyAt = null;
 function waterExtraPlant(plant) {
   const now = getSharedPlantSimulationNow();
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
   const waterCapacity = getPlantWaterCapacity(plant);
-
+  plantRuntime.sproutGrownAt = null;
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
-
+  plantRuntime.sproutEvolutionLastTickAt = null;
   plant.lastWateredAt = now;
   plant.needsFirstWater = false;
-
+  plantRuntime.waterCapacity = 2;
   if (
     plant.growthStartedAt === null &&
     !plant.isSproutGrown &&
@@ -10511,20 +10511,20 @@ function waterExtraPlant(plant) {
   ) {
     plant.growthStartedAt = now;
   }
-
+  plantRuntime.soilOrdinal = 0;
   plant.wateredAtList = plant.wateredAtList
     .filter(function (wateredAt) {
       return now - wateredAt <= overwaterWindowMs;
     })
     .concat(now);
-
+  plantSpot.removeAttribute("title");
   if (plant.isOverwatered || plant.status === "rotten") {
     saveAppleState();
     syncWorldState(true);
     updateExtraSeedsAndPlants();
     return;
   }
-
+  plantMaster.style.display = "none";
   if (isFirstWater || plant.waterLevel <= 0) {
     plant.waterLevel = 1;
     plant.isOverwatered = false;
@@ -10551,17 +10551,17 @@ function waterExtraPlant(plant) {
     plant.isOverwatered = false;
     plant.status = "normal";
   }
-
+}
   plant.waterLevelUpdatedAt = now;
   plant.becameEmptyAt = null;
   holdLocalPlantStateAgainstStaleSnapshot(1200);
   holdLocalAppleStateAgainstStaleSnapshot(1200);
-
+  const goodDist = goodTarget ? goodTarget.distance : Infinity;
   saveAppleState();
   syncWorldState(true);
   updateExtraSeedsAndPlants();
 }
-
+      const plant = goodTarget.plant;
 function updatePlantWaterLevel() {
   if (
     !plantRuntime.isSeedPlanted ||
@@ -10571,9 +10571,9 @@ function updatePlantWaterLevel() {
   ) {
     return;
   }
-
+    }
   const now = getSharedPlantSimulationNow();
-
+    if (
   if (shouldPauseWaterDecayForPlant(plantRuntime, now)) {
     if (plantRuntime.waterLevel > 0 && plantRuntime.becameEmptyAt != null) {
       plantRuntime.becameEmptyAt = null;
@@ -10584,23 +10584,23 @@ function updatePlantWaterLevel() {
     plantRuntime.waterLevelUpdatedAt = now;
     return;
   }
-
+    hidePlantHoverLabel();
   applyPlantWaterDecay(plantRuntime, now);
-
+  }
   if (plantRuntime.waterLevel === 0 && plantRuntime.becameEmptyAt === null) {
     plantRuntime.becameEmptyAt = plantRuntime.waterLevelUpdatedAt;
   }
-
+}
   if (plantRuntime.waterLevel < getPlantWaterCapacity(plantRuntime) && !plantRuntime.isOverwatered) {
     plantRuntime.isOverwatered = false;
   }
-
+  const powderRatio = getPowderUpgradeRatio(plantRuntime, now);
   saveSeedState({
     bumpMergeGuard: false,
     skipWorldDirty: isSharedWorldMergeActive()
   });
 }
-
+    plantRuntime.status === "dry" ||
 function updatePlantState() {
   if (!plantRuntime.isSeedPlanted) {
     waterNeeded.style.display = "none";
@@ -10615,9 +10615,9 @@ function updatePlantState() {
     }
     return;
   }
-
+  const growthRatio = plantRuntime.growthStartedAt === null
   const now = getSharedPlantSimulationNow();
-
+    : Math.min(1, elapsed / getPlantFirstGrowthDurationMs(plantRuntime));
   if (
     (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) &&
     plantRuntime.rottenAt != null
@@ -10630,7 +10630,7 @@ function updatePlantState() {
       return;
     }
   }
-
+    Math.min(plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - cardWidth / 2, WORLD_WIDTH - cardWidth)
   if (plantRuntime.status === "dry" && plantRuntime.drySoilAt != null) {
     const dryAt = Number(plantRuntime.drySoilAt);
     if (Number.isFinite(dryAt) && now - dryAt >= plantDrySoilClearMs) {
@@ -10642,14 +10642,14 @@ function updatePlantState() {
   } else if (plantRuntime.status !== "dry") {
     plantRuntime.drySoilAt = null;
   }
-
+    updateSproutPosition();
   if (
     plantRuntime.status === "dry" &&
     (plantRuntime.drySoilAt == null || !Number.isFinite(Number(plantRuntime.drySoilAt)))
   ) {
     plantRuntime.drySoilAt = now;
   }
-
+  setWorldPosition(growthCard, cardX, plantRuntime.spotY - 26);
   normalizePlantSproutFieldsWhenSoilDry(plantRuntime);
   updatePlantWaterLevel();
   ensureGrassAuto5EligibleForTier4Plant(plantRuntime, now);
@@ -10661,11 +10661,11 @@ function updatePlantState() {
     saveSeedState();
     syncWorldState(true);
   }
-
+  const stage = getSproutStageFromPlant(plantRuntime);
   if (plantRuntime.isSproutGrown && !plantRuntime.isSproutSelfSustaining) {
     tickSproutEvolution(plantRuntime, now);
   }
-
+  sprout.src = getSproutImageForStage(stage);
   if (
     plantRuntime.growthStartedAt != null &&
     plantRuntime.status !== "dry" &&
@@ -10686,7 +10686,7 @@ function updatePlantState() {
       skipWorldDirty: isSharedWorldMergeActive()
     });
   }
-
+    }
   if (
     plantRuntime.status !== "dry" &&
     canPlantWiltFromEmptyWater(plantRuntime, now) &&
@@ -10711,17 +10711,17 @@ function updatePlantState() {
   }
 
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
-
+    updatePlayerBubblePosition();
   if (mainSoilRotten) {
-    plantSpot.src = "이미지/soil-rotten.png";
+    plantSpot.src = "??지/soil-rotten.png";
   } else if (plantRuntime.status === "wet") {
-    plantSpot.src = "이미지/soil-wet.png";
+    plantSpot.src = "??지/soil-wet.png";
   } else if (plantRuntime.status === "dry") {
-    plantSpot.src = "이미지/soil-dry.png";
+    plantSpot.src = "??지/soil-dry.png";
   } else {
-    plantSpot.src = "이미지/tilled-soil.png";
+    plantSpot.src = "??지/tilled-soil.png";
   }
-
+    GROUND_WORLD_HEIGHT - playerRenderedHeight - playerDepth + jumpY;
   if (mainSoilRotten) {
     waterNeeded.style.display = "none";
     growthCard.style.display = "none";
@@ -10736,7 +10736,7 @@ function updatePlantState() {
   } else {
     waterNeeded.style.display = "none";
   }
-
+function updateNpcPrompt() {
   ensureGrassOrdinalIfNeeded(plantRuntime);
   updatePlantCard();
   updatePlantGrowth();
@@ -10746,11 +10746,11 @@ function updatePlantState() {
     plantSpot.style.display = "block";
   }
 }
-
+      : "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
 function shouldSuppressPlantWaterCardForSelfSustaining(plant) {
   return false;
 }
-
+    window.clearTimeout(npcPromptHideTimeout);
 function removeMainPlant() {
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
@@ -10800,7 +10800,7 @@ function removeMainPlant() {
   mainPlantGrowthMeter.element.style.display = "none";
   markWorldDirty();
 }
-
+    onboardingFlowStep === 2 &&
 function getNearestBadSoilPlantForProximityCard() {
   let best = null;
   let bestDist = Infinity;
@@ -10821,13 +10821,13 @@ function getNearestBadSoilPlantForProximityCard() {
   });
   return best;
 }
-
+  }
 function updatePlantCard() {
   if (!plantCard) return;
   plantCard.style.display = "none";
   if (plantCardTitle) plantCardTitle.textContent = "";
 }
-
+  }
 function updatePlantGrowth() {
   const now = Date.now();
   const powderRatio = getPowderUpgradeRatio(plantRuntime, now);
@@ -10868,7 +10868,7 @@ function updatePlantGrowth() {
     0,
     Math.min(plantRuntime.spotX + PLANT_SPOT_WIDTH / 2 - cardWidth / 2, WORLD_WIDTH - cardWidth)
   );
-
+  if (elapsedRefills > 0) {
   if (growthRatio >= 1) {
     if (!plantRuntime.isSproutGrown) {
       plantRuntime.isSproutGrown = true;
@@ -10882,21 +10882,21 @@ function updatePlantGrowth() {
     saveSeedState();
     return;
   }
-
+      saveWellStateToStorage({
   growthCard.style.display = "none";
   growthFill.style.width = growthRatio * 100 + "%";
   setWorldPosition(growthCard, cardX, plantRuntime.spotY - 26);
   sprout.style.display = "none";
   updateSproutPosition();
 }
-
+  }
 function updateSproutPosition() {
   if (!plantRuntime.isSproutGrown || plantRuntime.status === "rotten" || plantRuntime.status === "dry") {
     sprout.style.display = "none";
     sprout.removeAttribute("title");
     return;
   }
-
+  well.src = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
   const stage = getSproutStageFromPlant(plantRuntime);
   const sproutSize = getSproutSizeForStage(stage);
   sprout.style.display = "block";
@@ -10912,7 +10912,7 @@ function updateSproutPosition() {
   setWorldPosition(sprout, sproutPos.x, sproutPos.y);
   updateNpcPosition();
 }
-
+  seedCard.style.display = "none";
 function updateNpcPosition() {
   if (!isPlantMasterVisible()) {
     if (plantMaster) plantMaster.style.display = "none";
@@ -10925,7 +10925,7 @@ function updateNpcPosition() {
     }
     updateNpcPrompt();
   }
-
+  plantRuntime.wateredAtList = loadedPlant.plantWateredAtList;
   if (tradeMaster) {
     if (isTradeMasterVisible()) {
       tradeMaster.style.display = "block";
@@ -10936,7 +10936,7 @@ function updateNpcPosition() {
       if (tradeMasterBubble) tradeMasterBubble.style.display = "none";
     }
   }
-
+  plantRuntime.needsFirstWater = loadedPlant.plantNeedsFirstWater;
   if (alchemyMaster) {
     if (isAlchemyMasterVisible()) {
       alchemyMaster.style.display = "block";
@@ -10945,14 +10945,14 @@ function updateNpcPosition() {
       alchemyMaster.style.display = "none";
     }
   }
-
+  plantRuntime.sproutGrownAt =
   if (playerBubble.style.display === "block") {
     updatePlayerBubblePosition();
   } else {
     playerBubble.classList.remove("is-in-front-of-name");
   }
 }
-
+  const hadSelfKey = Object.prototype.hasOwnProperty.call(loadedPlant, "isSproutSelfSustaining");
 function updatePlayerBubblePosition() {
   const playerWorldLeft = playerX;
   const playerRenderedHeight = player.offsetHeight || PLAYER_HEIGHT;
@@ -10971,13 +10971,13 @@ function updatePlayerBubblePosition() {
     bubbleWorldY
   );
 }
-
+    }
 function updateNpcPrompt() {
   if (isNpcDialogueRunning) return;
-
+  }
   if (isNearPlantMaster()) {
     if (npcBubble.dataset.promptShown === "true") return;
-
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "growthTier")) {
     npcBubble.dataset.speaker = "npc";
     npcBubble.dataset.promptShown = "true";
     npcBubble.textContent = isNpcDialogueComplete
@@ -10985,7 +10985,7 @@ function updateNpcPrompt() {
       : "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     npcBubble.style.display = "block";
     layoutNpcSpeechBubble();
-
+  plantRuntime.powderUpgradeStartedAt = Number(loadedPlant.powderUpgradeStartedAt) || null;
     window.clearTimeout(npcPromptHideTimeout);
     npcPromptHideTimeout = window.setTimeout(function () {
       if (!isNpcDialogueRunning) {
@@ -10998,10 +10998,10 @@ function updateNpcPrompt() {
     window.clearTimeout(npcPromptHideTimeout);
   }
 }
-
+  }
 function updatePlayerAlert() {
   if (playerAlert.style.display !== "block") return;
-
+  plantRuntime.ownerUserId =
   const playerBox = getPlayerBox();
   const alertWidth = playerAlert.offsetWidth || 10;
   const alertHeight = playerAlert.offsetHeight || 10;
@@ -11017,14 +11017,14 @@ function updateGuideCard() {
   syncGuideInventoryBar();
   const shouldShow =
     hasGuideBook && (isGuideBookOpen || (nearSign && !isGuideDismissedAtSign));
-
+    const da = Number(loadedPlant.drySoilAt);
   if (shouldShow) {
     guideCard.style.display = "block";
     updateGuidePages();
   } else {
     guideCard.style.display = "none";
   }
-
+  if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
   if (guideBook) guideBook.classList.remove("is-near");
   if (worldBag) worldBag.classList.remove("is-near");
   if (worldBagInventory) {
@@ -11033,7 +11033,7 @@ function updateGuideCard() {
       hasGuideBook && isGuideBookClickPromptActive
     );
   }
-
+    plantRuntime.needsFirstWater = false;
   if (
     !getStoredFlag(onboardingFlowDoneKey) &&
     onboardingFlowStep === 2 &&
@@ -11044,11 +11044,11 @@ function updateGuideCard() {
     persistOnboardingStep();
   }
 }
-
+  }
 function getGuideMaxPage() {
   return 0;
 }
-
+  if (!plantRuntime.isSeedPlanted) {
 function updateGuidePages() {
   if (isGuidePlantPageUnlocked && guidePlantPageHtml) {
     guidePages[0].innerHTML = guidePlantPageHtml;
@@ -11058,23 +11058,23 @@ function updateGuidePages() {
   if (guidePages[1]) {
     guidePages[1].classList.remove("is-active");
   }
-
+  if (isApplyingWorldState && plantRuntime.isSeedPlanted) {
   const maxPage = getGuideMaxPage();
-
+  }
   if (guidePageIndex > maxPage) {
     guidePageIndex = maxPage;
   }
-
+  return {
   guidePages.forEach(function (page, index) {
     page.classList.toggle("is-active", index === guidePageIndex);
   });
-
+    plantLastWateredAt: plantRuntime.lastWateredAt,
   guidePrev.style.display = maxPage > 0 && guidePageIndex > 0 ? "block" : "none";
   guideNext.style.display =
     maxPage > 0 && guidePageIndex < maxPage ? "block" : "none";
   guidePageText.textContent = guidePageIndex + 1 + "/" + (maxPage + 1);
 }
-
+    isPlantOverwatered: plantRuntime.isOverwatered,
 function loadWellState() {
   const loaded = loadWellStateFromStorage({
     wellWaterKey,
@@ -11085,10 +11085,10 @@ function loadWellState() {
   });
   wellState.water = loaded.wellWater;
   wellState.lastRefillAt = loaded.lastWellRefillAt;
-
+    growthTier: plantRuntime.growthTier,
   refillWellIfNeeded();
 }
-
+    powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
 function saveWellState() {
   lastWellStateChangeAt = Date.now();
   saveWellStateToStorage({
@@ -11099,11 +11099,11 @@ function saveWellState() {
   });
   markWorldDirty();
 }
-
+    drySoilAt:
 function refillWellIfNeeded() {
   const now = Date.now();
   const elapsedRefills = Math.floor((now - wellState.lastRefillAt) / wellRefillMs);
-
+    npcX,
   if (elapsedRefills > 0) {
     const previousWater = wellState.water;
     wellState.water = Math.min(maxWellWater, wellState.water + elapsedRefills);
@@ -11112,7 +11112,7 @@ function refillWellIfNeeded() {
     // diverge across clients (clock skew) and the resulting saves would
     // flip-flop the visible water amount as snapshots overwrote each other.
     wellState.lastRefillAt += elapsedRefills * wellRefillMs;
-
+    defaultSeedCreatedAt: Date.now(),
     if (previousWater !== wellState.water) {
       // Auto-refill is deterministic from lastRefillAt, so we keep it local-only
       // to avoid spamming snapshots that race with player actions on other
@@ -11126,32 +11126,32 @@ function refillWellIfNeeded() {
       });
     }
   }
-
+  // Tutorial never applies the shared snapshot; NPC stays on old saved coords unless we realign.
   updateWellImage();
   updateWellCard();
 }
-
+    guideBookX = GUIDE_BOOK_START_X;
 function updateWellImage() {
-  well.src = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
+  well.src = wellState.water > 0 ? "??지/well.png" : "??지/well-empty.png";
 }
-
+    setWorldPosition(signBoard, signX, signY);
 function updateWellCard() {
   const isVisible = isNearWell();
   const waterRatio = wellState.water / maxWellWater;
-  const wellImage = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
-
+  const wellImage = wellState.water > 0 ? "??지/well.png" : "??지/well-empty.png";
+      npcY = NPC_START_Y;
   wellCard.style.display = isVisible ? "flex" : "none";
   wellCardImage.src = wellImage;
   wellWaterText.textContent = wellState.water + "/" + maxWellWater;
   wellWaterFill.style.width = waterRatio * 100 + "%";
 }
-
+    saveSeedState();
 function updateSeedCard() {
   updateSeedDryState();
   seedCard.style.display = "none";
   seedWorldText.style.display = "none";
 }
-
+    setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
 function getSeedDryRemainingMs() {
   return Math.max(0, seedDryMs - (Date.now() - plantRuntime.seedCreatedAt));
 }
@@ -11186,7 +11186,7 @@ function applyLoadedPlantState(loadedPlant) {
     (plantRuntime.isSproutGrown && plantRuntime.growthStartedAt
       ? plantRuntime.growthStartedAt
       : null);
-
+    halfTextWidth,
   const hadEvolutionKey = Object.prototype.hasOwnProperty.call(loadedPlant, "sproutEvolutionMs");
   const hadSelfKey = Object.prototype.hasOwnProperty.call(loadedPlant, "isSproutSelfSustaining");
   plantRuntime.isSproutSelfSustaining = hadSelfKey ? Boolean(loadedPlant.isSproutSelfSustaining) : false;
@@ -11211,7 +11211,7 @@ function applyLoadedPlantState(loadedPlant) {
   } else {
     plantRuntime.sproutEvolutionMs = Math.max(0, Number(loadedPlant.sproutEvolutionMs) || 0);
   }
-
+  const groundTop = WORLD_HEIGHT - GROUND_WORLD_HEIGHT;
   plantRuntime.sproutEvolutionLastTickAt = Date.now();
   if (Object.prototype.hasOwnProperty.call(loadedPlant, "growthTier")) {
     plantRuntime.growthTier = Math.max(0, Number(loadedPlant.growthTier) || 0);
@@ -11259,7 +11259,7 @@ function applyLoadedPlantState(loadedPlant) {
   } else {
     plantRuntime.drySoilAt = null;
   }
-
+    });
   if (plantRuntime.status === "rotten" || plantRuntime.isOverwatered) {
     plantRuntime.status = "rotten";
     if (!plantRuntime.rottenAt) plantRuntime.rottenAt = Date.now();
@@ -11298,7 +11298,7 @@ function applyLoadedPlantState(loadedPlant) {
     stabilizeFirstWaterHintFlags(plantRuntime);
   }
 }
-
+    return "이미지/player-white.png";
 function getPlantStateForStorage() {
   return {
     isSeedPlanted: plantRuntime.isSeedPlanted,
@@ -11383,7 +11383,7 @@ function loadSeedState() {
     markWorldDirty();
     saveSeedState();
   }
-
+    const baseImageDecoded =
   if (plantRuntime.isSeedPlanted) {
     heldItem = null;
     plantSpot.style.display = "block";
@@ -11391,10 +11391,10 @@ function loadSeedState() {
     seedCard.style.display = "none";
     updatePlantState();
   }
-
+        playerBaseImage.removeEventListener("load", onReady);
   updateSeedDryState();
 }
-
+        playerBaseImageReady =
 /**
  * @param {{ bumpMergeGuard?: boolean, skipWorldDirty?: boolean }} [opts] - bumpMergeGuard:false
  *   for sim-only deltas. skipWorldDirty:true stops enqueueing a shared save (e.g. water decay online).
@@ -11411,11 +11411,11 @@ function saveSeedState(opts) {
   });
   if (!opts.skipWorldDirty) markWorldDirty();
 }
-
+      }, 4000);
 function updateSeedDryState() {
   plantRuntime.isSeedDry = false;
 }
-
+    return;
 function updatePlayerStatus() {
   const playerBox = getPlayerBox();
   const textWidth = playerStatus.offsetWidth || 40;
@@ -11426,24 +11426,24 @@ function updatePlayerStatus() {
     Math.min(targetX, window.innerWidth - halfTextWidth)
   );
   const yWorld = toScreenY(playerBox.top + 26);
-
+function openCharacterColorChange() {
   if (plantRuntime.isPlanting || appleState.isEating) {
     playerStatus.style.display = "block";
     playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
     return;
   }
-
+}
   if (Date.now() < plantProximityWarnUntil) {
     playerStatus.style.display = "block";
     playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
     return;
   }
-
+  if (currentUserScopedHasChosenColorKey) {
   playerStatus.style.display = "none";
 }
-
+  characterSelectOverlay.classList.remove("is-open");
 function updateCamera() {
   zoomLevel = clampZoom(zoomLevel);
   const playerBox = getPlayerBox();
@@ -11456,7 +11456,7 @@ function updateCamera() {
   const targetY = playerCenterY - visibleHeight / 2;
   const maxCameraX = Math.max(0, WORLD_WIDTH - visibleWidth);
   const maxCameraY = Math.max(0, WORLD_HEIGHT - visibleHeight);
-
+    isReloadingForWorldReset = true;
   cameraX = Math.max(0, Math.min(targetX, maxCameraX));
   cameraY = Math.max(0, Math.min(targetY, maxCameraY));
   world.style.transform =
@@ -11468,7 +11468,7 @@ function updateCamera() {
     zoomLevel +
     ")";
 }
-
+    } catch (eTutSpawn) {}
 function getMaxZoom() {
   return Math.max(maxZoom, getFitZoom() + 1);
 }
@@ -11476,13 +11476,13 @@ function getMaxZoom() {
 function clampZoom(value) {
   return Math.max(getFitZoom(), Math.min(getMaxZoom(), value));
 }
-
+    updatePlayerColorBodyPosition();
 function initializeZoom() {
   if (hasInitializedZoom) return;
   zoomLevel = clampZoom(defaultZoom);
   hasInitializedZoom = true;
 }
-
+    saveBucketState();
 function postJson(url, payload) {
   return fetch(url, {
     method: "POST",
@@ -11493,12 +11493,12 @@ function postJson(url, payload) {
       if (!response.ok || !data.ok) {
         throw new Error(data.message || "?청???패?습?다.");
       }
-
+function updatePlayerName() {
       return data;
     });
   });
 }
-
+  ) {
 function applyPlayerColor(color) {
   const normalizedColor = normalizeHexColor(color) || "#ffffff";
   selectedPlayerColor = normalizedColor;
@@ -11517,38 +11517,38 @@ function applyPlayerColor(color) {
   addNetworkDebugLog("apply color: " + normalizedColor);
   syncPlayerColorToServer();
 }
-
+  playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
 function getTintedPlayerSrc(color) {
   const tintColor = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color.toLowerCase() : "#ffffff";
-
+function syncLocalPlayerVisibility() {
   if (playerTintCache.has(tintColor)) {
     return playerTintCache.get(tintColor);
   }
-
+    player.classList.remove("is-hidden-before-spawn");
   if (!playerBaseImageReady || !playerBaseImage.naturalWidth || !playerBaseImage.naturalHeight) {
-    return "이미지/player-white.png";
+    return "??지/player-white.png";
   }
-
+    }
   const canvas = document.createElement("canvas");
   canvas.width = playerBaseImage.naturalWidth;
   canvas.height = playerBaseImage.naturalHeight;
   const context = canvas.getContext("2d");
   if (!context) {
-    return "이미지/player-white.png";
+    return "??지/player-white.png";
   }
-
+  return Boolean(multiplayerChannel && currentSessionId && isMultiplayerSubscribed);
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.drawImage(playerBaseImage, 0, 0);
   context.globalCompositeOperation = "source-atop";
   context.fillStyle = tintColor;
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.globalCompositeOperation = "source-over";
-
+  return false;
   const tintedSrc = canvas.toDataURL("image/png");
   playerTintCache.set(tintColor, tintedSrc);
   return tintedSrc;
 }
-
+  if (!worldChatPanelOpen) {
 function needsDarkOutline(color) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color || "")) return false;
   const normalized = color.toLowerCase();
@@ -11559,17 +11559,17 @@ function needsDarkOutline(color) {
   const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   return luminance > 0.62;
 }
-
+}
 function getPlayerColorFilter(color) {
   if (color === "#ffffff") return "none";
-
+  setWorldChatPanelOpen(!worldChatPanelOpen);
   if (color === "#111827") {
     return "brightness(0) saturate(100%) invert(7%) sepia(13%) saturate(2308%) hue-rotate(182deg) brightness(96%) contrast(93%)";
   }
-
+  let s = String(raw || "")
   return "saturate(160%) brightness(0.98)";
 }
-
+  if (s.length > WORLD_CHAT_MAX_CHARS) s = truncateWorldChatString(s, WORLD_CHAT_MAX_CHARS);
 function buildCharacterColorGrid() {
   characterColorGrid.innerHTML = "";
 
@@ -11579,11 +11579,11 @@ function buildCharacterColorGrid() {
     button.className = "character-color-option";
     button.style.background = color;
     button.setAttribute("aria-label", color + " ?깔");
-
+  if (s.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
     if (color === selectedPlayerColor) {
       button.classList.add("is-selected");
     }
-
+  if (colon <= 0) {
     button.addEventListener("click", function () {
       selectedPlayerColor = color;
       document.documentElement.style.setProperty("--preview-player-color", color);
@@ -11591,25 +11591,25 @@ function buildCharacterColorGrid() {
       if (multiplayerChannel) {
         sendMultiplayerPresence(true);
       }
-
+      return p.trim();
       characterColorGrid.querySelectorAll(".character-color-option").forEach(function (option) {
         option.classList.remove("is-selected");
       });
       button.classList.add("is-selected");
     });
-
+  if (parts.length === 1 && parts[0] === "\uC804\uCCB4") {
     characterColorGrid.appendChild(button);
   });
 }
-
+}
 function openCharacterSelectIfNeeded() {
   if (!currentUserId || !currentUserName) {
     window.location.replace("ovc-login.html?v=20260509a");
     return;
   }
-
+  const mySid = currentSessionId ? String(currentSessionId) : "";
   playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
-
+    const want = nameForIngameUiDisplay(nm);
   if (hasSpawnedCharacter) {
     syncLocalPlayerVisibility();
     player.classList.remove("is-hidden-before-spawn");
@@ -11653,7 +11653,7 @@ function openCharacterSelectIfNeeded() {
     }
     return;
   }
-
+    err.className = "world-chat-user-picker-empty";
   isCharacterSelecting = true;
   updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
   player.classList.add("is-hidden-before-spawn");
@@ -11661,7 +11661,7 @@ function openCharacterSelectIfNeeded() {
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
   characterSelectOverlay.classList.add("is-open");
 }
-
+  worldChatUserPickerEl.appendChild(loading);
 function openCharacterColorChange() {
   onboardingStep26OpenedSettingsWithEsc = false;
   setSettingsOverlayOpen(settingsOverlay, false);
@@ -11670,7 +11670,7 @@ function openCharacterColorChange() {
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
   characterSelectOverlay.classList.add("is-open");
 }
-
+      const nb = nameForIngameUiDisplay((b && b.name) || "");
 function finishCharacterSelect() {
   hasSpawnedCharacter = true;
   isCharacterSelecting = false;
@@ -11682,9 +11682,9 @@ function finishCharacterSelect() {
   characterSelectOverlay.classList.remove("is-open");
   syncLocalPlayerVisibility();
   applyPlayerColor(selectedPlayerColor);
-
+      btn.type = "button";
   syncPlayerColorToServer(true);
-
+      const label = nameForIngameUiDisplay(row.name || "OVC");
   restoreWorldHubIfVeteranWithoutActiveReplay();
   ovcApplyForceWorldHubBypassLoggedIn();
   if (
@@ -11708,7 +11708,7 @@ function finishCharacterSelect() {
     window.location.replace(ovcTutorialPageUrl());
     return;
   }
-
+    return;
   if (!applyTutorialWorldResetIfPending()) {
     loadOnboardingFlowState();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
@@ -11720,15 +11720,15 @@ function finishCharacterSelect() {
     saveAppleState();
     saveBucketState();
   }
-
+  if (!pick) return;
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     hasHydratedSharedWorldFromServer = true;
   }
-
+    v = lead.slice(WORLD_CHAT_GLOBAL_PREFIX.length).replace(/^\s+/, "");
   updateOnboardingFlowUI();
   setupMultiplayer();
 }
-
+  let rest = "";
 function updatePlayerName() {
   if (!playerName) return;
   if (
@@ -11739,7 +11739,7 @@ function updatePlayerName() {
     playerName.classList.remove("is-dialogue-layer");
     return;
   }
-
+    rest = "";
   playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi() || "OVC");
   playerName.style.display = "block";
   playerName.style.position = "";
@@ -11750,12 +11750,12 @@ function updatePlayerName() {
   playerName.style.margin = "";
   playerName.style.transform = "";
   playerName.style.visibility = "";
-
+    const len = worldChatInputEl.value.length;
   const npcLineShowing =
     isNpcDialogueRunning && npcBubble.style.display === "block";
   playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
 }
-
+function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
 function syncLocalPlayerVisibility() {
   if (!player || !localPlayerRoot) return;
   localPlayerRoot.style.display = "block";
@@ -11763,25 +11763,25 @@ function syncLocalPlayerVisibility() {
     player.classList.remove("is-hidden-before-spawn");
     player.style.display = "block";
     if (!player.getAttribute("src")) {
-      player.src = "이미지/player-white.png";
+      player.src = "??지/player-white.png";
     }
     return;
   }
   player.style.display = "";
   player.classList.add("is-hidden-before-spawn");
 }
-
+    row.classList.add("is-whisper");
 function isWorldSocialRealtimeReady() {
   return Boolean(multiplayerChannel && currentSessionId && isMultiplayerSubscribed);
 }
-
+  const mm = String(d.getMinutes()).padStart(2, "0");
 function isWorldChatBlockingGameInput() {
   if (!worldSocialUiReady) return false;
   if (worldChatPanelOpen) return true;
   if (worldChatInputEl && document.activeElement === worldChatInputEl) return true;
   return false;
 }
-
+  } else {
 function setWorldChatPanelOpen(nextOpen) {
   worldChatPanelOpen = Boolean(nextOpen);
   if (!worldChatPanelOpen) {
@@ -11796,11 +11796,11 @@ function setWorldChatPanelOpen(nextOpen) {
     worldChatInputEl.focus();
   }
 }
-
+  if (!text || !playerChatBubbleEl) return;
 function toggleWorldChatPanel() {
   setWorldChatPanelOpen(!worldChatPanelOpen);
 }
-
+  localChatBubbleTimer = setTimeout(function () {
 function sanitizeWorldChatText(raw) {
   let s = String(raw || "")
     .trim()
@@ -11808,7 +11808,7 @@ function sanitizeWorldChatText(raw) {
   if (s.length > WORLD_CHAT_MAX_CHARS) s = truncateWorldChatString(s, WORLD_CHAT_MAX_CHARS);
   return s;
 }
-
+function setRemoteChatBubble(sessionId, text, hideAt) {
 /**
  * @returns {{ kind: "world", body: string } | { kind: "whisper", recipientNames: string[], body: string } | null}
  */
@@ -11838,7 +11838,7 @@ function parseWorldChatComposition(raw) {
   }
   return { kind: "whisper", recipientNames: parts, body: right };
 }
-
+  return true;
 function resolveWhisperTargetSessionIds(recipientNames) {
   const out = [];
   const seen = Object.create(null);
@@ -11864,7 +11864,7 @@ function resolveWhisperTargetSessionIds(recipientNames) {
   });
   return out;
 }
-
+    multiplayerChannel.send({
 function setWorldChatUserPickerOpen(open) {
   worldChatUsersPickerOpen = Boolean(open);
   if (worldChatUserPickerEl) {
@@ -11875,11 +11875,11 @@ function setWorldChatUserPickerOpen(open) {
     );
   }
 }
-
+      }
 function closeWorldChatUserPicker() {
   setWorldChatUserPickerOpen(false);
 }
-
+}
 function fillWorldChatUserPickerFromServer() {
   if (!worldChatUserPickerEl) return;
   worldChatUserPickerEl.innerHTML = "";
@@ -11939,7 +11939,7 @@ function fillWorldChatUserPickerFromServer() {
     worldChatUserPickerEl.appendChild(err);
   });
 }
-
+    if (!rpp || !rpp.bodyElement) return;
 function toggleWorldChatUserPicker() {
   if (!worldChatUserPickerEl) return;
   if (worldChatUsersPickerOpen) {
@@ -11949,7 +11949,7 @@ function toggleWorldChatUserPicker() {
   setWorldChatUserPickerOpen(true);
   fillWorldChatUserPickerFromServer();
 }
-
+  if (!rp || !rp.bodyElement) return;
 /**
  * "?길??" ??"?길?? ?람??" ?태??신???두??적. `?체:` 가 ?으??거 ??귓말 ?두??환.
  */
@@ -11990,7 +11990,7 @@ function appendWhisperRecipientToWorldChatInput(pickedName) {
     worldChatInputEl.setSelectionRange(len, len);
   } catch (eSel) {}
 }
-
+    const dy = -rise - Math.random() * spreadY;
 function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
   const entry = {
     name: name || "OVC",
@@ -12024,7 +12024,7 @@ function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
   worldChatLogEl.appendChild(row);
   worldChatLogEl.scrollTop = worldChatLogEl.scrollHeight;
 }
-
+    const dy = -rise - Math.random() * spreadY;
 function setLocalChatBubble(text, hideAt) {
   localChatBubbleText = text;
   localChatBubbleHideAt = hideAt;
@@ -12043,7 +12043,7 @@ function setLocalChatBubble(text, hideAt) {
     if (playerChatBubbleEl) playerChatBubbleEl.style.display = "none";
   }, delay);
 }
-
+  }, 600);
 function setRemoteChatBubble(sessionId, text, hideAt) {
   if (!sessionId) return;
   remoteChatBubbles[sessionId] = { text: text, hideAt: hideAt };
@@ -12057,14 +12057,14 @@ function setRemoteChatBubble(sessionId, text, hideAt) {
   el.textContent = text;
   el.style.display = "block";
 }
-
+  const ok = isWorldSocialRealtimeReady();
 function removeRemoteChatBubbleEl(sessionId) {
   const el = remoteChatBubbleEls[sessionId];
   if (el && el.parentNode) el.parentNode.removeChild(el);
   delete remoteChatBubbleEls[sessionId];
   delete remoteChatBubbles[sessionId];
 }
-
+  if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
 function broadcastWorldChat(payload) {
   if (!isWorldSocialRealtimeReady()) return false;
   Promise.resolve(
@@ -12076,7 +12076,7 @@ function broadcastWorldChat(payload) {
   ).catch(function () {});
   return true;
 }
-
+    phase = 204821;
 function broadcastWorldHeart() {
   if (!isWorldSocialRealtimeReady()) return false;
   Promise.resolve(
@@ -12096,7 +12096,7 @@ function broadcastWorldHeart() {
   ).catch(function () {});
   return true;
 }
-
+  const padH = Math.max(
 function broadcastWorldSad() {
   if (!isWorldSocialRealtimeReady()) return false;
   Promise.resolve(
@@ -12116,7 +12116,7 @@ function broadcastWorldSad() {
   ).catch(function () {});
   return true;
 }
-
+  const wdx = w.dx * pxPerWu;
 function shouldShowIncomingWorldChatPayload(payload) {
   const kind = payload.chatKind === "whisper" ? "whisper" : "world";
   if (kind !== "whisper") return true;
@@ -12132,7 +12132,7 @@ function shouldShowIncomingWorldChatPayload(payload) {
   }
   return false;
 }
-
+  if (!playerChatBubbleEl) return;
 function handleWorldChatBroadcast(payload) {
   if (!payload || !payload.id) return;
   const sid = String(payload.id);
@@ -12154,7 +12154,7 @@ function handleWorldChatBroadcast(payload) {
   });
   setRemoteChatBubble(sid, text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
 }
-
+    const rp = remotePlayers[sid];
 function handleWorldHeartBroadcast(payload) {
   if (!payload || !payload.id) return;
   const sid = String(payload.id);
@@ -12179,7 +12179,7 @@ function handleWorldHeartBroadcast(payload) {
     spawnWorldHeartFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
   });
 }
-
+  const parsed = parseWorldChatComposition(raw);
 function handleWorldSadBroadcast(payload) {
   if (!payload || !payload.id) return;
   const sid = String(payload.id);
@@ -12204,7 +12204,7 @@ function handleWorldSadBroadcast(payload) {
     spawnWorldSadFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
   });
 }
-
+    broadcastWorldChat(
 function spawnWorldHeartFxNearBodyRect(rect) {
   if (!rect || rect.width < 2 || rect.height < 2) return;
   const root = document.createElement("div");
@@ -12237,7 +12237,7 @@ function spawnWorldHeartFxNearBodyRect(rect) {
     if (root.parentNode) root.parentNode.removeChild(root);
   }, WORLD_HEART_FX_MS + 200);
 }
-
+  if (worldSocialUiReady) return;
 function spawnWorldSadFxNearBodyRect(rect) {
   if (!rect || rect.width < 2 || rect.height < 2) return;
   const root = document.createElement("div");
@@ -12271,7 +12271,7 @@ function spawnWorldSadFxNearBodyRect(rect) {
     if (root.parentNode) root.parentNode.removeChild(root);
   }, WORLD_HEART_FX_MS + 200);
 }
-
+    '\uC804\uCCB4 \uCC57: "\uC804\uCCB4: "\uC785\uB825 \uD6C4 \uCC57\uC305 or \uADF8\uB0E5 \uC785\uB825\n' +
 function pulseWorldHeartButton() {
   if (!worldHeartBtn) return;
   worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
@@ -12281,7 +12281,7 @@ function pulseWorldHeartButton() {
     if (worldHeartBtn) worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
   }, 600);
 }
-
+  inpRow.className = "world-chat-input-row";
 function pulseWorldSadButton() {
   if (!worldSadBtn) return;
   worldSadBtn.classList.remove("ovc-sad-btn-pulse");
@@ -12291,7 +12291,7 @@ function pulseWorldSadButton() {
     if (worldSadBtn) worldSadBtn.classList.remove("ovc-sad-btn-pulse");
   }, 600);
 }
-
+  worldChatUsersBtn.title = "\uC11C\uBC84 \uC811\uC18D \uC720\uC800 \uBAA9\uB85D";
 function updateWorldSocialChatUiEnabled() {
   const ok = isWorldSocialRealtimeReady();
   if (worldChatInputEl) {
@@ -12305,7 +12305,7 @@ function updateWorldSocialChatUiEnabled() {
   if (worldHeartBtn) worldHeartBtn.disabled = !ok;
   if (worldSadBtn) worldSadBtn.disabled = !ok;
 }
-
+  playerChatBubbleEl = document.createElement("div");
 function worldChatBubbleWobble(sessionIdForPhase, nowMs) {
   let phase = 0;
   const sid = sessionIdForPhase != null ? String(sessionIdForPhase) : "";
@@ -12320,7 +12320,7 @@ function worldChatBubbleWobble(sessionIdForPhase, nowMs) {
     dy: Math.sin(t) * 4.0
   };
 }
-
+  worldChatSendBtn.addEventListener("click", function () {
 function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) {
   if (!el || !rect || rect.width < 2 || rect.height < 2) return false;
   const pxPerWu = rect.width / PLAYER_WIDTH;
@@ -12384,7 +12384,7 @@ function updatePlayerChatBubbleOverlay() {
     playerChatBubbleEl.style.display = "none";
   }
 }
-
+    }
 function updateRemoteChatBubbleOverlays() {
   const now = Date.now();
   Object.keys(remoteChatBubbleEls).forEach(function (sid) {
@@ -12411,7 +12411,7 @@ function updateRemoteChatBubbleOverlays() {
     }
   });
 }
-
+    window.OVC_ONLINE_CONFIG.supabaseKey.startsWith("sb_publishable_")
 function sendWorldChatFromUi() {
   if (!worldChatInputEl) return;
   const raw = worldChatInputEl.value;
@@ -12453,7 +12453,7 @@ function sendWorldChatFromUi() {
   setLocalChatBubble(body, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
   broadcastWorldChat(Object.assign({}, basePayload, { chatKind: "world" }));
 }
-
+      if (channel !== multiplayerChannel) return;
 function onWorldHeartClick() {
   if (!isWorldSocialRealtimeReady()) return;
   broadcastWorldHeart();
@@ -12462,7 +12462,7 @@ function onWorldHeartClick() {
   const rect = player.getBoundingClientRect();
   spawnWorldHeartFxNearBodyRect(rect);
 }
-
+      handleWorldHeartBroadcast(payload.payload || {});
 function onWorldSadClick() {
   if (!isWorldSocialRealtimeReady()) return;
   broadcastWorldSad();
@@ -12471,7 +12471,7 @@ function onWorldSadClick() {
   const rect = player.getBoundingClientRect();
   spawnWorldSadFxNearBodyRect(rect);
 }
-
+      const message = String((payload && payload.message) || "");
 function ensureWorldSocialUi() {
   if (worldSocialUiReady) return;
   worldSadBtn = document.createElement("button");
@@ -12481,7 +12481,7 @@ function ensureWorldSocialUi() {
   worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
   worldSadBtn.innerHTML = WORLD_SAD_BUTTON_EMOJI;
   document.body.appendChild(worldSadBtn);
-
+        status +
   worldHeartBtn = document.createElement("button");
   worldHeartBtn.type = "button";
   worldHeartBtn.id = "world-heart-button";
@@ -12489,7 +12489,7 @@ function ensureWorldSocialUi() {
   worldHeartBtn.setAttribute("aria-label", "\uD558\uD2B8");
   worldHeartBtn.innerHTML = "\u2764\uFE0F";
   document.body.appendChild(worldHeartBtn);
-
+        setTimeout(function () {
   worldChatToggleBtn = document.createElement("button");
   worldChatToggleBtn.type = "button";
   worldChatToggleBtn.id = "world-chat-toggle";
@@ -12497,7 +12497,7 @@ function ensureWorldSocialUi() {
   worldChatToggleBtn.setAttribute("aria-label", "\uCC57");
   worldChatToggleBtn.textContent = "\uD83D\uDCAC";
   document.body.appendChild(worldChatToggleBtn);
-
+        if (terminalHandled) return;
   worldChatPanelEl = document.createElement("div");
   worldChatPanelEl.id = "world-chat-panel";
   worldChatPanelEl.className = "world-chat-panel";
@@ -12540,13 +12540,13 @@ function ensureWorldSocialUi() {
   worldChatPanelEl.appendChild(worldChatLogEl);
   worldChatPanelEl.appendChild(worldChatInputWrapEl);
   document.body.appendChild(worldChatPanelEl);
-
+        : shouldShowWorldRockPickupAction
   playerChatBubbleEl = document.createElement("div");
   playerChatBubbleEl.id = "player-chat-bubble";
   playerChatBubbleEl.className = "world-player-chat-bubble world-local-chat-bubble";
   playerChatBubbleEl.style.display = "none";
   document.body.appendChild(playerChatBubbleEl);
-
+    color: selectedPlayerColor,
   worldSadBtn.addEventListener("click", function () {
     onWorldSadClick();
   });
@@ -12572,7 +12572,7 @@ function ensureWorldSocialUi() {
       sendWorldChatFromUi();
     }
   });
-
+      (hasChanged && now - lastBroadcastAt >= getMultiplayerBroadcastMinMs()) ||
   document.addEventListener("click", function (ev) {
     if (!worldChatPanelOpen || !worldChatPanelEl) return;
     const t = ev.target;
@@ -12583,18 +12583,18 @@ function ensureWorldSocialUi() {
     if (worldSadBtn && worldSadBtn.contains(t)) return;
     setWorldChatPanelOpen(false);
   });
-
+      );
   worldSocialUiReady = true;
   updateWorldSocialChatUiEnabled();
 }
-
+      lastHeartbeatBroadcastAt = now;
 function updateWorldSocialOverlaysInGameLoop() {
   if (!worldSocialUiReady) return;
   updateWorldSocialChatUiEnabled();
   updatePlayerChatBubbleOverlay();
   updateRemoteChatBubbleOverlays();
 }
-
+    syncPresenceToDatabase(state);
 function setupMultiplayer() {
   if (isTabSessionSuperseded) return;
   if (!hasSpawnedCharacter) {
@@ -12602,16 +12602,16 @@ function setupMultiplayer() {
     addNetworkDebugLog("multiplayer skipped: character not spawned");
     return;
   }
-
+function broadcastBucketState(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) {
     teardownMultiplayerForTutorial();
     updateMultiplayerStatus(
-      "튜토리얼: 다른 플레이어/세상 비공유 · 멀티 미연결"
+  if (!multiplayerChannel || !currentSessionId) {
     );
     addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
   }
-
+    );
   if (multiplayerChannel) {
     if (isMultiplayerSubscribed) {
       updateMultiplayerStatus("\uC5F0\uACB0\uB428");
@@ -12623,7 +12623,7 @@ function setupMultiplayer() {
     }
     return;
   }
-
+    x: bucketX,
   if (
     !currentUserId ||
     !currentSessionId ||
@@ -12643,7 +12643,7 @@ function setupMultiplayer() {
     );
     return;
   }
-
+function handleRemoteBucketBroadcast(payload) {
   if (
     window.OVC_ONLINE_CONFIG &&
     typeof window.OVC_ONLINE_CONFIG.supabaseKey === "string" &&
@@ -12651,7 +12651,7 @@ function setupMultiplayer() {
   ) {
     addNetworkDebugLog("warning: sb_publishable key can close Realtime immediately; use anon public key");
   }
-
+  const remoteId = String(payload.id);
   updateMultiplayerStatus("\uC5F0\uACB0\uC911");
   const channel = window.OVCOnline.createPresenceChannel(
     window.OVC_ONLINE_CONFIG.multiplayerRoom,
@@ -12659,14 +12659,14 @@ function setupMultiplayer() {
   );
   multiplayerChannel = channel;
   const attempt = ++multiplayerConnectAttempt;
-
+    const nextX = Number(payload.x);
   if (!channel) {
     updateMultiplayerStatus("\uC5F0\uACB0 \uC548\uB428");
     addNetworkDebugLog("multiplayer failed: createPresenceChannel returned null");
     return;
   }
   let terminalHandled = false;
-
+      "from=" + remoteId + " held=true x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
   channel
     .on("broadcast", { event: "player_state" }, function (payload) {
       if (channel !== multiplayerChannel) return;
@@ -12731,7 +12731,7 @@ function setupMultiplayer() {
         }, 600);
         return;
       }
-
+        state.butterflyActive !== false;
       if (status === "TIMED_OUT" || status === "CHANNEL_ERROR" || status === "CLOSED") {
         if (terminalHandled) return;
         terminalHandled = true;
@@ -12756,11 +12756,11 @@ function setupMultiplayer() {
       }
     });
 }
-
+  if (heldItem === HELD_ITEM_BUCKET || window.OVC_SHARED_BUCKET_HELD_BY === currentSessionId) {
 function sendMultiplayerPresence(forceSend) {
   if (!hasSpawnedCharacter || isTabSessionSuperseded) return;
   if (isSharedWorldSyncPausedForTutorial()) return;
-
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
   const now = Date.now();
   const butterflyActive = !document.hidden;
   const shouldShowWorldRockPickupAction =
@@ -12801,7 +12801,7 @@ function sendMultiplayerPresence(forceSend) {
     Math.round(state.waterSplashAt || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
-
+      return;
   // Broadcast is the primary multiplayer sync path. Keep a heartbeat so idle
   // players stay visible even when they are not moving.
   if (
@@ -12837,7 +12837,7 @@ function sendMultiplayerPresence(forceSend) {
   }
   lastPresenceSentAt = now;
 }
-
+  if (!remotePlayer) return;
 function broadcastBucketState(forceSend) {
   if (isSharedWorldSyncPausedForTutorial()) {
     return;
@@ -12855,7 +12855,7 @@ function broadcastBucketState(forceSend) {
     addBucketTrace("send-skip", "throttled " + (now - lastBucketBroadcastAt) + "ms", 1000);
     return;
   }
-
+    addSyncDebugLog("remote_state_reject", {
   const payload = {
     id: currentSessionId,
     held: heldItem === HELD_ITEM_BUCKET,
@@ -12878,7 +12878,7 @@ function broadcastBucketState(forceSend) {
     350
   );
 }
-
+  remotePlayer.nameElement.textContent = nameForIngameUiDisplay(
 function handleRemoteBucketBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.id || payload.id === currentSessionId) return;
@@ -12892,7 +12892,7 @@ function handleRemoteBucketBroadcast(payload) {
   const prevUpdatedAt = Number(remoteBucketUpdateAtById[remoteId] || 0);
   if (nextUpdatedAt < prevUpdatedAt) return;
   remoteBucketUpdateAtById[remoteId] = nextUpdatedAt;
-
+        ? WORLD_ROCK_REMOTE_STATUS_TAIL_MS
   if (payload.held === true) {
     window.OVC_SHARED_BUCKET_HELD_BY = remoteId;
     const nextX = Number(payload.x);
@@ -12907,7 +12907,7 @@ function handleRemoteBucketBroadcast(payload) {
     );
     return;
   }
-
+  }
   if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     const nextX = Number(payload.x);
@@ -12922,7 +12922,7 @@ function handleRemoteBucketBroadcast(payload) {
     );
   }
 }
-
+  });
 function syncPresenceToDatabase(state) {
   if (
     isPresenceDbSyncing ||
@@ -12933,7 +12933,7 @@ function syncPresenceToDatabase(state) {
   ) {
     return;
   }
-
+      createWaterSplashAt(nextSplashX, nextSplashY);
   isPresenceDbSyncing = true;
   lastPresenceDbSyncAt = Date.now();
   window.OVCOnline.savePresence(state).catch(function (error) {
@@ -12944,7 +12944,7 @@ function syncPresenceToDatabase(state) {
     isPresenceDbSyncing = false;
   });
 }
-
+  const statusElement = document.createElement("div");
 function pollPresenceDatabase() {
   if (
     isPresenceDbPolling ||
@@ -12955,7 +12955,7 @@ function pollPresenceDatabase() {
   ) {
     return;
   }
-
+  element.appendChild(nameElement);
   isPresenceDbPolling = true;
   lastPresenceDbPollAt = Date.now();
   window.OVCOnline.listPresence(
@@ -12988,10 +12988,10 @@ function pollPresenceDatabase() {
     isPresenceDbPolling = false;
   });
 }
-
+      markWorldDirty();
 function sendMultiplayerLeave() {
   if (!currentSessionId) return;
-
+  });
   if (heldItem === HELD_ITEM_BUCKET || window.OVC_SHARED_BUCKET_HELD_BY === currentSessionId) {
     if (heldItem === HELD_ITEM_BUCKET) {
       dropBucket();
@@ -13000,7 +13000,7 @@ function sendMultiplayerLeave() {
     markWorldDirty();
     syncWorldState(true);
   }
-
+    if (seenUsers[userKey]) return count;
   if (multiplayerChannel) {
     Promise.resolve(multiplayerChannel.send({
       type: "broadcast",
@@ -13016,7 +13016,7 @@ function sendMultiplayerLeave() {
       // The page may be closing; best effort is enough here.
     });
   }
-
+    (typeof multiplayerStatusText === "string" &&
   if (window.OVCOnline && typeof window.OVCOnline.removePresence === "function") {
     Promise.resolve(window.OVCOnline.removePresence(currentSessionId)).catch(function () {
       // The page may be closing; best effort is enough here.
@@ -13026,7 +13026,7 @@ function sendMultiplayerLeave() {
 
 function renderRemotePlayersFromPresence(presenceState) {
   const nextRemotePlayers = {};
-
+    clearTimeout(multiplayerReconnectTimeout);
   Object.keys(presenceState || {}).forEach(function (presenceKey) {
     const presences = presenceState[presenceKey];
     if (!Array.isArray(presences) || presenceKey === currentSessionId) return;
@@ -13039,17 +13039,17 @@ function renderRemotePlayersFromPresence(presenceState) {
     if (isRemotePresenceSameLoggedInAccount(latestPresence)) {
       return;
     }
-
+    setupMultiplayer();
     nextRemotePlayers[latestPresence.id] = latestPresence;
   });
 
   Object.keys(nextRemotePlayers).forEach(function (remoteId) {
     renderRemotePlayerState(nextRemotePlayers[remoteId], "presence");
   });
-
+  const colorToSync = selectedPlayerColor.toLowerCase();
   updateRemotePlayerCount();
 }
-
+  if (window.OVCOnline && window.OVCOnline.isConfigured()) {
 function handleRemotePlayerBroadcast(state) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!isValidRemotePlayerStatePayload(state) || state.id === currentSessionId) return;
@@ -13070,7 +13070,7 @@ function handleRemotePlayerBroadcast(state) {
   renderRemotePlayerState(state, "broadcast");
   updateRemotePlayerCount();
 }
-
+    showOnlineDebugMessage(
 function removeRemotePlayer(remoteId) {
   const remotePlayer = remotePlayers[remoteId];
   if (!remotePlayer) return;
@@ -13079,7 +13079,7 @@ function removeRemotePlayer(remoteId) {
   removeRemoteChatBubbleEl(remoteId);
   updateRemotePlayerCount();
 }
-
+  return remotePlayerCount + 1;
 function renderRemotePlayerState(state, source) {
   const remoteId = state.id;
   const remotePlayer = remotePlayers[remoteId] || createRemotePlayer(remoteId);
@@ -13113,7 +13113,7 @@ function renderRemotePlayerState(state, source) {
     state.action !== "state"
       ? state.action
       : "";
-
+    empty.textContent = "\uAC00\uC785\uB41C \uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.";
   remotePlayer.nameElement.textContent = nameForIngameUiDisplay(
     state.name || "OVC"
   );
@@ -13175,7 +13175,7 @@ function renderRemotePlayerState(state, source) {
   }
   remotePlayer.lastSeenAt = Date.now();
 }
-
+    return [];
 function createRemotePlayer(remoteId) {
   const element = document.createElement("div");
   const bodyElement = document.createElement("img");
@@ -13195,7 +13195,7 @@ function createRemotePlayer(remoteId) {
   element.appendChild(statusElement);
   ground.appendChild(element);
   setWorldSize(element, PLAYER_WIDTH);
-
+  logoutConfirmOverlay.classList.remove("is-open");
   remotePlayers[remoteId] = {
     element,
     bodyElement,
@@ -13215,7 +13215,7 @@ function createRemotePlayer(remoteId) {
   };
   return remotePlayers[remoteId];
 }
-
+  }
 function pruneStaleRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(function (remoteId) {
@@ -13229,7 +13229,7 @@ function pruneStaleRemotePlayers() {
     removeRemotePlayer(remoteId);
   });
 }
-
+  if (!networkDebugPanel || !networkDebugDomStale) {
 function updateRemotePlayerCount() {
   const seenUsers = Object.create(null);
   remotePlayerCount = Object.keys(remotePlayers).reduce(function (count, remoteId) {
@@ -13242,16 +13242,16 @@ function updateRemotePlayerCount() {
   }, 0);
   updateMultiplayerStatus(multiplayerStatusText);
 }
-
+  networkDebugLines.push("[" + timestamp + "] " + message);
 function updateMultiplayerStatus(statusText) {
   multiplayerStatusText = statusText;
   if (!multiplayerStatus) return;
-
+  networkDebugDomStale = true;
   const statusLabel =
-    multiplayerStatusText === "연결됨" ||
-    multiplayerStatusText === "연결중" ||
-    multiplayerStatusText === "캐릭터 선택 전" ||
-    multiplayerStatusText === "초기화 중" ||
+}
+    multiplayerStatusText === "?결? ||
+function addBucketTrace(key, message, minIntervalMs) {
+  if (!BUCKET_DEBUG_TRACE) return;
     (typeof multiplayerStatusText === "string" &&
       multiplayerStatusText.indexOf("?토리얼") !== -1)
       ? multiplayerStatusText
@@ -13259,14 +13259,14 @@ function updateMultiplayerStatus(statusText) {
   multiplayerStatus.textContent =
     "멀??" + statusLabel + " / 로그??" + getOnlinePlayerCount();
 }
-
+const syncDebugHelpers = createSyncDebugHelpers({
 function clearMultiplayerReconnectTimeout() {
   if (multiplayerReconnectTimeout) {
     clearTimeout(multiplayerReconnectTimeout);
     multiplayerReconnectTimeout = null;
   }
 }
-
+async function validateCurrentAccount() {
 function scheduleMultiplayerReconnect(delayMs) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (multiplayerReconnectTimeout || !hasSpawnedCharacter || isLoggingOut || isTabSessionSuperseded) return;
@@ -13278,13 +13278,13 @@ function scheduleMultiplayerReconnect(delayMs) {
     setupMultiplayer();
   }, waitMs);
 }
-
+            showOnlineDebugMessage("삭제된 계정입니다. 로그아웃합니다.");
 function syncPlayerColorToServer(forceSync) {
   if (!hasSpawnedCharacter || !currentUserId) return;
   if (!/^#[0-9a-fA-F]{6}$/.test(selectedPlayerColor || "")) return;
   const colorToSync = selectedPlayerColor.toLowerCase();
   if (!forceSync && colorToSync === lastSyncedPlayerColor) return;
-
+      }
   if (window.OVCOnline && window.OVCOnline.isConfigured()) {
     window.OVCOnline.savePlayerColor(currentUserId, colorToSync).then(function () {
       lastSyncedPlayerColor = colorToSync;
@@ -13297,7 +13297,7 @@ function syncPlayerColorToServer(forceSync) {
     });
     return;
   }
-
+  } catch (error) {
   if (!currentUserName) return;
   postJson("/api/player/color", {
     name: currentUserName,
@@ -13312,27 +13312,27 @@ function syncPlayerColorToServer(forceSync) {
     );
   });
 }
-
+  playerName.style.display = "none";
 function getOnlinePlayerCount() {
   if (!currentUserId) return remotePlayerCount;
   return remotePlayerCount + 1;
 }
-
+  });
 function openAdminPanel() {
   adminOverlay.classList.add("is-open");
   adminOverlay.setAttribute("aria-hidden", "false");
   loadAdminAccounts();
 }
-
+      sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
 function closeAdminPanel() {
   adminOverlay.classList.remove("is-open");
   adminOverlay.setAttribute("aria-hidden", "true");
 }
-
+    localStorage.removeItem(currentUserIdKey);
 async function loadAdminAccounts() {
   adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
   adminAccountList.innerHTML = "";
-
+    localStorage.removeItem(lastSelectedColorKey);
   try {
     const accounts = await window.OVCOnline.listAccounts();
     adminAccountList.dataset.accounts = JSON.stringify(accounts);
@@ -13342,10 +13342,10 @@ async function loadAdminAccounts() {
     adminMessage.textContent = error.message;
   }
 }
-
+      sessionStorage.removeItem(ovcSessionUserNameKey);
 function renderAdminAccounts(accounts) {
   adminAccountList.innerHTML = "";
-
+    window.location.href = "ovc-login.html?v=20260509a";
   if (!accounts.length) {
     const empty = document.createElement("div");
     empty.className = "admin-empty";
@@ -13353,19 +13353,19 @@ function renderAdminAccounts(accounts) {
     adminAccountList.appendChild(empty);
     return;
   }
-
+      window.OVCOnline && typeof window.OVCOnline.getClient === "function"
   accounts.forEach(function (account) {
     const row = document.createElement("div");
     const info = document.createElement("div");
     const name = document.createElement("div");
     const meta = document.createElement("div");
     const deleteButton = document.createElement("button");
-
+          // Continue logout even if cleanup fails.
     row.className = "admin-account-row";
     name.className = "admin-account-name";
     meta.className = "admin-account-meta";
     deleteButton.className = "admin-delete-button";
-
+      finishLogout();
     name.textContent = account.name || "\uC774\uB984 \uC5C6\uC74C";
     meta.textContent =
       (account.color || "\uC0C9 \uC5C6\uC74C") +
@@ -13373,7 +13373,7 @@ function renderAdminAccounts(accounts) {
       formatAdminDate(account.created_at);
     deleteButton.textContent = "\uC0AD\uC81C";
     deleteButton.type = "button";
-
+function getFitZoom() {
     deleteButton.addEventListener("click", async function () {
       if (!confirm((account.name || "\uC774 \uACC4\uC815") + "\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?")) return;
 
@@ -13385,7 +13385,7 @@ function renderAdminAccounts(accounts) {
         });
         adminAccountList.dataset.accounts = JSON.stringify(remainingAccounts);
         renderAdminAccounts(remainingAccounts);
-
+// for display. Catch distance uses that same smoothed center on non-authority
         if (account.id === currentUserId) {
           logout();
           return;
@@ -13405,7 +13405,7 @@ function renderAdminAccounts(accounts) {
     adminAccountList.appendChild(row);
   });
 }
-
+      const count = Math.max(0, Math.floor(Number(parsed[color]) || 0));
 function getRenderedAdminAccounts() {
   try {
     const parsed = JSON.parse(adminAccountList.dataset.accounts || "[]");
@@ -13414,27 +13414,27 @@ function getRenderedAdminAccounts() {
     return [];
   }
 }
-
+}
 function formatAdminDate(value) {
   if (!value) return "\uB0A0\uC9DC \uC5C6\uC74C";
-
+  const raw = Number(getStoredValue(magicPowderCountKey) || 0);
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "\uB0A0\uC9DC \uC5C6\uC74C";
 
   return date.toLocaleString("ko-KR");
 }
-
+    butterflyCaughtCountsKey,
 function openLogoutConfirm() {
   setSettingsOverlayOpen(settingsOverlay, false);
   logoutConfirmOverlay.classList.add("is-open");
   logoutConfirmOverlay.setAttribute("aria-hidden", "false");
 }
-
+  setStoredValue(magicPowderCountKey, String(Math.max(0, Math.floor(magicPowderCount))));
 function closeLogoutConfirm() {
   logoutConfirmOverlay.classList.remove("is-open");
   logoutConfirmOverlay.setAttribute("aria-hidden", "true");
 }
-
+    return total + Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
 function showOnlineDebugMessage(message) {
   if (!onlineDebugToast || !message) return;
   onlineDebugToast.textContent = message;
@@ -13447,7 +13447,7 @@ function showOnlineDebugMessage(message) {
     onlineDebugToast.classList.remove("is-visible");
   }, 3000);
 }
-
+  return butterflyMotion.create(now, options);
 function isNetworkDebugPanelActiveTextSelection() {
   if (!networkDebugPanel || !networkDebugPanel.classList.contains("is-visible")) {
     return false;
@@ -13474,7 +13474,7 @@ function refreshNetworkDebugPanelDom() {
   networkDebugPanel.textContent = networkDebugLines.join("\n");
   networkDebugDomStale = false;
 }
-
+  });
 function addNetworkDebugLog(message) {
   if (!networkDebugPanel || !message) return;
   const timestamp = new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -13485,7 +13485,7 @@ function addNetworkDebugLog(message) {
   networkDebugDomStale = true;
   refreshNetworkDebugPanelDom();
 }
-
+  if (syncEventDedupeStore) return syncEventDedupeStore;
 function addBucketTrace(key, message, minIntervalMs) {
   if (!BUCKET_DEBUG_TRACE) return;
   const now = Date.now();
@@ -13494,14 +13494,14 @@ function addBucketTrace(key, message, minIntervalMs) {
   lastBucketTraceAtByKey[key] = now;
   addNetworkDebugLog("[bucket:" + key + "] " + message);
 }
-
+    },
 const syncDebugHelpers = createSyncDebugHelpers({
   enabled: SYNC_DEBUG_TRACE,
   addNetworkDebugLog: addNetworkDebugLog
 });
 const addSyncDebugLog = syncDebugHelpers.addSyncDebugLog;
 syncDebugHelpers.publishSyncDebugChecklistTemplate(window);
-
+  });
 async function validateCurrentAccount() {
   if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
 
@@ -13537,7 +13537,7 @@ async function validateCurrentAccount() {
     // Temporary network errors should not kick the player out.
   }
 }
-
+  createWaterSplashAt(x, y);
 function logout() {
   if (isLoggingOut) return;
   isLoggingOut = true;
@@ -13549,12 +13549,12 @@ function logout() {
   saveGameSnapshot();
   player.classList.add("is-hidden-before-spawn");
   playerName.style.display = "none";
-
+    if (multiplayerRoomSessionButterflyActive[sid] === false) return;
   Object.keys(remotePlayers).forEach(function (remoteId) {
     remotePlayers[remoteId].element.remove();
     delete remotePlayers[remoteId];
   });
-
+    } else if (!presenceSeenAt || now - presenceSeenAt > stateFreshMs) {
   const finishLogout = function () {
     try {
       sessionStorage.removeItem("ovcGameSessionId");
@@ -13583,7 +13583,7 @@ function logout() {
     } catch (eSessOut) {}
     window.location.href = "ovc-login.html?v=20260509a";
   };
-
+    waypoint = {
   if (multiplayerChannel) {
     clearMultiplayerReconnectTimeout();
     isMultiplayerSubscribed = false;
@@ -13605,14 +13605,14 @@ function logout() {
     });
     return;
   }
-
+    // lastSpawnAt만 0이면(스냅샷 누락·병합) 여기서 5마리를 한꺼번에 넣어 리스폰 주기가 무시됨.
   finishLogout();
 }
-
+      return false;
 function getFitZoom() {
   return Math.max(window.innerWidth / WORLD_WIDTH, window.innerHeight / WORLD_HEIGHT);
 }
-
+  const elapsedCycles = Math.floor(
 // ----------------------------------------------------------------------------
 // Butterflies
 //
@@ -13633,7 +13633,7 @@ function getFitZoom() {
 // Respawn: authority only ??`authoritySpawnButterfliesIfNeeded` vs cap and
 // `butterflyRespawnMs` since `butterflyState.lastSpawnAt`.
 // ----------------------------------------------------------------------------
-
+  }
 function loadButterflyCaughtCounts() {
   try {
     const raw = getStoredValue(butterflyCaughtCountsKey);
@@ -13651,55 +13651,55 @@ function loadButterflyCaughtCounts() {
     });
   }
 }
-
+  setWorldSize(element, BUTTERFLY_SIZE, BUTTERFLY_SIZE);
 function loadMagicPowderCount() {
   const raw = Number(getStoredValue(magicPowderCountKey) || 0);
   magicPowderCount = Math.max(0, Math.floor(raw));
 }
-
+    color: null,
 function saveButterflyCaughtCounts() {
   setStoredValue(
     butterflyCaughtCountsKey,
     JSON.stringify(butterflyState.caughtCounts)
   );
 }
-
+  butterflyRenderById[butterfly.id] = entry;
 function saveMagicPowderCount() {
   setStoredValue(magicPowderCountKey, String(Math.max(0, Math.floor(magicPowderCount))));
 }
-
+function removeButterflyRenderEntry(id) {
 function getTotalCaughtButterflies() {
   return butterflyColors.reduce(function (total, color) {
     return total + Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
   }, 0);
 }
-
+  delete butterflyAuthorityWaypointById[id];
 function pickRandomButterflyColor() {
   return butterflyMotion.pickColor();
 }
-
+  if (entry.color === color && entry.frame === frame) return;
 function pickRandomButterflySpawnPoint() {
   return butterflyMotion.pickSpawnPoint();
 }
-
+  // each unit is 100% / (cols-1) horizontally and 100% / (rows-1) vertically.
 function createButterfly(now, options) {
   return butterflyMotion.create(now, options);
 }
-
+  entry.color = color;
 /** ?냅?·병??버그?같? id가 ????어?는 경우 방? */
 function dedupeButterfliesByIdStable(list) {
   return butterflyMotion.dedupe(list);
 }
-
+  if (entry.facingRight === facingRight) return;
 /** 공유 ?한(butterflyMaxAlive) 초과 ???래??개체부???거 */
 function trimButterflyListToMaxCap(list) {
   return butterflyMotion.trim(list);
 }
-
+function applyButterflyCatchable(entry, catchable) {
 function pruneButterflyAuthorityWaypointsToList() {
   butterflyMotion.pruneWaypoints(butterflyState.list, butterflyAuthorityWaypointById);
 }
-
+}
 function pruneStaleMultiplayerRoomSessions(now) {
   const staleMs = 45000;
   Object.keys(multiplayerRoomSessionIdsLastSeen).forEach(function (sid) {
@@ -13712,14 +13712,14 @@ function pruneStaleMultiplayerRoomSessions(now) {
     }
   });
 }
-
+    BUTTERFLY_SIZE,
 function clearMultiplayerRoomSessionTracking() {
   multiplayerRoomSessionIdsLastSeen = Object.create(null);
   multiplayerRoomSessionButterflyActive = Object.create(null);
   multiplayerRoomSessionButterflyStateLastSeen = Object.create(null);
   lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
 }
-
+  butterflyState.list.forEach(function (butterfly) {
 function ensureSyncEventDedupeStore() {
   if (syncEventDedupeStore) return syncEventDedupeStore;
   syncEventDedupeStore = createSyncEventDedupeStore({
@@ -13740,27 +13740,27 @@ function ensureSyncEventDedupeStore() {
   });
   return syncEventDedupeStore;
 }
-
+  const ts = Math.max(
 function makeSyncEventId(kind, entityId, atMs) {
   return makeSyncEventIdCore(currentSessionId, kind, entityId, atMs);
 }
-
+  butterflyLocalCatchTombstoneById[id] = ts;
 function consumeSyncEventId(eventId, nowMs) {
   return ensureSyncEventDedupeStore().consume(eventId, nowMs);
 }
-
+  butterflyState.list = butterflyState.list.filter(function (other) {
 function getRemoteStateSourceRank(source) {
   return getRemoteStateSourceRankCore(source);
 }
-
+  return had;
 function getRemoteStateVersion(state) {
   return getRemoteStateVersionCore(state);
 }
-
+  const t = now || Date.now();
 function isValidRemotePlayerStatePayload(state) {
   return isValidRemotePlayerStatePayloadCore(state);
 }
-
+  lastButterflyStateChangeAt = t;
 function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
   if (!remoteId || !state) return;
   const now = Date.now();
@@ -13776,7 +13776,7 @@ function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
   createWaterSplashAt(x, y);
   lastRemoteWaterSplashAppliedAtBySession[remoteId] = nextWaterSplashAt;
 }
-
+      event: "world_loose_seed_pickup",
 function isButterflyAuthority() {
   if (!currentSessionId) return false;
   if (document.hidden) return false;
@@ -13798,11 +13798,11 @@ function isButterflyAuthority() {
   ids.sort();
   return ids[0] === currentSessionId;
 }
-
+  }
 function getNumericButterflyValue(value, fallback) {
   return getNumericButterflyValueCore(value, fallback);
 }
-
+  if (evtAt > 0 && evtAt <= Number(lastWorldLooseSeedPickupAt || 0)) {
 function ensureButterflyWaypoint(butterfly, now) {
   return butterflyMotion.ensureWaypoint(butterfly, now, butterflyAuthorityWaypointById);
 /*
@@ -13832,11 +13832,11 @@ function ensureButterflyWaypoint(butterfly, now) {
   return waypoint;
 */
 }
-
+  const px = Number(payload.x);
 function simulateButterflyAuthorityStep(butterfly, now) {
   butterflyMotion.simulate(butterfly, now, butterflyAuthorityWaypointById);
 }
-
+  saveAppleState();
 function authoritySpawnButterfliesIfNeeded(now) {
   if (butterflyState.list.length >= butterflyMaxAlive) return false;
   if (!butterflyState.lastSpawnAt) {
@@ -13852,7 +13852,7 @@ function authoritySpawnButterfliesIfNeeded(now) {
     (now - butterflyState.lastSpawnAt) / butterflyRespawnMs
   );
   if (elapsedCycles <= 0) return false;
-
+  if (!rid) return;
   const slotsAvailable = butterflyMaxAlive - butterflyState.list.length;
   const toSpawn = Math.min(elapsedCycles, slotsAvailable);
   for (let i = 0; i < toSpawn; i += 1) {
@@ -13863,7 +13863,7 @@ function authoritySpawnButterfliesIfNeeded(now) {
   butterflyState.lastSpawnAt += toSpawn * butterflyRespawnMs;
   return toSpawn > 0;
 }
-
+        at: at,
 function authorityFillToCapInstantly(now) {
   let added = false;
   while (butterflyState.list.length < butterflyMaxAlive) {
@@ -13873,7 +13873,7 @@ function authorityFillToCapInstantly(now) {
   if (added) butterflyState.lastSpawnAt = now;
   return added;
 }
-
+  if (isSharedWorldSyncPausedForTutorial()) return;
 function ensureButterflyRenderEntry(butterfly) {
   let entry = butterflyRenderById[butterfly.id];
   if (entry && entry.element && entry.element.isConnected) return entry;
@@ -13902,7 +13902,7 @@ function ensureButterflyRenderEntry(butterfly) {
   butterflyRenderById[butterfly.id] = entry;
   return entry;
 }
-
+    remote.lastShownAction = "rock_pickup";
 function removeButterflyRenderEntry(id) {
   const entry = butterflyRenderById[id];
   if (entry && entry.element && entry.element.parentNode) {
@@ -13911,7 +13911,7 @@ function removeButterflyRenderEntry(id) {
   delete butterflyRenderById[id];
   delete butterflyAuthorityWaypointById[id];
 }
-
+  const bid = String(butterflyId || "");
 function applyButterflySpriteFrame(entry, color, frame) {
   if (entry.color === color && entry.frame === frame) return;
   const colorIndex = Math.max(0, butterflyColors.indexOf(color));
@@ -13924,25 +13924,25 @@ function applyButterflySpriteFrame(entry, color, frame) {
   entry.color = color;
   entry.frame = frame;
 }
-
+    })
 function applyButterflyFacing(entry, facingRight) {
   if (entry.facingRight === facingRight) return;
   entry.element.classList.toggle("is-facing-right", facingRight);
   entry.facingRight = facingRight;
 }
-
+function handleRemoteButterflyCatchBroadcast(payload) {
 function applyButterflyCatchable(entry, catchable) {
   if (entry.catchable === catchable) return;
   entry.element.classList.toggle("is-catchable", catchable);
   entry.catchable = catchable;
 }
-
+  const butterflyId = String(payload.butterflyId || "");
 function getButterflyAnimationFrame(now, butterfly) {
   // Phase the animation by id length so the swarm doesn't beat in sync.
   const offset = butterfly.id.length * 53;
   return Math.floor((now + offset) / butterflyFrameMs) % butterflyFrameCount;
 }
-
+      butterflyId: butterflyId,
 /** ?드 중심(cx, cy) 기? ?레?어???거리 */
 function getButterflyCatchDistanceAtWorldCenter(cx, cy) {
   return getCenterDistance(
@@ -13952,7 +13952,7 @@ function getButterflyCatchDistanceAtWorldCenter(cx, cy) {
     BUTTERFLY_SIZE
   );
 }
-
+      butterflyId: butterflyId,
 function findCatchableButterfly() {
   let nearest = null;
   butterflyState.list.forEach(function (butterfly) {
@@ -13972,7 +13972,7 @@ function findCatchableButterfly() {
   });
   return nearest;
 }
-
+  });
 function stripButterflyFromSharedList(butterflyId, tombstoneAt) {
   const id = String(butterflyId || "");
   if (!id) return false;
@@ -13990,7 +13990,7 @@ function stripButterflyFromSharedList(butterflyId, tombstoneAt) {
   removeButterflyRenderEntry(id);
   return had;
 }
-
+  }
 function finalizeButterflyRemovalEffects(now) {
   const t = now || Date.now();
   if (!butterflyState.lastSpawnAt || t < butterflyState.lastSpawnAt) {
@@ -13999,7 +13999,7 @@ function finalizeButterflyRemovalEffects(now) {
   lastButterflyStateChangeAt = t;
   markWorldDirty();
 }
-
+    butterflyCatch: true
 function broadcastWorldLooseSeedPickup() {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!usesWorldLooseSeedMode()) return;
@@ -14026,7 +14026,7 @@ function broadcastWorldLooseSeedPickup() {
     // syncWorldState still persists pickup for polling clients.
   });
 }
-
+    lastButterflyWallClockMs > 0 ? Math.min(60000, now - lastButterflyWallClockMs) : 0;
 function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!usesWorldLooseSeedMode()) return;
@@ -14082,7 +14082,7 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
     nextSpawnAt: nextAt
   });
 }
-
+  const butterflyRemoteLerpAlpha = (function () {
 function broadcastWorldRockPickup(rockId) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!isWorldDocumentEntry()) return;
@@ -14107,7 +14107,7 @@ function broadcastWorldRockPickup(rockId) {
     // syncWorldState still persists pickup for polling clients.
   });
 }
-
+  const renderButterflyBounds = getActiveButterflyBounds();
 function handleRemoteWorldRockPickupBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!isWorldDocumentEntry()) return;
@@ -14143,7 +14143,7 @@ function handleRemoteWorldRockPickupBroadcast(payload) {
     showPlayerAlert({ message: "\uB3CC \uC218\uC9D1", durationMs: WORLD_ROCK_PICKUP_ACTION_MS });
   }
 }
-
+        ny = butterfly._renderY + my * s;
 function broadcastButterflyCatch(butterflyId) {
   if (!multiplayerChannel || !currentSessionId) return;
   const at = Date.now();
@@ -14165,7 +14165,7 @@ function broadcastButterflyCatch(butterflyId) {
     // World save still carries the removal if broadcast fails.
   });
 }
-
+    const motionX = drawX;
 function handleRemoteButterflyCatchBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.butterflyId) return;
@@ -14210,7 +14210,7 @@ function handleRemoteButterflyCatchBroadcast(payload) {
     eventAt: evtAt
   });
 }
-
+  keepButterfliesInsideActiveBounds();
 function tryCatchButterfly() {
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 18) {
     return false;
@@ -14219,7 +14219,7 @@ function tryCatchButterfly() {
   if (now - lastLocalButterflyCatchAt < 200) return false;
   const target = findCatchableButterfly();
   if (!target) return false;
-
+function broadcastButterflyState(now) {
   lastLocalButterflyCatchAt = now;
   lastLocalButterflyCatchActionAt = now;
   const caught = target.butterfly;
@@ -14229,7 +14229,7 @@ function tryCatchButterfly() {
   }
   butterflyState.caughtCounts[caught.color] += 1;
   saveButterflyCaughtCounts();
-
+      id: currentSessionId,
   broadcastButterflyCatch(caught.id);
   finalizeButterflyRemovalEffects(now);
   showPlayerAlert({
@@ -14246,7 +14246,7 @@ function tryCatchButterfly() {
   }
   return true;
 }
-
+  }
 function updateMagicPowderInventoryUi() {
   if (magicPowderInventory) {
     magicPowderInventory.style.display = "none";
@@ -14258,20 +14258,20 @@ function updateMagicPowderInventoryUi() {
   }
   updateBagInventorySlots();
 }
-
+      butterflyState.list.forEach(function (b) {
 function updateButterflies() {
   const now = Date.now();
   const wallDelta =
     lastButterflyWallClockMs > 0 ? Math.min(60000, now - lastButterflyWallClockMs) : 0;
   lastButterflyWallClockMs = now;
-
+    return;
   // Wait until either (a) we know there's no online sync available so this
   // client is definitely authoritative on its own world, or (b) we have
   // hydrated shared state from the server. This avoids one client racing to
   // seed butterflies while another is still loading the existing population.
   const onlineAvailable = isWorldServerSyncAvailable();
   const sharedHydrated = hasHydratedSharedWorldFromServer || !onlineAvailable;
-
+  const recvAt = now;
   if (sharedHydrated && isButterflyAuthority()) {
     if (!areButterfliesUnlockedForPlantFogWorld()) {
       if (clearLiveButterfliesForPlantFogLock(now)) {
@@ -14325,7 +14325,7 @@ function updateButterflies() {
   })();
   /** 과도???발 ?프?막음(?전 ??? 캡? 계단처럼 보이???). */
   const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 160 : 120;
-
+      });
   if (wallDelta > 380 && sharedHydrated && isButterflyAuthority()) {
     Object.keys(butterflyAuthorityWaypointById).forEach(function (wid) {
       delete butterflyAuthorityWaypointById[wid];
@@ -14339,7 +14339,7 @@ function updateButterflies() {
       }
     });
   }
-
+      const newX = nextPoint.x;
   // Render (?기 ?정? 보간??중심 `_catchProbe*`? ?일 ??비권???????면??치)
   const aliveIds = {};
   let catchTarget = null;
@@ -14444,7 +14444,7 @@ function updateButterflies() {
     if (!aliveIds[id]) removeButterflyRenderEntry(id);
   });
 }
-
+  setStoredValue(
 function getButterflyStateForSnapshot() {
   keepButterfliesInsideActiveBounds();
   const before = butterflyState.list;
@@ -14473,7 +14473,7 @@ function broadcastButterflyState(now) {
     // World sync remains the fallback when realtime misses an update.
   });
 }
-
+  setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
 function handleRemoteButterflyStateBroadcast(payload) {
   if (!payload || payload.id === currentSessionId) return;
   if (isSharedWorldSyncPausedForTutorial()) return;
@@ -14489,7 +14489,7 @@ function handleRemoteButterflyStateBroadcast(payload) {
   lastButterflyRealtimeStateAt = Math.max(lastButterflyRealtimeStateAt, sentAt);
   applyButterflySnapshot(snapshot, sentAt);
 }
-
+  setWorldSize(plantSpot, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
 function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
   if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
   if (!areButterfliesUnlockedForPlantFogWorld()) {
@@ -14524,7 +14524,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
     if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
     incomingById[String(raw.id)] = raw;
   });
-
+  updateWellImage();
   // If we are currently the authority we keep our locally-simulated positions
   // (otherwise we would constantly snap our own broadcasts back onto
   // ourselves) but still honor catches/spawns by reconciling membership.
@@ -14605,7 +14605,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       if (!stillExists) removeButterflyRenderEntry(butterfly.id);
     });
   }
-
+    if (currentUserId && getStoredFlag(onboardingFlowDoneKey)) {
   let merged = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(nextList));
   butterflyState.list = merged;
   pruneButterflyAuthorityWaypointsToList();
@@ -14620,12 +14620,12 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       }
     });
   }
-
+    );
   const rawLast = snapshotButterflies.lastSpawnAt;
   const parsedLast = Number(rawLast);
   const hasValidSnapshotSpawnAt =
     Number.isFinite(parsedLast) && parsedLast > 0;
-
+        if (
   if (hasValidSnapshotSpawnAt) {
     butterflyState.lastSpawnAt = parsedLast;
   } else if (butterflyState.list.length === 0) {
@@ -14636,7 +14636,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
   }
 }
-
+    if (!isWorldServerSyncAvailable() || isSharedWorldSyncPausedForTutorial()) {
 function gameLoop() {
   if (isTabSessionSuperseded) return;
   syncLocalPlayerVisibility();
@@ -14675,11 +14675,11 @@ function gameLoop() {
   savePlayerPosition(false);
   requestAnimationFrame(gameLoop);
 }
-
+  validateCurrentAccount();
 function savePlayerPosition(forceSave) {
   const now = Date.now();
   if (!forceSave && now - lastPlayerPositionSavedAt < 400) return;
-
+  zoomLevel = clampZoom(zoomLevel);
   setStoredValue(
     playerPositionKey,
     JSON.stringify({
