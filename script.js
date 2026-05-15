@@ -166,6 +166,7 @@ import {
   seedPlantedStateKey,
   hasGuideBookKey,
   npcDialogueCompleteKey,
+  tradeMasterDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
   bucketStateKey,
@@ -191,6 +192,12 @@ import {
   tradeMaster,
   alchemyMaster,
   npcBubble,
+  tradeMasterBubble,
+  tradeExchangeOverlay,
+  tradeCounterSlot,
+  tradeOfferList,
+  tradeExchangeConfirm,
+  tradeExchangeClose,
   playerBubble,
   playerAlert,
   waterNeeded,
@@ -344,6 +351,19 @@ import {
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
   getBagItemDescriptor as getBagItemDescriptorCore
 } from "./src/game/bag-inventory.js";
+import {
+  bindTradeMaster,
+  closeTradeExchangePanel,
+  handleBagSlotClickWhileTradeOpen,
+  hydrateTradeMasterDialogueComplete,
+  isNearTradeMaster,
+  isTradeExchangeOpen,
+  isTradeMasterDialogueRunning,
+  openTradeExchangePanel,
+  pickWorldNpcHover,
+  tryTalkToTradeMaster,
+  updateTradeNpcPrompt
+} from "./src/game/trade-master-ui.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -1796,13 +1816,18 @@ function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHea
   return headTopWorldY - gap - bhWorld;
 }
 
-function setNpcBubbleWorldPosition(worldX, worldY) {
+function setSpeechBubbleTransform(bubbleEl, worldX, worldY) {
+  if (!bubbleEl) return;
   const px = Math.round(toScreenX(worldX));
   const py = Math.round(toScreenY(worldY));
   const n = Math.round(SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX);
-  npcBubble.style.transform = n
+  bubbleEl.style.transform = n
     ? "translate(" + px + "px, " + py + "px) translateY(" + n + "px)"
     : "translate(" + px + "px, " + py + "px)";
+}
+
+function setNpcBubbleWorldPosition(worldX, worldY) {
+  setSpeechBubbleTransform(npcBubble, worldX, worldY);
 }
 
 function setPlayerBubbleWorldPosition(worldX, worldY) {
@@ -2000,11 +2025,21 @@ document.addEventListener("keydown", function (event) {
     if (isNearPlantMaster()) {
       if (tryTalkToPlantMaster()) return;
     }
+    if (isTradeMasterVisible() && isNearTradeMaster()) {
+      if (tryTalkToTradeMaster()) return;
+    }
     if (hasGuideBook && tryCatchButterfly()) return;
     useHeldItem();
   }
 
   if (key === "Escape") {
+    if (isTradeExchangeOpen()) {
+      event.preventDefault();
+      closeTradeExchangePanel();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (worldChatPanelOpen && worldChatPanelEl) {
       event.preventDefault();
       setWorldChatPanelOpen(false);
@@ -2141,6 +2176,10 @@ function setBagInventoryPanelOpen(open) {
 }
 
 function closeBagInventoryPanel() {
+  if (isTradeExchangeOpen()) {
+    closeTradeExchangePanel();
+    return;
+  }
   setBagInventoryPanelOpen(false);
   updateOnboardingFlowUI();
 }
@@ -2738,11 +2777,12 @@ function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
+    const rockInset = Math.max(1.5, Math.min(4, sz * 0.18));
     return isOverlappingRect(playerFeet, {
-      left: rx,
-      top: ry,
-      right: rx + sz,
-      bottom: ry + sz
+      left: rx + rockInset,
+      top: ry + rockInset,
+      right: rx + sz - rockInset,
+      bottom: ry + sz - rockInset * 0.35
     });
   });
 }
@@ -3974,6 +4014,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
     }
   }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
+  hydrateTradeMasterDialogueComplete(getStoredFlag(tradeMasterDialogueCompleteKey));
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
   isGuideBookClickPromptActive =
@@ -7685,6 +7726,95 @@ function getBagInventoryCountsByKey() {
     "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
     "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
   };
+}
+
+function removeOneBagItemForTrade(itemKey) {
+  const counts = getBagInventoryCountsByKey();
+  if (Number(counts[itemKey] || 0) <= 0) return false;
+  if (itemKey === "rock") {
+    if (!Array.isArray(appleState.worldRockPickedIds) || !appleState.worldRockPickedIds.length) {
+      return false;
+    }
+    appleState.worldRockPickedIds.pop();
+    updateBagInventorySlots();
+    saveAppleState();
+    return true;
+  }
+  if (itemKey === "seed") {
+    if (usesWorldLooseSeedMode()) {
+      if (appleState.seedCount <= 0) return false;
+      appleState.seedCount = Math.max(0, appleState.seedCount - 1);
+      updateBagInventorySlots();
+      saveAppleState();
+      return true;
+    }
+    const seedIndex = appleState.extraSeeds.findIndex(function (extraSeed) {
+      return extraSeed.inInventory && !extraSeed.planted && extraSeed.id !== plantingInventorySeedId;
+    });
+    if (seedIndex < 0) return false;
+    discardInventorySeed(appleState.extraSeeds[seedIndex].id);
+    return true;
+  }
+  if (itemKey === "apple") {
+    if (appleState.count <= 0) return false;
+    appleState.count = Math.max(0, appleState.count - 1);
+    updateSeedInventory();
+    saveAppleState();
+    return true;
+  }
+  if (itemKey === "magicPowder") {
+    if (magicPowderCount <= 0) return false;
+    magicPowderCount = Math.max(0, magicPowderCount - 1);
+    updateMagicPowderInventoryUi();
+    updateBagInventorySlots();
+    saveAppleState();
+    return true;
+  }
+  return false;
+}
+
+function addBagItemsForTrade(itemKey, amount) {
+  const n = Math.max(0, Math.floor(Number(amount) || 0));
+  if (n <= 0) return;
+  if (itemKey === "rock") {
+    if (!Array.isArray(appleState.worldRockPickedIds)) appleState.worldRockPickedIds = [];
+    for (let i = 0; i < n; i++) {
+      appleState.worldRockPickedIds.push(
+        "trade-ret-" + Date.now() + "-" + i + "-" + Math.random().toString(16).slice(2)
+      );
+    }
+    updateBagInventorySlots();
+    saveAppleState();
+    return;
+  }
+  if (itemKey === "seed") {
+    if (usesWorldLooseSeedMode()) {
+      appleState.seedCount = Math.min(500, appleState.seedCount + n);
+    } else {
+      for (let i = 0; i < n; i++) {
+        appleState.extraSeeds.push({
+          id: "trade-seed-" + Date.now() + "-" + i,
+          inInventory: true,
+          planted: false
+        });
+      }
+    }
+    updateSeedInventory();
+    saveAppleState();
+    return;
+  }
+  if (itemKey === "apple") {
+    appleState.count = Math.max(0, Number(appleState.count) || 0) + n;
+    updateSeedInventory();
+    saveAppleState();
+    return;
+  }
+  if (itemKey === "magicPowder") {
+    magicPowderCount = Math.max(0, Math.floor(magicPowderCount) || 0) + n;
+    updateMagicPowderInventoryUi();
+    updateBagInventorySlots();
+    saveAppleState();
+  }
 }
 
 function normalizeBagInventoryOrderByCounts(counts) {

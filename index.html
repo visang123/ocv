@@ -46,6 +46,7 @@
         <img id="trade-master" class="world-npc" src="이미지/trade-master.png?v=20260515g" alt="거래의 달인">
         <img id="alchemy-master" class="world-npc" src="이미지/alchemy-master.png?v=20260515g" alt="연금술의 달인">
         <div id="npc-bubble"></div>
+        <div id="trade-master-bubble"></div>
         <div id="player-bubble"></div>
         <div id="player-alert">!</div>
         <img id="water-needed" src="이미지/water-needed.png" alt="water needed">
@@ -391,6 +392,23 @@
       <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="8" data-bag-type="empty"></div>
     </div>
   </div>
+
+  <div id="trade-exchange-overlay" class="trade-exchange-overlay" style="display: none" aria-hidden="true">
+    <div class="trade-exchange-panel" role="dialog" aria-labelledby="trade-exchange-title">
+      <div class="trade-exchange-header">
+        <h2 id="trade-exchange-title">교환</h2>
+        <button type="button" id="trade-exchange-close" class="trade-exchange-close" aria-label="닫기">
+          &#215;
+        </button>
+      </div>
+      <p class="trade-exchange-hint">가방에서 아이템을 클릭해 교환대에 올리세요.</p>
+      <div id="trade-counter-slot" class="trade-counter-slot" aria-label="교환대"></div>
+      <ul id="trade-offer-list" class="trade-offer-list" aria-label="교환 가능 목록"></ul>
+      <button type="button" id="trade-exchange-confirm" class="trade-exchange-confirm" disabled>
+        교환
+      </button>
+    </div>
+  </div>
   <div id="multiplayer-status">멀티 초기화 중 / 로그인 1</div>
   <button id="admin-open-button" type="button" aria-label="관리자"></button>
   <div id="admin-overlay" aria-hidden="true">
@@ -429,7 +447,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260515h"></script>
+  <script type="module" src="src/main.js?v=20260515i"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

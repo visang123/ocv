@@ -9,6 +9,12 @@ const plantMaster = document.getElementById("plant-master");
 const tradeMaster = document.getElementById("trade-master");
 const alchemyMaster = document.getElementById("alchemy-master");
 const npcBubble = document.getElementById("npc-bubble");
+const tradeMasterBubble = document.getElementById("trade-master-bubble");
+const tradeExchangeOverlay = document.getElementById("trade-exchange-overlay");
+const tradeCounterSlot = document.getElementById("trade-counter-slot");
+const tradeOfferList = document.getElementById("trade-offer-list");
+const tradeExchangeConfirm = document.getElementById("trade-exchange-confirm");
+const tradeExchangeClose = document.getElementById("trade-exchange-close");
 const playerBubble = document.getElementById("player-bubble");
 const playerAlert = document.getElementById("player-alert");
 const waterNeeded = document.getElementById("water-needed");
@@ -74,6 +80,12 @@ export {
   tradeMaster,
   alchemyMaster,
   npcBubble,
+  tradeMasterBubble,
+  tradeExchangeOverlay,
+  tradeCounterSlot,
+  tradeOfferList,
+  tradeExchangeConfirm,
+  tradeExchangeClose,
   playerBubble,
   playerAlert,
   waterNeeded,
