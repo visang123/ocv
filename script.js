@@ -1515,14 +1515,14 @@ const TREE_CSS_ROOTS_BOTTOM_EXTEND = 2;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /** NPC 말풍선: 머리와의 간격(플레이어보다 좁게) */
-const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 1;
+const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 0;
 /**
  * NPC 발밑 y는 npcY, 논리 박스 높이는 NPC_HEIGHT.
  * PNG 상단 여백이 있으면 양수로 키워 실제 머리 윗선을 아래로 보정.
  */
-const NPC_HEAD_TOP_TRIM_WORLD = 6;
+const NPC_HEAD_TOP_TRIM_WORLD = 10;
 /** NPC 말풍선만: 양수일수록 아래(머리 쪽). 과하면 머리에 겹침 */
-const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 14;
+const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 20;
 /** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
@@ -2150,6 +2150,9 @@ window.addEventListener(
 );
 
 function onGuideInventoryToggleClick() {
+  if (isTradeExchangeOpen()) {
+    return;
+  }
   if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
     flashOnboardingOrderHint("");
     return;
@@ -2183,6 +2186,9 @@ function closeBagInventoryPanel() {
 }
 
 function toggleBagInventoryPanelFromBagClick() {
+  if (isTradeExchangeOpen()) {
+    return;
+  }
   if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
     flashOnboardingOrderHint("");
     return;
@@ -2225,9 +2231,10 @@ if (bagInventoryPanel) {
     }
     const slot = event.target.closest(".bag-inventory-slot");
     if (!slot || !bagInventoryPanel.contains(slot)) return;
-    if (isTradeExchangeOpen() && handleBagSlotClickWhileTradeOpen(slot)) {
+    if (isTradeExchangeOpen()) {
       event.preventDefault();
       event.stopPropagation();
+      handleBagSlotClickWhileTradeOpen(slot);
       return;
     }
     const kind = slot.dataset.bagType;
@@ -2796,7 +2803,7 @@ function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
 function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
   const footY = GROUND_WORLD_HEIGHT - pd + jy;
   const feetInsetX = 5;
-  const feetH = 9;
+  const feetH = 7;
   return {
     left: px + feetInsetX,
     top: footY - feetH,
@@ -2804,6 +2811,21 @@ function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
     bottom: footY + 1,
     width: PLAYER_WIDTH - feetInsetX * 2,
     height: feetH + 1
+  };
+}
+
+/** rock-ground.svg 상단 여백 제외 — 발·이동 막힘은 돌 본체만 */
+function getVisibleWorldRockCollisionRect(rx, ry, sz) {
+  const size = Number(sz) || WORLD_ROCK_SIZE;
+  const sideInset = Math.max(2, size * 0.22);
+  const bottomInset = Math.max(1, size * 0.06);
+  /** SVG 상단 빈 여백·잔디 — 위쪽 이동 막힘을 줄이려면 비율을 키움 */
+  const topTrim = Math.max(6, size * 0.68);
+  return {
+    left: rx + sideInset,
+    top: ry + bottomInset,
+    right: rx + size - sideInset,
+    bottom: ry + size - topTrim
   };
 }
 
@@ -2820,13 +2842,7 @@ function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
-    const rockInset = Math.max(1.5, Math.min(4, sz * 0.18));
-    return isOverlappingRect(playerFeet, {
-      left: rx + rockInset,
-      top: ry + rockInset,
-      right: rx + sz - rockInset,
-      bottom: ry + sz - rockInset * 0.35
-    });
+    return isOverlappingRect(playerFeet, getVisibleWorldRockCollisionRect(rx, ry, sz));
   });
 }
 
@@ -9232,7 +9248,16 @@ function isPlantSpotOverlappingVisibleWorldRock(plantX, plantY, rockPad) {
     const ry = Number(rock.y);
     const sz = Number(rock.size) || WORLD_ROCK_SIZE;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
-    return plantSpotOverlapsExpandedRect(plantX, plantY, rx, ry, sz, sz, pad);
+    const rockBox = getVisibleWorldRockCollisionRect(rx, ry, sz);
+    return plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      rockBox.left,
+      rockBox.top,
+      rockBox.right - rockBox.left,
+      rockBox.bottom - rockBox.top,
+      pad
+    );
   });
 }
 

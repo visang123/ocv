@@ -1326,7 +1326,7 @@ body::-webkit-scrollbar {
   top: 0;
   z-index: 2;
   pointer-events: none;
-  background: url("이미지/rock-ground.svg?v=20260512a") center / contain no-repeat;
+  background: url("이미지/rock-ground.svg?v=20260512a") center bottom / contain no-repeat;
 }
 
 #spawn-portal {

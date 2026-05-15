@@ -92,19 +92,24 @@ export function updateTradeNpcPrompt() {
   }
 
   if (isNearTradeMaster()) {
-    if (host.tradeMasterBubble.dataset.promptShown === "true") return;
-    host.tradeMasterBubble.dataset.promptShown = "true";
-    host.tradeMasterBubble.textContent = complete
+    const promptText = complete
       ? "\uBB3C\uAC74\uC740 \uAC00\uC838\uC654\uB098?!"
       : "\uBC18\uAC11\uB124 \uC774\uBC29\uC778\uC774\uC5EC";
+    if (!complete) {
+      if (host.tradeMasterBubble.dataset.promptShown === "true") return;
+      host.tradeMasterBubble.dataset.promptShown = "true";
+    }
+    host.tradeMasterBubble.textContent = promptText;
     host.tradeMasterBubble.style.display = "block";
     layoutTradeSpeechBubble();
     window.clearTimeout(promptHideTimeout);
-    promptHideTimeout = window.setTimeout(function () {
-      if (!running && host.tradeMasterBubble) {
-        host.tradeMasterBubble.style.display = "none";
-      }
-    }, 5000);
+    if (!complete) {
+      promptHideTimeout = window.setTimeout(function () {
+        if (!running && host.tradeMasterBubble && !complete) {
+          host.tradeMasterBubble.style.display = "none";
+        }
+      }, 5000);
+    }
     return;
   }
 
@@ -140,10 +145,11 @@ export function pickWorldNpcHover(clientX, clientY) {
 }
 
 export function handleBagSlotClickWhileTradeOpen(slotEl) {
-  if (!exchangeOpen || !slotEl) return false;
+  if (!exchangeOpen || !slotEl) return true;
   const key = bagSlotToItemKey(slotEl);
-  if (!key || !TRADEABLE_KEYS.has(key)) return false;
-  return addOneInventoryItemToTradeCounter(key);
+  if (!key || !TRADEABLE_KEYS.has(key)) return true;
+  addOneInventoryItemToTradeCounter(key);
+  return true;
 }
 
 function bagSlotToItemKey(slotEl) {
