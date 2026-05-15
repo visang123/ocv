@@ -4,8 +4,7 @@ import {
   getMatchingTradeRecipes,
   getTradeRecipeById,
   recipeMatchesCounter,
-  subtractRecipeInputsFromCounter,
-  TRADE_RECIPES
+  subtractRecipeInputsFromCounter
 } from "./trade-exchange.js";
 
 const TRADEABLE_KEYS = new Set(["rock", "seed", "apple", "magicPowder"]);
@@ -88,7 +87,9 @@ export function tryTalkToTradeMaster() {
 
 export function updateTradeNpcPrompt() {
   if (!host || !host.tradeMasterBubble) return;
-  if (running || exchangeOpen) return;
+  if (running || exchangeOpen || (host.isNpcDialogueRunning && host.isNpcDialogueRunning())) {
+    return;
+  }
 
   if (isNearTradeMaster()) {
     if (host.tradeMasterBubble.dataset.promptShown === "true") return;
@@ -293,7 +294,7 @@ function renderTradeOffers() {
   const matches = getMatchingTradeRecipes(counterByKey);
   if (!matches.length) {
     host.tradeOfferList.innerHTML =
-      '<li class="trade-offer-item" disabled style="pointer-events:none;opacity:0.55">\uad50\ud658 \uac00\ub2a5\ud55c \ubb3c\uac74\uc774 \uc5c6\uc2b5\ub2c8\ub2e4</li>';
+      '<li class="trade-offer-empty">\uad50\ud658 \uac00\ub2a5\ud55c \ubb3c\uac74\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.</li>';
     return;
   }
   host.tradeOfferList.innerHTML = matches

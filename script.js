@@ -358,8 +358,6 @@ import {
   hydrateTradeMasterDialogueComplete,
   isNearTradeMaster,
   isTradeExchangeOpen,
-  isTradeMasterDialogueRunning,
-  openTradeExchangePanel,
   pickWorldNpcHover,
   tryTalkToTradeMaster,
   updateTradeNpcPrompt
@@ -2227,6 +2225,11 @@ if (bagInventoryPanel) {
     }
     const slot = event.target.closest(".bag-inventory-slot");
     if (!slot || !bagInventoryPanel.contains(slot)) return;
+    if (isTradeExchangeOpen() && handleBagSlotClickWhileTradeOpen(slot)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const kind = slot.dataset.bagType;
     if (!kind || kind === "empty") return;
     if (kind === "butterfly") {
@@ -2290,6 +2293,46 @@ if (bagInventoryPanel) {
     }
   });
 }
+
+bindTradeMaster({
+  plantMaster: plantMaster,
+  tradeMaster: tradeMaster,
+  alchemyMaster: alchemyMaster,
+  tradeMasterBubble: tradeMasterBubble,
+  tradeExchangeOverlay: tradeExchangeOverlay,
+  tradeCounterSlot: tradeCounterSlot,
+  tradeOfferList: tradeOfferList,
+  tradeExchangeConfirm: tradeExchangeConfirm,
+  tradeExchangeClose: tradeExchangeClose,
+  bagInventoryPanel: bagInventoryPanel,
+  worldBagInventory: worldBagInventory,
+  TRADE_MASTER_START_X: TRADE_MASTER_START_X,
+  TRADE_MASTER_START_Y: TRADE_MASTER_START_Y,
+  NPC_WIDTH: NPC_WIDTH,
+  NPC_HEIGHT: NPC_HEIGHT,
+  NPC_HEAD_TOP_TRIM_WORLD: NPC_HEAD_TOP_TRIM_WORLD,
+  NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD: NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
+  NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD: NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
+  npcInteractDistance: npcInteractDistance,
+  tradeMasterDialogueCompleteKey: tradeMasterDialogueCompleteKey,
+  isTradeMasterVisible: isTradeMasterVisible,
+  isPlantMasterVisible: isPlantMasterVisible,
+  isAlchemyMasterVisible: isAlchemyMasterVisible,
+  getCenterDistance: getCenterDistance,
+  speechBubbleTopWorldYFromHead: speechBubbleTopWorldYFromHead,
+  setSpeechBubbleTransform: setSpeechBubbleTransform,
+  setStoredFlag: setStoredFlag,
+  setBagInventoryPanelOpen: setBagInventoryPanelOpen,
+  updateBagInventorySlots: updateBagInventorySlots,
+  updateNpcPosition: updateNpcPosition,
+  removeOneBagItem: removeOneBagItemForTrade,
+  addBagItems: addBagItemsForTrade,
+  saveAppleState: saveAppleState,
+  markWorldDirty: markWorldDirty,
+  isNpcDialogueRunning: function () {
+    return isNpcDialogueRunning;
+  }
+});
 
 signBoard.addEventListener("click", function () {
   if (isOnboardingLinearGateActive()) {
@@ -7379,10 +7422,35 @@ function restorePlantHoverLabelToWorldDom() {
   ground.appendChild(plantHoverLabel);
 }
 
+function showWorldNpcHoverLabel(text, anchorEl) {
+  if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
+  ensurePlantHoverLabelOnBodyForFixedUi();
+  plantHoverLabel.classList.remove(
+    "is-seed-inventory-hint",
+    "is-stage3-complete",
+    "is-well-dock",
+    "is-ui-shortcut-hint"
+  );
+  plantHoverLabel.classList.add("is-world-npc-name");
+  plantHoverLabel.textContent = text;
+  plantHoverLabel.style.display = "block";
+  plantHoverLabel.style.position = "fixed";
+  plantHoverLabel.style.zIndex = "225";
+  plantHoverLabel.style.transform = "none";
+  const rect = anchorEl.getBoundingClientRect();
+  void plantHoverLabel.offsetWidth;
+  const w = plantHoverLabel.offsetWidth || 1;
+  const h = plantHoverLabel.offsetHeight || 1;
+  const left = Math.round(rect.left + rect.width / 2 - w / 2);
+  const top = Math.round(rect.top - h - 6);
+  plantHoverLabel.style.left = left + "px";
+  plantHoverLabel.style.top = top + "px";
+}
+
 function showUiShortcutHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   ensurePlantHoverLabelOnBodyForFixedUi();
-  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete", "is-well-dock");
+  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete", "is-well-dock", "is-world-npc-name");
   plantHoverLabel.classList.add("is-ui-shortcut-hint");
   plantHoverLabel.textContent = text;
   plantHoverLabel.style.display = "block";
@@ -7409,6 +7477,13 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (uiShortcut) {
     if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
     showUiShortcutHoverLabel(uiShortcut.text, uiShortcut.anchorEl);
+    return;
+  }
+
+  const npcHover = pickWorldNpcHover(clientX, clientY);
+  if (npcHover) {
+    if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
+    showWorldNpcHoverLabel(npcHover.name, npcHover.anchorEl);
     return;
   }
 
@@ -7767,6 +7842,7 @@ function removeOneBagItemForTrade(itemKey) {
     magicPowderCount = Math.max(0, magicPowderCount - 1);
     updateMagicPowderInventoryUi();
     updateBagInventorySlots();
+    saveMagicPowderCount();
     saveAppleState();
     return true;
   }
@@ -7813,6 +7889,7 @@ function addBagItemsForTrade(itemKey, amount) {
     magicPowderCount = Math.max(0, Math.floor(magicPowderCount) || 0) + n;
     updateMagicPowderInventoryUi();
     updateBagInventorySlots();
+    saveMagicPowderCount();
     saveAppleState();
   }
 }
@@ -9072,6 +9149,7 @@ function hidePlantHoverLabel() {
     plantHoverLabel.classList.remove("is-seed-inventory-hint");
     plantHoverLabel.classList.remove("is-stage3-complete");
     plantHoverLabel.classList.remove("is-ui-shortcut-hint");
+    plantHoverLabel.classList.remove("is-world-npc-name");
     plantHoverLabel.classList.remove("is-well-dock");
     plantHoverLabel.style.position = "";
     plantHoverLabel.style.left = "";
@@ -10282,8 +10360,10 @@ function updateNpcPosition() {
     if (isTradeMasterVisible()) {
       tradeMaster.style.display = "block";
       setWorldPosition(tradeMaster, TRADE_MASTER_START_X, TRADE_MASTER_START_Y);
+      updateTradeNpcPrompt();
     } else {
       tradeMaster.style.display = "none";
+      if (tradeMasterBubble) tradeMasterBubble.style.display = "none";
     }
   }
 
