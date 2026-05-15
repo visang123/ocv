@@ -33,7 +33,7 @@
     })();
   </script>
   <title>온라인 비상 커뮤니티 – 튜토리얼</title>
-  <link rel="stylesheet" href="style.css?v=20260514d">
+  <link rel="stylesheet" href="style.css?v=20260514f">
 </head>
 <body class="ovc-page-tutorial">
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -110,7 +110,6 @@
       </div>
     </div>
   </div>
-  <div id="world-plant-index-hud" class="world-plant-index-hud" aria-hidden="true">0</div>
   <div id="onboarding-callout" class="onboarding-callout" style="display: none" aria-live="polite">
     <div class="onboarding-callout-panel">
       <p id="onboarding-callout-text" class="onboarding-callout-text"></p>
@@ -228,6 +227,7 @@
     >
   </button>
   <div id="plant-progress-gauge" class="plant-progress-gauge" aria-hidden="true">
+    <div id="plant-progress-score" class="plant-progress-score" aria-live="polite">0</div>
     <div id="plant-progress-gauge-panel" class="plant-progress-gauge-panel" role="group" aria-label="식물 지수">
       <div class="plant-progress-meter">
         <div class="plant-progress-vines" aria-hidden="true"></div>
@@ -496,7 +496,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "tutorial";</script>
-  <script type="module" src="src/tutorial-main.js?v=20260514d"></script>
+  <script type="module" src="src/tutorial-main.js?v=20260514f"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

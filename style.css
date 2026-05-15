@@ -157,24 +157,6 @@ body::-webkit-scrollbar {
   pointer-events: auto;
 }
 
-.world-plant-index-hud {
-  position: fixed;
-  top: 12px;
-  right: 14px;
-  z-index: 260;
-  display: none;
-  pointer-events: none;
-  font: 900 26px/1.05 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
-  color: #c8f56e;
-  letter-spacing: 0.04em;
-  user-select: none;
-  text-shadow:
-    0 0 10px rgba(0, 0, 0, 0.55),
-    0 1px 3px rgba(0, 0, 0, 0.88),
-    0 0 20px rgba(130, 230, 60, 0.45);
-  -webkit-text-stroke: 0.4px rgba(18, 52, 12, 0.4);
-}
-
 .ground {
   position: absolute;
   left: 0;
@@ -2665,7 +2647,7 @@ body #world-bag-inventory {
   display: none;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
   width: 156px;
   height: 428px;
   pointer-events: none;
@@ -2677,6 +2659,30 @@ body #world-bag-inventory {
   display: flex;
 }
 
+.plant-progress-score {
+  flex-shrink: 0;
+  order: 0;
+  align-self: flex-start;
+  min-width: 28px;
+  padding: 0 0 8px;
+  font: 900 22px/1.05 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  color: #c8f56e;
+  letter-spacing: 0.04em;
+  text-align: left;
+  user-select: none;
+  pointer-events: none;
+  text-shadow:
+    0 0 10px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.88),
+    0 0 16px rgba(130, 230, 60, 0.4);
+  -webkit-text-stroke: 0.35px rgba(18, 52, 12, 0.35);
+}
+
+.plant-progress-gauge.is-collapsed .plant-progress-score {
+  padding-bottom: 4px;
+  font-size: 16px;
+}
+
 .plant-progress-gauge.is-collapsed {
   height: 52px;
   overflow: hidden;
@@ -2685,6 +2691,7 @@ body #world-bag-inventory {
 .plant-progress-gauge-panel {
   position: relative;
   flex: 1 1 auto;
+  order: 1;
   width: 100%;
   min-height: 100px;
   margin-bottom: -10px;
@@ -2808,7 +2815,9 @@ body #world-bag-inventory {
 .plant-progress-sprout-toggle {
   position: relative;
   z-index: 6;
+  order: 2;
   flex-shrink: 0;
+  margin-top: auto;
   width: 44px;
   height: 44px;
   padding: 0;

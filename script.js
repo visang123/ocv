@@ -954,12 +954,10 @@ function clearLiveButterfliesForPlantFogLock(now) {
 function updatePlantProgressGauge() {
   syncWorldPlantFogVisuals();
   const score = getTotalPlantIndexScore();
-  const hud = document.getElementById("world-plant-index-hud");
-  if (hud) {
-    hud.textContent = String(score);
-    const hudVisible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
-    hud.style.display = hudVisible ? "block" : "none";
-    hud.setAttribute("aria-hidden", hudVisible ? "false" : "true");
+  const legacyHud = document.getElementById("world-plant-index-hud");
+  if (legacyHud) {
+    legacyHud.style.display = "none";
+    legacyHud.setAttribute("aria-hidden", "true");
   }
   const gauge = document.getElementById("plant-progress-gauge");
   if (!gauge) return;
@@ -972,6 +970,10 @@ function updatePlantProgressGauge() {
   const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
   gauge.classList.toggle("is-visible", visible);
   gauge.setAttribute("aria-hidden", visible ? "false" : "true");
+  const scoreEl = document.getElementById("plant-progress-score");
+  if (scoreEl) {
+    scoreEl.textContent = String(score);
+  }
   ensurePlantProgressSproutToggleBound();
 
   const meterEl = gauge.querySelector(".plant-progress-meter");
@@ -2249,8 +2251,8 @@ const adminDevMagicPowderButton = document.createElement("button");
 adminDevMagicPowderButton.id = "admin-dev-magic-powder-button";
 adminDevMagicPowderButton.type = "button";
 adminDevMagicPowderButton.textContent = "";
-adminDevMagicPowderButton.setAttribute("aria-label", "마법의 가루 즉석 제작 (테스트)");
-adminDevMagicPowderButton.setAttribute("title", "마법의 가루 +10 (관리자 테스트)");
+adminDevMagicPowderButton.setAttribute("aria-label", "마법의 가루 +1 (관리자 테스트)");
+adminDevMagicPowderButton.setAttribute("title", "마법의 가루 +1");
 document.body.appendChild(adminDevMagicPowderButton);
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
@@ -2271,7 +2273,7 @@ magicPowderInventory.addEventListener("click", function () {
   tryUseMagicPowder();
 });
 adminDevMagicPowderButton.addEventListener("click", function () {
-  magicPowderCount = Math.max(0, Math.floor(magicPowderCount)) + 10;
+  magicPowderCount = Math.max(0, Math.floor(magicPowderCount)) + 1;
   saveMagicPowderCount();
   updateMagicPowderInventoryUi();
 });
