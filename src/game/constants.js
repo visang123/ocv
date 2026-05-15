@@ -37,9 +37,9 @@ export function getPlantFogClearRectWorldPx(stage) {
   const H = GROUND_WORLD_HEIGHT;
   const st = Math.max(1, Math.min(5, Math.floor(Number(stage)) || 1));
   if (st >= 5) return { left: 0, top: 0, right: W, bottom: H };
-  if (st === 4) return { left: 0, top: 16, right: W, bottom: H };
-  if (st === 3) return { left: 0, top: 56, right: W, bottom: H };
-  if (st === 2) return { left: 0, top: Math.floor(H * 0.5), right: W, bottom: H };
+  if (st === 4) return { left: 0, top: 0, right: W, bottom: H };
+  if (st === 3) return { left: 0, top: 56, right: Math.floor(W * 0.84), bottom: H };
+  if (st === 2) return { left: 0, top: Math.floor(H * 0.56), right: Math.floor(W * 0.58), bottom: H };
   return {
     left: 0,
     top: Math.floor(H * 0.5),
@@ -52,7 +52,7 @@ export function getPlantFogClearRectWorldPx(stage) {
 export function getPlantFogGlobalDimAlphaForStage(stage) {
   const st = Math.max(1, Math.min(5, Math.floor(Number(stage)) || 1));
   if (st >= 5) return 0;
-  if (st === 4) return 0.08;
+  if (st === 4) return 0;
   if (st === 3) return 0.18;
   if (st === 2) return 0.32;
   return 0.48;
@@ -60,8 +60,8 @@ export function getPlantFogGlobalDimAlphaForStage(stage) {
 
 /** 월드 세로 중 땅(324px) 위쪽 하늘 밴드 높이(216px) */
 export const WORLD_SKY_BAND_HEIGHT = WORLD_HEIGHT - GROUND_WORLD_HEIGHT;
-/** 이 단계(4 = 식물지수 750~)부터 하늘 밴드 안개 제거 */
-export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 4;
+/** Stage 5 (plant index 1000) opens the sky band. */
+export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 5;
 
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;

@@ -857,6 +857,7 @@ function syncWorldPlantFogVisuals() {
   }
   if (!worldPlantFog) return;
   worldPlantFog.style.display = "block";
+  worldPlantFog.dataset.stage = String(stage);
   const rect = getPlantFogClearRectWorldPx(stage);
   const W = WORLD_WIDTH;
   const H = GROUND_WORLD_HEIGHT;
@@ -868,6 +869,7 @@ function syncWorldPlantFogVisuals() {
   const bottomEl = worldPlantFog.querySelector('[data-fog-strip="bottom"]');
   const leftEl = worldPlantFog.querySelector('[data-fog-strip="left"]');
   const rightEl = worldPlantFog.querySelector('[data-fog-strip="right"]');
+  const lineEl = worldPlantFog.querySelector('[data-fog-clear-line="true"]');
 
   const dimAlpha = getPlantFogGlobalDimAlphaForStage(stage);
   if (dim) {
@@ -880,6 +882,26 @@ function syncWorldPlantFogVisuals() {
   [topEl, bottomEl, leftEl, rightEl].forEach(function (el) {
     if (el) el.style.display = showFog ? "block" : "none";
   });
+  if (lineEl) {
+    const showLine = stage >= 2 && stage <= 4;
+    lineEl.style.display = showLine ? "block" : "none";
+    lineEl.style.borderTopWidth = "0";
+    lineEl.style.borderRightWidth = "0";
+    lineEl.style.borderBottomWidth = "0";
+    lineEl.style.borderLeftWidth = "0";
+    if (showLine) {
+      if (stage === 4) {
+        setWorldSize(lineEl, W, 0);
+        setWorldPosition(lineEl, 0, 0);
+        lineEl.style.borderTopWidth = "6px";
+      } else {
+        setWorldSize(lineEl, Math.max(0, rect.right - rect.left), Math.max(0, rect.bottom - rect.top));
+        setWorldPosition(lineEl, rect.left, rect.top);
+        lineEl.style.borderTopWidth = "6px";
+        lineEl.style.borderRightWidth = "6px";
+      }
+    }
+  }
   if (!showFog) return;
 
   const L = rect.left;
@@ -2102,6 +2124,13 @@ if (bagInventoryPanel) {
     if (kind === "rock") {
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (kind === "magicPowder") {
+      if (magicPowderCount <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      tryUseMagicPowder();
     }
   });
 }
@@ -7477,6 +7506,7 @@ function getBagInventoryCountsByKey() {
     seed: getBagInventorySeedCount(),
     apple: Math.max(0, Number(appleState.count) || 0),
     rock: Math.max(0, appleState.worldRockPickedIds ? appleState.worldRockPickedIds.length : 0),
+    magicPowder: Math.max(0, Math.floor(magicPowderCount) || 0),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
     "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
     "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
@@ -7538,6 +7568,20 @@ function updateBagInventorySlots() {
     slot.classList.toggle("is-empty", itemCount <= 0);
     slot.innerHTML = descriptor.iconHtml + '<span class="bag-slot-count">' + itemCount + "</span>";
   });
+
+  if (bagInventoryPanel) {
+    const powderUsable = magicPowderCount > 0 && isMagicPowderUsableNow();
+    bagInventoryPanel.querySelectorAll('.bag-inventory-slot[data-bag-type="magicPowder"]').forEach(
+      function (slot) {
+        slot.classList.toggle("is-magic-powder-usable", powderUsable);
+        if (powderUsable) {
+          slot.setAttribute("data-ovc-tip", "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \u00B7 \uC0AC\uC6A9 click");
+        } else if (magicPowderCount > 0) {
+          slot.setAttribute("data-ovc-tip", "\uB9C8\uBC95\uC758 \uAC00\uB8E8");
+        }
+      }
+    );
+  }
 }
 
 function updateSeedInventory() {
@@ -13190,23 +13234,15 @@ function tryCatchButterfly() {
 }
 
 function updateMagicPowderInventoryUi() {
-  if (!magicPowderInventory || !magicPowderCountText) return;
-  if (magicPowderCount <= 0) {
+  if (magicPowderInventory) {
     magicPowderInventory.style.display = "none";
     magicPowderInventory.classList.remove("is-near");
     setInstantHoverTip(magicPowderInventory, null);
-    setInstantHoverTip(magicPowderCountText, null);
-    return;
   }
-  magicPowderInventory.style.display = "block";
-  magicPowderCountText.textContent = String(magicPowderCount);
-  const powderUsable = isMagicPowderUsableNow();
-  magicPowderInventory.classList.toggle("is-near", powderUsable);
-  setInstantHoverTip(
-    magicPowderInventory,
-    powderUsable ? "\uC0AC\uC6A9 click" : null
-  );
-  setInstantHoverTip(magicPowderCountText, null);
+  if (magicPowderCountText) {
+    setInstantHoverTip(magicPowderCountText, null);
+  }
+  updateBagInventorySlots();
 }
 
 function updateButterflies() {

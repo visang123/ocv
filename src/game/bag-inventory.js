@@ -3,6 +3,7 @@ export const BAG_SLOT_ITEM_KEYS = [
   "seed",
   "apple",
   "rock",
+  "magicPowder",
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"
@@ -115,6 +116,15 @@ export function getBagItemDescriptor(itemKey) {
       label: "\uB3CC",
       iconHtml:
         '<img class="bag-slot-icon bag-slot-icon--rock" src="이미지/rock-icon.svg?v=20260512a" alt="" width="42" height="42" draggable="false">'
+    };
+  }
+  if (itemKey === "magicPowder") {
+    return {
+      bagType: "magicPowder",
+      butterflyColor: "",
+      label: "\uB9C8\uBC95\uC758 \uAC00\uB8E8",
+      iconHtml:
+        '<span class="bag-slot-icon bag-slot-icon--magic-powder" aria-hidden="true"></span>'
     };
   }
   if (itemKey === "butterfly:brown") {
