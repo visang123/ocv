@@ -9,6 +9,12 @@ export const TRADE_RECIPES = [
     label: "\uC528\uC557 1\uAC1C"
   },
   {
+    id: "rock7_bucket1",
+    inputs: { rock: 7 },
+    outputs: { worldBucket: 1 },
+    label: "\uC591\uB3D9\uC774"
+  },
+  {
     id: "seed10_overgrowth1",
     inputs: { seed: 10 },
     outputs: { overgrowthSeed: 1 },

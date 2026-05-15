@@ -201,7 +201,9 @@ export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
 export const WORLD_LOOSE_SEED_X = SEED_START_X;
 export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 /** 월드 땅에 흩어지는 회색 돌(나무 사과 size 10의 1/2) */
-export const WORLD_LOOSE_ROCK_COUNT = 25;
+export const WORLD_LOOSE_ROCK_COUNT = 40;
+/** 맵에 보이는 돌이 이 수보다 적으면 1분마다 1개 리스폰 */
+export const WORLD_ROCK_RESPAWN_INTERVAL_MS = 60 * 1000;
 export const WORLD_ROCK_SIZE = 14;
 /** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) — 가장자리만 남기고 땅 전체에 분포 */
 export const WORLD_ROCK_SPAWN_X_MARGIN = 3;

@@ -101,6 +101,7 @@ import {
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
   WORLD_LOOSE_ROCK_COUNT,
+  WORLD_ROCK_RESPAWN_INTERVAL_MS,
   WORLD_ROCK_SIZE,
   WORLD_ROCK_SPAWN_X_MARGIN,
   WORLD_ROCK_SPAWN_Y_MIN,
@@ -431,6 +432,7 @@ let dryMainSeedVisibleSince = 0;
 let firstSeedFocusTimeout = null;
 let isHoveringMainSeed = false;
 let lastPickupToggleAt = 0;
+let lastWorldRockRespawnAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
 const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
@@ -5246,43 +5248,144 @@ function buildWorldRockSpawnContext() {
   };
 }
 
-function createRandomWorldRocks(ctx) {
-  const count = WORLD_LOOSE_ROCK_COUNT;
-  const size = WORLD_ROCK_SIZE;
+function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) {
+  const rockSize = Number(size) || WORLD_ROCK_SIZE;
   const margin = WORLD_ROCK_SPAWN_X_MARGIN;
   const yMin = WORLD_ROCK_SPAWN_Y_MIN;
   const yTopMax = WORLD_ROCK_SPAWN_Y_MAX;
-  const xSpan = Math.max(1, WORLD_WIDTH - 2 * margin - size + 1);
+  const xSpan = Math.max(1, WORLD_WIDTH - 2 * margin - rockSize + 1);
   const ySpan = Math.max(1, yTopMax - yMin + 1);
-  const spawnCtx = ctx || buildWorldRockSpawnContext();
-  const avoidZones = collectWorldRockAvoidZones(spawnCtx);
-  const rocks = [];
-  for (let i = 0; i < count; i += 1) {
-    let placed = false;
-    let x = margin;
-    let y = yMin;
-    for (let attempt = 0; attempt < 320; attempt += 1) {
-      x = margin + Math.floor(Math.random() * xSpan);
-      y = yMin + Math.floor(Math.random() * ySpan);
-      const rockR = worldRockRect(x, y, size);
-      const clashRock = rocks.some(function (other) {
-        return Math.abs(other.x - x) < 10 && Math.abs(other.y - y) < 10;
-      });
-      const clashUi = worldRockOverlapsAnyAvoidRect(rockR, avoidZones);
-      if (!clashRock && !clashUi) {
-        placed = true;
-        break;
-      }
+  const avoidZones = collectWorldRockAvoidZones(ctx || buildWorldRockSpawnContext());
+  const list = Array.isArray(existingRocks) ? existingRocks : [];
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    const x = margin + Math.floor(Math.random() * xSpan);
+    const y = yMin + Math.floor(Math.random() * ySpan);
+    const rockR = worldRockRect(x, y, rockSize);
+    const clashRock = list.some(function (other) {
+      if (!other) return false;
+      return Math.abs(Number(other.x) - x) < 10 && Math.abs(Number(other.y) - y) < 10;
+    });
+    if (clashRock || worldRockOverlapsAnyAvoidRect(rockR, avoidZones)) continue;
+    return { x: x, y: y };
+  }
+  return null;
+}
+
+function getUnpickedWorldRockCount() {
+  if (!Array.isArray(appleState.worldRocks)) return 0;
+  const picked = new Set((appleState.worldRockPickedIds || []).map(String));
+  return appleState.worldRocks.filter(function (rock) {
+    return rock && !picked.has(String(rock.id));
+  }).length;
+}
+
+function tryRespawnOneWorldRockIfBelowCap() {
+  if (!isWorldDocumentEntry() || !isWorldRockPickupUnlocked()) return false;
+  if (!Array.isArray(appleState.worldRocks)) appleState.worldRocks = [];
+  if (!Array.isArray(appleState.worldRockPickedIds)) appleState.worldRockPickedIds = [];
+  if (getUnpickedWorldRockCount() >= WORLD_LOOSE_ROCK_COUNT) return false;
+
+  const size = WORLD_ROCK_SIZE;
+  const pos = pickRandomWorldRockSpawnPosition(size, buildWorldRockSpawnContext(), appleState.worldRocks);
+  if (!pos) return false;
+
+  const pickedSet = new Set(appleState.worldRockPickedIds.map(String));
+  let rock = appleState.worldRocks.find(function (r) {
+    return r && pickedSet.has(String(r.id));
+  });
+
+  if (!rock) {
+    if (appleState.worldRocks.length >= WORLD_LOOSE_ROCK_COUNT) return false;
+    rock = {
+      id: "ground-rock-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
+      x: pos.x,
+      y: pos.y,
+      size: size
+    };
+    appleState.worldRocks.push(rock);
+  }
+
+  rock.x = pos.x;
+  rock.y = pos.y;
+  rock.size = size;
+  appleState.worldRockPickedIds = appleState.worldRockPickedIds.filter(function (id) {
+    return String(id) !== String(rock.id);
+  });
+
+  if (!rock._el && ground) {
+    const insertBeforeEl =
+      localPlayerRoot && localPlayerRoot.parentNode === ground
+        ? localPlayerRoot
+        : player && player.parentNode === ground
+          ? player
+          : null;
+    const el = document.createElement("div");
+    el.className = "world-ground-rock";
+    el.dataset.rockId = rock.id;
+    el.setAttribute("aria-hidden", "true");
+    if (insertBeforeEl) {
+      ground.insertBefore(el, insertBeforeEl);
+    } else {
+      ground.appendChild(el);
     }
-    if (!placed) continue;
+    rock._el = el;
+  }
+
+  updateWorldRocks();
+  saveAppleState();
+  markWorldDirty();
+  return true;
+}
+
+function tickWorldRockRespawn(now) {
+  if (!isWorldDocumentEntry() || !isWorldRockPickupUnlocked()) return;
+  const t = now != null ? now : Date.now();
+  if (lastWorldRockRespawnAt <= 0) {
+    lastWorldRockRespawnAt = t;
+    return;
+  }
+  if (t - lastWorldRockRespawnAt < WORLD_ROCK_RESPAWN_INTERVAL_MS) return;
+  lastWorldRockRespawnAt = t;
+  tryRespawnOneWorldRockIfBelowCap();
+}
+
+function createRandomWorldRocks(ctx) {
+  const size = WORLD_ROCK_SIZE;
+  const rocks = [];
+  for (let i = 0; i < WORLD_LOOSE_ROCK_COUNT; i += 1) {
+    const pos = pickRandomWorldRockSpawnPosition(size, ctx, rocks);
+    if (!pos) continue;
     rocks.push({
       id: "ground-rock-" + (i + 1),
-      x,
-      y,
-      size
+      x: pos.x,
+      y: pos.y,
+      size: size
     });
   }
   return rocks;
+}
+
+function spawnWorldBucketBelowTradeMaster() {
+  if (!bucket || !isWorldDocumentEntry()) return;
+  const bucketSz = getBucketSize();
+  bucketX = TRADE_MASTER_START_X + Math.max(0, Math.floor((NPC_WIDTH - bucketSz.width) / 2));
+  bucketY = TRADE_MASTER_START_Y + NPC_HEIGHT + 3;
+  isBucketFull = false;
+  if (heldItem === HELD_ITEM_BUCKET) {
+    heldItem = null;
+  }
+  window.OVC_SHARED_BUCKET_HELD_BY = "";
+  updateBucketPosition();
+  markWorldDirty();
+  broadcastBucketState(false);
+  try {
+    const savedRaw = getStoredValue(bucketStateKey);
+    const saved = savedRaw ? JSON.parse(savedRaw) : {};
+    saved.bucketX = bucketX;
+    saved.bucketY = bucketY;
+    saved.isBucketFull = false;
+    setStoredValue(bucketStateKey, JSON.stringify(saved));
+  } catch (eBucket) {}
 }
 
 function isAppleInTrunkArea(localX, localY, size) {
@@ -7130,11 +7233,13 @@ function updateExtraPlantState(plant, now) {
     !plant.isSproutGrown &&
     now - plant.growthStartedAt >= getPlantFirstGrowthDurationMs(plant)
   ) {
-    plant.isSproutGrown = true;
-    plant.sproutGrownAt = now;
-    plant.sproutEvolutionMs = 0;
-    plant.sproutEvolutionLastTickAt = now;
-    plant.isSproutSelfSustaining = false;
+    if (!makePlantStableStage3FromOvergrowthSeed(plant, now)) {
+      plant.isSproutGrown = true;
+      plant.sproutGrownAt = now;
+      plant.sproutEvolutionMs = 0;
+      plant.sproutEvolutionLastTickAt = now;
+      plant.isSproutSelfSustaining = false;
+    }
   }
 }
 
@@ -7961,6 +8066,12 @@ function addBagItemsForTrade(itemKey, amount) {
     updateBagInventorySlots();
     saveMagicPowderCount();
     saveAppleState();
+    return;
+  }
+  if (itemKey === "worldBucket") {
+    for (let i = 0; i < n; i++) {
+      spawnWorldBucketBelowTradeMaster();
+    }
   }
 }
 
@@ -8692,6 +8803,7 @@ function startPlanting() {
     plantRuntime.powderUpgradeStartedAt = null;
     plantRuntime.powderUpgradeDurationMs = 0;
     plantRuntime.grassAuto5EligibleAt = null;
+    plantRuntime.seedKind = "";
     assignSproutIdentityToNewPlant(plantRuntime);
     ensureGrassOrdinalIfNeeded(plantRuntime);
     plantRuntime.blockSproutRegrowthAfterDry = false;
@@ -8827,6 +8939,7 @@ function plantWorldSeedCount() {
       plantRuntime.powderUpgradeStartedAt = null;
       plantRuntime.powderUpgradeDurationMs = 0;
       plantRuntime.grassAuto5EligibleAt = null;
+      plantRuntime.seedKind = "";
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
@@ -8841,6 +8954,116 @@ function plantWorldSeedCount() {
       onboardingNotifyMainPlantPlanted();
     } else {
       const invPlant = createExtraPlant("plant-" + syntheticId, plantX, plantY);
+      assignSproutIdentityToNewPlant(invPlant);
+      ensureGrassOrdinalIfNeeded(invPlant);
+      appleState.extraPlants.push(invPlant);
+      updateExtraSeedsAndPlants();
+      holdLocalPlantStateAgainstStaleSnapshot(3000);
+      holdLocalAppleStateAgainstStaleSnapshot(3000);
+    }
+
+    playerStatus.textContent = "";
+    updateSeedInventory();
+    holdLocalAppleStateAgainstStaleSnapshot(3000);
+    saveAppleState();
+    markWorldDirty();
+    syncWorldState(true);
+  }, plantActionMs);
+}
+
+function plantWorldOvergrowthSeedCount() {
+  if ((Number(appleState.overgrowthSeedCount) || 0) <= 0) {
+    updateSeedInventory();
+    return;
+  }
+
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    flashOnboardingOrderHint("");
+    updateSeedInventory();
+    return;
+  }
+
+  if (
+    plantRuntime.isPlanting ||
+    appleState.isEating ||
+    isNpcDialogueRunning ||
+    !isOnGround
+  ) {
+    updateSeedInventory();
+    return;
+  }
+
+  const syntheticId = "og-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  const playerBox = getPlayerBox();
+  const plantX = playerBox.left + playerBox.width / 2 - PLANT_SPOT_WIDTH / 2;
+  const plantY = playerBox.bottom - PLANT_SPOT_HEIGHT / 2;
+
+  if (!canPlantAt(plantX, plantY)) {
+    if (lastPlantProximityBlockMessage) {
+      flashPlantProximityWarning(lastPlantProximityBlockMessage);
+      updatePlayerStatus();
+    }
+    updateSeedInventory();
+    return;
+  }
+
+  plantingInventorySeedId = syntheticId;
+  plantRuntime.isPlanting = true;
+  playerStatus.textContent = "\uACFC\uC131\uC7A5 \uC528\uC557 \uC2EC\uB294\uC911...";
+  updateSeedInventory();
+  saveAppleState();
+  sendMultiplayerPresence(true);
+
+  window.setTimeout(function () {
+    plantRuntime.isPlanting = false;
+    sendMultiplayerPresence(true);
+    plantingInventorySeedId = null;
+    appleState.overgrowthSeedCount =
+      Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0) - 1);
+
+    if (!plantRuntime.isSeedPlanted) {
+      const plantedAt = getSharedPlantSimulationNow();
+      plantRuntime.spotX = plantX;
+      plantRuntime.spotY = plantY;
+      plantRuntime.isSeedPlanted = true;
+      plantRuntime.lastWateredAt = null;
+      plantRuntime.wateredAtList = [];
+      plantRuntime.status = "normal";
+      plantRuntime.waterLevel = 1;
+      plantRuntime.waterLevelUpdatedAt = plantedAt;
+      plantRuntime.becameEmptyAt = null;
+      plantRuntime.isOverwatered = false;
+      plantRuntime.rottenAt = null;
+      plantRuntime.needsFirstWater = false;
+      plantRuntime.growthStartedAt = plantedAt;
+      plantRuntime.plantedAt = plantedAt;
+      plantRuntime.isSproutGrown = false;
+      plantRuntime.sproutGrownAt = null;
+      plantRuntime.sproutEvolutionMs = 0;
+      plantRuntime.sproutEvolutionLastTickAt = null;
+      plantRuntime.isSproutSelfSustaining = false;
+      plantRuntime.growthTier = 0;
+      plantRuntime.waterCapacity = 2;
+      plantRuntime.powderUpgradeTargetTier = 0;
+      plantRuntime.powderUpgradeStartedAt = null;
+      plantRuntime.powderUpgradeDurationMs = 0;
+      plantRuntime.grassAuto5EligibleAt = null;
+      plantRuntime.seedKind = "overgrowth";
+      assignSproutIdentityToNewPlant(plantRuntime);
+      ensureGrassOrdinalIfNeeded(plantRuntime);
+      plantRuntime.blockSproutRegrowthAfterDry = false;
+      plantRuntime.drySoilAt = null;
+      plantSpot.style.display = "block";
+      setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
+      updatePlantState();
+      updateNpcPosition();
+      holdLocalPlantStateAgainstStaleSnapshot(3000);
+      holdLocalAppleStateAgainstStaleSnapshot(3000);
+      saveSeedState();
+      onboardingNotifyMainPlantPlanted();
+    } else {
+      const invPlant = createExtraPlant("plant-" + syntheticId, plantX, plantY);
+      invPlant.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(invPlant);
       ensureGrassOrdinalIfNeeded(invPlant);
       appleState.extraPlants.push(invPlant);
@@ -8944,6 +9167,7 @@ function plantInventorySeed(seedId) {
       plantRuntime.powderUpgradeStartedAt = null;
       plantRuntime.powderUpgradeDurationMs = 0;
       plantRuntime.grassAuto5EligibleAt = null;
+      plantRuntime.seedKind = "";
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
@@ -9043,6 +9267,26 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
 }
 
 /** 스냅샷 병합: 소유자 비어 있으면 false(전원 로컬로 취급하지 않음) → 원격 제거와 충돌 시 유령 씨앗 억제 */
+function isOvergrowthSeedPlant(plant) {
+  return String(plant && plant.seedKind || "") === "overgrowth";
+}
+
+function makePlantStableStage3FromOvergrowthSeed(plant, now) {
+  if (!isOvergrowthSeedPlant(plant)) return false;
+  plant.isSproutGrown = true;
+  plant.sproutGrownAt = now;
+  plant.sproutEvolutionMs = sproutStage1Ms + sproutStage2GrowMs;
+  plant.sproutEvolutionLastTickAt = now;
+  plant.isSproutSelfSustaining = true;
+  plant.growthTier = Math.max(Number(plant.growthTier) || 0, 3);
+  plant.waterCapacity = 3;
+  plant.waterLevel = Math.min(3, Math.max(Number(plant.waterLevel) || 0, 2));
+  plant.becameEmptyAt = null;
+  plant.status = "normal";
+  plant.needsFirstWater = false;
+  return true;
+}
+
 function isExtraSeedSessionOwnedByLocal(seed) {
   if (!seed) return false;
   const uid = getLocalExtraSeedOwnerUserId();
@@ -10157,11 +10401,13 @@ function updatePlantState() {
     !plantRuntime.isSproutGrown &&
     now - plantRuntime.growthStartedAt >= getPlantFirstGrowthDurationMs(plantRuntime)
   ) {
-    plantRuntime.isSproutGrown = true;
-    plantRuntime.sproutGrownAt = now;
-    plantRuntime.sproutEvolutionMs = 0;
-    plantRuntime.sproutEvolutionLastTickAt = now;
-    plantRuntime.isSproutSelfSustaining = false;
+    if (!makePlantStableStage3FromOvergrowthSeed(plantRuntime, now)) {
+      plantRuntime.isSproutGrown = true;
+      plantRuntime.sproutGrownAt = now;
+      plantRuntime.sproutEvolutionMs = 0;
+      plantRuntime.sproutEvolutionLastTickAt = now;
+      plantRuntime.isSproutSelfSustaining = false;
+    }
     saveSeedState({
       bumpMergeGuard: false,
       skipWorldDirty: isSharedWorldMergeActive()
@@ -10258,8 +10504,10 @@ function removeMainPlant() {
   plantRuntime.powderUpgradeStartedAt = null;
   plantRuntime.powderUpgradeDurationMs = 0;
   plantRuntime.grassAuto5EligibleAt = null;
+  plantRuntime.seedKind = "";
   plantRuntime.ownerUserId = "";
   plantRuntime.ownerDisplayName = "";
+  plantRuntime.soilOrdinal = 0;
   plantRuntime.sproutOrdinal = 0;
   plantRuntime.grassOrdinal = null;
   plantRuntime.plantedAt = null;
@@ -14158,6 +14406,7 @@ function gameLoop() {
     requestAccountTutorialDoneSync();
   }
   respawnApplesIfNeeded();
+  tickWorldRockRespawn(Date.now());
   refillWellIfNeeded();
   movementTutorial.prepareBeforeMove();
   updatePlayerPosition();
