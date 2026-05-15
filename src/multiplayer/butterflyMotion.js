@@ -47,7 +47,9 @@ export function getButterflyFlutterOffsetWorld(now, butterfly, config) {
 }
 
 export function createButterflyMotionController(config) {
-  const bounds = config.bounds;
+  function getBounds() {
+    return typeof config.getBounds === "function" ? config.getBounds() : config.bounds;
+  }
   const colors = Array.isArray(config.colors) && config.colors.length
     ? config.colors.slice()
     : ["brown"];
@@ -68,6 +70,7 @@ export function createButterflyMotionController(config) {
   }
 
   function pickSpawnPoint() {
+    const bounds = getBounds();
     return {
       x: bounds.left + Math.random() * (bounds.right - bounds.left),
       y: bounds.top + Math.random() * (bounds.bottom - bounds.top)
@@ -75,6 +78,7 @@ export function createButterflyMotionController(config) {
   }
 
   function pickWaypoint(fromX, fromY) {
+    const bounds = getBounds();
     const from = clampPoint({
       x: getNumericButterflyValue(fromX, bounds.left),
       y: getNumericButterflyValue(fromY, bounds.top)
@@ -95,6 +99,7 @@ export function createButterflyMotionController(config) {
 
   function create(now, options) {
     const opts = options || {};
+    const bounds = getBounds();
     const spawn = clampPoint(opts.spawn || pickSpawnPoint(), bounds);
     return {
       id: String(opts.id || generateId(now)),
@@ -145,6 +150,7 @@ export function createButterflyMotionController(config) {
   }
 
   function ensureWaypoint(butterfly, now, waypointMap) {
+    const bounds = getBounds();
     const id = String(butterfly.id);
     let waypoint = waypointMap[id];
     if (waypoint && now > waypoint.endAt + 1500) {
@@ -173,6 +179,7 @@ export function createButterflyMotionController(config) {
   }
 
   function simulate(butterfly, now, waypointMap) {
+    const bounds = getBounds();
     const waypoint = ensureWaypoint(butterfly, now, waypointMap);
     const total = Math.max(1, waypoint.endAt - waypoint.startAt);
     const rawT = clamp((now - waypoint.startAt) / total, 0, 1);
@@ -192,6 +199,7 @@ export function createButterflyMotionController(config) {
   }
 
   function normalizeSnapshotList(rawList) {
+    const bounds = getBounds();
     const seen = Object.create(null);
     const out = [];
     (Array.isArray(rawList) ? rawList : []).forEach(function (raw) {
@@ -216,16 +224,21 @@ export function createButterflyMotionController(config) {
   }
 
   function snapshotFromState(state) {
+    const bounds = getBounds();
     const list = trim(state.list);
     state.list = list;
     return {
       lastSpawnAt: state.lastSpawnAt,
       list: list.map(function (butterfly) {
+        const point = clampPoint({
+          x: getNumericButterflyValue(butterfly.x, bounds.left),
+          y: getNumericButterflyValue(butterfly.y, bounds.top)
+        }, bounds);
         return {
           id: butterfly.id,
           color: butterfly.color,
-          x: Math.round(getNumericButterflyValue(butterfly.x, bounds.left) * 10000) / 10000,
-          y: Math.round(getNumericButterflyValue(butterfly.y, bounds.top) * 10000) / 10000,
+          x: Math.round(point.x * 10000) / 10000,
+          y: Math.round(point.y * 10000) / 10000,
           dirX: butterfly.dirX > 0 ? 1 : -1,
           spawnedAt: butterfly.spawnedAt || null
         };

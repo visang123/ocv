@@ -1007,6 +1007,63 @@ function areButterfliesUnlockedForPlantFogWorld() {
   return isWorldDocumentEntry() && getTotalPlantIndexScore() >= PLANT_FOG_BUTTERFLY_MIN_SCORE;
 }
 
+function getDefaultButterflyBounds() {
+  return {
+    left: butterflyBoundsLeft,
+    right: butterflyBoundsRight,
+    top: butterflyBoundsTop,
+    bottom: butterflyBoundsBottom
+  };
+}
+
+function getActiveButterflyBounds() {
+  const base = getDefaultButterflyBounds();
+  if (!isWorldDocumentEntry()) return base;
+  const stage = getPlantFogWorldStageFromScore(getTotalPlantIndexScore());
+  if (stage < 3 || stage >= 5) return base;
+  const clearRect = getPlantFogClearRectWorldPx(stage);
+  const bounds = {
+    left: Math.max(base.left, clearRect.left),
+    right: Math.min(base.right, clearRect.right),
+    top: Math.max(base.top, clearRect.top),
+    bottom: Math.min(base.bottom, clearRect.bottom)
+  };
+  if (bounds.right < bounds.left || bounds.bottom < bounds.top) return base;
+  return bounds;
+}
+
+function clampButterflyPointToActiveBounds(x, y) {
+  const bounds = getActiveButterflyBounds();
+  return {
+    x: Math.max(bounds.left, Math.min(bounds.right, getNumericButterflyValue(x, bounds.left))),
+    y: Math.max(bounds.top, Math.min(bounds.bottom, getNumericButterflyValue(y, bounds.top)))
+  };
+}
+
+function keepButterfliesInsideActiveBounds() {
+  let changed = false;
+  butterflyState.list.forEach(function (butterfly) {
+    if (!butterfly) return;
+    const beforeX = Number(butterfly.x);
+    const beforeY = Number(butterfly.y);
+    const next = clampButterflyPointToActiveBounds(butterfly.x, butterfly.y);
+    butterfly.x = next.x;
+    butterfly.y = next.y;
+    if (
+      !Number.isFinite(beforeX) ||
+      !Number.isFinite(beforeY) ||
+      Math.abs(beforeX - next.x) > 0.001 ||
+      Math.abs(beforeY - next.y) > 0.001
+    ) {
+      delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
+      butterfly._renderX = next.x;
+      butterfly._renderY = next.y;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function clearLiveButterfliesForPlantFogLock(now) {
   if (!butterflyState.list.length) return false;
   butterflyState.list.forEach(function (b) {
@@ -1213,6 +1270,7 @@ const butterflyMotion = createButterflyMotionController({
     top: butterflyBoundsTop,
     bottom: butterflyBoundsBottom
   },
+  getBounds: getActiveButterflyBounds,
   colors: butterflyColors,
   maxAlive: butterflyMaxAlive,
   minLeg: 56,
@@ -1438,13 +1496,15 @@ const TREE_CSS_ROOTS_HEIGHT = 16;
 const TREE_CSS_ROOTS_BOTTOM_EXTEND = 2;
 /** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
+/** NPC 말풍선: 머리와의 간격(플레이어보다 좁게) */
+const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 1;
 /**
  * NPC 발밑 y는 npcY, 논리 박스 높이는 NPC_HEIGHT.
- * 스프라이트 scale로 실제 머리가 더 위면 양수로 키움(머리 윗선을 위로 보정).
+ * PNG 상단 여백이 있으면 양수로 키워 실제 머리 윗선을 아래로 보정.
  */
-const NPC_HEAD_TOP_TRIM_WORLD = 0;
-/** NPC 말풍선만: 너무 떠 보이면 양수로 키워서 아래로 내림(월드 단위) */
-const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 12;
+const NPC_HEAD_TOP_TRIM_WORLD = 6;
+/** NPC 말풍선만: 양수일수록 아래(머리 쪽). 과하면 머리에 겹침 */
+const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 3;
 /** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
@@ -1729,9 +1789,11 @@ function groundScreenPxToWorldX(px) {
 }
 
 /** headTopWorldY: 캐릭터 머리(윗선) 월드 y. 말풍선 transform 기준 y(버블 꼭대기) */
-function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement) {
+function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld) {
+  const gap =
+    gapAboveHeadWorld != null ? gapAboveHeadWorld : SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD;
   const bhWorld = groundScreenPxToWorldY(bubbleElement.offsetHeight || 12);
-  return headTopWorldY - SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD - bhWorld;
+  return headTopWorldY - gap - bhWorld;
 }
 
 function setNpcBubbleWorldPosition(worldX, worldY) {
@@ -1756,7 +1818,7 @@ function layoutNpcSpeechBubble() {
   const bubbleWidth = npcBubble.offsetWidth || 48;
   const npcHeadTop = npcY - NPC_HEIGHT - NPC_HEAD_TOP_TRIM_WORLD;
   const bubbleWorldY =
-    speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble) +
+    speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble, NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) +
     NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   setNpcBubbleWorldPosition(
     npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
@@ -13388,6 +13450,10 @@ function updateButterflies() {
         markWorldDirty();
       }
     } else {
+      if (keepButterfliesInsideActiveBounds()) {
+        lastButterflyStateChangeAt = now;
+        markWorldDirty();
+      }
       if (
         !hasSeededInitialButterflies &&
         butterflyState.list.length === 0 &&
@@ -13448,6 +13514,7 @@ function updateButterflies() {
   // Render (잡기 판정은 보간된 중심 `_catchProbe*`와 동일 — 비권한 탭에서 화면과 일치)
   const aliveIds = {};
   let catchTarget = null;
+  const renderButterflyBounds = getActiveButterflyBounds();
   butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = ensureButterflyRenderEntry(butterfly);
@@ -13460,8 +13527,8 @@ function updateButterflies() {
       const vy = Math.max(-maxVelocity, Math.min(maxVelocity, Number(butterfly._netVy) || 0));
       targetX += vx * sampleAge;
       targetY += vy * sampleAge;
-      targetX = Math.max(butterflyBoundsLeft, Math.min(butterflyBoundsRight, targetX));
-      targetY = Math.max(butterflyBoundsTop, Math.min(butterflyBoundsBottom, targetY));
+      targetX = Math.max(renderButterflyBounds.left, Math.min(renderButterflyBounds.right, targetX));
+      targetY = Math.max(renderButterflyBounds.top, Math.min(renderButterflyBounds.bottom, targetY));
     }
     let drawX = targetX;
     let drawY = targetY;
@@ -13550,6 +13617,7 @@ function updateButterflies() {
 }
 
 function getButterflyStateForSnapshot() {
+  keepButterfliesInsideActiveBounds();
   const before = butterflyState.list;
   const snapshot = butterflyMotion.snapshotFromState(butterflyState);
   if (before !== butterflyState.list) {
@@ -13648,13 +13716,11 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
     });
     Object.keys(incomingById).forEach(function (id) {
       const raw = incomingById[id];
+      const spawn = clampButterflyPointToActiveBounds(raw.x, raw.y);
       const butterfly = createButterfly(Date.now(), {
         id: raw.id,
         color: raw.color,
-        spawn: {
-          x: getNumericButterflyValue(raw.x, butterflyBoundsLeft),
-          y: getNumericButterflyValue(raw.y, butterflyBoundsTop)
-        }
+        spawn
       });
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       butterfly.spawnedAt = getNumericButterflyValue(raw.spawnedAt, Date.now());
@@ -13676,8 +13742,12 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       const prevX = Number.isFinite(Number(butterfly.x)) ? butterfly.x : null;
       const prevY = Number.isFinite(Number(butterfly.y)) ? butterfly.y : null;
       const prevSampleAt = butterfly._netSampleAt;
-      const newX = getNumericButterflyValue(raw.x, prevX != null ? prevX : butterflyBoundsLeft);
-      const newY = getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop);
+      const nextPoint = clampButterflyPointToActiveBounds(
+        getNumericButterflyValue(raw.x, prevX != null ? prevX : butterflyBoundsLeft),
+        getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop)
+      );
+      const newX = nextPoint.x;
+      const newY = nextPoint.y;
       if (prevX != null && prevY != null && Number.isFinite(prevSampleAt) && prevSampleAt > 0) {
         const dtMs = Math.max(16, sampleAt - prevSampleAt);
         const rawVx = (newX - prevX) / dtMs;
