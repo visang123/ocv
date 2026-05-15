@@ -915,8 +915,8 @@ function syncWorldPlantFogVisuals() {
     if (el) el.style.display = showFog ? "block" : "none";
   });
   if (lineEl) {
-    const showLine = stage >= 2 && stage <= 4;
-    lineEl.style.display = showLine ? "block" : "none";
+    const showLine = false;
+    lineEl.style.display = "none";
     lineEl.style.borderTopWidth = "0";
     lineEl.style.borderRightWidth = "0";
     lineEl.style.borderBottomWidth = "0";
@@ -2614,17 +2614,16 @@ function getPlayerHeadFogProbeBox() {
 }
 
 function getPlayerHeadFogProbeBoxForPose(px, pd, jy) {
-  const top = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT - pd + jy;
-  const bottom = GROUND_WORLD_HEIGHT - pd + jy;
-  const h = bottom - top;
-  const headH = Math.min(24, Math.max(10, h * 0.38));
+  const footY = GROUND_WORLD_HEIGHT - pd + jy;
+  const feetInsetX = 3;
+  const feetH = 8;
   return {
-    left: px,
-    top: top,
-    right: px + PLAYER_WIDTH,
-    bottom: top + headH,
-    width: PLAYER_WIDTH,
-    height: headH
+    left: px + feetInsetX,
+    top: footY - feetH,
+    right: px + PLAYER_WIDTH - feetInsetX,
+    bottom: footY,
+    width: PLAYER_WIDTH - feetInsetX * 2,
+    height: feetH
   };
 }
 

@@ -2647,6 +2647,7 @@ body #world-bag-inventory {
   border-radius: 3px;
   box-shadow: 0 0 10px var(--fog-line-glow, rgba(255, 255, 255, 0.35));
   opacity: 0.88;
+  display: none !important;
 }
 
 .world-plant-fog[data-stage="2"] .world-plant-fog-clear-line {

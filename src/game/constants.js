@@ -39,7 +39,7 @@ export function getPlantFogClearRectWorldPx(stage) {
   if (st >= 5) return { left: 0, top: 0, right: W, bottom: H };
   if (st === 4) return { left: 0, top: 0, right: W, bottom: H };
   if (st === 3) return { left: 0, top: 56, right: Math.floor(W * 0.84), bottom: H };
-  if (st === 2) return { left: 0, top: Math.floor(H * 0.56), right: Math.floor(W * 0.58), bottom: H };
+  if (st === 2) return { left: 0, top: Math.floor(H * 0.4), right: Math.floor(W * 0.68), bottom: H };
   return {
     left: 0,
     top: Math.floor(H * 0.5),
