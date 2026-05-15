@@ -721,6 +721,38 @@ function saveBagInventoryOrder() {
 }
 bagInventoryItemOrder = loadBagInventoryOrder();
 
+let plantProgressScoreTickRowBound = false;
+/** 현재 식물지수 숫자를 1000 눈금 행과 한 줄에 배치(겹침 방지) */
+function ensurePlantProgressScoreInTickRow() {
+  const scoreEl = document.getElementById("plant-progress-score");
+  const ticks = document.querySelector(".plant-progress-ticks");
+  if (!scoreEl || !ticks) return;
+  if (ticks.querySelector(".plant-progress-tick-row--head")) {
+    plantProgressScoreTickRowBound = true;
+    return;
+  }
+  if (plantProgressScoreTickRowBound) return;
+
+  let headRow = ticks.querySelector(".plant-progress-tick-row--head");
+  const firstRow = ticks.querySelector(".plant-progress-tick-row");
+  if (!firstRow) return;
+
+  if (!headRow) {
+    headRow = document.createElement("div");
+    headRow.className = "plant-progress-tick-row plant-progress-tick-row--head";
+    const mark = firstRow.querySelector(".plant-progress-tick-mark");
+    const pct = firstRow.querySelector(".plant-progress-tick-pct");
+    if (scoreEl.parentNode !== headRow) {
+      headRow.appendChild(scoreEl);
+    }
+    if (mark) headRow.appendChild(mark);
+    if (pct) headRow.appendChild(pct);
+    ticks.replaceChild(headRow, firstRow);
+  } else if (!headRow.contains(scoreEl)) {
+    headRow.insertBefore(scoreEl, headRow.firstChild);
+  }
+}
+
 let plantProgressSproutToggleBound = false;
 function ensurePlantProgressSproutToggleBound() {
   if (plantProgressSproutToggleBound) return;
@@ -766,7 +798,14 @@ function syncGuideInventoryBar() {
 function getPlantIndexPointsForSinglePlant(plant) {
   if (!plant || plant.removed) return 0;
   if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return 0;
-  if (!plant.isSeedPlanted) return 0;
+  const isPlanted =
+    plant.isSeedPlanted ||
+    (
+      plant.plantedAt != null &&
+      Number.isFinite(Number(plant.x)) &&
+      Number.isFinite(Number(plant.y))
+    );
+  if (!isPlanted) return 0;
   if (!plant.isSproutGrown) return PLANT_INDEX_SEEDED_SOIL;
   const st = getSproutStageFromPlant(plant);
   if (st <= 0) return PLANT_INDEX_SEEDED_SOIL;
@@ -799,14 +838,7 @@ function getPlantFogClearRectForCurrentScore() {
 
 /** 시각용 맑은 구역보다 이동 허용을 약간 넓혀 닿기 전에 막히는 느낌을 줄임 */
 function getPlantFogClearRectForMovementClamp() {
-  const r = getPlantFogClearRectForCurrentScore();
-  const pad = 8;
-  return {
-    left: r.left - pad,
-    top: r.top - pad,
-    right: r.right + pad,
-    bottom: r.bottom + pad
-  };
+  return getPlantFogClearRectForCurrentScore();
 }
 
 function isPlantFogMovementClampActive() {
@@ -909,7 +941,7 @@ function syncWorldPlantFogVisuals() {
   const R = rect.right;
   const B = rect.bottom;
   const midH = Math.max(0, B - T);
-  const o = 20;
+  const o = 0;
 
   if (topEl) {
     if (T > 0) {
@@ -992,6 +1024,7 @@ function updatePlantProgressGauge() {
   const visible = Boolean(hasSpawnedCharacter && !isCharacterSelecting);
   gauge.classList.toggle("is-visible", visible);
   gauge.setAttribute("aria-hidden", visible ? "false" : "true");
+  ensurePlantProgressScoreInTickRow();
   const scoreEl = document.getElementById("plant-progress-score");
   if (scoreEl) {
     scoreEl.textContent = String(score);
@@ -7976,7 +8009,7 @@ function updatePlayerPosition() {
     jumpY = previousJumpY;
   } else if (isPlantFogMovementClampActive()) {
     const clearRect = getPlantFogClearRectForMovementClamp();
-    const eps = 2.5;
+    const eps = 0.35;
     if (!isPlayerHeadFogClearForPose(playerX, playerDepth, jumpY, clearRect, eps)) {
       if (isPlayerHeadFogClearForPose(previousPlayerX, playerDepth, jumpY, clearRect, eps)) {
         playerX = previousPlayerX;

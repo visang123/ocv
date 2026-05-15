@@ -2687,54 +2687,78 @@ body #world-bag-inventory {
 }
 
 .plant-progress-score {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 30;
-  flex-shrink: 0;
-  order: 0;
-  align-self: flex-start;
-  min-width: 28px;
-  padding: 2px 6px 4px;
-  font: 900 22px/1.05 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  position: static;
+  z-index: 3;
+  flex: 0 0 auto;
+  margin-right: auto;
+  min-width: 0;
+  padding: 0 3px 0 0;
+  font: 900 13px/1.05 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
   color: #c8f56e;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-align: left;
   user-select: none;
   pointer-events: none;
   text-shadow:
-    0 0 10px rgba(0, 0, 0, 0.55),
-    0 1px 3px rgba(0, 0, 0, 0.88),
-    0 0 16px rgba(130, 230, 60, 0.4);
-  -webkit-text-stroke: 0.35px rgba(18, 52, 12, 0.35);
-  background: linear-gradient(180deg, rgba(12, 18, 8, 0.82) 0%, rgba(12, 18, 8, 0.35) 70%, transparent 100%);
-  border-radius: 6px;
+    0 0 8px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 12px rgba(130, 230, 60, 0.45);
+  -webkit-text-stroke: 0.3px rgba(18, 52, 12, 0.4);
+  background: rgba(12, 18, 8, 0.72);
+  border-radius: 4px;
+}
+
+.plant-progress-tick-row--head {
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .plant-progress-gauge.is-collapsed .plant-progress-score {
-  padding-bottom: 2px;
-  font-size: 16px;
+  font-size: 12px;
 }
 
 .plant-progress-gauge.is-collapsed {
-  height: 52px;
-  overflow: hidden;
+  height: auto;
+  min-height: 52px;
+  overflow: visible;
 }
 
 .plant-progress-gauge-panel {
+  --pp-meter-h: 388px;
+  --pp-pad-top: 10px;
+  --pp-pad-bottom: 24px;
+  --pp-track-h: calc(var(--pp-meter-h) - var(--pp-pad-top) - var(--pp-pad-bottom));
   position: relative;
   z-index: 1;
   flex: 1 1 auto;
   order: 1;
   width: 100%;
   min-height: 100px;
-  margin-top: 30px;
+  margin-top: 0;
   margin-bottom: -10px;
   pointer-events: none;
 }
 
 .plant-progress-gauge.is-collapsed .plant-progress-gauge-panel {
+  display: block;
+  flex: 0 0 auto;
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.plant-progress-gauge.is-collapsed .plant-progress-meter,
+.plant-progress-gauge.is-collapsed .plant-progress-rewards {
   display: none;
+}
+
+.plant-progress-gauge.is-collapsed .plant-progress-ticks {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  right: auto;
+  width: auto;
+  padding: 4px 0;
 }
 
 .plant-progress-meter {
@@ -2742,7 +2766,7 @@ body #world-bag-inventory {
   left: 0;
   bottom: 0;
   width: 28px;
-  height: 388px;
+  height: var(--pp-meter-h);
   border-radius: 14px 14px 50% 50%;
   background:
     linear-gradient(90deg, #4a2810 0 10%, #b86e22 22%, #d8943a 38%, #6a3214 52%, #945418 72%, #2e1406 100%);
@@ -2880,13 +2904,16 @@ body #world-bag-inventory {
 .plant-progress-rewards {
   position: absolute;
   left: 42px;
-  top: 2px;
-  display: grid;
-  gap: 22px;
+  bottom: 0;
+  width: 40px;
+  height: var(--pp-meter-h, 388px);
+  pointer-events: none;
 }
 
 .plant-progress-reward {
-  position: relative;
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
   display: grid;
   grid-template-columns: 1fr;
   place-items: center;
@@ -2909,6 +2936,33 @@ body #world-bag-inventory {
 
 .plant-progress-reward.is-unlocked {
   opacity: 1;
+}
+
+.plant-progress-reward[data-threshold="1000"] {
+  top: var(--pp-pad-top, 10px);
+}
+
+.plant-progress-reward[data-threshold="750"] {
+  top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.25);
+}
+
+.plant-progress-reward[data-threshold="500"] {
+  top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.5);
+}
+
+.plant-progress-reward[data-threshold="250"] {
+  top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.75);
+}
+
+.plant-progress-reward .plant-progress-fog-icon {
+  width: 24px;
+  height: 20px;
+  background: url("이미지/fog-mist-icon.svg?v=20260515d") center / contain no-repeat;
+}
+
+.plant-progress-reward .plant-progress-fog-icon ellipse,
+.plant-progress-reward .plant-progress-fog-icon defs {
+  display: none;
 }
 
 .plant-progress-reward::before {
