@@ -45,6 +45,15 @@ export function bindTradeMaster(h) {
       updateTradeConfirmButton();
     });
   }
+  if (host.tradeCounterSlot) {
+    host.tradeCounterSlot.addEventListener("click", function (event) {
+      const chip = event.target.closest(".trade-counter-chip");
+      if (!chip || !exchangeOpen) return;
+      event.preventDefault();
+      event.stopPropagation();
+      returnOneTradeCounterItemToInventory(chip.dataset.itemKey || "");
+    });
+  }
 }
 
 export function hydrateTradeMasterDialogueComplete(flag) {
@@ -165,14 +174,15 @@ function bagSlotToItemKey(slotEl) {
 function layoutTradeSpeechBubble() {
   if (!host || !host.tradeMasterBubble) return;
   const bubbleWidth = host.tradeMasterBubble.offsetWidth || 48;
-  const headTop =
-    host.TRADE_MASTER_START_Y - host.NPC_HEIGHT - host.NPC_HEAD_TOP_TRIM_WORLD;
+  const headTop = host.getNpcHeadTopWorldY
+    ? host.getNpcHeadTopWorldY(host.TRADE_MASTER_START_Y)
+    : host.TRADE_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
   const bubbleWorldY =
     host.speechBubbleTopWorldYFromHead(
       headTop,
       host.tradeMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
-    ) + host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
+    ) - host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   host.setSpeechBubbleTransform(
     host.tradeMasterBubble,
     host.TRADE_MASTER_START_X + host.NPC_WIDTH / 2 - bubbleWidth / 2,
@@ -266,6 +276,25 @@ function addOneInventoryItemToTradeCounter(itemKey) {
   }
   updateTradeConfirmButton();
   return true;
+}
+
+function returnOneTradeCounterItemToInventory(itemKey) {
+  if (!itemKey) return;
+  const n = Math.max(0, Math.floor(Number(counterByKey[itemKey]) || 0));
+  if (n <= 0) return;
+  counterByKey[itemKey] = n - 1;
+  if (counterByKey[itemKey] <= 0) delete counterByKey[itemKey];
+  host.addBagItems(itemKey, 1);
+  renderTradeCounter();
+  renderTradeOffers();
+  if (
+    selectedRecipeId &&
+    !recipeMatchesCounter(counterByKey, getTradeRecipeById(selectedRecipeId))
+  ) {
+    selectedRecipeId = null;
+  }
+  updateTradeConfirmButton();
+  host.updateBagInventorySlots();
 }
 
 function renderTradeCounter() {

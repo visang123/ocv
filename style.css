@@ -3516,6 +3516,12 @@ body #world-bag-inventory {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.trade-counter-chip:hover {
+  border-color: rgba(251, 191, 36, 0.75);
+  background: rgba(245, 158, 11, 0.14);
 }
 
 .trade-counter-chip .bag-slot-icon {

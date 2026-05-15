@@ -1517,12 +1517,12 @@ const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
 /** NPC 말풍선: 머리와의 간격(플레이어보다 좁게) */
 const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 0;
 /**
- * NPC 발밑 y는 npcY, 논리 박스 높이는 NPC_HEIGHT.
- * PNG 상단 여백이 있으면 양수로 키워 실제 머리 윗선을 아래로 보정.
+ * npcY는 스프라이트 박스 윗선(월드 y가 작을수록 화면 위).
+ * PNG 상단 여백만큼 아래로 내려 실제 머리 꼭대기 y.
  */
-const NPC_HEAD_TOP_TRIM_WORLD = 10;
-/** NPC 말풍선만: 양수일수록 아래(머리 쪽). 과하면 머리에 겹침 */
-const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 20;
+const NPC_HEAD_TOP_TRIM_WORLD = 8;
+/** NPC 말풍선: 양수일수록 y를 줄여 머리 쪽(아래)으로 이동 */
+const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 4;
 /** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
@@ -1837,11 +1837,15 @@ function setPlayerBubbleWorldPosition(worldX, worldY) {
     : "translate(" + px + "px, " + py + "px)";
 }
 
+function getNpcHeadTopWorldY(npcWorldTopY) {
+  return Number(npcWorldTopY) + NPC_HEAD_TOP_TRIM_WORLD;
+}
+
 function layoutNpcSpeechBubble() {
   const bubbleWidth = npcBubble.offsetWidth || 48;
-  const npcHeadTop = npcY - NPC_HEIGHT - NPC_HEAD_TOP_TRIM_WORLD;
+  const npcHeadTop = getNpcHeadTopWorldY(npcY);
   const bubbleWorldY =
-    speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble, NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) +
+    speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble, NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) -
     NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   setNpcBubbleWorldPosition(
     npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
@@ -2320,6 +2324,7 @@ bindTradeMaster({
   NPC_HEAD_TOP_TRIM_WORLD: NPC_HEAD_TOP_TRIM_WORLD,
   NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD: NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
   NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD: NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
+  getNpcHeadTopWorldY: getNpcHeadTopWorldY,
   npcInteractDistance: npcInteractDistance,
   tradeMasterDialogueCompleteKey: tradeMasterDialogueCompleteKey,
   isTradeMasterVisible: isTradeMasterVisible,
@@ -5034,8 +5039,8 @@ function createRandomApple(id) {
   };
 }
 
-/** 돌과 월드 UI(우물·포탈·허브·나무 등) 사이 최소 여백 */
-const WORLD_ROCK_UI_CLEAR_PAD = 5;
+/** 돌과 월드 UI(우물·NPC·포탈 등) 사이 최소 여백 */
+const WORLD_ROCK_UI_CLEAR_PAD = 10;
 
 function expandWorldRockAvoidRect(left, top, w, h, pad) {
   return {
@@ -5088,28 +5093,25 @@ function collectWorldRockAvoidZones(ctx) {
   zones.push(expandWorldRockAvoidRect(guideBookX, guideBookY, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT, p));
   zones.push(expandWorldRockAvoidRect(worldBagX, worldBagY, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT, p));
   zones.push(expandWorldRockAvoidRect(npcX, npcY, NPC_WIDTH, NPC_HEIGHT, p));
-  if (isTradeMasterVisible()) {
-    zones.push(
-      expandWorldRockAvoidRect(
-        TRADE_MASTER_START_X,
-        TRADE_MASTER_START_Y,
-        NPC_WIDTH,
-        NPC_HEIGHT,
-        p
-      )
-    );
-  }
-  if (isAlchemyMasterVisible()) {
-    zones.push(
-      expandWorldRockAvoidRect(
-        ALCHEMY_MASTER_START_X,
-        ALCHEMY_MASTER_START_Y,
-        NPC_WIDTH,
-        NPC_HEIGHT,
-        p
-      )
-    );
-  }
+  zones.push(expandWorldRockAvoidRect(NPC_START_X, NPC_START_Y, NPC_WIDTH, NPC_HEIGHT, p));
+  zones.push(
+    expandWorldRockAvoidRect(
+      TRADE_MASTER_START_X,
+      TRADE_MASTER_START_Y,
+      NPC_WIDTH,
+      NPC_HEIGHT,
+      p
+    )
+  );
+  zones.push(
+    expandWorldRockAvoidRect(
+      ALCHEMY_MASTER_START_X,
+      ALCHEMY_MASTER_START_Y,
+      NPC_WIDTH,
+      NPC_HEIGHT,
+      p
+    )
+  );
   zones.push(expandWorldRockAvoidRect(seedX, seedY, SEED_SIZE, SEED_SIZE, p));
   const bucketSz = getBucketSize();
   const bx =
@@ -5225,9 +5227,10 @@ function createRandomWorldRocks(ctx) {
   const avoidZones = collectWorldRockAvoidZones(spawnCtx);
   const rocks = [];
   for (let i = 0; i < count; i += 1) {
+    let placed = false;
     let x = margin;
     let y = yMin;
-    for (let attempt = 0; attempt < 220; attempt += 1) {
+    for (let attempt = 0; attempt < 320; attempt += 1) {
       x = margin + Math.floor(Math.random() * xSpan);
       y = yMin + Math.floor(Math.random() * ySpan);
       const rockR = worldRockRect(x, y, size);
@@ -5236,9 +5239,11 @@ function createRandomWorldRocks(ctx) {
       });
       const clashUi = worldRockOverlapsAnyAvoidRect(rockR, avoidZones);
       if (!clashRock && !clashUi) {
+        placed = true;
         break;
       }
     }
+    if (!placed) continue;
     rocks.push({
       id: "ground-rock-" + (i + 1),
       x,
