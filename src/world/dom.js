@@ -20,6 +20,7 @@ const alchemyCraftOverlay = document.getElementById("alchemy-craft-overlay");
 const alchemyCraftProductList = document.getElementById("alchemy-craft-product-list");
 const alchemyCraftShowRequirements = document.getElementById("alchemy-craft-show-requirements");
 const alchemyCraftRequirementSlots = document.getElementById("alchemy-craft-requirement-slots");
+const alchemyCraftRequirementSummary = document.getElementById("alchemy-craft-requirement-summary");
 const alchemyCraftConfirm = document.getElementById("alchemy-craft-confirm");
 const alchemyCraftClose = document.getElementById("alchemy-craft-close");
 const playerBubble = document.getElementById("player-bubble");
@@ -98,6 +99,7 @@ export {
   alchemyCraftProductList,
   alchemyCraftShowRequirements,
   alchemyCraftRequirementSlots,
+  alchemyCraftRequirementSummary,
   alchemyCraftConfirm,
   alchemyCraftClose,
   playerBubble,

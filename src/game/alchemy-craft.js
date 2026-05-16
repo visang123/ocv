@@ -71,25 +71,46 @@ export function getAlchemyCraftRecipeById(recipeId) {
   });
 }
 
-/** @returns {{ key: string }[]} */
+/** @typedef {{ key: string, required: number }} AlchemyRequirementSlotDef */
+
+/** @returns {AlchemyRequirementSlotDef[]} */
 export function buildAlchemyRequirementSlots(recipe) {
   if (!recipe) return [];
-  const slots = [];
-  Object.keys(recipe.inputs).forEach(function (key) {
-    const n = Math.max(0, Math.floor(Number(recipe.inputs[key]) || 0));
-    for (let i = 0; i < n; i++) {
-      slots.push({ key: key });
-    }
-  });
-  return slots;
+  return Object.keys(recipe.inputs)
+    .map(function (key) {
+      return {
+        key: key,
+        required: Math.max(0, Math.floor(Number(recipe.inputs[key]) || 0))
+      };
+    })
+    .filter(function (def) {
+      return def.required > 0;
+    });
 }
 
-/** @param {({ key: string } | null)[]} slotFills */
+/** @param {AlchemyRequirementSlotDef[]} slotDefs @param {number[]} slotFills */
+/** @param {{ key: string, required: number }[]} slotDefs @param {number[]} slotFills */
+export function formatAlchemyRequirementSummary(slotDefs, slotFills, getLabel) {
+  if (!slotDefs.length) return { text: "", allComplete: true };
+  const parts = [];
+  slotDefs.forEach(function (def, index) {
+    const filled = Math.max(0, Math.floor(Number(slotFills[index]) || 0));
+    const remaining = def.required - filled;
+    if (remaining <= 0) return;
+    const label = getLabel(def.key);
+    parts.push(label + " " + remaining + "\uAC1C");
+  });
+  if (!parts.length) {
+    return { text: "\uD544\uC694\uD55C \uC7AC\uB8CC\uB97C \uBAA8\uB450 \uCC44\uC6E0\uC2B5\uB2C8\uB2E4.", allComplete: true };
+  }
+  return { text: parts.join(", ") + " \uD544\uC694", allComplete: false };
+}
+
 export function alchemySlotsAreComplete(slotDefs, slotFills) {
   if (!slotDefs.length) return false;
   if (slotFills.length !== slotDefs.length) return false;
   for (let i = 0; i < slotDefs.length; i++) {
-    if (!slotFills[i]) return false;
+    if ((Number(slotFills[i]) || 0) < slotDefs[i].required) return false;
   }
   return true;
 }

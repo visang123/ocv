@@ -20,8 +20,36 @@ let exchangeOpen = false;
 let counterByKey = {};
 let selectedRecipeId = null;
 
+let outsideDismissBound = false;
+
+function isTradeExchangeKeepOpenTarget(target) {
+  if (!(target instanceof Element) || !host) return false;
+  const panel = host.tradeExchangeOverlay
+    ? host.tradeExchangeOverlay.querySelector(".trade-exchange-panel")
+    : null;
+  if (panel && panel.contains(target)) return true;
+  if (host.bagInventoryPanel && host.bagInventoryPanel.contains(target)) return true;
+  if (host.worldBagInventory && host.worldBagInventory.contains(target)) return true;
+  return false;
+}
+
+function onTradeExchangeOutsidePointer(event) {
+  if (!exchangeOpen) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (isTradeExchangeKeepOpenTarget(target)) return;
+  closeTradeExchangePanel();
+}
+
+function bindTradeExchangeOutsideDismiss() {
+  if (outsideDismissBound) return;
+  outsideDismissBound = true;
+  document.addEventListener("pointerdown", onTradeExchangeOutsidePointer, true);
+}
+
 export function bindTradeMaster(h) {
   host = h;
+  bindTradeExchangeOutsideDismiss();
   if (host.tradeExchangeClose) {
     host.tradeExchangeClose.addEventListener("click", function (event) {
       event.preventDefault();
@@ -96,9 +124,14 @@ export function tryTalkToTradeMaster() {
 
 export function updateTradeNpcPrompt() {
   if (!host || !host.tradeMasterBubble) return;
+  if (exchangeOpen) {
+    if (!isNearTradeMaster()) {
+      closeTradeExchangePanel();
+    }
+    return;
+  }
   if (
     running ||
-    exchangeOpen ||
     (host.isNpcDialogueRunning && host.isNpcDialogueRunning()) ||
     (host.isAlchemyMasterDialogueRunning && host.isAlchemyMasterDialogueRunning()) ||
     (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen())

@@ -206,6 +206,7 @@ import {
   alchemyCraftProductList,
   alchemyCraftShowRequirements,
   alchemyCraftRequirementSlots,
+  alchemyCraftRequirementSummary,
   alchemyCraftConfirm,
   alchemyCraftClose,
   playerBubble,
@@ -2479,6 +2480,7 @@ bindAlchemyMaster({
   alchemyCraftProductList: alchemyCraftProductList,
   alchemyCraftShowRequirements: alchemyCraftShowRequirements,
   alchemyCraftRequirementSlots: alchemyCraftRequirementSlots,
+  alchemyCraftRequirementSummary: alchemyCraftRequirementSummary,
   alchemyCraftConfirm: alchemyCraftConfirm,
   alchemyCraftClose: alchemyCraftClose,
   bagInventoryPanel: bagInventoryPanel,
@@ -8240,6 +8242,53 @@ function syncPlantCardWaterReadoutVisibility(showWater) {
   plantWaterBar.style.display = shouldShowWater ? "grid" : "none";
 }
 
+function appendPlantHoverWaterDetail(parentEl, plant) {
+  if (!parentEl || !plant) return;
+  const detailEl = document.createElement("div");
+  detailEl.className = "plant-world-sign-water";
+  const badTitle = getPlantSoilBadStateTitle(plant);
+  if (badTitle) {
+    detailEl.textContent = badTitle;
+    parentEl.appendChild(detailEl);
+    return;
+  }
+  if (isStage3CompleteAwaitingMagicPowder(plant)) {
+    detailEl.classList.add("is-magic-hint");
+    detailEl.textContent = stage3CompleteMagicHint;
+    parentEl.appendChild(detailEl);
+    return;
+  }
+  const waterCapacity = getPlantWaterCapacity(plant);
+  const waterLevel = Number(plant.waterLevel) || 0;
+  const textEl = document.createElement("div");
+  textEl.className = "plant-world-sign-water-text";
+  textEl.textContent = "\uC218\uBD84\uD83D\uDCA7: " + waterLevel + "/" + waterCapacity;
+  detailEl.appendChild(textEl);
+  const barEl = document.createElement("div");
+  barEl.className = "plant-world-sign-water-bar";
+  for (let i = 0; i < waterCapacity; i += 1) {
+    const segment = document.createElement("div");
+    segment.className = "plant-water-segment";
+    if (i < waterLevel) segment.classList.add("is-filled");
+    barEl.appendChild(segment);
+  }
+  detailEl.appendChild(barEl);
+  parentEl.appendChild(detailEl);
+}
+
+function syncPlantHoverWellDockLayout() {
+  if (!plantHoverLabel || !wellCard) return;
+  if (!plantHoverLabel.classList.contains("is-well-dock")) return;
+  if (window.getComputedStyle(wellCard).display === "none") {
+    plantHoverLabel.style.top = "";
+    plantHoverLabel.style.height = "";
+    return;
+  }
+  const rect = wellCard.getBoundingClientRect();
+  plantHoverLabel.style.top = Math.round(rect.top) + "px";
+  plantHoverLabel.style.height = Math.round(rect.height) + "px";
+}
+
 function renderPlantCardForPlant(plant) {
   if (getPlantSoilBadStateTitle(plant)) {
     plantCard.style.display = "none";
@@ -10067,12 +10116,15 @@ function hidePlantHoverLabel() {
       "is-ui-shortcut-hint",
       "is-world-npc-name",
       "is-well-dock",
-      "is-plant-world-sign"
+      "is-plant-world-sign",
+      "is-dry",
+      "is-overwatered"
     );
     plantHoverLabel.textContent = "";
     plantHoverLabel.style.position = "";
     plantHoverLabel.style.left = "";
     plantHoverLabel.style.top = "";
+    plantHoverLabel.style.height = "";
     plantHoverLabel.style.right = "";
     plantHoverLabel.style.zIndex = "";
     plantHoverLabel.style.transform = "";
@@ -10104,6 +10156,8 @@ function showPlantHoverSignForPlant(plant) {
     "is-stage3-complete"
   );
   plantHoverLabel.classList.add("is-well-dock", "is-plant-world-sign");
+  plantHoverLabel.classList.toggle("is-dry", plant.status === "dry");
+  plantHoverLabel.classList.toggle("is-overwatered", Boolean(plant.isOverwatered));
   plantHoverLabel.style.position = "fixed";
   plantHoverLabel.style.left = "auto";
   plantHoverLabel.style.top = "";
@@ -10119,24 +10173,10 @@ function showPlantHoverSignForPlant(plant) {
     plantHoverLabel.appendChild(titleEl);
   }
 
-  const detailEl = document.createElement("div");
-  detailEl.className = "plant-world-sign-water";
-  if (badTitle) {
-    detailEl.textContent = badTitle;
-  } else if (isStage3CompleteAwaitingMagicPowder(plant)) {
-    detailEl.classList.add("is-magic-hint");
-    detailEl.textContent = stage3CompleteMagicHint;
-  } else {
-    const waterCapacity = getPlantWaterCapacity(plant);
-    detailEl.textContent =
-      "\uC218\uBD84\uD83D\uDCA7: " +
-      (Number(plant.waterLevel) || 0) +
-      "/" +
-      waterCapacity;
-  }
-  plantHoverLabel.appendChild(detailEl);
+  appendPlantHoverWaterDetail(plantHoverLabel, plant);
 
   plantHoverLabel.style.display = "flex";
+  syncPlantHoverWellDockLayout();
   applyPlantHoverVisuals(plant);
 }
 

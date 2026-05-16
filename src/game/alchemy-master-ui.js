@@ -4,6 +4,7 @@ import {
   ALCHEMY_CRAFT_RECIPES,
   alchemySlotsAreComplete,
   buildAlchemyRequirementSlots,
+  formatAlchemyRequirementSummary,
   getAlchemyCraftRecipeById
 } from "./alchemy-craft.js";
 
@@ -21,16 +22,44 @@ let promptHideTimeout = null;
 let craftOpen = false;
 let selectedRecipeId = null;
 let requirementsVisible = false;
-/** @type {({ key: string } | null)[]} */
+/** @type {number[]} */
 let requirementSlotFills = [];
-/** @type {{ key: string }[]} */
+/** @type {import("./alchemy-craft.js").AlchemyRequirementSlotDef[]} */
 let requirementSlotDefs = [];
 
 /** @type {{ el: HTMLElement, startMs: number, startX: number, startY: number, vx: number, vy: number } | null} */
 let craftSmokeEffect = null;
 
+let outsideDismissBound = false;
+
+function isAlchemyCraftKeepOpenTarget(target) {
+  if (!(target instanceof Element) || !host) return false;
+  const panel = host.alchemyCraftOverlay
+    ? host.alchemyCraftOverlay.querySelector(".alchemy-craft-panel")
+    : null;
+  if (panel && panel.contains(target)) return true;
+  if (host.bagInventoryPanel && host.bagInventoryPanel.contains(target)) return true;
+  if (host.worldBagInventory && host.worldBagInventory.contains(target)) return true;
+  return false;
+}
+
+function onAlchemyCraftOutsidePointer(event) {
+  if (!craftOpen) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (isAlchemyCraftKeepOpenTarget(target)) return;
+  closeAlchemyCraftPanel();
+}
+
+function bindAlchemyCraftOutsideDismiss() {
+  if (outsideDismissBound) return;
+  outsideDismissBound = true;
+  document.addEventListener("pointerdown", onAlchemyCraftOutsidePointer, true);
+}
+
 export function bindAlchemyMaster(h) {
   host = h;
+  bindAlchemyCraftOutsideDismiss();
   if (host.alchemyCraftClose) {
     host.alchemyCraftClose.addEventListener("click", function (event) {
       event.preventDefault();
@@ -118,9 +147,14 @@ export function tryTalkToAlchemyMaster() {
 
 export function updateAlchemyNpcPrompt() {
   if (!host || !host.alchemyMasterBubble) return;
+  if (craftOpen) {
+    if (!isNearAlchemyMaster()) {
+      closeAlchemyCraftPanel();
+    }
+    return;
+  }
   if (
     running ||
-    craftOpen ||
     (host.isNpcDialogueRunning && host.isNpcDialogueRunning()) ||
     (host.isTradeMasterDialogueRunning && host.isTradeMasterDialogueRunning()) ||
     (host.isTradeExchangeOpen && host.isTradeExchangeOpen())
@@ -286,9 +320,9 @@ export function closeAlchemyCraftPanel() {
 }
 
 function returnAlchemyRequirementSlotsToInventory() {
-  requirementSlotFills.forEach(function (filled) {
-    if (!filled) return;
-    host.addBagItems(filled.key, 1);
+  requirementSlotDefs.forEach(function (def, index) {
+    const n = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
+    if (n > 0) host.addBagItems(def.key, n);
   });
 }
 
@@ -299,7 +333,7 @@ function showAlchemyRequirements() {
   requirementsVisible = true;
   requirementSlotDefs = buildAlchemyRequirementSlots(recipe);
   requirementSlotFills = requirementSlotDefs.map(function () {
-    return null;
+    return 0;
   });
   renderAlchemyRequirementSlots();
   updateAlchemyCraftConfirmButton();
@@ -308,21 +342,23 @@ function showAlchemyRequirements() {
 function addOneInventoryItemToAlchemySlots(itemKey) {
   if (!requirementsVisible) return false;
   const index = requirementSlotDefs.findIndex(function (def, i) {
-    return def.key === itemKey && !requirementSlotFills[i];
+    const filled = Math.max(0, Math.floor(Number(requirementSlotFills[i]) || 0));
+    return def.key === itemKey && filled < def.required;
   });
   if (index < 0) return false;
   if (!host.removeOneBagItem(itemKey)) return false;
-  requirementSlotFills[index] = { key: itemKey };
+  requirementSlotFills[index] = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0)) + 1;
   renderAlchemyRequirementSlots();
   updateAlchemyCraftConfirmButton();
   return true;
 }
 
 function returnOneAlchemyRequirementSlot(index) {
-  const filled = requirementSlotFills[index];
-  if (!filled) return;
-  requirementSlotFills[index] = null;
-  host.addBagItems(filled.key, 1);
+  const def = requirementSlotDefs[index];
+  const filled = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
+  if (!def || filled <= 0) return;
+  requirementSlotFills[index] = filled - 1;
+  host.addBagItems(def.key, 1);
   renderAlchemyRequirementSlots();
   updateAlchemyCraftConfirmButton();
   host.updateBagInventorySlots();
@@ -359,28 +395,70 @@ function renderAlchemyRequirementSlots() {
     wrap.style.display = "none";
     wrap.innerHTML = "";
     wrap.classList.add("is-hidden");
+    renderAlchemyRequirementSummary();
     return;
   }
   wrap.style.display = "flex";
   wrap.classList.remove("is-hidden");
   wrap.innerHTML = requirementSlotDefs
     .map(function (def, index) {
-      const filled = requirementSlotFills[index];
+      const filled = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
+      const required = def.required;
+      const ratio = required > 0 ? Math.min(1, filled / required) : 0;
       const desc = getBagItemDescriptor(def.key);
-      const filledClass = filled ? " is-filled" : "";
+      const complete = filled >= required;
+      const filledClass = complete ? " is-filled" : filled > 0 ? " is-partial" : "";
+      const qtyLabel = required > 1 ? "×" + required : "";
+      const progressLabel = required > 1 ? filled + "/" + required : "";
       return (
         '<button type="button" class="alchemy-craft-req-slot' +
         filledClass +
         '" data-slot-index="' +
         index +
+        '" style="--req-fill:' +
+        ratio +
         '" aria-label="' +
         desc.label +
+        (required > 1 ? " " + filled + "/" + required : "") +
         '">' +
-        (filled ? desc.iconHtml : '<span class="alchemy-craft-req-ghost">' + desc.iconHtml + "</span>") +
+        '<span class="alchemy-craft-req-fill" aria-hidden="true"></span>' +
+        '<span class="alchemy-craft-req-icon' +
+        (complete ? "" : " alchemy-craft-req-icon--ghost") +
+        '">' +
+        desc.iconHtml +
+        "</span>" +
+        (qtyLabel
+          ? '<span class="alchemy-craft-req-qty">' + qtyLabel + "</span>"
+          : "") +
+        (required > 1 && filled > 0
+          ? '<span class="alchemy-craft-req-progress">' + progressLabel + "</span>"
+          : "") +
         "</button>"
       );
     })
     .join("");
+  renderAlchemyRequirementSummary();
+}
+
+function renderAlchemyRequirementSummary() {
+  const el = host && host.alchemyCraftRequirementSummary;
+  if (!el) return;
+  if (!requirementsVisible || !requirementSlotDefs.length) {
+    el.textContent = "";
+    el.classList.add("is-hidden");
+    el.classList.remove("is-complete");
+    return;
+  }
+  const summary = formatAlchemyRequirementSummary(
+    requirementSlotDefs,
+    requirementSlotFills,
+    function (key) {
+      return getBagItemDescriptor(key).label;
+    }
+  );
+  el.textContent = summary.text;
+  el.classList.remove("is-hidden");
+  el.classList.toggle("is-complete", summary.allComplete);
 }
 
 function updateAlchemyCraftConfirmButton() {
