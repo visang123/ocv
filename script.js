@@ -125,7 +125,8 @@ import {
   SPROUT_STAGE_HEIGHTS,
   grassStage4WorldScale,
   grassStage5WorldScale,
-  grassStage5AnchorDxWorld,
+  getMatureSpriteAnchor,
+  PLANT_HOVER_RING_WORLD_SIZE,
   pickupDistance,
   guideInteractDistance,
   npcInteractDistance,
@@ -212,7 +213,7 @@ import {
   tradeExchangeClose,
   alchemyCraftOverlay,
   alchemyCraftProductList,
-  alchemyCraftShowRequirements,
+  alchemyCraftRequirementsBlock,
   alchemyCraftRequirementSlots,
   alchemyCraftRequirementSummary,
   alchemyCraftConfirm,
@@ -308,9 +309,16 @@ import {
   isFlowerMaturePlant,
   isTreeMaturePlant,
   isCactusMaturePlant,
+  normalizePlantMatureKind,
   getMatureKindForPowderBagType,
-  getColoredPowderCountField
+  getColoredPowderCountField,
+  normalizeMagicPowderBagType
 } from "./src/game/magic-powder.js";
+import {
+  getPlantIndexPointsForSinglePlant as getPlantIndexPointsForSinglePlantCore,
+  sumPlantIndexScoreForPlants,
+  reconcileMaturePlantGrowthTierFromOrdinal
+} from "./src/game/plant-index.js";
 import {
   makeSyncEventId as makeSyncEventIdCore,
   getRemoteStateVersion as getRemoteStateVersionCore,
@@ -339,7 +347,10 @@ import {
 import {
   isWorldPointInsideRect as isWorldPointInsideRectCore,
   getPlantVisibleHoverRectsWorld as getPlantVisibleHoverRectsWorldCore,
-  getPlantWorldAnchorXY
+  getPlantWorldAnchorXY,
+  getPlantDepthSortY as getPlantDepthSortYCore,
+  mapPlantDepthSortYToZIndex,
+  worldRectsOverlap
 } from "./src/game/plantHover.js";
 import {
   HELD_ITEM_SEED,
@@ -378,8 +389,9 @@ import {
   loadBagInventoryOrder as loadBagInventoryOrderCore,
   saveBagInventoryOrder as saveBagInventoryOrderCore,
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
-  getBagItemDescriptor as getBagItemDescriptorCore
-} from "./src/game/bag-inventory.js?v=20260516g";
+  getBagItemDescriptor as getBagItemDescriptorCore,
+  canBagInventoryFitItems
+} from "./src/game/bag-inventory.js?v=20260517a";
 import {
   bindTradeMaster,
   closeTradeExchangePanel,
@@ -830,12 +842,50 @@ let bagInventoryItemOrder = [];
 let bagInventoryCountsPrev = null;
 
 function loadBagInventoryOrder() {
-  return loadBagInventoryOrderCore(getStoredValue);
+  const seenMagicPowder = new Set();
+  return loadBagInventoryOrderCore(getStoredValue)
+    .map(normalizeBagItemKey)
+    .filter(function (key) {
+      if (key !== "magicPowder") return true;
+      if (seenMagicPowder.has("magicPowder")) return false;
+      seenMagicPowder.add("magicPowder");
+      return true;
+    });
 }
 
 function saveBagInventoryOrder() {
   saveBagInventoryOrderCore(setStoredValue, bagInventoryItemOrder);
 }
+
+function normalizeBagItemKey(itemKey) {
+  return itemKey === "magicPowderMixed" ? "magicPowder" : itemKey;
+}
+
+/** 저장 데이터: 혼합 가루 → 기본 마법의 가루 */
+function migrateLegacyMixedMagicPowderIntoBase() {
+  const mixed = Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0));
+  let changed = mixed > 0;
+  if (mixed > 0) {
+    magicPowderCount = Math.max(0, Math.floor(magicPowderCount) || 0) + mixed;
+    coloredMagicPowderCounts.mixed = 0;
+    saveMagicPowderCount();
+    saveColoredMagicPowderCounts();
+  }
+  if (bagInventoryItemOrder.indexOf("magicPowderMixed") >= 0) {
+    bagInventoryItemOrder = bagInventoryItemOrder.map(normalizeBagItemKey);
+    const seenMagicPowder = new Set();
+    bagInventoryItemOrder = bagInventoryItemOrder.filter(function (key) {
+      if (key !== "magicPowder") return true;
+      if (seenMagicPowder.has("magicPowder")) return false;
+      seenMagicPowder.add("magicPowder");
+      return true;
+    });
+    saveBagInventoryOrder();
+    changed = true;
+  }
+  return changed;
+}
+
 bagInventoryItemOrder = loadBagInventoryOrder();
 
 let plantProgressScoreTickRowBound = false;
@@ -912,40 +962,32 @@ function syncGuideInventoryBar() {
   updatePlantProgressGauge();
 }
 
+function getPlantIndexScoringOptions(now) {
+  return {
+    now: now != null ? now : getSharedPlantSimulationNow(),
+    getSproutStageFromPlant: getSproutStageFromPlant,
+    isPowderUpgradeInProgress: isPowderUpgradeInProgress,
+    getPowderUpgradeRatio: getPowderUpgradeRatio,
+    getGrassAutoTier5GrowthRatio: getGrassAutoTier5GrowthRatio
+  };
+}
+
 function getPlantIndexPointsForSinglePlant(plant) {
-  if (!plant || plant.removed) return 0;
-  if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return 0;
-  const isPlanted =
-    plant.isSeedPlanted ||
-    (
-      plant.plantedAt != null &&
-      Number.isFinite(Number(plant.x)) &&
-      Number.isFinite(Number(plant.y))
-    );
-  if (!isPlanted) return 0;
-  if (!plant.isSproutGrown) return PLANT_INDEX_SEEDED_SOIL;
-  const st = getSproutStageFromPlant(plant);
-  if (st <= 0) return PLANT_INDEX_SEEDED_SOIL;
-  if (st === 1) return PLANT_INDEX_SPROUT_STAGE_1;
-  if (st === 2) return PLANT_INDEX_SPROUT_STAGE_2;
-  if (st === 3) return PLANT_INDEX_SPROUT_STAGE_3;
-  if (st === 4) return PLANT_INDEX_GRASS_STAGE_4;
-  return PLANT_INDEX_GRASS_STAGE_5;
+  return getPlantIndexPointsForSinglePlantCore(plant, getPlantIndexScoringOptions());
 }
 
 function getTotalPlantIndexScore() {
-  let sum = 0;
+  const plants = [];
   if (plantRuntime && plantRuntime.isSeedPlanted) {
-    sum += getPlantIndexPointsForSinglePlant(plantRuntime);
+    plants.push(plantRuntime);
   }
   if (appleState && Array.isArray(appleState.extraPlants)) {
     appleState.extraPlants.forEach(function (p) {
-      if (!p || p.removed) return;
-      sum += getPlantIndexPointsForSinglePlant(p);
+      if (p && !p.removed) plants.push(p);
     });
   }
   const bonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
-  return Math.min(PLANT_INDEX_SCORE_CAP, Math.max(0, sum + bonus));
+  return sumPlantIndexScoreForPlants(plants, getPlantIndexScoringOptions(), bonus);
 }
 
 function getPlantFogClearRectForCurrentScore() {
@@ -1269,6 +1311,11 @@ let lastHeartbeatBroadcastAt = 0;
 let lastWaterSplashAt = 0;
 let lastWaterSplashX = 0;
 let lastWaterSplashY = 0;
+/** 연속 입력(클릭+Q 등)으로 한 번에 여러 칸이 차는 것 방지 */
+const PLANT_WATER_POUR_COOLDOWN_MS = 220;
+let lastPlantWaterPourAt = 0;
+/** 물 준 직후 updatePlantWaterLevel이 같은 프레임에 감소시키지 않도록 */
+let suppressPlantWaterDecayUntilSim = 0;
 const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
@@ -2148,14 +2195,18 @@ document.addEventListener("keydown", function (event) {
       useHeldItem();
       return;
     }
-    if (isNearPlantMaster()) {
-      if (tryTalkToPlantMaster()) return;
-    }
+    // 거래·제작 NPC를 식물의 달인보다 먼저 처리하고, 근처에서 Q는 항상 소비(다른 Q 동작으로 넘어가지 않음).
     if (isTradeMasterVisible() && isNearTradeMaster()) {
-      if (tryTalkToTradeMaster()) return;
+      tryTalkToTradeMaster();
+      return;
     }
     if (isAlchemyMasterVisible() && isNearAlchemyMaster()) {
-      if (tryTalkToAlchemyMaster()) return;
+      tryTalkToAlchemyMaster();
+      return;
+    }
+    if (isNearPlantMaster()) {
+      tryTalkToPlantMaster();
+      return;
     }
     if (hasGuideBook && tryCatchButterfly()) return;
     useHeldItem();
@@ -2235,11 +2286,15 @@ window.addEventListener("blur", function () {
   resetInputKeys(keys);
 });
 window.addEventListener("pagehide", function () {
+  if (isTradeExchangeOpen()) closeTradeExchangePanel();
+  if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
   sendMultiplayerLeave();
   saveGameSnapshot();
   resetInputKeys(keys);
 });
 window.addEventListener("beforeunload", function () {
+  if (isTradeExchangeOpen()) closeTradeExchangePanel();
+  if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
   sendMultiplayerLeave();
   saveGameSnapshot();
   resetInputKeys(keys);
@@ -2249,6 +2304,8 @@ window.addEventListener("pageshow", function () {
 });
 document.addEventListener("visibilitychange", function () {
   if (document.hidden) {
+    if (isTradeExchangeOpen()) closeTradeExchangePanel();
+    if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
     settlePlayerBeforeBackground();
     sendMultiplayerPresence(true);
     saveGameSnapshot();
@@ -2508,6 +2565,8 @@ bindTradeMaster({
   updateNpcPosition: updateNpcPosition,
   removeOneBagItem: removeOneBagItemForTrade,
   addBagItems: addBagItemsForTrade,
+  canAddBagItems: canAddBagItemsForTrade,
+  showInventoryFullFail: showBagInventoryFullFailMessage,
   saveAppleState: saveAppleState,
   markWorldDirty: markWorldDirty,
   isNpcDialogueRunning: function () {
@@ -2524,7 +2583,7 @@ bindAlchemyMaster({
   alchemyMaster: alchemyMaster,
   alchemyCraftOverlay: alchemyCraftOverlay,
   alchemyCraftProductList: alchemyCraftProductList,
-  alchemyCraftShowRequirements: alchemyCraftShowRequirements,
+  alchemyCraftRequirementsBlock: alchemyCraftRequirementsBlock,
   alchemyCraftRequirementSlots: alchemyCraftRequirementSlots,
   alchemyCraftRequirementSummary: alchemyCraftRequirementSummary,
   alchemyCraftConfirm: alchemyCraftConfirm,
@@ -2554,6 +2613,8 @@ bindAlchemyMaster({
   updatePlayerBubblePosition: updatePlayerBubblePosition,
   removeOneBagItem: removeOneBagItemForTrade,
   addBagItems: addBagItemsForTrade,
+  canAddBagItems: canAddBagItemsForTrade,
+  showInventoryFullFail: showBagInventoryFullFailMessage,
   saveCraftFurnitureCounts: saveCraftFurnitureCounts,
   saveColoredMagicPowderCounts: saveColoredMagicPowderCounts,
   markWorldDirty: markWorldDirty,
@@ -4737,12 +4798,15 @@ function isNearPlantMaster() {
 }
 
 function tryTalkToPlantMaster() {
-  if (!isNearPlantMaster() || isNpcDialogueRunning) {
+  if (!isNearPlantMaster()) {
     return false;
+  }
+  if (isNpcDialogueRunning) {
+    return true;
   }
   if (isOnboardingLinearGateActive() && onboardingFlowStep < 9) {
     flashOnboardingOrderHint("");
-    return false;
+    return true;
   }
 
   startPlantMasterDialogue();
@@ -5299,6 +5363,11 @@ function useCraftFurnitureFromBag(kind) {
     getPlayerFootY()
   );
   if (!placement) return;
+  const craftBlockMsg = getCraftFurniturePlacementBlockMessage(placement);
+  if (craftBlockMsg) {
+    flashPlantProximityWarning(craftBlockMsg);
+    return;
+  }
   if (!removeOneBagItemForTrade(kind)) return;
 
   const entry = {
@@ -7665,7 +7734,7 @@ function updateExtraSeedsAndPlants() {
     const isSproutGrown =
       plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry";
     const stage = getSproutStageFromPlant(plant);
-    const sproutSize = getSproutSizeForStage(stage);
+    const sproutSize = getSproutSizeForStage(stage, plant);
     plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
     plant.sproutElement.classList.toggle("is-big", stage >= 2);
     plant.waterNeededElement.style.display = shouldShowFirstWaterNeededDroplet(plant) ? "block" : "none";
@@ -7679,9 +7748,11 @@ function updateExtraSeedsAndPlants() {
     if (!isSproutGrown) return;
     plant.sproutElement.src = getSproutImageForPlant(plant, stage);
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
-    const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage);
+    const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage, plant);
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
   });
+  syncAllPlantDepthStacking();
+  refreshPlantOccluderFade();
   if (didRemoveDrySoilExtraPlant) {
     saveAppleState();
     markWorldDirty();
@@ -7782,6 +7853,7 @@ function normalizeExtraPlantState(plant) {
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
   }
+  reconcileMaturePlantGrowthTierFromOrdinal(plant);
   syncPlantWaterCapacityField(plant);
   migrateLegacyPowderTier5ToAutoGrass(plant, now);
   ensureGrassOrdinalIfNeeded(plant);
@@ -8108,42 +8180,111 @@ function isWorldPointInsideRect(x, y, rect) {
 
 /** ?재 보이???물 ?프?이?????싹/?)???드 박스 목록 */
 function getPlantVisibleHoverRectsWorld(plant) {
-  return getPlantVisibleHoverRectsWorldCore(plant, {
+  return getPlantVisibleHoverRectsWorldCore(plant, getPlantHoverGeometryOptions());
+}
+
+const PLANT_DEPTH_Z_MIN = 3;
+const PLANT_DEPTH_Z_MAX = 14;
+let currentPlantHoverTarget = null;
+
+function getPlantHoverGeometryOptions() {
+  return {
     shouldHideSoil: shouldHideSeparateSoilUnderBigGrass,
     plantSpotWidth: PLANT_SPOT_WIDTH,
     plantSpotHeight: PLANT_SPOT_HEIGHT,
     getSproutStageFromPlant: getSproutStageFromPlant,
     getSproutSizeForStage: getSproutSizeForStage,
     getSproutWorldPositionForPlant: getSproutWorldPositionForPlant
+  };
+}
+
+function getPlantDepthSortY(plant) {
+  return getPlantDepthSortYCore(plant, getPlantHoverGeometryOptions());
+}
+
+function getPlantDepthZIndex(sortY) {
+  return mapPlantDepthSortYToZIndex(
+    sortY,
+    GROUND_WORLD_HEIGHT,
+    PLANT_DEPTH_Z_MIN,
+    PLANT_DEPTH_Z_MAX
+  );
+}
+
+function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl) {
+  const z = getPlantDepthZIndex(getPlantDepthSortY(plant));
+  if (spotEl) spotEl.style.zIndex = String(z);
+  if (sproutEl) sproutEl.style.zIndex = String(z + 1);
+}
+
+function syncAllPlantDepthStacking() {
+  if (plantRuntime.isSeedPlanted) {
+    applyPlantDepthZIndexToElements(plantRuntime, plantSpot, sprout);
+  }
+  appleState.extraPlants.forEach(function (plant) {
+    if (!plant || plant.removed) return;
+    applyPlantDepthZIndexToElements(plant, plant.spotElement, plant.sproutElement);
   });
 }
 
-/** ?인?? ?재 ?물 ??지 ?역 ?에 ?을 ?만 ?택(겹침 ??중심거리 가까운 ? */
+function clearPlantOccluderFade() {
+  if (!ground) return;
+  ground.querySelectorAll(".is-plant-occluding-hover").forEach(function (el) {
+    el.classList.remove("is-plant-occluding-hover");
+  });
+}
+
+function refreshPlantOccluderFade() {
+  clearPlantOccluderFade();
+  const target = currentPlantHoverTarget;
+  if (!target) return;
+  const targetDepthY = getPlantDepthSortY(target);
+  const targetRects = getPlantVisibleHoverRectsWorld(target);
+  function fadeOccluders(plant) {
+    if (!plant || plant === target) return;
+    if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
+    if (plant.removed) return;
+    if (getPlantDepthSortY(plant) <= targetDepthY) return;
+    if (!worldRectsOverlap(targetRects, getPlantVisibleHoverRectsWorld(plant))) return;
+    getPlantHoverDomElements(plant).forEach(function (el) {
+      el.classList.add("is-plant-occluding-hover");
+    });
+  }
+  if (plantRuntime.isSeedPlanted) fadeOccluders(plantRuntime);
+  appleState.extraPlants.forEach(fadeOccluders);
+}
+
+/** 포인터 아래 식물 중 가려진(뒤·작은 Y) 식물 우선 — 겹침 시 앞 식물이 아닌 뒤 식물 호버 */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
-  let best = null;
-  let bestD = Infinity;
+  const matches = [];
   function consider(plant) {
     if (!plant) return;
+    if (plant.removed) return;
     const rects = getPlantVisibleHoverRectsWorld(plant);
     for (let i = 0; i < rects.length; i += 1) {
       const rect = rects[i];
       if (!isWorldPointInsideRect(pxy.x, pxy.y, rect)) continue;
       const cx = (rect.left + rect.right) / 2;
       const cy = (rect.top + rect.bottom) / 2;
-      const d = Math.hypot(pxy.x - cx, pxy.y - cy);
-      if (d < bestD) {
-        bestD = d;
-        best = plant;
-      }
+      matches.push({
+        plant: plant,
+        depthY: getPlantDepthSortY(plant),
+        d: Math.hypot(pxy.x - cx, pxy.y - cy)
+      });
     }
   }
   if (plantRuntime.isSeedPlanted) consider(plantRuntime);
   for (let i = 0; i < appleState.extraPlants.length; i++) {
     consider(appleState.extraPlants[i]);
   }
-  return best;
+  if (!matches.length) return null;
+  matches.sort(function (a, b) {
+    if (a.depthY !== b.depthY) return a.depthY - b.depthY;
+    return a.d - b.d;
+  });
+  return matches[0].plant;
 }
 
 function bagHasPlantableSeedsForHoverHint() {
@@ -8226,7 +8367,6 @@ function syncWorldNpcHoverLabelPosition(anchorEl) {
 
 function showWorldNpcHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
-  const sameAnchor = worldNpcHoverAnchorEl === anchorEl;
   worldNpcHoverAnchorEl = anchorEl;
   ensurePlantHoverLabelOnBodyForFixedUi();
   plantHoverLabel.classList.remove(
@@ -8234,7 +8374,9 @@ function showWorldNpcHoverLabel(text, anchorEl) {
     "is-stage3-complete",
     "is-well-dock",
     "is-ui-shortcut-hint",
-    "is-plant-world-sign"
+    "is-plant-world-sign",
+    "is-dry",
+    "is-overwatered"
   );
   plantHoverLabel.classList.add("is-world-npc-name");
   if (plantHoverLabel.textContent !== text) {
@@ -8244,22 +8386,35 @@ function showWorldNpcHoverLabel(text, anchorEl) {
   plantHoverLabel.style.position = "fixed";
   plantHoverLabel.style.zIndex = "225";
   plantHoverLabel.style.transform = "none";
-  if (sameAnchor && plantHoverLabel.style.left) {
-    return;
-  }
+  plantHoverLabel.style.height = "";
+  plantHoverLabel.style.width = "";
+  plantHoverLabel.style.minWidth = "";
+  plantHoverLabel.style.right = "";
   syncWorldNpcHoverLabelPosition(anchorEl);
 }
 
 function showUiShortcutHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   ensurePlantHoverLabelOnBodyForFixedUi();
-  plantHoverLabel.classList.remove("is-seed-inventory-hint", "is-stage3-complete", "is-well-dock", "is-world-npc-name");
+  plantHoverLabel.classList.remove(
+    "is-seed-inventory-hint",
+    "is-stage3-complete",
+    "is-well-dock",
+    "is-world-npc-name",
+    "is-plant-world-sign",
+    "is-dry",
+    "is-overwatered"
+  );
   plantHoverLabel.classList.add("is-ui-shortcut-hint");
   plantHoverLabel.textContent = text;
   plantHoverLabel.style.display = "block";
   plantHoverLabel.style.position = "fixed";
   plantHoverLabel.style.zIndex = "220";
   plantHoverLabel.style.transform = "none";
+  plantHoverLabel.style.height = "";
+  plantHoverLabel.style.width = "";
+  plantHoverLabel.style.minWidth = "";
+  plantHoverLabel.style.right = "";
   const r = anchorEl.getBoundingClientRect();
   void plantHoverLabel.offsetWidth;
   const w = plantHoverLabel.offsetWidth || 1;
@@ -8369,10 +8524,17 @@ function getSproutImageForPlant(plant, stage) {
   return sproutStage1Image;
 }
 
-function getSproutSizeForStage(stage) {
+function getSproutSizeForStage(stage, plant) {
+  const matureAnchor =
+    plant && stage >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), stage) : null;
   const idx = Math.min(2, Math.max(0, Math.min(stage, 3) - 1));
-  const growthScale =
-    stage >= 5 ? grassStage5WorldScale : stage >= 4 ? grassStage4WorldScale : 1;
+  const growthScale = matureAnchor
+    ? matureAnchor.scale
+    : stage >= 5
+      ? grassStage5WorldScale
+      : stage >= 4
+        ? grassStage4WorldScale
+        : 1;
   const baseWidth = SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH;
   const baseHeight = SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT;
   return {
@@ -8389,20 +8551,28 @@ function shouldHideSeparateSoilUnderBigGrass(plant) {
 }
 
 /**
- * ? ?프?이??발밑???? ?plantBaseY ~ +PLANT_SPOT_HEIGHT)??맞춘??
- * 4·5?계??PNG ?단 ?백 ?문??world top-left 보정.
+ * 스프라이트 발밑·시각 중심을 plant spot 중앙·땅에 맞춤.
+ * 4·5단은 PNG bbox 앵커(MATURE_SPRITE_ANCHORS)로 보정.
  */
-function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stage) {
+function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stage, plant) {
+  const matureAnchor =
+    plant && stage >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), stage) : null;
+  if (matureAnchor) {
+    const spotCenterX = plantBaseX + PLANT_SPOT_WIDTH / 2;
+    const spotFootY = plantBaseY + PLANT_SPOT_HEIGHT;
+    return {
+      x: spotCenterX - (matureAnchor.centerX / matureAnchor.srcW) * sproutSize.width,
+      y: spotFootY - (matureAnchor.footY / matureAnchor.srcH) * sproutSize.height
+    };
+  }
   let footInset = 7;
-  let anchorDx = 0;
   if (stage >= 5) {
     footInset = 24;
-    anchorDx = grassStage5AnchorDxWorld;
   } else if (stage >= 4) {
     footInset = 16;
   }
   return {
-    x: plantBaseX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2 + anchorDx,
+    x: plantBaseX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
     y: plantBaseY - sproutSize.height + footInset
   };
 }
@@ -8411,17 +8581,9 @@ function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stag
 function getPlantHoverAnchorWorld(plant) {
   const px = plant.spotX != null ? plant.spotX : plant.x;
   const py = plant.spotY != null ? plant.spotY : plant.y;
-  const sproutVisible =
-    plant.isSproutGrown && plant.status !== "rotten" && plant.status !== "dry" && !plant.isOverwatered;
-  if (!sproutVisible) {
-    return { cxWorld: px + PLANT_SPOT_WIDTH / 2, cyWorld: py + PLANT_SPOT_HEIGHT / 2 };
-  }
-  const st = getSproutStageFromPlant(plant);
-  const sz = getSproutSizeForStage(st);
-  const pos = getSproutWorldPositionForPlant(px, py, sz, st);
   return {
-    cxWorld: pos.x + sz.width / 2,
-    cyWorld: pos.y + Math.min(sz.height * 0.22, 10)
+    cxWorld: px + PLANT_SPOT_WIDTH / 2,
+    cyWorld: py + PLANT_SPOT_HEIGHT / 2
   };
 }
 
@@ -8473,8 +8635,23 @@ function isSproutStage3Or5IdleNoGrowth(plant, now) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
   const st = getSproutStageFromPlant(plant);
   if (st !== 3 && st !== 5) return false;
-  if (st === 5 && isCactusMaturePlant(plant)) return false;
   if (hasActiveGreenGrowthProgress(plant, now)) return false;
+  if (isPowderUpgradeInProgress(plant)) return false;
+  return true;
+}
+
+/** 꽃·나무·선인장 5단(최종) — 새싹 3단처럼 물·수분 게이지 없음 */
+function isFinalMaturePlantNoWaterCare(plant, now) {
+  if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
+    return false;
+  }
+  if (getSproutStageFromPlant(plant) !== 5) return false;
+  if (!isFlowerMaturePlant(plant) && !isTreeMaturePlant(plant) && !isCactusMaturePlant(plant)) {
+    return false;
+  }
+  const tNow = now != null ? now : getSharedPlantSimulationNow();
+  if (hasActiveGreenGrowthProgress(plant, tNow)) return false;
+  if (isPowderUpgradeInProgress(plant)) return false;
   return true;
 }
 
@@ -8519,6 +8696,9 @@ function appendPlantHoverWaterDetail(parentEl, plant) {
   if (badTitle) {
     detailEl.textContent = badTitle;
     parentEl.appendChild(detailEl);
+    return;
+  }
+  if (isFinalMaturePlantNoWaterCare(plant)) {
     return;
   }
   if (isStage3CompleteAwaitingMagicPowder(plant)) {
@@ -8602,6 +8782,7 @@ function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) {
 }
 
 function applyPlantWaterDecay(plant, now) {
+  if (shouldSkipPlantWaterDecayNow(now)) return;
   plant.waterLevel = Math.max(0, Number(plant.waterLevel) || 0);
   if (plant.waterLevel <= 0) {
     return;
@@ -8678,7 +8859,6 @@ function getBagInventoryCountsByKey() {
     magicPowderYellow: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.yellow) || 0)),
     magicPowderWhite: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.white) || 0)),
     magicPowderBrown: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)),
-    magicPowderMixed: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0)),
     craftDesk: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftDesk) || 0)),
     craftFence: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftFence) || 0)),
     craftChair: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftChair) || 0)),
@@ -8690,6 +8870,7 @@ function getBagInventoryCountsByKey() {
 }
 
 function removeOneBagItemForTrade(itemKey) {
+  itemKey = normalizeBagItemKey(itemKey);
   const counts = getBagInventoryCountsByKey();
   if (Number(counts[itemKey] || 0) <= 0) return false;
   if (itemKey === "rock") {
@@ -8758,13 +8939,6 @@ function removeOneBagItemForTrade(itemKey) {
     saveColoredMagicPowderCounts();
     return true;
   }
-  if (itemKey === "magicPowderMixed") {
-    if ((Number(coloredMagicPowderCounts.mixed) || 0) <= 0) return false;
-    coloredMagicPowderCounts.mixed = Math.max(0, coloredMagicPowderCounts.mixed - 1);
-    updateBagInventorySlots();
-    saveColoredMagicPowderCounts();
-    return true;
-  }
   if (itemKey === "craftDesk" || itemKey === "craftFence" || itemKey === "craftChair" || itemKey === "craftHouse") {
     if ((Number(craftFurnitureCounts[itemKey]) || 0) <= 0) return false;
     craftFurnitureCounts[itemKey] = Math.max(0, craftFurnitureCounts[itemKey] - 1);
@@ -8783,7 +8957,29 @@ function removeOneBagItemForTrade(itemKey) {
   return false;
 }
 
+function canAddBagItemsForTrade(itemsToAdd) {
+  const normalized = {};
+  Object.keys(itemsToAdd || {}).forEach(function (key) {
+    const nk = normalizeBagItemKey(key);
+    normalized[nk] =
+      (Number(normalized[nk]) || 0) + Math.max(0, Math.floor(Number(itemsToAdd[key]) || 0));
+  });
+  const counts = getBagInventoryCountsByKey();
+  const slotCount = bagInventoryPanel
+    ? bagInventoryPanel.querySelectorAll(".bag-inventory-slot").length
+    : undefined;
+  return canBagInventoryFitItems(bagInventoryItemOrder, counts, normalized, slotCount);
+}
+
+function showBagInventoryFullFailMessage() {
+  showPlayerAlert({
+    message: "\uC778\uBCA4\uD1A0\uB9AC(\uC800\uC7A5\uC18C) \uCE78\uBD80\uC871, \uC81C\uC791 \uC2E4\uD328!",
+    durationMs: 2200
+  });
+}
+
 function addBagItemsForTrade(itemKey, amount) {
+  itemKey = normalizeBagItemKey(itemKey);
   const n = Math.max(0, Math.floor(Number(amount) || 0));
   if (n <= 0) return;
   if (itemKey === "rock") {
@@ -8846,13 +9042,6 @@ function addBagItemsForTrade(itemKey, amount) {
   if (itemKey === "magicPowderBrown") {
     coloredMagicPowderCounts.brown =
       Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)) + n;
-    updateBagInventorySlots();
-    saveColoredMagicPowderCounts();
-    return;
-  }
-  if (itemKey === "magicPowderMixed") {
-    coloredMagicPowderCounts.mixed =
-      Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0)) + n;
     updateBagInventorySlots();
     saveColoredMagicPowderCounts();
     return;
@@ -9872,7 +10061,6 @@ function plantWorldOvergrowthSeedCount() {
       plantRuntime.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
-      makePlantStableStage3FromOvergrowthSeed(plantRuntime, plantedAt);
       plantRuntime.blockSproutRegrowthAfterDry = false;
       plantRuntime.drySoilAt = null;
       plantSpot.style.display = "block";
@@ -9888,7 +10076,6 @@ function plantWorldOvergrowthSeedCount() {
       invPlant.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(invPlant);
       ensureGrassOrdinalIfNeeded(invPlant);
-      makePlantStableStage3FromOvergrowthSeed(invPlant, getSharedPlantSimulationNow());
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
@@ -10354,6 +10541,21 @@ function clearPlantHoverRing() {
 }
 
 function getPlantHoverRingWorldBounds(plant) {
+  const st = getSproutStageFromPlant(plant);
+  const sproutVisible =
+    plant.isSproutGrown &&
+    plant.status !== "rotten" &&
+    plant.status !== "dry" &&
+    !plant.isOverwatered;
+  if (sproutVisible && st >= 4 && shouldHideSeparateSoilUnderBigGrass(plant)) {
+    const anchor = getPlantHoverAnchorWorld(plant);
+    const size = PLANT_HOVER_RING_WORLD_SIZE;
+    return {
+      x: anchor.cxWorld - size / 2,
+      y: anchor.cyWorld - size / 2,
+      size: size
+    };
+  }
   const rects = getPlantVisibleHoverRectsWorld(plant);
   if (!rects.length) return null;
   let left = Infinity;
@@ -10369,7 +10571,7 @@ function getPlantHoverRingWorldBounds(plant) {
   }
   const w = right - left;
   const h = bottom - top;
-  const size = Math.max(w, h) * 1.1;
+  const size = Math.max(w, h) * 1.05;
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   return { x: cx - size / 2, y: cy - size / 2, size: size };
@@ -10385,12 +10587,14 @@ function layoutPlantHoverRing(plant, urgentWater) {
   plantHoverRing.classList.add("is-visible");
   plantHoverRing.classList.toggle("is-needs-water", !!urgentWater);
   plantHoverRing.style.display = "block";
+  plantHoverRing.style.zIndex = String(getPlantDepthZIndex(getPlantDepthSortY(plant)) + 2);
   setWorldPosition(plantHoverRing, bounds.x, bounds.y);
   setWorldSize(plantHoverRing, bounds.size, bounds.size);
 }
 
 function clearPlantHoverVisuals() {
   clearPlantHoverRing();
+  clearPlantOccluderFade();
   if (ground) {
     ground
       .querySelectorAll(".is-plant-water-clickable")
@@ -10426,6 +10630,30 @@ function getPlayerDistanceToPlant(plant) {
 
 function isPlayerNearPlantWorld(plant) {
   return getPlayerDistanceToPlant(plant) <= plantWaterDistance;
+}
+
+function tryConsumePlantWaterPourCooldown() {
+  const nowMs = Date.now();
+  if (nowMs - lastPlantWaterPourAt < PLANT_WATER_POUR_COOLDOWN_MS) return false;
+  lastPlantWaterPourAt = nowMs;
+  return true;
+}
+
+function markSuppressPlantWaterDecayBriefly(simNow) {
+  const t = Number(simNow);
+  if (!Number.isFinite(t) || t <= 0) return;
+  suppressPlantWaterDecayUntilSim = Math.max(suppressPlantWaterDecayUntilSim, t + 120);
+}
+
+function shouldSkipPlantWaterDecayNow(simNow) {
+  const t = Number(simNow);
+  return Number.isFinite(t) && t > 0 && t < suppressPlantWaterDecayUntilSim;
+}
+
+function refreshPlantWaterHoverIfShown(plant) {
+  if (!plant || !plantHoverLabel) return;
+  if (plantHoverLabel.style.display === "none") return;
+  showPlantHoverSignForPlant(plant);
 }
 
 function canWaterPlantByClick(plant) {
@@ -10489,6 +10717,7 @@ function applyPlantHoverVisuals(plant) {
 function hidePlantHoverLabel() {
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
+  currentPlantHoverTarget = null;
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   clearPlantHoverVisuals();
   if (plantHoverLabel) {
@@ -10519,6 +10748,7 @@ function showPlantHoverSignForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
+  currentPlantHoverTarget = plant;
   if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
     hidePlantHoverLabel();
     return;
@@ -10560,6 +10790,7 @@ function showPlantHoverSignForPlant(plant) {
   plantHoverLabel.style.display = "flex";
   syncPlantHoverWellDockLayout();
   applyPlantHoverVisuals(plant);
+  refreshPlantOccluderFade();
 }
 
 function tryWaterPlantByPointerClick(clientX, clientY) {
@@ -10577,6 +10808,7 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
     flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
     return false;
   }
+  if (!tryConsumePlantWaterPourCooldown()) return false;
 
   const target = plantToWateringTarget(plant);
   const anchor = getPlantWorldAnchorXY(plant);
@@ -10588,7 +10820,7 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
     onboardingFlowStep = 15;
     persistOnboardingStep();
   }
-  waterPlant(target, { fillToCapacity: true });
+  waterPlant(target);
   if (anchor) {
     createWaterSplashAt(anchor.x + PLANT_SPOT_WIDTH / 2, anchor.y + PLANT_SPOT_HEIGHT * 0.55, null);
   } else {
@@ -10597,10 +10829,12 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
   isBucketFull = false;
   markWorldDirty();
   broadcastBucketState(false);
-  syncWorldState(true);
   updateBucketPosition();
+  refreshPlantWaterHoverIfShown(plant);
   updatePlantState();
   updateExtraSeedsAndPlants();
+  refreshSharedWaterIndicators();
+  syncWorldState(true);
   return true;
 }
 
@@ -10817,6 +11051,253 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   return "";
 }
 
+function craftInstallBlockPhraseForNoun(noun) {
+  const ch = noun.length ? noun[noun.length - 1] : "";
+  const code = ch.charCodeAt(0);
+  let hasBatchim = true;
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    hasBatchim = (code - 0xac00) % 28 !== 0;
+  }
+  const particle = hasBatchim ? "\uC774" : "\uAC00";
+  return noun + particle + " \uC788\uC5B4\uC11C \uC124\uCE58 \uBD88\uAC00!";
+}
+
+function craftPlacementOverlapsExpandedRect(placement, ox, oy, ow, oh, pad) {
+  const fr = plantProximityRectFromXYWH(
+    placement.x,
+    placement.y,
+    placement.width,
+    placement.height
+  );
+  const br = plantProximityExpandRect(plantProximityRectFromXYWH(ox, oy, ow, oh), pad);
+  return isOverlappingRect(fr, br);
+}
+
+function craftPlacementOverlapsVisibleWorldRock(placement, rockPad) {
+  const pad = Number.isFinite(Number(rockPad)) ? Number(rockPad) : 0;
+  if (!isWorldDocumentEntry()) return false;
+  if (!Array.isArray(appleState.worldRocks)) return false;
+  const pickedIds = Array.isArray(appleState.worldRockPickedIds)
+    ? appleState.worldRockPickedIds
+    : [];
+  return appleState.worldRocks.some(function (rock) {
+    if (!rock || pickedIds.includes(rock.id)) return false;
+    const rx = Number(rock.x);
+    const ry = Number(rock.y);
+    const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+    if (!Number.isFinite(rx) || !Number.isFinite(ry)) return false;
+    const rockBox = getVisibleWorldRockCollisionRect(rx, ry, sz, rock._el);
+    return craftPlacementOverlapsExpandedRect(
+      placement,
+      rockBox.left,
+      rockBox.top,
+      rockBox.right - rockBox.left,
+      rockBox.bottom - rockBox.top,
+      pad
+    );
+  });
+}
+
+function getCraftFurnitureKindLabel(kind) {
+  if (kind === "craftDesk") return "\uCC45\uC0C1";
+  if (kind === "craftChair") return "\uC758\uC790";
+  if (kind === "craftHouse") return "\uC9D1";
+  if (kind === "craftFence") return "\uC6B8\uD0C0\uB9AC";
+  return "\uAC00\uAD6C";
+}
+
+function getCraftFurniturePlacementBlockMessage(placement) {
+  if (!placement) return "";
+
+  if (craftPlacementOverlapsVisibleWorldRock(placement, 0)) {
+    return craftInstallBlockPhraseForNoun("\uB3CC");
+  }
+
+  const wx = Number.isFinite(wellX) && wellX > 0 ? wellX : WELL_START_X;
+  const wy = Number.isFinite(wellY) && wellY > 0 ? wellY : WELL_START_Y;
+  if (craftPlacementOverlapsExpandedRect(placement, wx, wy, WELL_SIZE, WELL_SIZE, 0)) {
+    return craftInstallBlockPhraseForNoun("\uC6B0\uBB3C");
+  }
+
+  if (
+    craftPlacementOverlapsExpandedRect(
+      placement,
+      spawnPortalX,
+      spawnPortalY,
+      spawnPortalWidth,
+      spawnPortalHeight,
+      0
+    )
+  ) {
+    return craftInstallBlockPhraseForNoun("\uD3EC\uD0C8");
+  }
+
+  if (isPlantMasterVisible()) {
+    if (craftPlacementOverlapsExpandedRect(placement, npcX, npcY, NPC_WIDTH, NPC_HEIGHT, 0)) {
+      return craftInstallBlockPhraseForNoun("\uC2DD\uBB3C\uC758 \uB2EC\uC778");
+    }
+  }
+
+  if (isTradeMasterVisible()) {
+    if (
+      craftPlacementOverlapsExpandedRect(
+        placement,
+        TRADE_MASTER_START_X,
+        TRADE_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        0
+      )
+    ) {
+      return craftInstallBlockPhraseForNoun("\uC0C1\uC778");
+    }
+  }
+
+  if (isAlchemyMasterVisible()) {
+    if (
+      craftPlacementOverlapsExpandedRect(
+        placement,
+        ALCHEMY_MASTER_START_X,
+        ALCHEMY_MASTER_START_Y,
+        NPC_WIDTH,
+        NPC_HEIGHT,
+        0
+      )
+    ) {
+      return craftInstallBlockPhraseForNoun("\uC5F0\uAE08\uC220\uC758 \uB2EC\uC778");
+    }
+  }
+
+  if (usesWorldLooseSeedMode()) {
+    const lx = Number(appleState.worldLooseSeed && appleState.worldLooseSeed.x) || WORLD_LOOSE_SEED_X;
+    const ly = Number(appleState.worldLooseSeed && appleState.worldLooseSeed.y) || WORLD_LOOSE_SEED_Y;
+    if (craftPlacementOverlapsExpandedRect(placement, lx, ly, SEED_SIZE, SEED_SIZE, 0)) {
+      return craftInstallBlockPhraseForNoun("\uC528\uC557");
+    }
+  }
+
+  if (!plantRuntime.isSeedPlanted && seed && seed.style.display !== "none") {
+    if (craftPlacementOverlapsExpandedRect(placement, seedX, seedY, SEED_SIZE, SEED_SIZE, 0)) {
+      return craftInstallBlockPhraseForNoun("\uC528\uC557");
+    }
+  }
+
+  let blockedByGroundSeed = false;
+  const nowLoose = Date.now();
+  if (
+    usesWorldLooseSeedMode() &&
+    isWorldLooseSeedVisibleAt(nowLoose) &&
+    craftPlacementOverlapsExpandedRect(
+      placement,
+      appleState.worldLooseSeed.x,
+      appleState.worldLooseSeed.y,
+      SEED_SIZE,
+      SEED_SIZE,
+      0
+    )
+  ) {
+    blockedByGroundSeed = true;
+  }
+  appleState.extraSeeds.forEach(function (extraSeed) {
+    if (extraSeed.planted || extraSeed.inInventory) return;
+    if (usesWorldLooseSeedMode()) return;
+    if (!extraSeed.element || extraSeed.element.style.display === "none") return;
+    if (
+      craftPlacementOverlapsExpandedRect(placement, extraSeed.x, extraSeed.y, SEED_SIZE, SEED_SIZE, 0)
+    ) {
+      blockedByGroundSeed = true;
+    }
+  });
+  if (blockedByGroundSeed) {
+    return craftInstallBlockPhraseForNoun("\uC528\uC557");
+  }
+
+  const bsz = getBucketSize();
+  let blockedByBucket = false;
+  if (bucket && bucket.style.display === "block") {
+    const bx = Number.isFinite(bucketX) && bucketX > 0 ? bucketX : WELL_START_X - bsz.width - 8;
+    const by =
+      Number.isFinite(bucketY) && bucketY > 0 ? bucketY : WELL_START_Y + WELL_SIZE - bsz.height;
+    if (craftPlacementOverlapsExpandedRect(placement, bx, by, bsz.width, bsz.height, 0)) {
+      blockedByBucket = true;
+    }
+  }
+  (Array.isArray(appleState.worldExtraBuckets) ? appleState.worldExtraBuckets : []).forEach(
+    function (extraBucket) {
+      if (!extraBucket || blockedByBucket) return;
+      if (
+        craftPlacementOverlapsExpandedRect(
+          placement,
+          extraBucket.x,
+          extraBucket.y,
+          bsz.width,
+          bsz.height,
+          0
+        )
+      ) {
+        blockedByBucket = true;
+      }
+    }
+  );
+  if (blockedByBucket) {
+    return craftInstallBlockPhraseForNoun("\uC591\uB3D9\uC774");
+  }
+
+  if (
+    plantRuntime.isSeedPlanted &&
+    Number.isFinite(plantRuntime.spotX) &&
+    Number.isFinite(plantRuntime.spotY)
+  ) {
+    if (
+      craftPlacementOverlapsExpandedRect(
+        placement,
+        plantRuntime.spotX,
+        plantRuntime.spotY,
+        PLANT_SPOT_WIDTH,
+        PLANT_SPOT_HEIGHT,
+        0
+      )
+    ) {
+      return craftInstallBlockPhraseForNoun("\uC2DD\uBB3C");
+    }
+  }
+
+  let blockedByPlant = false;
+  appleState.extraPlants.forEach(function (plant) {
+    if (!plant || plant.removed) return;
+    if (
+      craftPlacementOverlapsExpandedRect(
+        placement,
+        plant.x,
+        plant.y,
+        PLANT_SPOT_WIDTH,
+        PLANT_SPOT_HEIGHT,
+        0
+      )
+    ) {
+      blockedByPlant = true;
+    }
+  });
+  if (blockedByPlant) {
+    return craftInstallBlockPhraseForNoun("\uC2DD\uBB3C");
+  }
+
+  let blockedByFurniture = "";
+  placedCraftFurniture.forEach(function (entry) {
+    if (blockedByFurniture) return;
+    if (
+      craftPlacementOverlapsExpandedRect(placement, entry.x, entry.y, entry.width, entry.height, 0)
+    ) {
+      blockedByFurniture = getCraftFurnitureKindLabel(entry.kind);
+    }
+  });
+  if (blockedByFurniture) {
+    return craftInstallBlockPhraseForNoun(blockedByFurniture);
+  }
+
+  return "";
+}
+
 function flashPlantProximityWarning(message) {
   plantProximityWarnUntil = Date.now() + 2800;
   playerStatus.textContent = message || "";
@@ -10954,6 +11435,8 @@ function useHeldItem() {
 }
 
 function useBucket() {
+  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return;
+
   refillWellIfNeeded();
   // ???력? 보통 ?음 updateBucketPosition보다 먼? ??????좌표가 ?레?어 ???레?????  // ?물 '?음' ?정???긋????인?????분기(뿌리???어가???.
   if (heldItem === HELD_ITEM_BUCKET) {
@@ -10985,15 +11468,13 @@ function useBucket() {
     return;
   }
 
-  const wellSize = getWellSize();
-  const wellDist = getCenterDistance(wellX, wellY, wellSize.width, wellSize.height);
   const wateringTarget = getNearestWateringTarget();
   const nearWellPour = wellReachForPour;
-  // ?물·?물 거리가 겹칠 ?? ?물???붓기는 ?물???유가 ?고, 급수 ??이 ?거???물????가까울 ?만.
+  // 급수 가능한 식물이 있으면 Q는 항상 식물에 붓기(우물과 거리 겹침 시 우물로 빠지는 문제 방지).
   if (
     nearWellPour &&
     wellState.water < maxWellWater &&
-    (!wateringTarget || wellDist < wateringTarget.distance)
+    !wateringTarget
   ) {
     wellState.water += 1;
     wellState.lastRefillAt = snapWellRefillToGrid(Date.now());
@@ -11008,6 +11489,7 @@ function useBucket() {
 
 
   if (wateringTarget) {
+    if (!tryConsumePlantWaterPourCooldown()) return;
     if (
       !getStoredFlag(onboardingFlowDoneKey) &&
       onboardingFlowStep === 14 &&
@@ -11021,10 +11503,12 @@ function useBucket() {
     isBucketFull = false;
     markWorldDirty();
     broadcastBucketState(false);
-    syncWorldState(true);
     updateBucketPosition();
+    refreshPlantWaterHoverIfShown(wateringTarget.plant);
     updatePlantState();
     updateExtraSeedsAndPlants();
+    refreshSharedWaterIndicators();
+    syncWorldState(true);
     return;
   }
 
@@ -11092,6 +11576,7 @@ function applyMagicPowderToPlant(plant, bagType) {
 }
 
 function getMagicPowderBagCount(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
   if (bagType === "magicPowder") {
     return Math.max(0, Math.floor(magicPowderCount) || 0);
   }
@@ -11101,6 +11586,7 @@ function getMagicPowderBagCount(bagType) {
 }
 
 function consumeMagicPowderBagItem(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
   if (bagType === "magicPowder") {
     if (magicPowderCount <= 0) return false;
     magicPowderCount = Math.max(0, magicPowderCount - 1);
@@ -11115,6 +11601,7 @@ function consumeMagicPowderBagItem(bagType) {
 }
 
 function isMagicPowderBagTypeUsableNow(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
   if (isOnboardingLinearGateActive()) return false;
   if (!isMagicPowderBagType(bagType)) return false;
   if (getMagicPowderBagCount(bagType) <= 0) return false;
@@ -11131,6 +11618,7 @@ function isMagicPowderUsableNow() {
 }
 
 function tryUseMagicPowderBagType(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
     return false;
@@ -11185,33 +11673,20 @@ function triggerWaterSplash() {
 function getNearestWateringTarget() {
   let nearest = null;
 
-  if (
-    plantRuntime.isSeedPlanted &&
-    plantRuntime.status !== "rotten" &&
-    plantRuntime.status !== "dry" &&
-    !plantRuntime.isOverwatered &&
-    isPlayerNearPlantWorld(plantRuntime)
-  ) {
-    const distance = getPlayerDistanceToPlant(plantRuntime);
-    nearest = {
-      type: "main",
-      plant: plantRuntime,
-      distance
-    };
-  }
-
-  appleState.extraPlants.forEach(function (plant) {
-    if (plant.status === "rotten" || plant.isOverwatered || plant.status === "dry") return;
+  function tryPlant(plant) {
+    if (!canWaterPlantByClick(plant)) return;
     if (!isPlayerNearPlantWorld(plant)) return;
     const distance = getPlayerDistanceToPlant(plant);
     if (!nearest || distance < nearest.distance) {
-      nearest = {
-        type: "extra",
-        plant,
-        distance
-      };
+      nearest =
+        plant === plantRuntime
+          ? { type: "main", plant: plantRuntime, distance: distance }
+          : { type: "extra", plant: plant, distance: distance };
     }
-  });
+  }
+
+  if (plantRuntime.isSeedPlanted) tryPlant(plantRuntime);
+  appleState.extraPlants.forEach(tryPlant);
 
   return nearest;
 }
@@ -11272,14 +11747,14 @@ function createWaterSplashAt(startX, startY, refElement) {
   }
 }
 
-function waterPlant(target, pourOptions) {
-  const fillToCapacity = Boolean(pourOptions && pourOptions.fillToCapacity);
+function waterPlant(target) {
   if (target && target.type === "extra") {
-    waterExtraPlant(target.plant, pourOptions);
+    waterExtraPlant(target.plant);
     return;
   }
 
   const now = getSharedPlantSimulationNow();
+  markSuppressPlantWaterDecayBriefly(now);
 
   updatePlantWaterLevel();
 
@@ -11312,7 +11787,7 @@ function waterPlant(target, pourOptions) {
   }
 
   if (isFirstWater || plantRuntime.waterLevel <= 0) {
-    plantRuntime.waterLevel = fillToCapacity ? waterCapacity : 1;
+    plantRuntime.waterLevel = 1;
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   } else if (plantRuntime.waterLevel >= waterCapacity) {
@@ -11337,26 +11812,25 @@ function waterPlant(target, pourOptions) {
       plantRuntime.needsFirstWater = false;
     }
   } else {
-    plantRuntime.waterLevel = fillToCapacity
-      ? waterCapacity
-      : Math.min(waterCapacity, plantRuntime.waterLevel + 1);
+    plantRuntime.waterLevel = Math.min(waterCapacity, plantRuntime.waterLevel + 1);
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   }
 
   plantRuntime.waterLevelUpdatedAt = now;
   plantRuntime.becameEmptyAt = null;
-  holdLocalPlantStateAgainstStaleSnapshot(1200);
+  holdLocalPlantStateAgainstStaleSnapshot(2200);
 
   saveSeedState();
-  syncWorldState(true);
   updatePlantState();
+  refreshSharedWaterIndicators();
+  syncWorldState(true);
   onboardingHookWateredMainPlantFromTutorial();
 }
 
-function waterExtraPlant(plant, pourOptions) {
-  const fillToCapacity = Boolean(pourOptions && pourOptions.fillToCapacity);
+function waterExtraPlant(plant) {
   const now = getSharedPlantSimulationNow();
+  markSuppressPlantWaterDecayBriefly(now);
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
   const waterCapacity = getPlantWaterCapacity(plant);
@@ -11388,7 +11862,7 @@ function waterExtraPlant(plant, pourOptions) {
   }
 
   if (isFirstWater || plant.waterLevel <= 0) {
-    plant.waterLevel = fillToCapacity ? waterCapacity : 1;
+    plant.waterLevel = 1;
     plant.isOverwatered = false;
     plant.status = "normal";
   } else if (plant.waterLevel >= waterCapacity) {
@@ -11409,21 +11883,20 @@ function waterExtraPlant(plant, pourOptions) {
       plant.needsFirstWater = false;
     }
   } else {
-    plant.waterLevel = fillToCapacity
-      ? waterCapacity
-      : Math.min(waterCapacity, plant.waterLevel + 1);
+    plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
     plant.status = "normal";
   }
 
   plant.waterLevelUpdatedAt = now;
   plant.becameEmptyAt = null;
-  holdLocalPlantStateAgainstStaleSnapshot(1200);
-  holdLocalAppleStateAgainstStaleSnapshot(1200);
+  holdLocalPlantStateAgainstStaleSnapshot(2200);
+  holdLocalAppleStateAgainstStaleSnapshot(2200);
 
   saveAppleState();
-  syncWorldState(true);
   updateExtraSeedsAndPlants();
+  refreshSharedWaterIndicators();
+  syncWorldState(true);
 }
 
 function updatePlantWaterLevel() {
@@ -11612,7 +12085,9 @@ function updatePlantState() {
 }
 
 function shouldSuppressPlantWaterCardForSelfSustaining(plant) {
-  return false;
+  if (!plant) return false;
+  if (isStage3CompleteAwaitingMagicPowder(plant)) return true;
+  return isFinalMaturePlantNoWaterCare(plant);
 }
 
 function removeMainPlant() {
@@ -11762,7 +12237,7 @@ function updateSproutPosition() {
   }
 
   const stage = getSproutStageFromPlant(plantRuntime);
-  const sproutSize = getSproutSizeForStage(stage);
+  const sproutSize = getSproutSizeForStage(stage, plantRuntime);
   sprout.style.display = "block";
   sprout.classList.toggle("is-big", stage >= 2);
   sprout.src = getSproutImageForPlant(plantRuntime, stage);
@@ -11771,9 +12246,11 @@ function updateSproutPosition() {
     plantRuntime.spotX,
     plantRuntime.spotY,
     sproutSize,
-    stage
+    stage,
+    plantRuntime
   );
   setWorldPosition(sprout, sproutPos.x, sproutPos.y);
+  applyPlantDepthZIndexToElements(plantRuntime, plantSpot, sprout);
   updateNpcPosition();
 }
 
@@ -11798,6 +12275,7 @@ function updateNpcPosition() {
     } else {
       tradeMaster.style.display = "none";
       if (tradeMasterBubble) tradeMasterBubble.style.display = "none";
+      if (isTradeExchangeOpen()) closeTradeExchangePanel();
     }
   }
 
@@ -11871,12 +12349,29 @@ function updateNpcPrompt() {
 function updatePlayerAlert() {
   if (playerAlert.style.display !== "block") return;
 
+  if (playerAlert.classList.contains("is-butterfly-catch")) {
+    const playerRenderedHeight = player.offsetHeight || PLAYER_HEIGHT;
+    const playerWorldTop =
+      GROUND_WORLD_HEIGHT - playerRenderedHeight - playerDepth + jumpY;
+    const alertWidth = playerAlert.offsetWidth || 36;
+    const alertWorldY = speechBubbleTopWorldYFromHead(
+      playerWorldTop,
+      playerAlert,
+      SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
+    );
+    setSpeechBubbleTransform(
+      playerAlert,
+      playerX + PLAYER_WIDTH / 2 - alertWidth / 2,
+      alertWorldY
+    );
+    return;
+  }
+
   const playerBox = getPlayerBox();
   const alertWidth = playerAlert.offsetWidth || 10;
   const alertHeight = playerAlert.offsetHeight || 10;
   const x = toScreenX(playerBox.left + playerBox.width / 2) - alertWidth / 2;
-  const yOffset = playerAlert.classList.contains("is-butterfly-catch") ? 2 : 4;
-  const y = toScreenY(playerBox.top) - alertHeight - yOffset;
+  const y = toScreenY(playerBox.top) - alertHeight - 4;
   playerAlert.style.transform = "translate(" + x + "px, " + y + "px)";
 }
 
@@ -12174,6 +12669,7 @@ function applyLoadedPlantState(loadedPlant) {
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
+  reconcileMaturePlantGrowthTierFromOrdinal(plantRuntime);
   syncPlantWaterCapacityField(plantRuntime);
   clampPlantGrowthTimingToCurrentConstants(plantRuntime);
   ensureGrassOrdinalIfNeeded(plantRuntime);
@@ -14657,6 +15153,7 @@ function loadButterflyCaughtCounts() {
 function loadMagicPowderCount() {
   const raw = Number(getStoredValue(magicPowderCountKey) || 0);
   magicPowderCount = Math.max(0, Math.floor(raw));
+  migrateLegacyMixedMagicPowderIntoBase();
 }
 
 function loadRockInventoryCount() {
@@ -14715,6 +15212,7 @@ function loadColoredMagicPowderCounts() {
     coloredMagicPowderCounts.brown = Math.max(0, Math.floor(Number(parsed.brown) || 0));
     coloredMagicPowderCounts.mixed = Math.max(0, Math.floor(Number(parsed.mixed) || 0));
   } catch (e) {}
+  migrateLegacyMixedMagicPowderIntoBase();
 }
 
 function saveColoredMagicPowderCounts() {
@@ -15260,7 +15758,7 @@ function handleRemoteButterflyCatchBroadcast(payload) {
   finalizeButterflyRemovalEffects(evtAt);
   const remote = remotePlayers[payload.from];
   if (remote && remote.statusElement) {
-    remote.statusElement.textContent = "?비 catch";
+    remote.statusElement.textContent = "\uB098\uBE44 catch";
     remote.statusElement.style.display = "block";
     remote.lastActionAt = now;
     remote.lastShownAction = "butterfly_catch";

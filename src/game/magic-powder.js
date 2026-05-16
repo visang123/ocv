@@ -1,7 +1,6 @@
 /** 가방 bagType → 성숙 형태(4·5단 스프라이트·이름) */
 export const MAGIC_POWDER_BAG_TYPES = [
   "magicPowder",
-  "magicPowderMixed",
   "magicPowderYellow",
   "magicPowderWhite",
   "magicPowderBrown"
@@ -12,19 +11,22 @@ export const MAGIC_POWDER_BAG_TYPES = [
 /** @type {Record<string, PlantMatureKind>} */
 export const MAGIC_POWDER_MATURE_KIND = {
   magicPowder: "grass",
-  magicPowderMixed: "grass",
   magicPowderYellow: "flower",
   magicPowderWhite: "cactus",
   magicPowderBrown: "tree"
 };
 
-/** @type {Record<string, "yellow"|"white"|"brown"|"mixed"|null>} */
+/** @type {Record<string, "yellow"|"white"|"brown"|null>} */
 export const COLORED_POWDER_COUNT_FIELD = {
   magicPowderYellow: "yellow",
   magicPowderWhite: "white",
-  magicPowderBrown: "brown",
-  magicPowderMixed: "mixed"
+  magicPowderBrown: "brown"
 };
+
+/** 혼합 가루는 기본 마법의 가루와 동일 아이템 */
+export function normalizeMagicPowderBagType(bagType) {
+  return bagType === "magicPowderMixed" ? "magicPowder" : bagType;
+}
 
 export function isMagicPowderBagType(bagType) {
   return MAGIC_POWDER_BAG_TYPES.includes(bagType);

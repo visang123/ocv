@@ -194,8 +194,47 @@ export const SPROUT_STAGE_HEIGHTS = [8, 15, 26];
 /** 4·5단계 풀 — 3단계 베이스(인덱스 2)에 곱해 월드에서 더 크게 그림 */
 export const grassStage4WorldScale = 2.95;
 export const grassStage5WorldScale = 3.55;
-/** 5단계 풀 PNG가 좌측으로 치우쳐 보일 때 월드 x 보정(양수=오른쪽) */
+/** 5단계 풀 PNG가 좌측으로 치우쳐 보일 때 월드 x 보정(양수=오른쪽) — 레거시, 앵커 배치로 대체 */
 export const grassStage5AnchorDxWorld = 7;
+
+/**
+ * 4·5단 성숙 스프라이트 PNG 앵커(불투명 bbox 기준 소스 픽셀).
+ * centerX·footY로 식물 spot 중앙·땅 발밑에 맞춤.
+ * @type {Record<string, Record<number, { srcW: number, srcH: number, centerX: number, footY: number, scale: number }>>}
+ */
+export const MATURE_SPRITE_ANCHORS = {
+  grass: {
+    4: { srcW: 504, srcH: 587, centerX: 255.5, footY: 554, scale: grassStage4WorldScale },
+    5: { srcW: 504, srcH: 587, centerX: 196.5, footY: 562, scale: grassStage5WorldScale }
+  },
+  flower: {
+    4: { srcW: 500, srcH: 601, centerX: 273, footY: 538, scale: grassStage4WorldScale },
+    5: { srcW: 500, srcH: 601, centerX: 217, footY: 553, scale: grassStage5WorldScale }
+  },
+  tree: {
+    4: { srcW: 325, srcH: 294, centerX: 162, footY: 255, scale: grassStage4WorldScale },
+    5: { srcW: 325, srcH: 294, centerX: 91.5, footY: 263, scale: grassStage5WorldScale }
+  },
+  cactus: {
+    4: { srcW: 325, srcH: 294, centerX: 162, footY: 274, scale: grassStage4WorldScale },
+    5: { srcW: 325, srcH: 294, centerX: 101, footY: 293, scale: grassStage5WorldScale }
+  }
+};
+
+/** 4·5단 성숙 식물 호버 링 지름(월드 px) — 큰 스프라이트 전체가 아닌 spot 기준 */
+export const PLANT_HOVER_RING_WORLD_SIZE = 24;
+
+/** @param {"grass"|"flower"|"tree"|"cactus"|string} matureKind */
+export function getMatureSpriteAnchor(matureKind, stage) {
+  if (stage < 4) return null;
+  const tier = stage >= 5 ? 5 : 4;
+  const kind =
+    matureKind === "flower" || matureKind === "tree" || matureKind === "cactus"
+      ? matureKind
+      : "grass";
+  const entry = MATURE_SPRITE_ANCHORS[kind];
+  return entry ? entry[tier] || null : null;
+}
 
 export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */

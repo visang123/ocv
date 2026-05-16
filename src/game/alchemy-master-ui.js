@@ -20,6 +20,9 @@ let running = false;
 let complete = false;
 let promptHideTimeout = null;
 let craftOpen = false;
+/** @type {number[]} */
+let dialogueTimeoutIds = [];
+let dialogueStartedAt = 0;
 let selectedRecipeId = null;
 let requirementsVisible = false;
 /** @type {number[]} */
@@ -57,9 +60,77 @@ function bindAlchemyCraftOutsideDismiss() {
   document.addEventListener("pointerdown", onAlchemyCraftOutsidePointer, true);
 }
 
+function clearAlchemyDialogueTimeouts() {
+  dialogueTimeoutIds.forEach(function (id) {
+    window.clearTimeout(id);
+  });
+  dialogueTimeoutIds = [];
+}
+
+function scheduleAlchemyDialogueTimeout(fn, delayMs) {
+  const id = window.setTimeout(fn, delayMs);
+  dialogueTimeoutIds.push(id);
+  return id;
+}
+
+function isAlchemyCraftOverlayVisible() {
+  return Boolean(
+    host && host.alchemyCraftOverlay && host.alchemyCraftOverlay.style.display === "block"
+  );
+}
+
+function reconcileAlchemyCraftOpenState() {
+  if (!craftOpen) return;
+  if (!isAlchemyCraftOverlayVisible()) {
+    craftOpen = false;
+    selectedRecipeId = null;
+    requirementsVisible = false;
+    requirementSlotDefs = [];
+    requirementSlotFills = [];
+    if (host) {
+      if (host.worldBagInventory) {
+        host.worldBagInventory.classList.remove("is-alchemy-craft-focus");
+      }
+      if (host.bagInventoryPanel) {
+        host.bagInventoryPanel.classList.remove("is-alchemy-craft-focus");
+      }
+    }
+  }
+}
+
+function abortAlchemyMasterDialogue() {
+  if (!running) return;
+  clearAlchemyDialogueTimeouts();
+  running = false;
+  if (host) {
+    if (host.alchemyMasterBubble) {
+      host.alchemyMasterBubble.style.display = "none";
+      host.alchemyMasterBubble.classList.remove("is-alchemy-idle-prompt");
+    }
+    if (host.playerBubble) host.playerBubble.style.display = "none";
+  }
+  window.clearTimeout(promptHideTimeout);
+}
+
+export function resetAlchemyMasterDialogueIfStuck() {
+  if (!running) return;
+  if (Date.now() - dialogueStartedAt < 16000) return;
+  abortAlchemyMasterDialogue();
+}
+
 export function bindAlchemyMaster(h) {
   host = h;
   bindAlchemyCraftOutsideDismiss();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) {
+        abortAlchemyMasterDialogue();
+        return;
+      }
+      resetAlchemyMasterDialogueIfStuck();
+      reconcileAlchemyCraftOpenState();
+    });
+  }
   if (host.alchemyCraftClose) {
     host.alchemyCraftClose.addEventListener("click", function (event) {
       event.preventDefault();
@@ -74,24 +145,21 @@ export function bindAlchemyMaster(h) {
       confirmAlchemyCraft();
     });
   }
-  if (host.alchemyCraftShowRequirements) {
-    host.alchemyCraftShowRequirements.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      showAlchemyRequirements();
-    });
-  }
   if (host.alchemyCraftProductList) {
     host.alchemyCraftProductList.addEventListener("click", function (event) {
       const btn = event.target.closest(".alchemy-craft-product");
       if (!btn || btn.disabled) return;
       selectedRecipeId = btn.dataset.recipeId || null;
-      requirementsVisible = false;
-      requirementSlotDefs = [];
-      requirementSlotFills = [];
       renderAlchemyCraftProducts();
-      renderAlchemyRequirementSlots();
-      updateAlchemyCraftConfirmButton();
+      if (selectedRecipeId) {
+        showAlchemyRequirements();
+      } else {
+        requirementsVisible = false;
+        requirementSlotDefs = [];
+        requirementSlotFills = [];
+        renderAlchemyRequirementSlots();
+        updateAlchemyCraftConfirmButton();
+      }
     });
   }
   if (host.alchemyCraftRequirementSlots) {
@@ -136,9 +204,15 @@ export function isNearAlchemyMaster() {
 }
 
 export function tryTalkToAlchemyMaster() {
-  if (!host || !isNearAlchemyMaster() || running) return false;
+  if (!host || !isNearAlchemyMaster()) return false;
+  reconcileAlchemyCraftOpenState();
+  if (running) return true;
   if (!complete) {
     startAlchemyMasterDialogue();
+    return true;
+  }
+  if (craftOpen) {
+    closeAlchemyCraftPanel({ keepInventory: true });
     return true;
   }
   openAlchemyCraftPanel();
@@ -252,6 +326,7 @@ function showAlchemyDialogueLine(lineInfo) {
 
 function startAlchemyMasterDialogue() {
   if (!host) return;
+  clearAlchemyDialogueTimeouts();
   const lines = [
     { speaker: "npc", text: "\uBC18\uAC11\uB124 \uC5EC\uD589\uC790\uC5EC...", delayAfterMs: 2000 },
     { speaker: "npc", text: "\uC790\uB124 \uB9C8\uBC95\uC744 \uBBFF\uB294\uAC00?!", delayAfterMs: 2000 },
@@ -259,18 +334,21 @@ function startAlchemyMasterDialogue() {
     { speaker: "npc", text: "\uB098\uB294 \uBBFF\uB294\uB2E4\uB124...", delayAfterMs: 2000 }
   ];
   running = true;
+  dialogueStartedAt = Date.now();
   host.alchemyMasterBubble.style.display = "none";
   host.alchemyMasterBubble.classList.remove("is-alchemy-idle-prompt");
   host.playerBubble.style.display = "none";
   window.clearTimeout(promptHideTimeout);
   let timelineMs = 0;
   lines.forEach(function (lineInfo) {
-    window.setTimeout(function () {
+    scheduleAlchemyDialogueTimeout(function () {
+      if (!running) return;
       showAlchemyDialogueLine(lineInfo);
     }, timelineMs);
     timelineMs += Math.max(0, Number(lineInfo.delayAfterMs) || 650);
   });
-  window.setTimeout(function () {
+  scheduleAlchemyDialogueTimeout(function () {
+    clearAlchemyDialogueTimeouts();
     running = false;
     complete = true;
     host.alchemyMasterBubble.style.display = "none";
@@ -279,10 +357,23 @@ function startAlchemyMasterDialogue() {
     host.setStoredFlag(host.alchemyMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
   }, timelineMs + 200);
+  scheduleAlchemyDialogueTimeout(function () {
+    if (!running) return;
+    clearAlchemyDialogueTimeouts();
+    running = false;
+    complete = true;
+    host.alchemyMasterBubble.style.display = "none";
+    host.alchemyMasterBubble.classList.remove("is-alchemy-idle-prompt");
+    host.playerBubble.style.display = "none";
+    host.setStoredFlag(host.alchemyMasterDialogueCompleteKey, true);
+    host.updateNpcPosition();
+  }, timelineMs + 12000);
 }
 
 export function openAlchemyCraftPanel() {
   if (!host || !complete) return;
+  reconcileAlchemyCraftOpenState();
+  if (craftOpen) return;
   if (host.isTradeExchangeOpen && host.isTradeExchangeOpen()) {
     if (host.closeTradeExchangePanel) host.closeTradeExchangePanel();
   }
@@ -388,55 +479,59 @@ function renderAlchemyCraftProducts() {
       "</span></button>"
     );
   }).join("");
-  if (host.alchemyCraftShowRequirements) {
-    host.alchemyCraftShowRequirements.disabled = !selectedRecipeId;
-  }
 }
 
 function renderAlchemyRequirementSlots() {
   if (!host.alchemyCraftRequirementSlots) return;
   const wrap = host.alchemyCraftRequirementSlots;
+  const block = host.alchemyCraftRequirementsBlock;
   if (!requirementsVisible || !requirementSlotDefs.length) {
-    wrap.style.display = "none";
     wrap.innerHTML = "";
-    wrap.classList.add("is-hidden");
+    if (block) block.classList.add("is-hidden");
     renderAlchemyRequirementSummary();
     return;
   }
-  wrap.style.display = "flex";
-  wrap.classList.remove("is-hidden");
+  if (block) block.classList.remove("is-hidden");
   wrap.innerHTML = requirementSlotDefs
     .map(function (def, index) {
       const filled = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
       const required = def.required;
-      const ratio = required > 0 ? Math.min(1, filled / required) : 0;
       const desc = getBagItemDescriptor(def.key);
       const complete = filled >= required;
       const filledClass = complete ? " is-filled" : filled > 0 ? " is-partial" : "";
-      const qtyLabel = required > 1 ? "×" + required : "";
-      const progressLabel = required > 1 ? filled + "/" + required : "";
+      const manySegClass = required > 6 ? " is-many-segments" : "";
+      const segCount = Math.max(1, required);
+      let segHtml = "";
+      for (let s = 0; s < segCount; s++) {
+        segHtml +=
+          '<span class="alchemy-craft-req-seg' +
+          (s < filled ? " is-filled" : "") +
+          '"></span>';
+      }
+      const ariaProgress =
+        required > 1 ? " " + filled + "/" + required : complete ? " 완료" : "";
       return (
         '<button type="button" class="alchemy-craft-req-slot' +
         filledClass +
+        manySegClass +
         '" data-slot-index="' +
         index +
-        '" style="--req-fill:' +
-        ratio +
         '" aria-label="' +
         desc.label +
-        (required > 1 ? " " + filled + "/" + required : "") +
+        ariaProgress +
         '">' +
-        '<span class="alchemy-craft-req-fill" aria-hidden="true"></span>' +
+        '<span class="alchemy-craft-req-segments" style="--seg-count:' +
+        segCount +
+        '" aria-hidden="true">' +
+        segHtml +
+        "</span>" +
         '<span class="alchemy-craft-req-icon' +
         (complete ? "" : " alchemy-craft-req-icon--ghost") +
         '">' +
         desc.iconHtml +
         "</span>" +
-        (qtyLabel
-          ? '<span class="alchemy-craft-req-qty">' + qtyLabel + "</span>"
-          : "") +
-        (required > 1 && filled > 0
-          ? '<span class="alchemy-craft-req-progress">' + progressLabel + "</span>"
+        (required > 1
+          ? '<span class="alchemy-craft-req-badge">×' + required + "</span>"
           : "") +
         "</button>"
       );
@@ -484,6 +579,10 @@ function confirmAlchemyCraft() {
     !requirementsVisible ||
     !alchemySlotsAreComplete(requirementSlotDefs, requirementSlotFills)
   ) {
+    return;
+  }
+  if (host.canAddBagItems && !host.canAddBagItems({ [recipe.outputKey]: 1 })) {
+    if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
   }
   requirementSlotFills = [];

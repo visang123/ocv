@@ -16,6 +16,9 @@ let running = false;
 let complete = false;
 let promptHideTimeout = null;
 let exchangeOpen = false;
+/** @type {number[]} */
+let dialogueTimeoutIds = [];
+let dialogueStartedAt = 0;
 /** @type {Record<string, number>} */
 let counterByKey = {};
 let selectedRecipeId = null;
@@ -47,9 +50,74 @@ function bindTradeExchangeOutsideDismiss() {
   document.addEventListener("pointerdown", onTradeExchangeOutsidePointer, true);
 }
 
+function clearTradeDialogueTimeouts() {
+  dialogueTimeoutIds.forEach(function (id) {
+    window.clearTimeout(id);
+  });
+  dialogueTimeoutIds = [];
+}
+
+function scheduleTradeDialogueTimeout(fn, delayMs) {
+  const id = window.setTimeout(fn, delayMs);
+  dialogueTimeoutIds.push(id);
+  return id;
+}
+
+function isTradeExchangeOverlayVisible() {
+  return Boolean(
+    host &&
+      host.tradeExchangeOverlay &&
+      host.tradeExchangeOverlay.style.display === "block"
+  );
+}
+
+function reconcileTradeExchangeOpenState() {
+  if (!exchangeOpen) return;
+  if (!isTradeExchangeOverlayVisible()) {
+    exchangeOpen = false;
+    selectedRecipeId = null;
+    counterByKey = {};
+    if (host) {
+      if (host.worldBagInventory) {
+        host.worldBagInventory.classList.remove("is-trade-exchange-focus");
+      }
+      if (host.bagInventoryPanel) {
+        host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
+      }
+    }
+  }
+}
+
+function abortTradeMasterDialogue() {
+  if (!running) return;
+  clearTradeDialogueTimeouts();
+  running = false;
+  if (host && host.tradeMasterBubble) {
+    host.tradeMasterBubble.style.display = "none";
+    host.tradeMasterBubble.dataset.promptShown = "false";
+  }
+  window.clearTimeout(promptHideTimeout);
+}
+
+export function resetTradeMasterDialogueIfStuck() {
+  if (!running) return;
+  if (Date.now() - dialogueStartedAt < 12000) return;
+  abortTradeMasterDialogue();
+}
+
 export function bindTradeMaster(h) {
   host = h;
   bindTradeExchangeOutsideDismiss();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) {
+        abortTradeMasterDialogue();
+        return;
+      }
+      resetTradeMasterDialogueIfStuck();
+      reconcileTradeExchangeOpenState();
+    });
+  }
   if (host.tradeExchangeClose) {
     host.tradeExchangeClose.addEventListener("click", function (event) {
       event.preventDefault();
@@ -113,9 +181,15 @@ export function isNearTradeMaster() {
 }
 
 export function tryTalkToTradeMaster() {
-  if (!host || !isNearTradeMaster() || running) return false;
+  if (!host || !isNearTradeMaster()) return false;
+  reconcileTradeExchangeOpenState();
+  if (running) return true;
   if (!complete) {
     startTradeMasterDialogue();
+    return true;
+  }
+  if (exchangeOpen) {
+    closeTradeExchangePanel();
     return true;
   }
   openTradeExchangePanel();
@@ -246,7 +320,10 @@ function bagSlotToItemKey(slotEl) {
 
 function layoutTradeSpeechBubble() {
   if (!host || !host.tradeMasterBubble) return;
-  const bubbleWidth = host.tradeMasterBubble.offsetWidth || 48;
+  const bubble = host.tradeMasterBubble;
+  bubble.style.width = "";
+  void bubble.offsetWidth;
+  const bubbleWidth = bubble.offsetWidth || bubble.scrollWidth || 48;
   const headTop = host.getNpcHeadTopWorldY
     ? host.getNpcHeadTopWorldY(host.TRADE_MASTER_START_Y)
     : host.TRADE_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
@@ -265,6 +342,7 @@ function layoutTradeSpeechBubble() {
 
 function startTradeMasterDialogue() {
   if (!host) return;
+  clearTradeDialogueTimeouts();
   const lines = [
     { text: "\uB098\uB294 \uAC70\uB798\uB97C \uC88B\uC544\uD55C\uB2E4\uB124.", delayAfterMs: 2000 },
     {
@@ -273,18 +351,21 @@ function startTradeMasterDialogue() {
     }
   ];
   running = true;
+  dialogueStartedAt = Date.now();
   host.tradeMasterBubble.style.display = "none";
   window.clearTimeout(promptHideTimeout);
   let timelineMs = 0;
   lines.forEach(function (line) {
-    window.setTimeout(function () {
+    scheduleTradeDialogueTimeout(function () {
+      if (!running) return;
       host.tradeMasterBubble.textContent = line.text;
       host.tradeMasterBubble.style.display = "block";
       layoutTradeSpeechBubble();
     }, timelineMs);
     timelineMs += Math.max(0, Number(line.delayAfterMs) || 650);
   });
-  window.setTimeout(function () {
+  scheduleTradeDialogueTimeout(function () {
+    clearTradeDialogueTimeouts();
     running = false;
     complete = true;
     host.tradeMasterBubble.style.display = "none";
@@ -292,10 +373,22 @@ function startTradeMasterDialogue() {
     host.setStoredFlag(host.tradeMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
   }, timelineMs + 200);
+  scheduleTradeDialogueTimeout(function () {
+    if (!running) return;
+    clearTradeDialogueTimeouts();
+    running = false;
+    complete = true;
+    host.tradeMasterBubble.style.display = "none";
+    host.tradeMasterBubble.dataset.promptShown = "false";
+    host.setStoredFlag(host.tradeMasterDialogueCompleteKey, true);
+    host.updateNpcPosition();
+  }, timelineMs + 8000);
 }
 
 export function openTradeExchangePanel() {
   if (!host || !complete) return;
+  reconcileTradeExchangeOpenState();
+  if (exchangeOpen) return;
   if (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen()) {
     if (host.closeAlchemyCraftPanel) host.closeAlchemyCraftPanel();
   }
@@ -334,10 +427,13 @@ export function closeTradeExchangePanel(options) {
 }
 
 function returnCounterItemsToInventory() {
+  if (!host) return;
   Object.keys(counterByKey).forEach(function (key) {
     const n = Math.max(0, Math.floor(Number(counterByKey[key]) || 0));
     if (n > 0) host.addBagItems(key, n);
   });
+  if (host.updateBagInventorySlots) host.updateBagInventorySlots();
+  if (host.saveAppleState) host.saveAppleState();
 }
 
 function addOneInventoryItemToTradeCounter(itemKey) {
@@ -442,6 +538,10 @@ function updateTradeConfirmButton() {
 function confirmSelectedTrade() {
   const recipe = getTradeRecipeById(selectedRecipeId);
   if (!recipe || !recipeMatchesCounter(counterByKey, recipe)) return;
+  if (host.canAddBagItems && !host.canAddBagItems(recipe.outputs)) {
+    if (host.showInventoryFullFail) host.showInventoryFullFail();
+    return;
+  }
   counterByKey = subtractRecipeInputsFromCounter(counterByKey, recipe);
   Object.keys(recipe.outputs).forEach(function (key) {
     host.addBagItems(key, Number(recipe.outputs[key] || 0));

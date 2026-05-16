@@ -18,7 +18,7 @@ const tradeExchangeConfirm = document.getElementById("trade-exchange-confirm");
 const tradeExchangeClose = document.getElementById("trade-exchange-close");
 const alchemyCraftOverlay = document.getElementById("alchemy-craft-overlay");
 const alchemyCraftProductList = document.getElementById("alchemy-craft-product-list");
-const alchemyCraftShowRequirements = document.getElementById("alchemy-craft-show-requirements");
+const alchemyCraftRequirementsBlock = document.getElementById("alchemy-craft-requirements-block");
 const alchemyCraftRequirementSlots = document.getElementById("alchemy-craft-requirement-slots");
 const alchemyCraftRequirementSummary = document.getElementById("alchemy-craft-requirement-summary");
 const alchemyCraftConfirm = document.getElementById("alchemy-craft-confirm");
@@ -98,7 +98,7 @@ export {
   tradeExchangeClose,
   alchemyCraftOverlay,
   alchemyCraftProductList,
-  alchemyCraftShowRequirements,
+  alchemyCraftRequirementsBlock,
   alchemyCraftRequirementSlots,
   alchemyCraftRequirementSummary,
   alchemyCraftConfirm,

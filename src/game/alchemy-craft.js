@@ -22,8 +22,8 @@ export const ALCHEMY_CRAFT_RECIPES = [
   },
   {
     id: "powderMixed",
-    label: "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
-    outputKey: "magicPowderMixed",
+    label: "\uB9C8\uBC95\uC758 \uAC00\uB8E8",
+    outputKey: "magicPowder",
     inputs: { "butterfly:brown": 3, "butterfly:yellow": 3, "butterfly:white": 3 }
   },
   {
