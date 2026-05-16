@@ -889,7 +889,7 @@ function migrateLegacyMixedMagicPowderIntoBase() {
 bagInventoryItemOrder = loadBagInventoryOrder();
 
 let plantProgressScoreTickRowBound = false;
-/** ?재 ?물지???자?1000 ?금 ?과 ??줄에 배치(겹침 방?) */
+/** 현재 식물지수 숫자를 500 눈금 행과 한 줄에 배치(겹침 방지) */
 function ensurePlantProgressScoreInTickRow() {
   const scoreEl = document.getElementById("plant-progress-score");
   const ticks = document.querySelector(".plant-progress-ticks");
@@ -1006,7 +1006,7 @@ function isPlantFogMovementClampActive() {
   return true;
 }
 
-/** ?물지??250+(?개 ?드 2)부??????E 줍기 ?용 */
+/** 식물지수 125+(안개 월드 2)부터 땅 돌 E 줍기 허용 */
 function isWorldRockPickupUnlocked() {
   if (!isWorldDocumentEntry()) return false;
   return getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= 2;
@@ -1333,9 +1333,11 @@ const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
 const SYNC_DEBUG_TRACE = false;
 const WORLD_HEART_FX_MS = 2200;
+/** \uC2AC\uD37C\uC694 \uBC84\uD2BC\uC6A9 \uC774\uBAA8\uC9C0(\uD83D\uDE22) */
+const WORLD_SAD_BUTTON_EMOJI = "\uD83D\uDE22";
 const WORLD_CHAT_MAX_CHARS = 120;
 
-/** \uC2AC\uD37C\uC694 \uBC84\uD2BC\u00B7\uC774\uD399\uD2B8 \uCCAB \uC54C\uACB9\uC774 \u2014 \uD50C\uB7AB\uD3FC \uC774\uBAA8\uC9C0 \uB300\uC2E0 CSS \uC2AC\uD508 \uC5BC\uAD74(\uB208\uBB3C \uD3EC\uD568) */
+/** \uC2AC\uD37C\uC694 \uC774\uD399\uD2B8 \uCCAB \uC54C\uACB9\uC774 \u2014 CSS \uC2AC\uD508 \uC5BC\uAD74(\uB208\uBB3C \uD3EC\uD568) */
 function createOvcSadFaceElement() {
   const face = document.createElement("span");
   face.className = "ovc-sad-face";
@@ -13933,7 +13935,7 @@ function ensureWorldSocialUi() {
   worldSadBtn.id = "world-sad-button";
   worldSadBtn.className = "world-sad-button";
   worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
-  worldSadBtn.appendChild(createOvcSadFaceElement());
+  worldSadBtn.innerHTML = WORLD_SAD_BUTTON_EMOJI;
   document.body.appendChild(worldSadBtn);
 
   worldHeartBtn = document.createElement("button");

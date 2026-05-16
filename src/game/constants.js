@@ -3,7 +3,7 @@ export const WORLD_HEIGHT = 540;
 export const GROUND_WORLD_HEIGHT = WORLD_HEIGHT * 0.6;
 
 /** 식물 지수 합산 상한 */
-export const PLANT_INDEX_SCORE_CAP = 1000;
+export const PLANT_INDEX_SCORE_CAP = 500;
 /** 안개 월드 단계 — NPC 등장(식물지수 구간과 동일) */
 export const PLANT_FOG_TRADE_MASTER_MIN_STAGE = 2;
 export const PLANT_FOG_ALCHEMY_MASTER_MIN_STAGE = 3;
@@ -16,19 +16,19 @@ export const PLANT_INDEX_SPROUT_STAGE_3 = 50;
 export const PLANT_INDEX_GRASS_STAGE_4 = 100;
 export const PLANT_INDEX_GRASS_STAGE_5 = 150;
 
-/** 식물지수 500 이상(월드 3)부터 나비 스폰·시뮬 허용 */
-export const PLANT_FOG_BUTTERFLY_MIN_SCORE = 500;
+/** 식물지수 250 이상(월드 3)부터 나비 스폰·시뮬 허용 */
+export const PLANT_FOG_BUTTERFLY_MIN_SCORE = 250;
 
 /**
  * 식물지수 구간 → 월드 1~5 (안개 해제 단계).
- * 1: 250 미만, 2: 250~499, 3: 500~749, 4: 750~999, 5: 1000
+ * 1: 125 미만, 2: 125~249, 3: 250~374, 4: 375~499, 5: 500
  */
 export function getPlantFogWorldStageFromScore(score) {
   const s = Math.max(0, Math.min(PLANT_INDEX_SCORE_CAP, Number(score) || 0));
-  if (s >= 1000) return 5;
-  if (s >= 750) return 4;
-  if (s >= 500) return 3;
-  if (s >= 250) return 2;
+  if (s >= 500) return 5;
+  if (s >= 375) return 4;
+  if (s >= 250) return 3;
+  if (s >= 125) return 2;
   return 1;
 }
 
@@ -64,7 +64,7 @@ export function getPlantFogGlobalDimAlphaForStage(stage) {
 
 /** 월드 세로 중 땅(324px) 위쪽 하늘 밴드 높이(216px) */
 export const WORLD_SKY_BAND_HEIGHT = WORLD_HEIGHT - GROUND_WORLD_HEIGHT;
-/** Stage 5 (plant index 1000) opens the sky band. */
+/** Stage 5 (plant index 500) opens the sky band. */
 export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 5;
 
 export const PLAYER_WIDTH = 25;
@@ -97,10 +97,10 @@ export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108;
 
 export const WELL_START_X = 405;
 export const WELL_START_Y = 190;
-/** 우물 오른쪽 땅 — 거래의 달인(상인), 월드 2(식물지수 250+)부터 */
+/** 우물 오른쪽 땅 — 거래의 달인(상인), 월드 2(식물지수 125+)부터 */
 export const TRADE_MASTER_START_X = WELL_START_X + WELL_SIZE + 22;
 export const TRADE_MASTER_START_Y = WELL_START_Y + 44;
-/** 거래의 달인보다 오른쪽·위 — 연금술의 달인, 월드 3(500+)부터 */
+/** 거래의 달인보다 오른쪽·위 — 연금술의 달인, 월드 3(250+)부터 */
 export const ALCHEMY_MASTER_START_X = TRADE_MASTER_START_X + NPC_WIDTH + 34;
 export const ALCHEMY_MASTER_START_Y = TRADE_MASTER_START_Y - 38;
 /** 안내판 — 책·씨앗·NPC와 간격을 두기 위해 약간 왼쪽·위로 */
@@ -284,7 +284,7 @@ export function getMinPlantCenterClearanceWorld(maturityLevel) {
 /** World size (w = h). Half of original 20px tuning; matches setWorldSize + .butterfly CSS. */
 export const BUTTERFLY_SIZE = 10;
 /** Maximum butterflies that can be alive on the shared map. */
-export const butterflyMaxAlive = 5;
+export const butterflyMaxAlive = 10;
 /** Available colors. Index doubles as the sprite-sheet row. */
 export const butterflyColors = ["brown", "yellow", "white"];
 /** Wing-flap frames per color in the sprite sheet. */
@@ -302,7 +302,7 @@ export const butterflyFlutterPeriodVerticalMs = 3000;
 export const butterflyFlutterAmplitudeX = 2.35;
 export const butterflyFlutterAmplitudeY = 2.55;
 /** Time between auto-spawns when below the map cap, in ms. */
-export const butterflyRespawnMs = 2 * MINUTE_MS;
+export const butterflyRespawnMs = 3 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */
 export const butterflyCatchDistance = 25;
 /** Authority (lowest sessionId) broadcasts butterfly positions on this cadence. */

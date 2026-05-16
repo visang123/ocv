@@ -1705,11 +1705,7 @@ body::-webkit-scrollbar {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.world-sad-button .ovc-sad-face {
-  font-size: 22px;
-}
-
-/* 슬퍼요 버튼·이펙트 첫 알갱이 — 선명한 슬픈 표정 + 눈물 */
+/* 슬퍼요 이펙트 첫 알갱이 — 선명한 슬픈 표정 + 눈물 */
 .ovc-sad-face {
   position: relative;
   display: inline-block;
@@ -3263,19 +3259,19 @@ body #world-bag-inventory {
   opacity: 1;
 }
 
-.plant-progress-reward[data-threshold="1000"] {
+.plant-progress-reward[data-threshold="500"] {
   top: var(--pp-pad-top, 10px);
 }
 
-.plant-progress-reward[data-threshold="750"] {
+.plant-progress-reward[data-threshold="375"] {
   top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.25);
 }
 
-.plant-progress-reward[data-threshold="500"] {
+.plant-progress-reward[data-threshold="250"] {
   top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.5);
 }
 
-.plant-progress-reward[data-threshold="250"] {
+.plant-progress-reward[data-threshold="125"] {
   top: calc(var(--pp-pad-top, 10px) + var(--pp-track-h, 354px) * 0.75);
 }
 
