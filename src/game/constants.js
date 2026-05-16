@@ -356,6 +356,8 @@ export const worldBagFloorPickedAccountKey = "ovcWorldBagFloorPickedV1";
 export const npcDialogueCompleteKey = "npcDialogueCompleteV1";
 export const tradeMasterDialogueCompleteKey = "tradeMasterDialogueCompleteV1";
 export const alchemyMasterDialogueCompleteKey = "alchemyMasterDialogueCompleteV1";
+export const craftFurnitureCountsKey = "craftFurnitureCountsV1";
+export const coloredMagicPowderCountsKey = "coloredMagicPowderCountsV1";
 export const guidePlantPageUnlockedKey = "guidePlantPageUnlockedV1";
 export const appleStateKey = "appleStateV1";
 export const playerPositionKey = "playerPositionV1";
@@ -395,7 +397,9 @@ export const appStorageKeys = [
   onboardingTutorialBindSessionKey,
   everBeenToWorldKey,
   "butterflyCaughtCountsV1",
-  "magicPowderCountV1"
+  "magicPowderCountV1",
+  "craftFurnitureCountsV1",
+  "coloredMagicPowderCountsV1"
 ];
 
 /**

@@ -410,6 +410,29 @@
       </button>
     </div>
   </div>
+  <div id="alchemy-craft-overlay" class="alchemy-craft-overlay" style="display: none" aria-hidden="true">
+    <div class="alchemy-craft-panel" role="dialog" aria-labelledby="alchemy-craft-title">
+      <div class="alchemy-craft-header">
+        <h2 id="alchemy-craft-title">제작</h2>
+        <button type="button" id="alchemy-craft-close" class="alchemy-craft-close" aria-label="닫기">
+          &#215;
+        </button>
+      </div>
+      <p class="alchemy-craft-hint">만들 아이템을 고른 뒤 요구 아이템을 확인하세요.</p>
+      <div id="alchemy-craft-product-list" class="alchemy-craft-product-list" aria-label="제작 목록"></div>
+      <button type="button" id="alchemy-craft-show-requirements" class="alchemy-craft-show-requirements" disabled>
+        요구 아이템
+      </button>
+      <div
+        id="alchemy-craft-requirement-slots"
+        class="alchemy-craft-requirement-slots is-hidden"
+        aria-label="필요 재료"
+      ></div>
+      <button type="button" id="alchemy-craft-confirm" class="alchemy-craft-confirm" disabled>
+        제작하기
+      </button>
+    </div>
+  </div>
   <div id="multiplayer-status">멀티 초기화 중 / 로그인 1</div>
   <button id="admin-open-button" type="button" aria-label="관리자"></button>
   <div id="admin-overlay" aria-hidden="true">

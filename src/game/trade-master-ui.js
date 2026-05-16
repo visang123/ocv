@@ -100,7 +100,8 @@ export function updateTradeNpcPrompt() {
     running ||
     exchangeOpen ||
     (host.isNpcDialogueRunning && host.isNpcDialogueRunning()) ||
-    (host.isAlchemyMasterDialogueRunning && host.isAlchemyMasterDialogueRunning())
+    (host.isAlchemyMasterDialogueRunning && host.isAlchemyMasterDialogueRunning()) ||
+    (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen())
   ) {
     return;
   }
@@ -134,6 +135,33 @@ export function updateTradeNpcPrompt() {
   }
 }
 
+/** @type {{ el: Element, name: string } | null} */
+let stickyWorldNpcHover = null;
+
+const NPC_HOVER_PICK_PAD_X = 14;
+const NPC_HOVER_PICK_PAD_BOTTOM = 10;
+/** 이름 라벨이 NPC 위에 뜨므로, 위쪽으로 넓혀 마우스를 올려도 호버가 끊기지 않게 */
+const NPC_HOVER_PICK_PAD_TOP = 52;
+
+function getNpcHoverPickRect(el) {
+  const rect = el.getBoundingClientRect();
+  return {
+    left: rect.left - NPC_HOVER_PICK_PAD_X,
+    right: rect.right + NPC_HOVER_PICK_PAD_X,
+    top: rect.top - NPC_HOVER_PICK_PAD_TOP,
+    bottom: rect.bottom + NPC_HOVER_PICK_PAD_BOTTOM
+  };
+}
+
+function pointInNpcHoverPickRect(clientX, clientY, el) {
+  const r = getNpcHoverPickRect(el);
+  return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+}
+
+export function clearWorldNpcHoverSticky() {
+  stickyWorldNpcHover = null;
+}
+
 export function pickWorldNpcHover(clientX, clientY) {
   if (!host) return null;
   const list = [
@@ -141,20 +169,27 @@ export function pickWorldNpcHover(clientX, clientY) {
     { el: host.tradeMaster, name: "\uAC70\uB798\uC758 \uB2EC\uC778", visible: host.isTradeMasterVisible },
     { el: host.alchemyMaster, name: "\uC5F0\uAE08\uC220\uC758 \uB2EC\uC778", visible: host.isAlchemyMasterVisible }
   ];
+
+  if (
+    stickyWorldNpcHover &&
+    stickyWorldNpcHover.el &&
+    stickyWorldNpcHover.el.isConnected &&
+    stickyWorldNpcHover.el.style.display !== "none" &&
+    pointInNpcHoverPickRect(clientX, clientY, stickyWorldNpcHover.el)
+  ) {
+    return { name: stickyWorldNpcHover.name, anchorEl: stickyWorldNpcHover.el };
+  }
+
   for (let i = 0; i < list.length; i++) {
     const entry = list[i];
     if (!entry.el || !entry.visible()) continue;
     if (entry.el.style.display === "none") continue;
-    const rect = entry.el.getBoundingClientRect();
-    if (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
-    ) {
+    if (pointInNpcHoverPickRect(clientX, clientY, entry.el)) {
+      stickyWorldNpcHover = { el: entry.el, name: entry.name };
       return { name: entry.name, anchorEl: entry.el };
     }
   }
+  stickyWorldNpcHover = null;
   return null;
 }
 

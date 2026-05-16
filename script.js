@@ -168,6 +168,8 @@ import {
   npcDialogueCompleteKey,
   tradeMasterDialogueCompleteKey,
   alchemyMasterDialogueCompleteKey,
+  craftFurnitureCountsKey,
+  coloredMagicPowderCountsKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
   bucketStateKey,
@@ -200,6 +202,12 @@ import {
   tradeOfferList,
   tradeExchangeConfirm,
   tradeExchangeClose,
+  alchemyCraftOverlay,
+  alchemyCraftProductList,
+  alchemyCraftShowRequirements,
+  alchemyCraftRequirementSlots,
+  alchemyCraftConfirm,
+  alchemyCraftClose,
   playerBubble,
   playerAlert,
   waterNeeded,
@@ -363,15 +371,20 @@ import {
   isTradeExchangeOpen,
   isTradeMasterDialogueRunning,
   pickWorldNpcHover,
+  clearWorldNpcHoverSticky,
   tryTalkToTradeMaster,
   updateTradeNpcPrompt
 } from "./src/game/trade-master-ui.js";
 import {
   bindAlchemyMaster,
+  closeAlchemyCraftPanel,
+  handleBagSlotClickWhileAlchemyCraftOpen,
   hydrateAlchemyMasterDialogueComplete,
+  isAlchemyCraftOpen,
   isAlchemyMasterDialogueRunning,
   isNearAlchemyMaster,
   tryTalkToAlchemyMaster,
+  updateAlchemyCraftEffects,
   updateAlchemyNpcPrompt
 } from "./src/game/alchemy-master-ui.js";
 
@@ -1248,9 +1261,24 @@ const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
 const SYNC_DEBUG_TRACE = false;
 const WORLD_HEART_FX_MS = 2200;
-/** ?퍼??버튼??펙????갱?에 ?일?게 ?는 ?모지(?) */
-const WORLD_SAD_BUTTON_EMOJI = "\uD83D\uDE22";
 const WORLD_CHAT_MAX_CHARS = 120;
+
+/** \uC2AC\uD37C\uC694 \uBC84\uD2BC\u00B7\uC774\uD399\uD2B8 \uCCAB \uC54C\uACB9\uC774 \u2014 \uD50C\uB7AB\uD3FC \uC774\uBAA8\uC9C0 \uB300\uC2E0 CSS \uC2AC\uD508 \uC5BC\uAD74(\uB208\uBB3C \uD3EC\uD568) */
+function createOvcSadFaceElement() {
+  const face = document.createElement("span");
+  face.className = "ovc-sad-face";
+  face.setAttribute("aria-hidden", "true");
+  face.innerHTML =
+    '<span class="ovc-sad-face__head"></span>' +
+    '<span class="ovc-sad-face__brow ovc-sad-face__brow--l"></span>' +
+    '<span class="ovc-sad-face__brow ovc-sad-face__brow--r"></span>' +
+    '<span class="ovc-sad-face__eye ovc-sad-face__eye--l"></span>' +
+    '<span class="ovc-sad-face__eye ovc-sad-face__eye--r"></span>' +
+    '<span class="ovc-sad-face__mouth"></span>' +
+    '<span class="ovc-sad-face__tear ovc-sad-face__tear--l"></span>' +
+    '<span class="ovc-sad-face__tear ovc-sad-face__tear--r"></span>';
+  return face;
+}
 /** ?체 채팅 ?두(???는 모두?게 ?시). */
 const WORLD_CHAT_GLOBAL_PREFIX = "\uC804\uCCB4:";
 /** ?각 콜론(U+FF1A) ?을 반각(U+003A)?로 ?일 ??IME·모바?에??귓말/?체 구문??깨?지 ?게 */
@@ -1365,6 +1393,15 @@ const rockInventoryCountKey = "rockInventoryCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
 let rockInventoryCount = 0;
+/** @type {Record<string, number>} */
+let craftFurnitureCounts = {
+  craftDesk: 0,
+  craftFence: 0,
+  craftChair: 0,
+  craftHouse: 0
+};
+/** @type {{ yellow: number, white: number, brown: number, mixed: number }} */
+let coloredMagicPowderCounts = { yellow: 0, white: 0, brown: 0, mixed: 0 };
 /** 관리자 ?버? ?물지???시·?개 ?에?가???제 ?물 ?산?별개) */
 let adminDebugPlantIndexBonus = 0;
 let ignoreSnapshotInventorySeedsUntil = 0;
@@ -2098,6 +2135,13 @@ document.addEventListener("keydown", function (event) {
   }
 
   if (key === "Escape") {
+    if (isAlchemyCraftOpen()) {
+      event.preventDefault();
+      closeAlchemyCraftPanel();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (isTradeExchangeOpen()) {
       event.preventDefault();
       closeTradeExchangePanel();
@@ -2216,7 +2260,7 @@ window.addEventListener(
 );
 
 function onGuideInventoryToggleClick() {
-  if (isTradeExchangeOpen()) {
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen()) {
     return;
   }
   if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
@@ -2243,6 +2287,10 @@ function setBagInventoryPanelOpen(open) {
 }
 
 function closeBagInventoryPanel() {
+  if (isAlchemyCraftOpen()) {
+    closeAlchemyCraftPanel();
+    return;
+  }
   if (isTradeExchangeOpen()) {
     closeTradeExchangePanel();
     return;
@@ -2252,7 +2300,7 @@ function closeBagInventoryPanel() {
 }
 
 function toggleBagInventoryPanelFromBagClick() {
-  if (isTradeExchangeOpen()) {
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen()) {
     return;
   }
   if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
@@ -2297,6 +2345,12 @@ if (bagInventoryPanel) {
     }
     const slot = event.target.closest(".bag-inventory-slot");
     if (!slot || !bagInventoryPanel.contains(slot)) return;
+    if (isAlchemyCraftOpen()) {
+      event.preventDefault();
+      event.stopPropagation();
+      handleBagSlotClickWhileAlchemyCraftOpen(slot);
+      return;
+    }
     if (isTradeExchangeOpen()) {
       event.preventDefault();
       event.stopPropagation();
@@ -2413,12 +2467,23 @@ bindTradeMaster({
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
-  isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning
+  isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning,
+  isAlchemyCraftOpen: isAlchemyCraftOpen
 });
 
 bindAlchemyMaster({
   alchemyMasterBubble: alchemyMasterBubble,
   playerBubble: playerBubble,
+  alchemyMaster: alchemyMaster,
+  alchemyCraftOverlay: alchemyCraftOverlay,
+  alchemyCraftProductList: alchemyCraftProductList,
+  alchemyCraftShowRequirements: alchemyCraftShowRequirements,
+  alchemyCraftRequirementSlots: alchemyCraftRequirementSlots,
+  alchemyCraftConfirm: alchemyCraftConfirm,
+  alchemyCraftClose: alchemyCraftClose,
+  bagInventoryPanel: bagInventoryPanel,
+  worldBagInventory: worldBagInventory,
+  ground: ground,
   ALCHEMY_MASTER_START_X: ALCHEMY_MASTER_START_X,
   ALCHEMY_MASTER_START_Y: ALCHEMY_MASTER_START_Y,
   NPC_WIDTH: NPC_WIDTH,
@@ -2433,13 +2498,22 @@ bindAlchemyMaster({
   getCenterDistance: getCenterDistance,
   speechBubbleTopWorldYFromHead: speechBubbleTopWorldYFromHead,
   setSpeechBubbleTransform: setSpeechBubbleTransform,
+  setWorldPosition: setWorldPosition,
   setStoredFlag: setStoredFlag,
+  setBagInventoryPanelOpen: setBagInventoryPanelOpen,
+  updateBagInventorySlots: updateBagInventorySlots,
   updateNpcPosition: updateNpcPosition,
   updatePlayerBubblePosition: updatePlayerBubblePosition,
+  removeOneBagItem: removeOneBagItemForTrade,
+  addBagItems: addBagItemsForTrade,
+  saveCraftFurnitureCounts: saveCraftFurnitureCounts,
+  saveColoredMagicPowderCounts: saveColoredMagicPowderCounts,
+  markWorldDirty: markWorldDirty,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
-  isTradeMasterDialogueRunning: isTradeMasterDialogueRunning
+  isTradeMasterDialogueRunning: isTradeMasterDialogueRunning,
+  isTradeExchangeOpen: isTradeExchangeOpen
 });
 
 signBoard.addEventListener("click", function () {
@@ -3122,6 +3196,27 @@ function isHoldingMainBucket() {
 
 function isHoldingExtraBucket() {
   return heldItem === HELD_ITEM_BUCKET && heldBucketId && heldBucketId !== MAIN_BUCKET_ID;
+}
+
+/** 메인 양동이(땅·우물 옆)의 좌표·찬/빈 — 추가 양동이를 들고 있을 때는 별도 보관값 사용 */
+function getMainBucketGroundState() {
+  if (isHoldingExtraBucket()) {
+    const bucketSize = getBucketSize();
+    return {
+      x: Number.isFinite(heldExtraBucketMainX)
+        ? heldExtraBucketMainX
+        : wellX - bucketSize.width - 8,
+      y: Number.isFinite(heldExtraBucketMainY)
+        ? heldExtraBucketMainY
+        : wellY + WELL_SIZE - bucketSize.height,
+      isFull: Boolean(heldExtraBucketMainIsFull)
+    };
+  }
+  return {
+    x: bucketX,
+    y: bucketY,
+    isFull: Boolean(isBucketFull)
+  };
 }
 
 function isMainBucketOnGroundForPickup() {
@@ -4205,6 +4300,8 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   hydrateTradeMasterDialogueComplete(getStoredFlag(tradeMasterDialogueCompleteKey));
   hydrateAlchemyMasterDialogueComplete(getStoredFlag(alchemyMasterDialogueCompleteKey));
+  loadCraftFurnitureCounts();
+  loadColoredMagicPowderCounts();
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
   isGuideBookClickPromptActive =
@@ -4702,6 +4799,10 @@ function tryPickSharedBucket(bucketDistance) {
         extra._el = null;
       }
     }
+  } else {
+    heldExtraBucketMainX = 0;
+    heldExtraBucketMainY = 0;
+    heldExtraBucketMainIsFull = false;
   }
   const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
   bucketX = handPosition.x;
@@ -4711,6 +4812,10 @@ function tryPickSharedBucket(bucketDistance) {
   window.OVC_SHARED_BUCKET_HELD_BY = heldBucketId === MAIN_BUCKET_ID ? currentSessionId : "";
   markWorldDirty();
   if (heldBucketId === MAIN_BUCKET_ID) {
+    broadcastBucketState(true);
+  } else {
+    saveAppleState();
+    saveBucketState();
     broadcastBucketState(true);
   }
   syncWorldState(true);
@@ -5805,12 +5910,13 @@ function loadBucketState() {
 }
 
 function saveBucketState() {
+  const mainBucket = getMainBucketGroundState();
   setStoredValue(
     bucketStateKey,
     JSON.stringify({
-      isBucketFull,
-      bucketX,
-      bucketY,
+      isBucketFull: mainBucket.isFull,
+      bucketX: mainBucket.x,
+      bucketY: mainBucket.y,
       heldItem: null,
       savedAt: Date.now()
     })
@@ -6012,9 +6118,10 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
 function getSharedWorldSnapshot() {
   flushPassiveSimulationBeforeSharedSnapshot();
   const bucketHeldBy = isHoldingMainBucket() ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
-  const snapshotBucketX = isHoldingExtraBucket() ? heldExtraBucketMainX : bucketX;
-  const snapshotBucketY = isHoldingExtraBucket() ? heldExtraBucketMainY : bucketY;
-  const snapshotBucketIsFull = isHoldingExtraBucket() ? heldExtraBucketMainIsFull : isBucketFull;
+  const mainBucketSnapshot = getMainBucketGroundState();
+  const snapshotBucketX = mainBucketSnapshot.x;
+  const snapshotBucketY = mainBucketSnapshot.y;
+  const snapshotBucketIsFull = mainBucketSnapshot.isFull;
   const plantIndexBonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
   return {
     /** 멀?? ?물 ??스?프? 같? ?각축으??어 `rebasePlantModelTimestampsToLocalNow`??refTime?괴리 감소 */
@@ -7849,29 +7956,52 @@ function restorePlantHoverLabelToWorldDom() {
   ground.appendChild(plantHoverLabel);
 }
 
+let worldNpcHoverAnchorEl = null;
+
+function syncWorldNpcHoverLabelPosition(anchorEl) {
+  const anchor = anchorEl || worldNpcHoverAnchorEl;
+  if (!plantHoverLabel || !anchor || !anchor.isConnected) return;
+  if (!plantHoverLabel.classList.contains("is-world-npc-name")) return;
+  ensurePlantHoverLabelOnBodyForFixedUi();
+  const rect = anchor.getBoundingClientRect();
+  void plantHoverLabel.offsetWidth;
+  const w = plantHoverLabel.offsetWidth || 1;
+  const h = plantHoverLabel.offsetHeight || 1;
+  const gap = 6;
+  let left = Math.round(rect.left + rect.width / 2 - w / 2);
+  let top = Math.round(rect.top - h - gap);
+  left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
+  top = Math.max(8, top);
+  plantHoverLabel.style.left = left + "px";
+  plantHoverLabel.style.top = top + "px";
+  plantHoverLabel.style.right = "";
+  plantHoverLabel.style.bottom = "";
+}
+
 function showWorldNpcHoverLabel(text, anchorEl) {
   if (!plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
+  const sameAnchor = worldNpcHoverAnchorEl === anchorEl;
+  worldNpcHoverAnchorEl = anchorEl;
   ensurePlantHoverLabelOnBodyForFixedUi();
   plantHoverLabel.classList.remove(
     "is-seed-inventory-hint",
     "is-stage3-complete",
     "is-well-dock",
-    "is-ui-shortcut-hint"
+    "is-ui-shortcut-hint",
+    "is-plant-world-sign"
   );
   plantHoverLabel.classList.add("is-world-npc-name");
-  plantHoverLabel.textContent = text;
+  if (plantHoverLabel.textContent !== text) {
+    plantHoverLabel.textContent = text;
+  }
   plantHoverLabel.style.display = "block";
   plantHoverLabel.style.position = "fixed";
   plantHoverLabel.style.zIndex = "225";
   plantHoverLabel.style.transform = "none";
-  const rect = anchorEl.getBoundingClientRect();
-  void plantHoverLabel.offsetWidth;
-  const w = plantHoverLabel.offsetWidth || 1;
-  const h = plantHoverLabel.offsetHeight || 1;
-  const left = Math.round(rect.left + rect.width / 2 - w / 2);
-  const top = Math.round(rect.top - h - 6);
-  plantHoverLabel.style.left = left + "px";
-  plantHoverLabel.style.top = top + "px";
+  if (sameAnchor && plantHoverLabel.style.left) {
+    return;
+  }
+  syncWorldNpcHoverLabelPosition(anchorEl);
 }
 
 function showUiShortcutHoverLabel(text, anchorEl) {
@@ -7930,6 +8060,8 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
     if (overInv) {
       worldBagInventory.classList.add("is-seed-inventory-hover-hint");
       if (plantHoverLabel) {
+        worldNpcHoverAnchorEl = null;
+        clearWorldNpcHoverSticky();
         plantHoverLabel.classList.remove("is-seed-inventory-hint");
         plantHoverLabel.style.display = "none";
         restorePlantHoverLabelToWorldDom();
@@ -8225,6 +8357,14 @@ function getBagInventoryCountsByKey() {
     apple: Math.max(0, Number(appleState.count) || 0),
     rock: Math.max(0, Math.floor(Number(rockInventoryCount) || 0)),
     magicPowder: Math.max(0, Math.floor(magicPowderCount) || 0),
+    magicPowderYellow: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.yellow) || 0)),
+    magicPowderWhite: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.white) || 0)),
+    magicPowderBrown: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)),
+    magicPowderMixed: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0)),
+    craftDesk: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftDesk) || 0)),
+    craftFence: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftFence) || 0)),
+    craftChair: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftChair) || 0)),
+    craftHouse: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftHouse) || 0)),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
     "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
     "butterfly:white": Math.max(0, Number(butterflyState.caughtCounts.white) || 0)
@@ -8279,6 +8419,49 @@ function removeOneBagItemForTrade(itemKey) {
     saveAppleState();
     return true;
   }
+  if (itemKey === "magicPowderYellow") {
+    if ((Number(coloredMagicPowderCounts.yellow) || 0) <= 0) return false;
+    coloredMagicPowderCounts.yellow = Math.max(0, coloredMagicPowderCounts.yellow - 1);
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return true;
+  }
+  if (itemKey === "magicPowderWhite") {
+    if ((Number(coloredMagicPowderCounts.white) || 0) <= 0) return false;
+    coloredMagicPowderCounts.white = Math.max(0, coloredMagicPowderCounts.white - 1);
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return true;
+  }
+  if (itemKey === "magicPowderBrown") {
+    if ((Number(coloredMagicPowderCounts.brown) || 0) <= 0) return false;
+    coloredMagicPowderCounts.brown = Math.max(0, coloredMagicPowderCounts.brown - 1);
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return true;
+  }
+  if (itemKey === "magicPowderMixed") {
+    if ((Number(coloredMagicPowderCounts.mixed) || 0) <= 0) return false;
+    coloredMagicPowderCounts.mixed = Math.max(0, coloredMagicPowderCounts.mixed - 1);
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return true;
+  }
+  if (itemKey === "craftDesk" || itemKey === "craftFence" || itemKey === "craftChair" || itemKey === "craftHouse") {
+    if ((Number(craftFurnitureCounts[itemKey]) || 0) <= 0) return false;
+    craftFurnitureCounts[itemKey] = Math.max(0, craftFurnitureCounts[itemKey] - 1);
+    updateBagInventorySlots();
+    saveCraftFurnitureCounts();
+    return true;
+  }
+  if (itemKey === "butterfly:brown" || itemKey === "butterfly:yellow" || itemKey === "butterfly:white") {
+    const color = itemKey.split(":")[1];
+    if ((Number(butterflyState.caughtCounts[color]) || 0) <= 0) return false;
+    butterflyState.caughtCounts[color] = Math.max(0, butterflyState.caughtCounts[color] - 1);
+    updateBagInventorySlots();
+    saveButterflyCaughtCounts();
+    return true;
+  }
   return false;
 }
 
@@ -8326,6 +8509,48 @@ function addBagItemsForTrade(itemKey, amount) {
     updateBagInventorySlots();
     saveMagicPowderCount();
     saveAppleState();
+    return;
+  }
+  if (itemKey === "magicPowderYellow") {
+    coloredMagicPowderCounts.yellow =
+      Math.max(0, Math.floor(Number(coloredMagicPowderCounts.yellow) || 0)) + n;
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return;
+  }
+  if (itemKey === "magicPowderWhite") {
+    coloredMagicPowderCounts.white =
+      Math.max(0, Math.floor(Number(coloredMagicPowderCounts.white) || 0)) + n;
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return;
+  }
+  if (itemKey === "magicPowderBrown") {
+    coloredMagicPowderCounts.brown =
+      Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)) + n;
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return;
+  }
+  if (itemKey === "magicPowderMixed") {
+    coloredMagicPowderCounts.mixed =
+      Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0)) + n;
+    updateBagInventorySlots();
+    saveColoredMagicPowderCounts();
+    return;
+  }
+  if (itemKey === "craftDesk" || itemKey === "craftFence" || itemKey === "craftChair" || itemKey === "craftHouse") {
+    craftFurnitureCounts[itemKey] = Math.max(0, Math.floor(Number(craftFurnitureCounts[itemKey]) || 0)) + n;
+    updateBagInventorySlots();
+    saveCraftFurnitureCounts();
+    return;
+  }
+  if (itemKey === "butterfly:brown" || itemKey === "butterfly:yellow" || itemKey === "butterfly:white") {
+    const color = itemKey.split(":")[1];
+    butterflyState.caughtCounts[color] =
+      Math.max(0, Math.floor(Number(butterflyState.caughtCounts[color]) || 0)) + n;
+    updateBagInventorySlots();
+    saveButterflyCaughtCounts();
     return;
   }
   if (itemKey === "worldBucket") {
@@ -8624,7 +8849,8 @@ function updateBucketPosition() {
     } else {
       const mainX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : wellX - bucketSize.width - 8;
       const mainY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : wellY + WELL_SIZE - bucketSize.height;
-      bucket.src = heldExtraBucketMainIsFull ? "?대?吏/bucket-full.png" : "?대?吏/bucket-empty.png";
+      const mainGround = getMainBucketGroundState();
+      bucket.src = mainGround.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
       bucket.style.display = "block";
       setWorldPosition(bucket, mainX, mainY);
     }
@@ -9619,10 +9845,11 @@ function setInstantHoverTip(el, text) {
   }
 }
 
-/** ?아 ?는 ?물? ?? ?각 기?: ?싹(?어 4 미만)??(?어 4 ?상)???유?별??로 번호 부?? */
+/** 살아 있는 식물·마른/썩은 땅: 땅·새싹·풀을 소유자별로 각각 따로 번호 부여 */
 function refreshPlantIdentityOrdinals() {
   function clearOrdinals(plant) {
     if (!plant) return;
+    plant.soilOrdinal = 0;
     plant.sproutOrdinal = 0;
     plant.grassOrdinal = null;
   }
@@ -9631,32 +9858,46 @@ function refreshPlantIdentityOrdinals() {
 
   const groups = Object.create(null);
   function consider(plant) {
-    if (!plant || !isPlantAliveForWorldOrdinal(plant)) return;
-    const tier = Math.max(0, Number(plant.growthTier) || 0);
+    if (!plant) return;
+    if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
     const k = plantOrdinalGroupKey(plant);
     if (!groups[k]) {
-      groups[k] = { sprouts: [], grasses: [] };
+      groups[k] = { soils: [], sprouts: [], grasses: [] };
     }
     const t = plantWorldOrdinalSortTime(plant);
     const entry = { plant: plant, t: t };
-    if (tier < 4) {
+    const isBadSoil =
+      plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered;
+    if (isBadSoil) {
+      groups[k].soils.push(entry);
+      return;
+    }
+    if (!isPlantAliveForWorldOrdinal(plant)) return;
+    const tier = Math.max(0, Number(plant.growthTier) || 0);
+    if (tier >= 4) {
+      groups[k].grasses.push(entry);
+    } else if (plant.isSproutGrown) {
       groups[k].sprouts.push(entry);
     } else {
-      groups[k].grasses.push(entry);
+      groups[k].soils.push(entry);
     }
   }
-  if (plantRuntime.isSeedPlanted) {
-    consider(plantRuntime);
-  }
+  consider(plantRuntime);
   appleState.extraPlants.forEach(consider);
 
   Object.keys(groups).forEach(function (k) {
     const g = groups[k];
+    g.soils.sort(function (a, b) {
+      return a.t - b.t;
+    });
     g.sprouts.sort(function (a, b) {
       return a.t - b.t;
     });
     g.grasses.sort(function (a, b) {
       return a.t - b.t;
+    });
+    g.soils.forEach(function (e, i) {
+      e.plant.soilOrdinal = i + 1;
     });
     g.sprouts.forEach(function (e, i) {
       e.plant.sproutOrdinal = i + 1;
@@ -9683,11 +9924,13 @@ function ensureGrassOrdinalIfNeeded(plant) {
 
 function getPlantSoilBadStateTitle(plant) {
   if (!plant) return "";
+  const soilOrd = Math.max(0, Number(plant.soilOrdinal) || 0);
+  const suffix = soilOrd > 0 ? String(soilOrd) : "";
   if (plant.status === "dry") {
-    return "\uB9C8\uB978\uB545";
+    return "\uB9C8\uB978\uB545" + suffix;
   }
   if (plant.status === "rotten" || plant.isOverwatered) {
-    return "\uC339\uC740\uB545";
+    return "\uC339\uC740\uB545" + suffix;
   }
   return "";
 }
@@ -9697,33 +9940,19 @@ function getPlantWorldLabel(plant) {
   if (getPlantSoilBadStateTitle(plant)) return "";
   const name = String(plant.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
   const tier = Math.max(0, Number(plant.growthTier) || 0);
+  const soilOrd = Math.max(0, Number(plant.soilOrdinal) || 0);
   const sproutOrd = Math.max(0, Number(plant.sproutOrdinal) || 0);
   const grassOrd =
     plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
       ? Math.max(0, Number(plant.grassOrdinal))
       : 0;
-  if (tier === 0) {
-    if (!plant.isSproutGrown) {
-      if (sproutOrd > 0) {
-        return name + "\uC758 \uB545" + sproutOrd;
-      }
-      return name + "\uC758 \uB545";
-    }
-    if (sproutOrd > 0) {
-      return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
-    }
-    return name + "\uC758 \uC0C8\uC2F9";
-  }
-  if (tier >= 4 && grassOrd > 0) {
-    return name + "\uC758 \uD480" + grassOrd;
-  }
   if (tier >= 4) {
-    return name + "\uC758 \uD480";
+    return name + "\uC758 \uD480" + (grassOrd > 0 ? grassOrd : "");
   }
-  if (sproutOrd > 0) {
-    return name + "\uC758 \uC0C8\uC2F9" + sproutOrd;
+  if (plant.isSproutGrown) {
+    return name + "\uC758 \uC0C8\uC2F9" + (sproutOrd > 0 ? sproutOrd : "");
   }
-  return name + "\uC758 \uC0C8\uC2F9";
+  return name + "\uC758 \uB545" + (soilOrd > 0 ? soilOrd : "");
 }
 
 function extraPlantFromDomElement(el) {
@@ -9827,6 +10056,8 @@ function applyPlantHoverVisuals(plant) {
 }
 
 function hidePlantHoverLabel() {
+  worldNpcHoverAnchorEl = null;
+  clearWorldNpcHoverSticky();
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   clearPlantHoverVisuals();
   if (plantHoverLabel) {
@@ -9852,6 +10083,8 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverSignForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
+  worldNpcHoverAnchorEl = null;
+  clearWorldNpcHoverSticky();
   if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
     hidePlantHoverLabel();
     return;
@@ -11642,6 +11875,9 @@ function updateCamera() {
     "px) scale(" +
     zoomLevel +
     ")";
+  if (worldNpcHoverAnchorEl) {
+    syncWorldNpcHoverLabelPosition(worldNpcHoverAnchorEl);
+  }
 }
 
 function getMaxZoom() {
@@ -12452,8 +12688,12 @@ function spawnWorldSadFxNearBodyRect(rect) {
   for (let i = 0; i < n; i++) {
     const bit = document.createElement("span");
     bit.className = "ovc-heart-fx-bit";
-    bit.textContent =
-      i === 0 ? WORLD_SAD_BUTTON_EMOJI : facesVariety[(i - 1) % facesVariety.length];
+    if (i === 0) {
+      bit.classList.add("ovc-heart-fx-bit--sad-lead");
+      bit.appendChild(createOvcSadFaceElement());
+    } else {
+      bit.textContent = facesVariety[(i - 1) % facesVariety.length];
+    }
     bit.style.fontSize = fontPx + "px";
     const dx = (Math.random() - 0.35) * spreadX;
     const dy = -rise - Math.random() * spreadY;
@@ -12675,7 +12915,7 @@ function ensureWorldSocialUi() {
   worldSadBtn.id = "world-sad-button";
   worldSadBtn.className = "world-sad-button";
   worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
-  worldSadBtn.innerHTML = WORLD_SAD_BUTTON_EMOJI;
+  worldSadBtn.appendChild(createOvcSadFaceElement());
   document.body.appendChild(worldSadBtn);
 
   worldHeartBtn = document.createElement("button");
@@ -13052,12 +13292,13 @@ function broadcastBucketState(forceSend) {
     return;
   }
 
+  const mainBucket = getMainBucketGroundState();
   const payload = {
     id: currentSessionId,
     held: isHoldingMainBucket(),
-    x: bucketX,
-    y: bucketY,
-    isFull: isBucketFull,
+    x: mainBucket.x,
+    y: mainBucket.y,
+    isFull: mainBucket.isFull,
     updatedAt: now
   };
   Promise.resolve(multiplayerChannel.send({
@@ -13947,6 +14188,56 @@ function saveMagicPowderCount() {
 
 function saveRockInventoryCount() {
   setStoredValue(rockInventoryCountKey, String(Math.max(0, Math.floor(rockInventoryCount))));
+}
+
+function loadCraftFurnitureCounts() {
+  try {
+    const raw = getStoredValue(craftFurnitureCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    craftFurnitureCounts.craftDesk = Math.max(0, Math.floor(Number(parsed.craftDesk) || 0));
+    craftFurnitureCounts.craftFence = Math.max(0, Math.floor(Number(parsed.craftFence) || 0));
+    craftFurnitureCounts.craftChair = Math.max(0, Math.floor(Number(parsed.craftChair) || 0));
+    craftFurnitureCounts.craftHouse = Math.max(0, Math.floor(Number(parsed.craftHouse) || 0));
+  } catch (e) {}
+}
+
+function saveCraftFurnitureCounts() {
+  setStoredValue(
+    craftFurnitureCountsKey,
+    JSON.stringify({
+      craftDesk: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftDesk) || 0)),
+      craftFence: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftFence) || 0)),
+      craftChair: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftChair) || 0)),
+      craftHouse: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftHouse) || 0))
+    })
+  );
+}
+
+function loadColoredMagicPowderCounts() {
+  try {
+    const raw = getStoredValue(coloredMagicPowderCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    coloredMagicPowderCounts.yellow = Math.max(0, Math.floor(Number(parsed.yellow) || 0));
+    coloredMagicPowderCounts.white = Math.max(0, Math.floor(Number(parsed.white) || 0));
+    coloredMagicPowderCounts.brown = Math.max(0, Math.floor(Number(parsed.brown) || 0));
+    coloredMagicPowderCounts.mixed = Math.max(0, Math.floor(Number(parsed.mixed) || 0));
+  } catch (e) {}
+}
+
+function saveColoredMagicPowderCounts() {
+  setStoredValue(
+    coloredMagicPowderCountsKey,
+    JSON.stringify({
+      yellow: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.yellow) || 0)),
+      white: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.white) || 0)),
+      brown: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)),
+      mixed: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0))
+    })
+  );
 }
 
 function getTotalCaughtButterflies() {
@@ -14942,6 +15233,7 @@ function gameLoop() {
   refreshPlantIdentityOrdinals();
   updatePlantState();
   updateNpcPosition();
+  updateAlchemyCraftEffects(Date.now());
   updateGuideCard();
   updatePlantProgressGauge();
   updateOnboardingFlowUI();

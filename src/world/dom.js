@@ -16,6 +16,12 @@ const tradeCounterSlot = document.getElementById("trade-counter-slot");
 const tradeOfferList = document.getElementById("trade-offer-list");
 const tradeExchangeConfirm = document.getElementById("trade-exchange-confirm");
 const tradeExchangeClose = document.getElementById("trade-exchange-close");
+const alchemyCraftOverlay = document.getElementById("alchemy-craft-overlay");
+const alchemyCraftProductList = document.getElementById("alchemy-craft-product-list");
+const alchemyCraftShowRequirements = document.getElementById("alchemy-craft-show-requirements");
+const alchemyCraftRequirementSlots = document.getElementById("alchemy-craft-requirement-slots");
+const alchemyCraftConfirm = document.getElementById("alchemy-craft-confirm");
+const alchemyCraftClose = document.getElementById("alchemy-craft-close");
 const playerBubble = document.getElementById("player-bubble");
 const playerAlert = document.getElementById("player-alert");
 const waterNeeded = document.getElementById("water-needed");
@@ -88,6 +94,12 @@ export {
   tradeOfferList,
   tradeExchangeConfirm,
   tradeExchangeClose,
+  alchemyCraftOverlay,
+  alchemyCraftProductList,
+  alchemyCraftShowRequirements,
+  alchemyCraftRequirementSlots,
+  alchemyCraftConfirm,
+  alchemyCraftClose,
   playerBubble,
   playerAlert,
   waterNeeded,
