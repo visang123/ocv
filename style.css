@@ -199,37 +199,37 @@ body::-webkit-scrollbar {
   left: 0;
   top: 0;
   display: none;
-  min-width: 28px;
-  padding: 2px 6px;
-  border-radius: 8px;
+  min-width: 36px;
+  padding: 3px 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(20, 83, 45, 0.28);
   color: #14532d;
-  font: 800 4px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  font: 800 5px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   text-align: center;
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
   z-index: 80;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
 }
 
 #plant-hover-label.is-plant-world-sign {
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 52px;
-  max-width: 120px;
-  padding: 4px 8px 5px;
-  border-radius: 6px;
+  gap: 3px;
+  min-width: 64px;
+  max-width: 150px;
+  padding: 5px 10px 6px;
+  border-radius: 8px;
   border: 1px solid rgba(20, 83, 45, 0.35);
   background: rgba(255, 255, 255, 0.96);
   white-space: normal;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.16);
 }
 
 #plant-hover-label.is-plant-world-sign .plant-world-sign-title {
-  font: 800 6px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  font: 800 8px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   color: #14532d;
   word-break: keep-all;
 }
@@ -238,9 +238,9 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
+  gap: 3px;
   width: 100%;
-  font: 800 5px/1.2 Arial, sans-serif;
+  font: 800 6px/1.25 Arial, sans-serif;
   color: #0c4a6e;
 }
 
@@ -251,8 +251,8 @@ body::-webkit-scrollbar {
 #plant-hover-label.is-plant-world-sign .plant-world-sign-water-bar {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  height: 5px;
+  gap: 3px;
+  height: 7px;
   width: 100%;
 }
 
@@ -283,18 +283,18 @@ body::-webkit-scrollbar {
 }
 
 #plant-hover-label.is-plant-world-sign .plant-world-sign-water.is-magic-hint {
-  font-size: 4px;
-  line-height: 1.25;
+  font-size: 5px;
+  line-height: 1.3;
   color: #14532d;
   word-break: keep-all;
 }
 
 @keyframes plant-water-hover-pulse {
   from {
-    filter: brightness(1.12) drop-shadow(0 0 4px rgba(56, 189, 248, 0.55));
+    filter: brightness(1.12) drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
   }
   to {
-    filter: brightness(1.38) drop-shadow(0 0 14px rgba(14, 165, 233, 0.95));
+    filter: brightness(1.38) drop-shadow(0 0 18px rgba(14, 165, 233, 0.95));
   }
 }
 
@@ -302,17 +302,17 @@ body::-webkit-scrollbar {
 .extra-plant-spot.is-plant-hover,
 #sprout.is-plant-hover,
 .extra-sprout.is-plant-hover {
-  outline: 2px solid rgba(125, 211, 252, 0.92);
-  outline-offset: 1px;
-  filter: brightness(1.1) drop-shadow(0 0 5px rgba(56, 189, 248, 0.45));
+  outline: 3px solid rgba(125, 211, 252, 0.92);
+  outline-offset: 2px;
+  filter: brightness(1.12) drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
 }
 
 #plant-spot.is-plant-hover-needs-water,
 .extra-plant-spot.is-plant-hover-needs-water,
 #sprout.is-plant-hover-needs-water,
 .extra-sprout.is-plant-hover-needs-water {
-  outline: 3px solid rgba(14, 165, 233, 1);
-  outline-offset: 1px;
+  outline: 4px solid rgba(14, 165, 233, 1);
+  outline-offset: 2px;
   animation: plant-water-hover-pulse 0.7s ease-in-out infinite alternate;
 }
 
@@ -329,74 +329,74 @@ body::-webkit-scrollbar {
   left: auto;
   right: 270px;
   top: 0;
-  width: 270px;
+  width: 320px;
   min-width: 0;
-  min-height: 44px;
+  min-height: 56px;
   margin: 0;
-  padding: 10px 14px;
+  padding: 12px 18px;
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
   transform: none;
-  border-radius: 8px 0 0 8px;
+  border-radius: 10px 0 0 10px;
   border-right: none;
   z-index: 11;
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign {
-  gap: 6px;
-  min-height: 72px;
+  gap: 8px;
+  min-height: 90px;
   max-width: none;
-  padding: 12px 16px 14px;
+  padding: 14px 20px 16px;
   border: 1px solid rgba(0, 0, 0, 0.14);
   border-right: none;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.12);
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-title {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1.25;
   color: #14532d;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-water {
-  gap: 5px;
-  font-size: 14px;
+  gap: 7px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.3;
   color: #0c4a6e;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-water-text {
-  font-size: 14px;
+  font-size: 18px;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-water-bar {
-  gap: 7px;
-  height: 16px;
-  max-width: 200px;
+  gap: 9px;
+  height: 22px;
+  max-width: 250px;
   margin: 0 auto;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-water.is-magic-hint {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.35;
   color: #14532d;
 }
 
 #plant-hover-label.is-ui-shortcut-hint {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.3;
-  padding: 6px 12px;
+  padding: 8px 14px;
   min-width: auto;
-  max-width: min(240px, 72vw);
-  border-radius: 10px;
+  max-width: min(300px, 78vw);
+  border-radius: 12px;
   white-space: nowrap;
-  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.16);
 }
 
 .extra-seed {
@@ -1514,6 +1514,17 @@ body::-webkit-scrollbar {
   z-index: 2;
   pointer-events: none;
   background: url("이미지/rock-ground.svg?v=20260512a") center bottom / contain no-repeat;
+}
+
+.world-craft-furniture {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+  object-fit: contain;
+  object-position: center bottom;
 }
 
 .world-extra-bucket {
@@ -3379,9 +3390,18 @@ body #world-bag-inventory {
   }
 }
 
+:root {
+  --ovc-bag-inventory-left: calc(18px + 78px + 10px);
+  --ovc-bag-inventory-width: calc(3 * 60px + 2 * 9px + 30px);
+  --ovc-npc-ui-gap: 12px;
+  --ovc-npc-side-panel-left: calc(
+    var(--ovc-bag-inventory-left) + var(--ovc-bag-inventory-width) + var(--ovc-npc-ui-gap)
+  );
+}
+
 #bag-inventory-panel {
   position: fixed;
-  left: calc(18px + 78px + 10px);
+  left: var(--ovc-bag-inventory-left);
   bottom: 18px;
   display: none;
   flex-direction: column;
@@ -3514,7 +3534,7 @@ body #world-bag-inventory {
 .bag-slot-icon--magic-powder {
   width: 39px;
   height: 39px;
-  background: url("이미지/magic-powder-gray.png?v=20260509b") center / contain no-repeat;
+  background: url("이미지/magic-powder-gray.png?v=20260516e") center / contain no-repeat;
 }
 
 .bag-slot-icon--magic-powder-img {
@@ -3722,7 +3742,7 @@ body #world-bag-inventory {
   height: 64px;
   pointer-events: none;
   background-color: transparent;
-  background-image: url("이미지/magic-powder-gray.png?v=20260509b");
+  background-image: url("이미지/magic-powder-gray.png?v=20260516e");
   background-position: center;
   background-size: contain;
   background-repeat: no-repeat;
@@ -3753,9 +3773,9 @@ body #world-bag-inventory {
 
 #plant-hover-label.is-world-npc-name {
   z-index: 225;
-  font: 700 4px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
-  padding: 2px 6px;
-  border-radius: 6px;
+  font: 700 5px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  padding: 3px 8px;
+  border-radius: 8px;
 }
 
 .trade-exchange-overlay {
@@ -3767,7 +3787,7 @@ body #world-bag-inventory {
 
 .trade-exchange-panel {
   position: fixed;
-  left: calc(18px + 78px + 10px + 3 * 60px + 2 * 9px + 30px + 24px);
+  left: var(--ovc-npc-side-panel-left);
   bottom: 18px;
   width: 200px;
   padding: 10px 12px 12px;
@@ -3951,7 +3971,7 @@ body #world-bag-inventory {
 
 .alchemy-craft-panel {
   position: fixed;
-  left: calc(18px + 78px + 10px + 3 * 60px + 2 * 9px + 30px + 24px + 220px);
+  left: var(--ovc-npc-side-panel-left);
   bottom: 18px;
   width: 210px;
   padding: 10px 12px 12px;

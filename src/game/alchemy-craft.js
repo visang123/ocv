@@ -33,12 +33,6 @@ export const ALCHEMY_CRAFT_RECIPES = [
     inputs: { rock: 4 }
   },
   {
-    id: "craftFence",
-    label: "\uC6B8\uD0C0\uB9AC",
-    outputKey: "craftFence",
-    inputs: { rock: 3, seed: 1 }
-  },
-  {
     id: "craftDesk",
     label: "\uCC45\uC0C1",
     outputKey: "craftDesk",
@@ -52,7 +46,7 @@ export const ALCHEMY_CRAFT_RECIPES = [
   }
 ];
 
-export const CRAFT_FURNITURE_KEYS = ["craftDesk", "craftFence", "craftChair", "craftHouse"];
+export const CRAFT_FURNITURE_KEYS = ["craftDesk", "craftChair", "craftHouse"];
 
 export const ALCHEMY_CRAFT_INPUT_KEYS = new Set([
   "rock",

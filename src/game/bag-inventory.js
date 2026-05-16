@@ -151,7 +151,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uB178\uB780 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-yellow-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-yellow-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "magicPowderWhite") {
@@ -160,7 +160,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uD558\uC580 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-white-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-white-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "magicPowderBrown") {
@@ -169,7 +169,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uAC08\uC0C9 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-brown-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-brown-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "magicPowderMixed") {
@@ -178,7 +178,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uD63C\uD569 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-mixed-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--magic-powder-img" src="\uC774\uBBF8\uC9C0/magic-powder-mixed-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "craftDesk") {
@@ -187,7 +187,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uCC45\uC0C1",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-desk" src="\uC774\uBBF8\uC9C0/craft-desk-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-desk" src="\uC774\uBBF8\uC9C0/craft-desk-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "craftFence") {
@@ -196,7 +196,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC6B8\uD0C0\uB9AC",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-fence" src="\uC774\uBBF8\uC9C0/craft-fence-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-fence" src="\uC774\uBBF8\uC9C0/craft-fence-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "craftChair") {
@@ -205,7 +205,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC758\uC790",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-chair" src="\uC774\uBBF8\uC9C0/craft-chair-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-chair" src="\uC774\uBBF8\uC9C0/craft-chair-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "craftHouse") {
@@ -214,7 +214,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC9D1",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-house" src="\uC774\uBBF8\uC9C0/craft-house-inv.png?v=20260516c" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--craft bag-slot-icon--craft-house" src="\uC774\uBBF8\uC9C0/craft-house-inv.png?v=20260516e" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "butterfly:brown") {

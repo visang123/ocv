@@ -11,6 +11,10 @@ FILES = [
     "craft-fence-inv.png",
     "craft-chair-inv.png",
     "craft-house-inv.png",
+    "craft-desk-world.png",
+    "craft-fence-world.png",
+    "craft-chair-world.png",
+    "craft-house-world.png",
     "magic-powder-yellow-inv.png",
     "magic-powder-white-inv.png",
     "magic-powder-brown-inv.png",
@@ -24,6 +28,18 @@ def is_background_pixel(r, g, b, a):
     if a < 8:
         return True
     return r <= THRESHOLD and g <= THRESHOLD and b <= THRESHOLD
+
+
+def clear_all_near_black(im):
+    im = im.convert("RGBA")
+    px = im.load()
+    w, h = im.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a and is_background_pixel(r, g, b, a):
+                px[x, y] = (r, g, b, 0)
+    return im
 
 
 def flood_clear_background(im):
@@ -72,6 +88,10 @@ def main():
             continue
         im = Image.open(path)
         out = flood_clear_background(im)
+        if filename.startswith("craft-"):
+            out = clear_all_near_black(out)
+        if filename.endswith("-world.png"):
+            out = clear_all_near_black(out)
         out.save(path)
         print("wrote", path)
 

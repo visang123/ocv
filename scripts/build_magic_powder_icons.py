@@ -1,4 +1,4 @@
-"""Crop colored magic powder inventory icons from the user reference sheet."""
+"""Crop magic powder inventory icons from the reference sheet (black bg -> transparent)."""
 
 from PIL import Image
 import os
@@ -7,50 +7,71 @@ SRC = (
     r"C:\Users\USER\.cursor\projects\c-Users-USER-Desktop-OVC\assets\\"
     r"c__Users_USER_AppData_Roaming_Cursor_User_workspaceStorage_"
     r"5051453ebec3272e55d6a08d292c16f6_images_image-"
-    r"da58d062-0134-4bdf-83ab-5d20ec86ed72.png"
+    r"4143a4ed-70fc-4952-b4aa-a6c1f1dc5edf.png"
 )
-DST_DIR = os.path.join(os.path.dirname(__file__), "..", "\uc774\ubbf8\uc9c0")
+DST_DIR = os.path.join(os.path.dirname(__file__), "..", "이미지")
 
-# Inventory icon centers (bottom row) in 1024x682 sheet: yellow | white | brown
-ITEMS = [
-    ("magic-powder-yellow-inv.png", 170, 555),
-    ("magic-powder-white-inv.png", 512, 555),
-    ("magic-powder-brown-inv.png", 852, 555),
+# Bottom-row inventory icon centers (mixed/grey, yellow, white, brown).
+INV_ITEMS = [
+    ("magic-powder-mixed-inv.png", 127, 619),
+    ("magic-powder-yellow-inv.png", 383, 619),
+    ("magic-powder-white-inv.png", 639, 619),
+    ("magic-powder-brown-inv.png", 895, 619),
 ]
 
-CELL = 132
-HALF = CELL // 2
+# Large jar sprites for HUD / legacy magic-powder-gray.png.
+LARGE_ITEMS = [
+    ("magic-powder-gray.png", 136, 263),
+]
 
-src = Image.open(SRC).convert("RGBA")
-W, H = src.size
+INV_CELL = 132
+LARGE_CELL = 256
+BG_THRESHOLD = 28
 
-for filename, cx, cy in ITEMS:
-    left = max(0, cx - HALF)
-    top = max(0, cy - HALF)
-    right = min(W, cx + HALF)
-    bottom = min(H, cy + HALF)
-    cell = src.crop((left, top, right, bottom))
-    out = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
-    paste_x = (CELL - cell.width) // 2
-    paste_y = (CELL - cell.height) // 2
-    out.paste(cell, (paste_x, paste_y), cell)
-    dst = os.path.join(DST_DIR, filename)
-    out.save(dst)
-    print("wrote", dst)
 
-# Mixed icon: simple horizontal blend of the three crops for inventory
-yellow = Image.open(os.path.join(DST_DIR, "magic-powder-yellow-inv.png")).convert("RGBA")
-white = Image.open(os.path.join(DST_DIR, "magic-powder-white-inv.png")).convert("RGBA")
-brown = Image.open(os.path.join(DST_DIR, "magic-powder-brown-inv.png")).convert("RGBA")
-mixed = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
-third = CELL // 3
-for x in range(CELL):
-    for y in range(CELL):
-        if x < third:
-            mixed.putpixel((x, y), yellow.getpixel((x, y)))
-        elif x < third * 2:
-            mixed.putpixel((x, y), white.getpixel((x - third, y)))
-        else:
-            mixed.putpixel((x, y), brown.getpixel((x - third * 2, y)))
-mixed.save(os.path.join(DST_DIR, "magic-powder-mixed-inv.png"))
-print("wrote mixed")
+def remove_dark_background(img: Image.Image, threshold: int = BG_THRESHOLD) -> Image.Image:
+    rgba = img.convert("RGBA")
+    px = rgba.load()
+    w, h = rgba.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if r <= threshold and g <= threshold and b <= threshold:
+                px[x, y] = (0, 0, 0, 0)
+    return rgba
+
+
+def crop_centered(src: Image.Image, cx: int, cy: int, cell: int) -> Image.Image:
+    w, h = src.size
+    half = cell // 2
+    left = max(0, cx - half)
+    top = max(0, cy - half)
+    right = min(w, cx + half)
+    bottom = min(h, cy + half)
+    patch = remove_dark_background(src.crop((left, top, right, bottom)))
+    out = Image.new("RGBA", (cell, cell), (0, 0, 0, 0))
+    paste_x = (cell - patch.width) // 2
+    paste_y = (cell - patch.height) // 2
+    out.paste(patch, (paste_x, paste_y), patch)
+    return out
+
+
+def main() -> None:
+    src = Image.open(SRC).convert("RGBA")
+    os.makedirs(DST_DIR, exist_ok=True)
+
+    for filename, cx, cy in INV_ITEMS:
+        out = crop_centered(src, cx, cy, INV_CELL)
+        dst = os.path.join(DST_DIR, filename)
+        out.save(dst)
+        print("wrote", dst)
+
+    for filename, cx, cy in LARGE_ITEMS:
+        out = crop_centered(src, cx, cy, LARGE_CELL)
+        dst = os.path.join(DST_DIR, filename)
+        out.save(dst)
+        print("wrote", dst)
+
+
+if __name__ == "__main__":
+    main()

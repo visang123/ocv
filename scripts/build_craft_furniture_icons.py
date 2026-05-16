@@ -7,16 +7,16 @@ SRC = (
     r"C:\Users\USER\.cursor\projects\c-Users-USER-Desktop-OVC\assets\\"
     r"c__Users_USER_AppData_Roaming_Cursor_User_workspaceStorage_"
     r"5051453ebec3272e55d6a08d292c16f6_images_image-"
-    r"c462c7f3-79c7-404f-9231-172e01a4a240.png"
+    r"f2656fac-2cbc-4d6a-ab55-9d318514b935.png"
 )
 DST_DIR = os.path.join(os.path.dirname(__file__), "..", "이미지")
 
 # Inventory icon centers (right column) in the 682x1024 sheet.
 ITEMS = [
-    ("craft-desk-inv.png", 520, 128),
-    ("craft-fence-inv.png", 520, 384),
-    ("craft-chair-inv.png", 520, 640),
-    ("craft-house-inv.png", 520, 896),
+    ("craft-desk-inv.png", 520, 268),
+    ("craft-fence-inv.png", 520, 496),
+    ("craft-chair-inv.png", 520, 708),
+    ("craft-house-inv.png", 520, 892),
 ]
 
 CELL = 148

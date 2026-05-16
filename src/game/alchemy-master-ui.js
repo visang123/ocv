@@ -283,6 +283,9 @@ function startAlchemyMasterDialogue() {
 
 export function openAlchemyCraftPanel() {
   if (!host || !complete) return;
+  if (host.isTradeExchangeOpen && host.isTradeExchangeOpen()) {
+    if (host.closeTradeExchangePanel) host.closeTradeExchangePanel();
+  }
   craftOpen = true;
   selectedRecipeId = null;
   requirementsVisible = false;
@@ -301,9 +304,11 @@ export function openAlchemyCraftPanel() {
   updateAlchemyCraftConfirmButton();
 }
 
-export function closeAlchemyCraftPanel() {
+export function closeAlchemyCraftPanel(options) {
   if (!host) return;
-  returnAlchemyRequirementSlotsToInventory();
+  const keepInventory = Boolean(options && options.keepInventory);
+  const returnSlots = !options || options.returnSlots !== false;
+  if (returnSlots) returnAlchemyRequirementSlotsToInventory();
   craftOpen = false;
   selectedRecipeId = null;
   requirementsVisible = false;
@@ -315,7 +320,7 @@ export function closeAlchemyCraftPanel() {
   }
   if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-alchemy-craft-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-alchemy-craft-focus");
-  host.setBagInventoryPanelOpen(false);
+  if (!keepInventory) host.setBagInventoryPanelOpen(false);
   renderAlchemyRequirementSlots();
 }
 
@@ -495,15 +500,7 @@ function confirmAlchemyCraft() {
 }
 
 function closeAlchemyCraftPanelKeepInventory() {
-  craftOpen = false;
-  selectedRecipeId = null;
-  if (host.alchemyCraftOverlay) {
-    host.alchemyCraftOverlay.style.display = "none";
-    host.alchemyCraftOverlay.setAttribute("aria-hidden", "true");
-  }
-  if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-alchemy-craft-focus");
-  if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-alchemy-craft-focus");
-  renderAlchemyRequirementSlots();
+  closeAlchemyCraftPanel({ keepInventory: true, returnSlots: false });
 }
 
 function spawnAlchemyCraftSmoke() {

@@ -503,7 +503,8 @@ export function loadAppleStateFromStorage(config) {
       worldLooseSeed,
       worldRocks: worldRockParts.worldRocks,
       worldRockPickedIds: worldRockParts.worldRockPickedIds,
-      worldExtraBuckets: normalizeSavedWorldExtraBuckets(saved)
+      worldExtraBuckets: normalizeSavedWorldExtraBuckets(saved),
+      placedCraftFurniture: Array.isArray(saved.placedCraftFurniture) ? saved.placedCraftFurniture : []
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
@@ -527,7 +528,8 @@ export function loadAppleStateFromStorage(config) {
       },
       worldRocks: rocksCatch.worldRocks,
       worldRockPickedIds: rocksCatch.worldRockPickedIds,
-      worldExtraBuckets: []
+      worldExtraBuckets: [],
+      placedCraftFurniture: []
     };
   }
 }
@@ -634,7 +636,17 @@ export function saveAppleStateToStorage(config) {
           isFull: Boolean(bucket.isFull)
         };
       }),
-      worldLooseSeed: worldLooseSeedOut
+      worldLooseSeed: worldLooseSeedOut,
+      placedCraftFurniture: Array.isArray(config.placedCraftFurniture)
+        ? config.placedCraftFurniture.map(function (entry) {
+            return {
+              id: entry && entry.id != null ? String(entry.id) : "",
+              kind: entry && entry.kind != null ? String(entry.kind) : "",
+              x: Number(entry && entry.x) || 0,
+              y: Number(entry && entry.y) || 0
+            };
+          })
+        : []
     })
   );
 }

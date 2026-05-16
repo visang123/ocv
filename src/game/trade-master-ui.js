@@ -296,6 +296,9 @@ function startTradeMasterDialogue() {
 
 export function openTradeExchangePanel() {
   if (!host || !complete) return;
+  if (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen()) {
+    if (host.closeAlchemyCraftPanel) host.closeAlchemyCraftPanel();
+  }
   exchangeOpen = true;
   selectedRecipeId = null;
   counterByKey = {};
@@ -312,8 +315,9 @@ export function openTradeExchangePanel() {
   updateTradeConfirmButton();
 }
 
-export function closeTradeExchangePanel() {
+export function closeTradeExchangePanel(options) {
   if (!host) return;
+  const keepInventory = Boolean(options && options.keepInventory);
   returnCounterItemsToInventory();
   exchangeOpen = false;
   selectedRecipeId = null;
@@ -324,7 +328,7 @@ export function closeTradeExchangePanel() {
   }
   if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-trade-exchange-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
-  host.setBagInventoryPanelOpen(false);
+  if (!keepInventory) host.setBagInventoryPanelOpen(false);
   renderTradeCounter();
   renderTradeOffers();
 }

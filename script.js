@@ -388,6 +388,13 @@ import {
   updateAlchemyCraftEffects,
   updateAlchemyNpcPrompt
 } from "./src/game/alchemy-master-ui.js";
+import {
+  isCraftFurnitureKind,
+  getCraftFurnitureWorldSpec,
+  computeCraftFurniturePlacement,
+  serializePlacedCraftFurnitureForSnapshot,
+  parsePlacedCraftFurnitureFromSnapshot
+} from "./src/game/craft-furniture-world.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -1401,6 +1408,8 @@ let craftFurnitureCounts = {
   craftChair: 0,
   craftHouse: 0
 };
+/** @type {Array<{ id: string, kind: string, x: number, y: number, width: number, height: number, _el?: HTMLElement }>} */
+let placedCraftFurniture = [];
 /** @type {{ yellow: number, white: number, brown: number, mixed: number }} */
 let coloredMagicPowderCounts = { yellow: 0, white: 0, brown: 0, mixed: 0 };
 /** 관리자 ?버? ?물지???시·?개 ?에?가???제 ?물 ?산?별개) */
@@ -2138,14 +2147,22 @@ document.addEventListener("keydown", function (event) {
   if (key === "Escape") {
     if (isAlchemyCraftOpen()) {
       event.preventDefault();
-      closeAlchemyCraftPanel();
+      closeAlchemyCraftPanel({ keepInventory: true });
       resetInputKeys(keys);
       isInteractKeyLatched = false;
       return;
     }
     if (isTradeExchangeOpen()) {
       event.preventDefault();
-      closeTradeExchangePanel();
+      closeTradeExchangePanel({ keepInventory: true });
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
+    if (bagInventoryPanelOpen) {
+      event.preventDefault();
+      setBagInventoryPanelOpen(false);
+      updateOnboardingFlowUI();
       resetInputKeys(keys);
       isInteractKeyLatched = false;
       return;
@@ -2420,6 +2437,17 @@ if (bagInventoryPanel) {
       event.stopPropagation();
       return;
     }
+    if (
+      kind === "craftDesk" ||
+      kind === "craftFence" ||
+      kind === "craftChair" ||
+      kind === "craftHouse"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      useCraftFurnitureFromBag(kind);
+      return;
+    }
     if (kind === "magicPowder") {
       if (magicPowderCount <= 0) return;
       event.preventDefault();
@@ -2469,7 +2497,8 @@ bindTradeMaster({
     return isNpcDialogueRunning;
   },
   isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning,
-  isAlchemyCraftOpen: isAlchemyCraftOpen
+  isAlchemyCraftOpen: isAlchemyCraftOpen,
+  closeAlchemyCraftPanel: closeAlchemyCraftPanel
 });
 
 bindAlchemyMaster({
@@ -2515,7 +2544,8 @@ bindAlchemyMaster({
     return isNpcDialogueRunning;
   },
   isTradeMasterDialogueRunning: isTradeMasterDialogueRunning,
-  isTradeExchangeOpen: isTradeExchangeOpen
+  isTradeExchangeOpen: isTradeExchangeOpen,
+  closeTradeExchangePanel: closeTradeExchangePanel
 });
 
 signBoard.addEventListener("click", function () {
@@ -2667,15 +2697,13 @@ const adminDevMagicPowderButton = document.createElement("button");
 adminDevMagicPowderButton.id = "admin-dev-magic-powder-button";
 adminDevMagicPowderButton.type = "button";
 adminDevMagicPowderButton.textContent = "";
-adminDevMagicPowderButton.setAttribute("aria-label", "마법??가?+1 (관리자 ?스??");
-adminDevMagicPowderButton.setAttribute("title", "마법??가?+1");
+adminDevMagicPowderButton.setAttribute("aria-hidden", "true");
 document.body.appendChild(adminDevMagicPowderButton);
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
-adminDevPlantIndexPlusButton.setAttribute("aria-label", "?물지??+100 (?스??");
-adminDevPlantIndexPlusButton.setAttribute("title", "?물지??+100 (관리자 ?스??");
+adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -4520,6 +4548,7 @@ function applyDefaultState(options) {
   appleState.worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
   appleState.worldRockPickedIds = [];
   appleState.worldExtraBuckets = [];
+  placedCraftFurniture = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
   adminDebugPlantIndexBonus = 0;
@@ -4597,6 +4626,7 @@ function applyDefaultState(options) {
   updateApples();
   updateExtraSeedsAndPlants();
   rebuildWorldRockDom();
+  rebuildPlacedCraftFurnitureDom();
 }
 
 function isNearPlantSpot() {
@@ -5133,6 +5163,118 @@ function updateWorldRocks() {
       setWorldPosition(rock._el, rock.x, rock.y);
     }
   });
+}
+
+function getCraftFurnitureInsertBeforeEl() {
+  if (localPlayerRoot && localPlayerRoot.parentNode === ground) {
+    return localPlayerRoot;
+  }
+  if (player && player.parentNode === ground) {
+    return player;
+  }
+  return null;
+}
+
+function rebuildPlacedCraftFurnitureDom() {
+  if (!ground) return;
+  ground.querySelectorAll(".world-craft-furniture").forEach(function (node) {
+    node.remove();
+  });
+  if (!isWorldDocumentEntry()) return;
+  const insertBeforeEl = getCraftFurnitureInsertBeforeEl();
+  placedCraftFurniture.forEach(function (entry) {
+    const spec = getCraftFurnitureWorldSpec(entry.kind);
+    if (!spec) return;
+    const el = document.createElement("img");
+    el.className =
+      "world-craft-furniture world-craft-furniture--" +
+      entry.kind.replace(/^craft/, "").toLowerCase();
+    el.src = spec.src;
+    el.alt = "";
+    el.draggable = false;
+    el.setAttribute("aria-hidden", "true");
+    if (insertBeforeEl) {
+      ground.insertBefore(el, insertBeforeEl);
+    } else {
+      ground.appendChild(el);
+    }
+    entry._el = el;
+  });
+  updatePlacedCraftFurnitureDom();
+}
+
+function updatePlacedCraftFurnitureDom() {
+  if (!isWorldDocumentEntry()) return;
+  placedCraftFurniture.forEach(function (entry) {
+    if (!entry._el) return;
+    setWorldSize(entry._el, entry.width, entry.height);
+    setWorldPosition(entry._el, entry.x, entry.y);
+  });
+}
+
+function useCraftFurnitureFromBag(kind) {
+  if (!isCraftFurnitureKind(kind)) return;
+  if ((Number(craftFurnitureCounts[kind]) || 0) <= 0) return;
+
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+
+  if (
+    plantRuntime.isPlanting ||
+    appleState.isEating ||
+    isNpcDialogueRunning ||
+    !isOnGround
+  ) {
+    return;
+  }
+
+  const placement = computeCraftFurniturePlacement(
+    kind,
+    getPlayerCenterX(),
+    getPlayerFootY()
+  );
+  if (!placement) return;
+  if (!removeOneBagItemForTrade(kind)) return;
+
+  const entry = {
+    id: "cf-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
+    kind: kind,
+    x: placement.x,
+    y: placement.y,
+    width: placement.width,
+    height: placement.height
+  };
+  placedCraftFurniture.push(entry);
+
+  if (isWorldDocumentEntry() && ground) {
+    const spec = getCraftFurnitureWorldSpec(kind);
+    if (spec) {
+      const insertBeforeEl = getCraftFurnitureInsertBeforeEl();
+      const el = document.createElement("img");
+      el.className =
+        "world-craft-furniture world-craft-furniture--" +
+        kind.replace(/^craft/, "").toLowerCase();
+      el.src = spec.src;
+      el.alt = "";
+      el.draggable = false;
+      el.setAttribute("aria-hidden", "true");
+      if (insertBeforeEl) {
+        ground.insertBefore(el, insertBeforeEl);
+      } else {
+        ground.appendChild(el);
+      }
+      entry._el = el;
+      setWorldSize(el, entry.width, entry.height);
+      setWorldPosition(el, entry.x, entry.y);
+    }
+  }
+
+  holdLocalAppleStateAgainstStaleSnapshot(3000);
+  saveAppleState();
+  markWorldDirty();
+  syncWorldState(true);
 }
 
 function pickApple() {
@@ -5794,6 +5936,7 @@ function loadAppleState() {
         nextSpawnAt: 0
       };
   appleState.worldRocks = Array.isArray(loaded.worldRocks) ? loaded.worldRocks : [];
+  placedCraftFurniture = parsePlacedCraftFurnitureFromSnapshot(loaded.placedCraftFurniture);
   appleState.worldExtraBuckets = Array.isArray(loaded.worldExtraBuckets)
     ? loaded.worldExtraBuckets
     : [];
@@ -5836,7 +5979,8 @@ function loadAppleState() {
         worldLooseSeed: appleState.worldLooseSeed,
         worldRocks: appleState.worldRocks,
         worldRockPickedIds: appleState.worldRockPickedIds,
-        worldExtraBuckets: appleState.worldExtraBuckets
+        worldExtraBuckets: appleState.worldExtraBuckets,
+        placedCraftFurniture: serializePlacedCraftFurnitureForSnapshot(placedCraftFurniture)
       });
     }
   }
@@ -5848,6 +5992,7 @@ function loadAppleState() {
   }
 
   rebuildWorldRockDom();
+  rebuildPlacedCraftFurnitureDom();
   rebuildWorldExtraBucketDom();
   updateApples();
   updateExtraSeedsAndPlants();
@@ -5878,7 +6023,8 @@ function saveAppleState() {
         y: Number(bucket.y) || 0,
         isFull: Boolean(bucket.isFull)
       };
-    })
+    }),
+    placedCraftFurniture: serializePlacedCraftFurnitureForSnapshot(placedCraftFurniture)
   });
   markWorldDirty();
 }
@@ -6270,6 +6416,9 @@ function getSharedWorldSnapshot() {
         ? (Array.isArray(appleState.worldRockPickedIds)
             ? appleState.worldRockPickedIds.map(String)
             : [])
+        : undefined,
+      placedCraftFurniture: isWorldDocumentEntry()
+        ? serializePlacedCraftFurnitureForSnapshot(placedCraftFurniture)
         : undefined
     },
     butterflies: getButterflyStateForSnapshot()
@@ -6292,6 +6441,7 @@ function refreshUiAfterSharedWorldApply() {
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
   rebuildWorldRockDom();
+  rebuildPlacedCraftFurnitureDom();
 }
 
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
@@ -6824,6 +6974,12 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
             }
           });
           appleState.worldRockPickedIds = Array.from(merged);
+        }
+        if (!shouldDeferRemoteAppleApply) {
+          const snapFurniture = snapApples.placedCraftFurniture;
+          if (Array.isArray(snapFurniture)) {
+            placedCraftFurniture = parsePlacedCraftFurnitureFromSnapshot(snapFurniture);
+          }
         }
       }
       if (snapshotSavedAt) {
@@ -8075,7 +8231,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
 
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
-  if (plant) showPlantHoverSignForPlant(plant);
+  if (plant) showPlantHoverEmphasisForPlant(plant);
   else hidePlantHoverLabel();
 }
 
@@ -10044,17 +10200,7 @@ function getPlantHoverDomElements(plant) {
 function getPlayerDistanceToPlant(plant) {
   const anchor = getPlantWorldAnchorXY(plant);
   if (!anchor) return Infinity;
-  const footY = GROUND_WORLD_HEIGHT - playerDepth + jumpY;
-  return getCenterDistance(
-    playerX,
-    footY,
-    PLAYER_WIDTH,
-    8,
-    anchor.x,
-    anchor.y,
-    PLANT_SPOT_WIDTH,
-    PLANT_SPOT_HEIGHT
-  );
+  return getCenterDistance(anchor.x, anchor.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
 }
 
 function isPlayerNearPlantWorld(plant) {
@@ -10071,13 +10217,6 @@ function canWaterPlantByClick(plant) {
   return true;
 }
 
-function plantShowsThirstyHoverEmphasis(plant) {
-  if (!canWaterPlantByClick(plant)) return false;
-  if (!isPlayerNearPlantWorld(plant)) return false;
-  const cap = getPlantWaterCapacity(plant);
-  return (Number(plant.waterLevel) || 0) < cap;
-}
-
 function plantToWateringTarget(plant) {
   if (plant === plantRuntime) {
     return { type: "main", plant: plantRuntime };
@@ -10085,10 +10224,28 @@ function plantToWateringTarget(plant) {
   return { type: "extra", plant: plant };
 }
 
+/** 수분 0칸(마름 카운트다운) — 호버 시 파란 펄스 강조 */
+function plantShowsUrgentWaterHoverEmphasis(plant, now) {
+  if (!canWaterPlantByClick(plant)) return false;
+  const tNow = now != null ? now : getSharedPlantSimulationNow();
+  if (shouldPauseWaterDecayForPlant(plant, tNow)) return false;
+  if ((Number(plant.waterLevel) || 0) !== 0) return false;
+  if (!canPlantWiltFromEmptyWater(plant, tNow)) return false;
+  const becameEmptyAt = Number(plant.becameEmptyAt);
+  if (!Number.isFinite(becameEmptyAt) || becameEmptyAt <= 0) return true;
+  const dryMs =
+    plant === plantRuntime
+      ? getMainDryAfterEmptyMsForPlant(plant, tNow)
+      : getExtraDryDelayMs(plant, tNow);
+  if (!Number.isFinite(dryMs) || dryMs <= 0) return true;
+  const remainingDryMs = dryMs - (tNow - becameEmptyAt);
+  return Math.floor(Math.max(0, remainingDryMs) / 60000) === 0;
+}
+
 function applyPlantHoverVisuals(plant) {
   clearPlantHoverVisuals();
   if (!plant) return;
-  const thirsty = plantShowsThirstyHoverEmphasis(plant);
+  const urgentWater = plantShowsUrgentWaterHoverEmphasis(plant);
   const clickable =
     heldItem === HELD_ITEM_BUCKET &&
     isBucketFull &&
@@ -10096,7 +10253,7 @@ function applyPlantHoverVisuals(plant) {
     isPlayerNearPlantWorld(plant);
   getPlantHoverDomElements(plant).forEach(function (el) {
     el.classList.add("is-plant-hover");
-    if (thirsty) el.classList.add("is-plant-hover-needs-water");
+    if (urgentWater) el.classList.add("is-plant-hover-needs-water");
     if (clickable) {
       el.classList.add("is-plant-water-clickable");
       el.style.cursor = "pointer";
@@ -10133,50 +10290,37 @@ function hidePlantHoverLabel() {
   }
 }
 
-function showPlantHoverSignForPlant(plant) {
-  if (!plantHoverLabel || !plant) return;
+/** 호버 시 월드 식물 스프라이트만 강조(이름·수분 패널 없음) */
+function showPlantHoverEmphasisForPlant(plant) {
+  if (!plant) return;
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
   if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
     hidePlantHoverLabel();
     return;
   }
-  const label = getPlantWorldLabel(plant);
-  const badTitle = getPlantSoilBadStateTitle(plant);
-  if (!String(label || "").trim() && !badTitle) {
-    hidePlantHoverLabel();
-    return;
+  if (
+    plantHoverLabel &&
+    (plantHoverLabel.classList.contains("is-plant-world-sign") ||
+      plantHoverLabel.classList.contains("is-well-dock"))
+  ) {
+    plantHoverLabel.classList.remove(
+      "is-well-dock",
+      "is-plant-world-sign",
+      "is-dry",
+      "is-overwatered"
+    );
+    plantHoverLabel.textContent = "";
+    plantHoverLabel.style.position = "";
+    plantHoverLabel.style.left = "";
+    plantHoverLabel.style.top = "";
+    plantHoverLabel.style.height = "";
+    plantHoverLabel.style.right = "";
+    plantHoverLabel.style.zIndex = "";
+    plantHoverLabel.style.transform = "";
+    plantHoverLabel.style.display = "none";
+    restorePlantHoverLabelToWorldDom();
   }
-
-  ensurePlantHoverLabelOnBodyForFixedUi();
-  plantHoverLabel.classList.remove(
-    "is-ui-shortcut-hint",
-    "is-seed-inventory-hint",
-    "is-world-npc-name",
-    "is-stage3-complete"
-  );
-  plantHoverLabel.classList.add("is-well-dock", "is-plant-world-sign");
-  plantHoverLabel.classList.toggle("is-dry", plant.status === "dry");
-  plantHoverLabel.classList.toggle("is-overwatered", Boolean(plant.isOverwatered));
-  plantHoverLabel.style.position = "fixed";
-  plantHoverLabel.style.left = "auto";
-  plantHoverLabel.style.top = "";
-  plantHoverLabel.style.right = "";
-  plantHoverLabel.style.transform = "none";
-  plantHoverLabel.style.zIndex = "11";
-
-  plantHoverLabel.textContent = "";
-  if (String(label || "").trim()) {
-    const titleEl = document.createElement("div");
-    titleEl.className = "plant-world-sign-title";
-    titleEl.textContent = label;
-    plantHoverLabel.appendChild(titleEl);
-  }
-
-  appendPlantHoverWaterDetail(plantHoverLabel, plant);
-
-  plantHoverLabel.style.display = "flex";
-  syncPlantHoverWellDockLayout();
   applyPlantHoverVisuals(plant);
 }
 
