@@ -3683,8 +3683,7 @@ function repairOnboardingCompletionFromStoredStep() {
 }
 
 /**
- * 한 번이라도 월드에 들어온 계정: 튜토리얼 재생 세션이 아니면 튜토리얼 미완료 상태를
- * 본게임으로 되돌린다(리로드·로그아웃/로그인·탭 전환 후에도 월드).
+ * 한 번이라도 월드에 들어온 계정: 튜토리얼 재생 세션이 아니면 튜토리얼 미완료 상태를 * 본게임으로 되돌린다(리로드·로그아웃/로그인·탭 전환 후에도 월드).
  */
 function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!currentUserId) return;
@@ -6458,8 +6457,7 @@ function snapWellRefillToGrid(nowMs) {
 }
 
 /**
- * 공유 월드 저장 직전: 패시브 물 감소·우물 리필을 현재 시각까지 반영해
- * 오래된 수분/우물 값이 스냅샷에 실리지 않게 함 (멀티에서 게이지가 들쭉날쭉한 원인).
+ * 공유 ?드 ???직전: ?시??감소·?물 리필???재 ?각까? 반영?? * ?래???분/?물 값이 ?냅?에 ?리지 ?게 ??(멀?에??게이지가 ?쭉?쭉???인).
  */
 function flushPassiveSimulationBeforeSharedSnapshot() {
   if (!isSharedWorldMergeActive()) return;
@@ -10414,6 +10412,7 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
   return false;
 }
 
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
 function isOvergrowthSeedPlant(plant) {
   return String(plant && plant.seedKind || "") === "overgrowth";
 }
@@ -11187,34 +11186,6 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     if (plantSpotOverlapsExpandedRect(plantX, plantY, bucketX, bucketY, bsz.width, bsz.height, bucketPad)) {
       return plantProximityPhraseForNoun("\uC591\uB3D9\uC774");
     }
-  }
-
-  let blockedByCraftFurniture = "";
-  placedCraftFurniture.forEach(function (entry) {
-    if (blockedByCraftFurniture || !entry) return;
-    if (
-      entry.kind !== "craftDesk" &&
-      entry.kind !== "craftChair" &&
-      entry.kind !== "craftHouse"
-    ) {
-      return;
-    }
-    if (
-      plantSpotOverlapsExpandedRect(
-        plantX,
-        plantY,
-        entry.x,
-        entry.y,
-        entry.width,
-        entry.height,
-        0
-      )
-    ) {
-      blockedByCraftFurniture = getCraftFurnitureKindLabel(entry.kind);
-    }
-  });
-  if (blockedByCraftFurniture) {
-    return plantProximityPhraseForNoun(blockedByCraftFurniture);
   }
 
   return "";
@@ -12958,7 +12929,7 @@ function loadSeedState() {
 }
 
 /**
- * @param {{ bumpMergeGuard?: boolean, skipWorldDirty?: boolean }} [opts] - bumpMergeGuard:false
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
  *   for sim-only deltas. skipWorldDirty:true stops enqueueing a shared save (e.g. water decay online).
  */
 function saveSeedState(opts) {
@@ -16040,7 +16011,7 @@ function updateButterflies() {
       for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
         const stepNow =
           motionStepCount > 1
-            ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
+    // 백그라운드 복귀 직후 한 프레임에만 쓰이는 wallDelta가 비정상적으로 커지면
             : now;
         butterflyState.list.forEach(function (butterfly) {
           simulateButterflyAuthorityStep(butterfly, stepNow);
@@ -16653,6 +16624,23 @@ function runMultiplayerWorldSyncTick() {
   pollWorldState(false);
   syncWorldState(false);
   window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
+}
+window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
+setInterval(function () {
+  if (isTabSessionSuperseded) return;
+  validateCurrentAccount();
+}, 5000);
+window.addEventListener("resize", function () {
+  setup();
+  zoomLevel = clampZoom(zoomLevel);
+  updateCamera();
+});
+window.addEventListener("load", function () {
+  updateCamera();
+  setTimeout(hideAppLoadingScreen, 450);
+});
+gameLoop();
+ window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
 }
 window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
 setInterval(function () {
