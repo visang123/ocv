@@ -155,6 +155,7 @@ export const NPC_START_Y = SEED_START_Y + SEED_SIZE - NPC_HEIGHT;
 
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
+export const HOUR_MS = 60 * MINUTE_MS;
 
 /** 스모크용 단축 성장(필요 시만). 본편은 plantGrowthMs·sproutStage*·level*GrowMs. */
 export const plantGrowthTestEveryMs = 3 * SECOND_MS;
@@ -180,6 +181,12 @@ export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
 /** 노란 마법 가루 4·5단계 꽃 */
 export const flowerStage4Image = "이미지/flower-stage4-front.png?v=20260516f";
 export const flowerStage5Image = "이미지/flower-stage5-front.png?v=20260516f";
+/** 갈색 마법 가루 4·5단계 나무 */
+export const treeStage4Image = "이미지/tree-stage4-front.png?v=20260517a";
+export const treeStage5Image = "이미지/tree-stage5-front.png?v=20260517a";
+/** 하얀 마법 가루 4·5단계 선인장 */
+export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260517a";
+export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260517a";
 /** Draw sizes per stage (world pixels). */
 /** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
 export const SPROUT_STAGE_WIDTHS = [7, 10, 15];
@@ -325,15 +332,25 @@ export function isFirstSproutGrowthPhase(plant) {
   return true;
 }
 
+function isCactusMaturePlantPhase(plant) {
+  return (
+    plant &&
+    String(plant.matureKind || "").trim() === "cactus" &&
+    Math.max(0, Number(plant.growthTier) || 0) >= 4
+  );
+}
+
 export function getPlantWaterLevelTickMsForPlant(plant) {
   const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
   if (tier === 0) return firstSproutWaterLevelTickMs;
+  if (isCactusMaturePlantPhase(plant)) return HOUR_MS;
   return getPlantWaterLevelTickMsForTier(tier);
 }
 
 export function getPlantDryAfterEmptyMsForPlantPhase(plant) {
   const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
   if (tier === 0) return firstSproutDryAfterEmptyMs;
+  if (isCactusMaturePlantPhase(plant)) return HOUR_MS;
   return getPlantDryAfterEmptyMsForTier(tier);
 }
 
@@ -348,8 +365,10 @@ export const plantDrySoilClearMs = 15 * SECOND_MS;
 export const plantRotClearMs = plantDrySoilClearMs;
 /** 가루 3→4(또는 동등 성장 구간) */
 export const level4GrowMs = 90 * SECOND_MS;
-/** 4단 풀 생존 후 자동 5단 */
+/** 4단 풀·나무 생존 후 자동 5단 */
 export const level5GrowMs = 120 * SECOND_MS;
+/** 4단 선인장 → 5단 (수분 유지 시) */
+export const cactusLevel5GrowMs = 3 * HOUR_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";

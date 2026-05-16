@@ -117,6 +117,10 @@ import {
   sproutStage5Image,
   flowerStage4Image,
   flowerStage5Image,
+  treeStage4Image,
+  treeStage5Image,
+  cactusStage4Image,
+  cactusStage5Image,
   SPROUT_STAGE_WIDTHS,
   SPROUT_STAGE_HEIGHTS,
   grassStage4WorldScale,
@@ -145,6 +149,7 @@ import {
   BUTTERFLY_SIZE,
   level4GrowMs,
   level5GrowMs,
+  cactusLevel5GrowMs,
   butterflyMaxAlive,
   butterflyColors,
   butterflyFrameCount,
@@ -301,6 +306,8 @@ import {
 import {
   isMagicPowderBagType,
   isFlowerMaturePlant,
+  isTreeMaturePlant,
+  isCactusMaturePlant,
   getMatureKindForPowderBagType,
   getColoredPowderCountField
 } from "./src/game/magic-powder.js";
@@ -7765,7 +7772,7 @@ function normalizeExtraPlantState(plant) {
   if (plant.isSproutSelfSustaining && plant.growthTier < 3) {
     plant.growthTier = 3;
   }
-  plant.waterCapacity = plant.growthTier >= 3 ? 3 : 2;
+  syncPlantWaterCapacityField(plant);
   migrateLegacyPowderTier5ToAutoGrass(plant, now);
   ensureGrassOrdinalIfNeeded(plant);
   clampPlantGrowthTimingToCurrentConstants(plant);
@@ -7848,8 +7855,18 @@ function getSproutStageFromPlant(plant) {
 
 function getPlantWaterCapacity(plant) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
+  if (tier >= 4 && isCactusMaturePlant(plant)) return 1;
   if (tier >= 3) return 3;
   return Math.max(2, Number(plant.waterCapacity) || 2);
+}
+
+function syncPlantWaterCapacityField(plant) {
+  if (!plant) return;
+  plant.waterCapacity = getPlantWaterCapacity(plant);
+}
+
+function getAutoTier5GrowMsForPlant(plant) {
+  return isCactusMaturePlant(plant) ? cactusLevel5GrowMs : level5GrowMs;
 }
 
 function isPowderUpgradeInProgress(plant) {
@@ -7988,8 +8005,9 @@ function tickPowderUpgrade(plant, now) {
   plant.powderUpgradeStartedAt = null;
   plant.powderUpgradeDurationMs = 0;
   if (plant.growthTier >= 3) {
-    plant.waterCapacity = 3;
-    plant.waterLevel = Math.min(3, Math.max(1, Number(plant.waterLevel) || 1));
+    syncPlantWaterCapacityField(plant);
+    const cap = getPlantWaterCapacity(plant);
+    plant.waterLevel = Math.min(cap, Math.max(1, Number(plant.waterLevel) || 1));
   }
   if (Math.max(0, Number(plant.growthTier) || 0) === 4) {
     plant.grassAuto5EligibleAt = now;
@@ -8016,7 +8034,7 @@ function tickGrassAutoAdvanceToTier5(plant, now) {
     plant.grassAuto5EligibleAt = now;
     return false;
   }
-  if (now - Number(t0) < level5GrowMs) return false;
+  if (now - Number(t0) < getAutoTier5GrowMsForPlant(plant)) return false;
   if ((Number(plant.waterLevel) || 0) <= 0) return false;
   plant.growthTier = 5;
   plant.grassAuto5EligibleAt = null;
@@ -8313,17 +8331,29 @@ function tickSproutEvolution(plant, now) {
     plant.sproutEvolutionMs = cap;
     plant.isSproutSelfSustaining = true;
     plant.growthTier = Math.max(Number(plant.growthTier) || 0, 3);
-    plant.waterCapacity = 3;
-    plant.waterLevel = Math.min(3, Math.max(Number(plant.waterLevel) || 0, 2));
+    syncPlantWaterCapacityField(plant);
+    plant.waterLevel = Math.min(
+      getPlantWaterCapacity(plant),
+      Math.max(Number(plant.waterLevel) || 0, 2)
+    );
     plant.becameEmptyAt = null;
     plant.status = "normal";
   }
 }
 
 function getSproutImageForPlant(plant, stage) {
-  const flower = isFlowerMaturePlant(plant);
-  if (stage >= 5) return flower ? flowerStage5Image : sproutStage5Image;
-  if (stage >= 4) return flower ? flowerStage4Image : sproutStage4Image;
+  if (stage >= 5) {
+    if (isFlowerMaturePlant(plant)) return flowerStage5Image;
+    if (isTreeMaturePlant(plant)) return treeStage5Image;
+    if (isCactusMaturePlant(plant)) return cactusStage5Image;
+    return sproutStage5Image;
+  }
+  if (stage >= 4) {
+    if (isFlowerMaturePlant(plant)) return flowerStage4Image;
+    if (isTreeMaturePlant(plant)) return treeStage4Image;
+    if (isCactusMaturePlant(plant)) return cactusStage4Image;
+    return sproutStage4Image;
+  }
   if (stage >= 3) return sproutStage3Image;
   if (stage === 2) return sproutStage2Image;
   return sproutStage1Image;
@@ -8403,7 +8433,7 @@ function getGrassAutoTier5GrowthRatio(plant, now) {
   if (t0 == null || !Number.isFinite(Number(t0))) return null;
   const elapsed = now - Number(t0);
   if (elapsed <= 0) return 0;
-  return Math.min(1, elapsed / level5GrowMs);
+  return Math.min(1, elapsed / getAutoTier5GrowMsForPlant(plant));
 }
 
 function getPlantSecondGrowthRatio(plant, now) {
@@ -8433,6 +8463,7 @@ function isSproutStage3Or5IdleNoGrowth(plant, now) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
   const st = getSproutStageFromPlant(plant);
   if (st !== 3 && st !== 5) return false;
+  if (st === 5 && isCactusMaturePlant(plant)) return false;
   if (hasActiveGreenGrowthProgress(plant, now)) return false;
   return true;
 }
@@ -10063,8 +10094,11 @@ function makePlantStableStage3FromOvergrowthSeed(plant, now) {
   plant.sproutEvolutionLastTickAt = now;
   plant.isSproutSelfSustaining = true;
   plant.growthTier = Math.max(Number(plant.growthTier) || 0, 3);
-  plant.waterCapacity = 3;
-  plant.waterLevel = Math.min(3, Math.max(Number(plant.waterLevel) || 0, 2));
+  syncPlantWaterCapacityField(plant);
+  plant.waterLevel = Math.min(
+    getPlantWaterCapacity(plant),
+    Math.max(Number(plant.waterLevel) || 0, 2)
+  );
   plant.becameEmptyAt = null;
   plant.status = "normal";
   plant.needsFirstWater = false;
@@ -10136,6 +10170,8 @@ function refreshPlantIdentityOrdinals() {
     plant.sproutOrdinal = 0;
     plant.grassOrdinal = null;
     plant.flowerOrdinal = null;
+    plant.treeOrdinal = null;
+    plant.cactusOrdinal = null;
   }
   clearOrdinals(plantRuntime);
   appleState.extraPlants.forEach(clearOrdinals);
@@ -10146,7 +10182,7 @@ function refreshPlantIdentityOrdinals() {
     if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
     const k = plantOrdinalGroupKey(plant);
     if (!groups[k]) {
-      groups[k] = { soils: [], sprouts: [], grasses: [], flowers: [] };
+      groups[k] = { soils: [], sprouts: [], grasses: [], flowers: [], trees: [], cactuses: [] };
     }
     const t = plantWorldOrdinalSortTime(plant);
     const entry = { plant: plant, t: t };
@@ -10161,6 +10197,10 @@ function refreshPlantIdentityOrdinals() {
     if (tier >= 4) {
       if (isFlowerMaturePlant(plant)) {
         groups[k].flowers.push(entry);
+      } else if (isCactusMaturePlant(plant)) {
+        groups[k].cactuses.push(entry);
+      } else if (isTreeMaturePlant(plant)) {
+        groups[k].trees.push(entry);
       } else {
         groups[k].grasses.push(entry);
       }
@@ -10187,6 +10227,12 @@ function refreshPlantIdentityOrdinals() {
     g.flowers.sort(function (a, b) {
       return a.t - b.t;
     });
+    g.trees.sort(function (a, b) {
+      return a.t - b.t;
+    });
+    g.cactuses.sort(function (a, b) {
+      return a.t - b.t;
+    });
     g.soils.forEach(function (e, i) {
       e.plant.soilOrdinal = i + 1;
     });
@@ -10198,6 +10244,12 @@ function refreshPlantIdentityOrdinals() {
     });
     g.flowers.forEach(function (e, i) {
       e.plant.flowerOrdinal = i + 1;
+    });
+    g.trees.forEach(function (e, i) {
+      e.plant.treeOrdinal = i + 1;
+    });
+    g.cactuses.forEach(function (e, i) {
+      e.plant.cactusOrdinal = i + 1;
     });
   });
 }
@@ -10212,6 +10264,8 @@ function assignSproutIdentityToNewPlant(plant) {
   plant.grassOrdinal = null;
   plant.matureKind = "";
   plant.flowerOrdinal = null;
+  plant.treeOrdinal = null;
+  plant.cactusOrdinal = null;
 }
 
 function ensureGrassOrdinalIfNeeded(plant) {
@@ -10246,9 +10300,23 @@ function getPlantWorldLabel(plant) {
     plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
       ? Math.max(0, Number(plant.flowerOrdinal))
       : 0;
+  const treeOrd =
+    plant.treeOrdinal != null && Number.isFinite(Number(plant.treeOrdinal))
+      ? Math.max(0, Number(plant.treeOrdinal))
+      : 0;
+  const cactusOrd =
+    plant.cactusOrdinal != null && Number.isFinite(Number(plant.cactusOrdinal))
+      ? Math.max(0, Number(plant.cactusOrdinal))
+      : 0;
   if (tier >= 4) {
     if (isFlowerMaturePlant(plant)) {
       return name + "\uC758 \uAF43" + (flowerOrd > 0 ? flowerOrd : "");
+    }
+    if (isCactusMaturePlant(plant)) {
+      return name + "\uC758 \uC120\uC778\uC7A5" + (cactusOrd > 0 ? cactusOrd : "");
+    }
+    if (isTreeMaturePlant(plant)) {
+      return name + "\uC758 \uB098\uBB34" + (treeOrd > 0 ? treeOrd : "");
     }
     return name + "\uC758 \uD480" + (grassOrd > 0 ? grassOrd : "");
   }
@@ -12086,7 +12154,7 @@ function applyLoadedPlantState(loadedPlant) {
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
-  plantRuntime.waterCapacity = plantRuntime.growthTier >= 3 ? 3 : 2;
+  syncPlantWaterCapacityField(plantRuntime);
   clampPlantGrowthTimingToCurrentConstants(plantRuntime);
   ensureGrassOrdinalIfNeeded(plantRuntime);
   ensureGrassAuto5EligibleForTier4Plant(plantRuntime, Date.now());

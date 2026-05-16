@@ -7,13 +7,15 @@ export const MAGIC_POWDER_BAG_TYPES = [
   "magicPowderBrown"
 ];
 
-/** @type {Record<string, "grass"|"flower">} */
+/** @typedef {"grass"|"flower"|"tree"|"cactus"} PlantMatureKind */
+
+/** @type {Record<string, PlantMatureKind>} */
 export const MAGIC_POWDER_MATURE_KIND = {
   magicPowder: "grass",
   magicPowderMixed: "grass",
   magicPowderYellow: "flower",
-  magicPowderWhite: "grass",
-  magicPowderBrown: "grass"
+  magicPowderWhite: "cactus",
+  magicPowderBrown: "tree"
 };
 
 /** @type {Record<string, "yellow"|"white"|"brown"|"mixed"|null>} */
@@ -29,11 +31,27 @@ export function isMagicPowderBagType(bagType) {
 }
 
 export function normalizePlantMatureKind(kind) {
-  return kind === "flower" ? "flower" : "grass";
+  const k = String(kind || "").trim();
+  if (k === "flower" || k === "tree" || k === "cactus") return k;
+  return "grass";
 }
 
 export function isFlowerMaturePlant(plant) {
   return normalizePlantMatureKind(plant && plant.matureKind) === "flower";
+}
+
+export function isTreeMaturePlant(plant) {
+  return normalizePlantMatureKind(plant && plant.matureKind) === "tree";
+}
+
+export function isCactusMaturePlant(plant) {
+  return normalizePlantMatureKind(plant && plant.matureKind) === "cactus";
+}
+
+/** 풀·나무 — 4·5단 수분·자동 성장 규칙 동일 */
+export function isGrassLikeMaturePlant(plant) {
+  const k = normalizePlantMatureKind(plant && plant.matureKind);
+  return k === "grass" || k === "tree";
 }
 
 export function getMatureKindForPowderBagType(bagType) {
