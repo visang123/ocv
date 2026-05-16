@@ -289,31 +289,37 @@ body::-webkit-scrollbar {
   word-break: keep-all;
 }
 
-@keyframes plant-water-hover-pulse {
+@keyframes plant-water-hover-ring-pulse {
   from {
-    filter: brightness(1.12) drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+    border-color: rgba(56, 189, 248, 0.72);
+    box-shadow: 0 0 4px rgba(56, 189, 248, 0.35);
   }
   to {
-    filter: brightness(1.38) drop-shadow(0 0 18px rgba(14, 165, 233, 0.95));
+    border-color: rgba(14, 165, 233, 0.98);
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.7);
   }
 }
 
-#plant-spot.is-plant-hover,
-.extra-plant-spot.is-plant-hover,
-#sprout.is-plant-hover,
-.extra-sprout.is-plant-hover {
-  outline: 3px solid rgba(125, 211, 252, 0.92);
-  outline-offset: 2px;
-  filter: brightness(1.12) drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
+#plant-hover-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  pointer-events: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid rgba(125, 211, 252, 0.88);
+  box-shadow: 0 0 5px rgba(56, 189, 248, 0.32);
+  z-index: 4;
 }
 
-#plant-spot.is-plant-hover-needs-water,
-.extra-plant-spot.is-plant-hover-needs-water,
-#sprout.is-plant-hover-needs-water,
-.extra-sprout.is-plant-hover-needs-water {
-  outline: 4px solid rgba(14, 165, 233, 1);
-  outline-offset: 2px;
-  animation: plant-water-hover-pulse 0.7s ease-in-out infinite alternate;
+#plant-hover-ring.is-visible {
+  display: block;
+}
+
+#plant-hover-ring.is-needs-water {
+  border-color: rgba(14, 165, 233, 0.92);
+  animation: plant-water-hover-ring-pulse 0.7s ease-in-out infinite alternate;
 }
 
 #plant-spot.is-plant-water-clickable,

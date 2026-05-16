@@ -249,6 +249,7 @@ import {
   seedDryText,
   seedWorldText,
   plantHoverLabel,
+  plantHoverRing,
   treeAppleElements,
   world,
   ground,
@@ -8247,7 +8248,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
 
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
-  if (plant) showPlantHoverEmphasisForPlant(plant);
+  if (plant) showPlantHoverSignForPlant(plant);
   else hidePlantHoverLabel();
 }
 
@@ -8390,6 +8391,17 @@ function isSproutStage3Or5IdleNoGrowth(plant, now) {
   const st = getSproutStageFromPlant(plant);
   if (st !== 3 && st !== 5) return false;
   if (hasActiveGreenGrowthProgress(plant, now)) return false;
+  return true;
+}
+
+/** 3단계 새싹·4·5성숙 등 성장이 멈춘 식물 — 호버 링 강조 생략(UI 패널은 유지) */
+function shouldSkipPlantHoverVisualEmphasis(plant, now) {
+  if (!plant || !plant.isSproutGrown) return false;
+  if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) return false;
+  const tNow = now != null ? now : getSharedPlantSimulationNow();
+  if (getSproutStageFromPlant(plant) < 3) return false;
+  if (hasActiveGreenGrowthProgress(plant, tNow)) return false;
+  if (isPowderUpgradeInProgress(plant)) return false;
   return true;
 }
 
@@ -10212,12 +10224,55 @@ function extraPlantFromDomElement(el) {
   return null;
 }
 
+function clearPlantHoverRing() {
+  if (!plantHoverRing) return;
+  plantHoverRing.classList.remove("is-visible", "is-needs-water");
+  plantHoverRing.style.display = "none";
+}
+
+function getPlantHoverRingWorldBounds(plant) {
+  const rects = getPlantVisibleHoverRectsWorld(plant);
+  if (!rects.length) return null;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (let i = 0; i < rects.length; i += 1) {
+    const r = rects[i];
+    left = Math.min(left, r.left);
+    top = Math.min(top, r.top);
+    right = Math.max(right, r.right);
+    bottom = Math.max(bottom, r.bottom);
+  }
+  const w = right - left;
+  const h = bottom - top;
+  const size = Math.max(w, h) * 1.1;
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  return { x: cx - size / 2, y: cy - size / 2, size: size };
+}
+
+function layoutPlantHoverRing(plant, urgentWater) {
+  if (!plantHoverRing || !plant) return;
+  const bounds = getPlantHoverRingWorldBounds(plant);
+  if (!bounds || bounds.size <= 0) {
+    clearPlantHoverRing();
+    return;
+  }
+  plantHoverRing.classList.add("is-visible");
+  plantHoverRing.classList.toggle("is-needs-water", !!urgentWater);
+  plantHoverRing.style.display = "block";
+  setWorldPosition(plantHoverRing, bounds.x, bounds.y);
+  setWorldSize(plantHoverRing, bounds.size, bounds.size);
+}
+
 function clearPlantHoverVisuals() {
+  clearPlantHoverRing();
   if (ground) {
     ground
-      .querySelectorAll(".is-plant-hover, .is-plant-hover-needs-water, .is-plant-water-clickable")
+      .querySelectorAll(".is-plant-water-clickable")
       .forEach(function (el) {
-        el.classList.remove("is-plant-hover", "is-plant-hover-needs-water", "is-plant-water-clickable");
+        el.classList.remove("is-plant-water-clickable");
         el.style.cursor = "";
       });
   }
@@ -10288,15 +10343,19 @@ function plantShowsUrgentWaterHoverEmphasis(plant, now) {
 function applyPlantHoverVisuals(plant) {
   clearPlantHoverVisuals();
   if (!plant) return;
-  const urgentWater = plantShowsUrgentWaterHoverEmphasis(plant);
+  const now = getSharedPlantSimulationNow();
+  const skipRing = shouldSkipPlantHoverVisualEmphasis(plant, now);
+  const urgentWater =
+    !skipRing && plantShowsUrgentWaterHoverEmphasis(plant, now);
   const clickable =
     heldItem === HELD_ITEM_BUCKET &&
     isBucketFull &&
     canWaterPlantByClick(plant) &&
     isPlayerNearPlantWorld(plant);
+  if (!skipRing) {
+    layoutPlantHoverRing(plant, urgentWater);
+  }
   getPlantHoverDomElements(plant).forEach(function (el) {
-    el.classList.add("is-plant-hover");
-    if (urgentWater) el.classList.add("is-plant-hover-needs-water");
     if (clickable) {
       el.classList.add("is-plant-water-clickable");
       el.style.cursor = "pointer";
@@ -10333,37 +10392,50 @@ function hidePlantHoverLabel() {
   }
 }
 
-/** 호버 시 월드 식물 스프라이트만 강조(이름·수분 패널 없음) */
-function showPlantHoverEmphasisForPlant(plant) {
-  if (!plant) return;
+function showPlantHoverSignForPlant(plant) {
+  if (!plantHoverLabel || !plant) return;
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
   if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
     hidePlantHoverLabel();
     return;
   }
-  if (
-    plantHoverLabel &&
-    (plantHoverLabel.classList.contains("is-plant-world-sign") ||
-      plantHoverLabel.classList.contains("is-well-dock"))
-  ) {
-    plantHoverLabel.classList.remove(
-      "is-well-dock",
-      "is-plant-world-sign",
-      "is-dry",
-      "is-overwatered"
-    );
-    plantHoverLabel.textContent = "";
-    plantHoverLabel.style.position = "";
-    plantHoverLabel.style.left = "";
-    plantHoverLabel.style.top = "";
-    plantHoverLabel.style.height = "";
-    plantHoverLabel.style.right = "";
-    plantHoverLabel.style.zIndex = "";
-    plantHoverLabel.style.transform = "";
-    plantHoverLabel.style.display = "none";
-    restorePlantHoverLabelToWorldDom();
+  const label = getPlantWorldLabel(plant);
+  const badTitle = getPlantSoilBadStateTitle(plant);
+  if (!String(label || "").trim() && !badTitle) {
+    hidePlantHoverLabel();
+    return;
   }
+
+  ensurePlantHoverLabelOnBodyForFixedUi();
+  plantHoverLabel.classList.remove(
+    "is-ui-shortcut-hint",
+    "is-seed-inventory-hint",
+    "is-world-npc-name",
+    "is-stage3-complete"
+  );
+  plantHoverLabel.classList.add("is-well-dock", "is-plant-world-sign");
+  plantHoverLabel.classList.toggle("is-dry", plant.status === "dry");
+  plantHoverLabel.classList.toggle("is-overwatered", Boolean(plant.isOverwatered));
+  plantHoverLabel.style.position = "fixed";
+  plantHoverLabel.style.left = "auto";
+  plantHoverLabel.style.top = "";
+  plantHoverLabel.style.right = "";
+  plantHoverLabel.style.transform = "none";
+  plantHoverLabel.style.zIndex = "11";
+
+  plantHoverLabel.textContent = "";
+  if (String(label || "").trim()) {
+    const titleEl = document.createElement("div");
+    titleEl.className = "plant-world-sign-title";
+    titleEl.textContent = label;
+    plantHoverLabel.appendChild(titleEl);
+  }
+
+  appendPlantHoverWaterDetail(plantHoverLabel, plant);
+
+  plantHoverLabel.style.display = "flex";
+  syncPlantHoverWellDockLayout();
   applyPlantHoverVisuals(plant);
 }
 

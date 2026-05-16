@@ -64,6 +64,7 @@ const seedDryGauge = document.getElementById("seed-dry-gauge");
 const seedDryText = document.getElementById("seed-dry-text");
 const seedWorldText = document.getElementById("seed-world-text");
 const plantHoverLabel = document.getElementById("plant-hover-label");
+const plantHoverRing = document.getElementById("plant-hover-ring");
 const treeAppleElements = Array.from(document.querySelectorAll(".tree-apple"));
 const world = document.querySelector(".world");
 const ground = document.querySelector(".ground");
@@ -141,6 +142,7 @@ export {
   seedDryText,
   seedWorldText,
   plantHoverLabel,
+  plantHoverRing,
   treeAppleElements,
   world,
   ground,
