@@ -13360,11 +13360,11 @@ function updateMultiplayerStatus(statusText) {
     multiplayerStatusText === "캐릭터 선택 전" ||
     multiplayerStatusText === "초기화 중" ||
     (typeof multiplayerStatusText === "string" &&
-      multiplayerStatusText.indexOf("?토리얼") !== -1)
+      multiplayerStatusText.indexOf("튜토리얼") !== -1)
       ? multiplayerStatusText
-      : "?결 ?됨";
+      : "연결 안됨";
   multiplayerStatus.textContent =
-    "멀??" + statusLabel + " / 로그??" + getOnlinePlayerCount();
+    "멀티 " + statusLabel + " / 로그인 " + getOnlinePlayerCount();
 }
 
 function clearMultiplayerReconnectTimeout() {
