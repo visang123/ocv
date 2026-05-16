@@ -4,22 +4,22 @@ export const CRAFT_FURNITURE_KINDS = ["craftDesk", "craftFence", "craftChair", "
 
 const CRAFT_FURNITURE_WORLD = {
   craftDesk: {
-    src: "\uC774\uBBF8\uC9C0/craft-desk-world.png?v=20260516f",
+    src: "\uC774\uBBF8\uC9C0/craft-desk-world.png?v=20260516g",
     width: 44,
     height: 38
   },
   craftFence: {
-    src: "\uC774\uBBF8\uC9C0/craft-fence-world.png?v=20260516f",
+    src: "\uC774\uBBF8\uC9C0/craft-fence-world.png?v=20260516g",
     width: 40,
     height: 32
   },
   craftChair: {
-    src: "\uC774\uBBF8\uC9C0/craft-chair-world.png?v=20260516f",
+    src: "\uC774\uBBF8\uC9C0/craft-chair-world.png?v=20260516g",
     width: 34,
     height: 36
   },
   craftHouse: {
-    src: "\uC774\uBBF8\uC9C0/craft-house-world.png?v=20260516f",
+    src: "\uC774\uBBF8\uC9C0/craft-house-world.png?v=20260516g",
     width: 88,
     height: 72
   }

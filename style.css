@@ -2522,9 +2522,11 @@ body::-webkit-scrollbar {
   opacity: 0.78;
 }
 
-#admin-dev-magic-powder-button {
+#admin-dev-butterflies-button,
+#admin-dev-rocks-button,
+#admin-dev-seeds-button,
+#admin-dev-apples-button {
   position: fixed;
-  left: 23px;
   top: 3px;
   z-index: 261;
   width: 9px;
@@ -2532,18 +2534,43 @@ body::-webkit-scrollbar {
   padding: 0;
   border: 0;
   border-radius: 2px;
-  background: linear-gradient(145deg, #c084fc, #7c3aed);
-  box-shadow: 0 0 0 1px rgba(88, 28, 135, 0.75);
   cursor: pointer;
 }
 
-#admin-dev-magic-powder-button:hover {
+#admin-dev-butterflies-button {
+  left: 23px;
+  background: linear-gradient(145deg, #f9a8d4, #ec4899);
+  box-shadow: 0 0 0 1px rgba(157, 23, 77, 0.7);
+}
+
+#admin-dev-rocks-button {
+  left: 34px;
+  background: linear-gradient(145deg, #d6d3d1, #78716c);
+  box-shadow: 0 0 0 1px rgba(68, 64, 60, 0.75);
+}
+
+#admin-dev-seeds-button {
+  left: 45px;
+  background: linear-gradient(145deg, #86efac, #16a34a);
+  box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.75);
+}
+
+#admin-dev-apples-button {
+  left: 56px;
+  background: linear-gradient(145deg, #fca5a5, #dc2626);
+  box-shadow: 0 0 0 1px rgba(153, 27, 27, 0.75);
+}
+
+#admin-dev-butterflies-button:hover,
+#admin-dev-rocks-button:hover,
+#admin-dev-seeds-button:hover,
+#admin-dev-apples-button:hover {
   filter: brightness(1.12);
 }
 
 #admin-dev-plant-index-plus-button {
   position: fixed;
-  left: 34px;
+  left: 67px;
   top: 4px;
   z-index: 261;
   width: 7px;
@@ -3540,7 +3567,7 @@ body #world-bag-inventory {
 .bag-slot-icon--magic-powder {
   width: 39px;
   height: 39px;
-  background: url("이미지/magic-powder-gray.png?v=20260516e") center / contain no-repeat;
+  background: url("이미지/magic-powder-gray.png?v=20260516g") center / contain no-repeat;
 }
 
 .bag-slot-icon--magic-powder-img {
@@ -3749,7 +3776,7 @@ body #world-bag-inventory {
   height: 64px;
   pointer-events: none;
   background-color: transparent;
-  background-image: url("이미지/magic-powder-gray.png?v=20260516e");
+  background-image: url("이미지/magic-powder-gray.png?v=20260516g");
   background-position: center;
   background-size: contain;
   background-repeat: no-repeat;

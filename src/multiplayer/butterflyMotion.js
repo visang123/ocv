@@ -83,6 +83,9 @@ export function createButterflyMotionController(config) {
       x: getNumericButterflyValue(fromX, bounds.left),
       y: getNumericButterflyValue(fromY, bounds.top)
     }, bounds);
+    const minDistSq = minLeg * minLeg * 0.64;
+    let best = null;
+    let bestDistSq = 0;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const angle = Math.random() * Math.PI * 2;
       const leg = minLeg + Math.random() * (maxLeg - minLeg);
@@ -92,9 +95,32 @@ export function createButterflyMotionController(config) {
       }, bounds);
       const dx = target.x - from.x;
       const dy = target.y - from.y;
-      if (dx * dx + dy * dy >= minLeg * minLeg * 0.64) return target;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= minDistSq) return target;
+      if (!best || distSq > bestDistSq) {
+        best = target;
+        bestDistSq = distSq;
+      }
     }
-    return pickSpawnPoint();
+    if (best && bestDistSq > 1) return best;
+    const cx = (bounds.left + bounds.right) * 0.5;
+    const cy = (bounds.top + bounds.bottom) * 0.5;
+    const toCenter = Math.hypot(cx - from.x, cy - from.y) || 1;
+    return clampPoint({
+      x: from.x + ((cx - from.x) / toCenter) * minLeg,
+      y: from.y + ((cy - from.y) / toCenter) * minLeg
+    }, bounds);
+  }
+
+  function getButterflyPathPoint(butterfly, now) {
+    const bounds = getBounds();
+    const offset = getButterflyFlutterOffsetWorld(now, butterfly, flutter);
+    const fallbackX = getNumericButterflyValue(butterfly.x, bounds.left) - offset.dx;
+    const fallbackY = getNumericButterflyValue(butterfly.y, bounds.top) - offset.dy;
+    return clampPoint({
+      x: getNumericButterflyValue(butterfly.lastPathX, fallbackX),
+      y: getNumericButterflyValue(butterfly.lastPathY, fallbackY)
+    }, bounds);
   }
 
   function create(now, options) {
@@ -159,16 +185,16 @@ export function createButterflyMotionController(config) {
     }
     if (waypoint && now < waypoint.endAt) return waypoint;
 
-    clampButterflyToBounds(butterfly, bounds);
-    const target = pickWaypoint(butterfly.x, butterfly.y);
-    const dx = target.x - butterfly.x;
-    const dy = target.y - butterfly.y;
+    const pathFrom = getButterflyPathPoint(butterfly, now);
+    const target = pickWaypoint(pathFrom.x, pathFrom.y);
+    const dx = target.x - pathFrom.x;
+    const dy = target.y - pathFrom.y;
     const distance = Math.max(1, Math.hypot(dx, dy));
     const baseDuration = (distance / speed) * (1000 / 60);
     const duration = Math.round(clamp(baseDuration * (0.9 + Math.random() * 0.3), 520, legMaxMs));
     waypoint = {
-      startX: butterfly.x,
-      startY: butterfly.y,
+      startX: pathFrom.x,
+      startY: pathFrom.y,
       targetX: target.x,
       targetY: target.y,
       startAt: now,
@@ -190,6 +216,7 @@ export function createButterflyMotionController(config) {
     const offset = getButterflyFlutterOffsetWorld(now, butterfly, flutter);
 
     butterfly.lastPathX = pathX;
+    butterfly.lastPathY = pathY;
     butterfly.x = pathX + offset.dx;
     butterfly.y = pathY + offset.dy;
     clampButterflyToBounds(butterfly, bounds);

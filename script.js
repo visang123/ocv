@@ -127,6 +127,7 @@ import {
   npcInteractDistance,
   wellUseDistance,
   wellPourDistance,
+  wellCardDistance,
   plantWaterDistance,
   maxWellWater,
   wellRefillMs,
@@ -371,7 +372,7 @@ import {
   saveBagInventoryOrder as saveBagInventoryOrderCore,
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
   getBagItemDescriptor as getBagItemDescriptorCore
-} from "./src/game/bag-inventory.js?v=20260516f";
+} from "./src/game/bag-inventory.js?v=20260516g";
 import {
   bindTradeMaster,
   closeTradeExchangePanel,
@@ -2702,17 +2703,40 @@ networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
 networkDebugButton.setAttribute("aria-label", "로그");
 document.body.appendChild(networkDebugButton);
-const adminDevMagicPowderButton = document.createElement("button");
-adminDevMagicPowderButton.id = "admin-dev-magic-powder-button";
-adminDevMagicPowderButton.type = "button";
-adminDevMagicPowderButton.textContent = "";
-adminDevMagicPowderButton.setAttribute("aria-hidden", "true");
-document.body.appendChild(adminDevMagicPowderButton);
+function appendAdminDevGrantButton(id, ariaLabel) {
+  const button = document.createElement("button");
+  button.id = id;
+  button.type = "button";
+  button.textContent = "";
+  button.setAttribute("aria-hidden", "true");
+  button.setAttribute("aria-label", ariaLabel);
+  button.setAttribute("title", ariaLabel);
+  document.body.appendChild(button);
+  return button;
+}
+const adminDevButterfliesButton = appendAdminDevGrantButton(
+  "admin-dev-butterflies-button",
+  "나비 종류별 +10 (관리자)"
+);
+const adminDevRocksButton = appendAdminDevGrantButton(
+  "admin-dev-rocks-button",
+  "돌 +10 (관리자)"
+);
+const adminDevSeedsButton = appendAdminDevGrantButton(
+  "admin-dev-seeds-button",
+  "씨앗 +10 (관리자)"
+);
+const adminDevApplesButton = appendAdminDevGrantButton(
+  "admin-dev-apples-button",
+  "사과 +10 (관리자)"
+);
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
+adminDevPlantIndexPlusButton.setAttribute("aria-label", "식물지수 +100 (관리자)");
+adminDevPlantIndexPlusButton.setAttribute("title", "식물지수 +100 (관리자)");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -2725,10 +2749,23 @@ const magicPowderCountText = magicPowderInventory.querySelector("#magic-powder-c
 magicPowderInventory.addEventListener("click", function () {
   tryUseMagicPowder();
 });
-adminDevMagicPowderButton.addEventListener("click", function () {
-  magicPowderCount = Math.max(0, Math.floor(magicPowderCount)) + 1;
-  saveMagicPowderCount();
-  updateMagicPowderInventoryUi();
+adminDevButterfliesButton.addEventListener("click", function () {
+  butterflyColors.forEach(function (color) {
+    addBagItemsForTrade("butterfly:" + color, 10);
+  });
+});
+adminDevRocksButton.addEventListener("click", function () {
+  addBagItemsForTrade("rock", 10);
+});
+adminDevSeedsButton.addEventListener("click", function () {
+  addBagItemsForTrade("seed", 10);
+  markWorldDirty();
+  syncWorldState(true);
+});
+adminDevApplesButton.addEventListener("click", function () {
+  addBagItemsForTrade("apple", 10);
+  markWorldDirty();
+  syncWorldState(true);
 });
 adminDevPlantIndexPlusButton.addEventListener("click", function () {
   adminDebugPlantIndexBonus = Math.max(0, Math.floor(adminDebugPlantIndexBonus)) + 100;
@@ -3297,6 +3334,12 @@ function isNearWell() {
   const wellSize = getWellSize();
 
   return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellUseDistance;
+}
+
+function isNearWellForCard() {
+  const wellSize = getWellSize();
+
+  return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellCardDistance;
 }
 
 function isNearWellForPouring() {
@@ -11882,7 +11925,7 @@ function updateWellImage() {
 }
 
 function updateWellCard() {
-  const isVisible = isNearWell();
+  const isVisible = isNearWellForCard();
   const waterRatio = wellState.water / maxWellWater;
   const wellImage = wellState.water > 0 ? "이미지/well.png" : "이미지/well-empty.png";
 
@@ -15228,9 +15271,18 @@ function updateButterflies() {
   if (sharedHydrated && butterflyState.list.length > 0) {
     const runAuthorityButterflyMotion = !onlineAvailable || isButterflyAuthority();
     if (runAuthorityButterflyMotion) {
-      butterflyState.list.forEach(function (butterfly) {
-        simulateButterflyAuthorityStep(butterfly, now);
-      });
+      const motionStepCount =
+        wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
+      const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
+      for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
+        const stepNow =
+          motionStepCount > 1
+            ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
+            : now;
+        butterflyState.list.forEach(function (butterfly) {
+          simulateButterflyAuthorityStep(butterfly, stepNow);
+        });
+      }
       if (onlineAvailable && now - lastButterflyBroadcastAt >= butterflyBroadcastMs) {
         broadcastButterflyState(now);
       }

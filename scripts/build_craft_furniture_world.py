@@ -1,7 +1,12 @@
 """Crop in-game craft furniture sprites from the reference sheet (left column)."""
 
-from PIL import Image
 import os
+import sys
+
+from PIL import Image
+
+sys.path.insert(0, os.path.dirname(__file__))
+from image_backdrop import crop_centered
 
 SRC = (
     r"C:\Users\USER\.cursor\projects\c-Users-USER-Desktop-OVC\assets\\"
@@ -20,19 +25,9 @@ ITEMS = [
 ]
 
 src = Image.open(SRC).convert("RGBA")
-W, H = src.size
 
 for filename, cx, cy, cell in ITEMS:
-    half = cell // 2
-    left = max(0, cx - half)
-    top = max(0, cy - half)
-    right = min(W, cx + half)
-    bottom = min(H, cy + half)
-    patch = src.crop((left, top, right, bottom))
-    out = Image.new("RGBA", (cell, cell), (0, 0, 0, 0))
-    paste_x = (cell - patch.width) // 2
-    paste_y = (cell - patch.height) // 2
-    out.paste(patch, (paste_x, paste_y), patch)
+    out = crop_centered(src, cx, cy, cell)
     dst = os.path.join(DST_DIR, filename)
-    out.save(dst)
+    out.save(dst, optimize=True)
     print("wrote", dst)

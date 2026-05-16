@@ -1,7 +1,12 @@
-"""Crop craft furniture inventory icons from the user reference sheet."""
+"""Crop craft furniture inventory icons from the reference sheet."""
+
+import os
+import sys
 
 from PIL import Image
-import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+from image_backdrop import crop_centered
 
 SRC = (
     r"C:\Users\USER\.cursor\projects\c-Users-USER-Desktop-OVC\assets\\"
@@ -20,21 +25,11 @@ ITEMS = [
 ]
 
 CELL = 148
-HALF = CELL // 2
 
 src = Image.open(SRC).convert("RGBA")
-W, H = src.size
 
 for filename, cx, cy in ITEMS:
-    left = max(0, cx - HALF)
-    top = max(0, cy - HALF)
-    right = min(W, cx + HALF)
-    bottom = min(H, cy + HALF)
-    cell = src.crop((left, top, right, bottom))
-    out = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
-    paste_x = (CELL - cell.width) // 2
-    paste_y = (CELL - cell.height) // 2
-    out.paste(cell, (paste_x, paste_y), cell)
+    out = crop_centered(src, cx, cy, CELL)
     dst = os.path.join(DST_DIR, filename)
-    out.save(dst)
+    out.save(dst, optimize=True)
     print("wrote", dst)
