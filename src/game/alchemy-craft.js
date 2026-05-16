@@ -30,19 +30,19 @@ export const ALCHEMY_CRAFT_RECIPES = [
     id: "craftChair",
     label: "\uC758\uC790",
     outputKey: "craftChair",
-    inputs: { rock: 4 }
+    inputs: { rock: 5, seed: 5 }
   },
   {
     id: "craftDesk",
     label: "\uCC45\uC0C1",
     outputKey: "craftDesk",
-    inputs: { rock: 2, magicPowder: 1, apple: 1 }
+    inputs: { rock: 7, seed: 7 }
   },
   {
     id: "craftHouse",
     label: "\uC9D1",
     outputKey: "craftHouse",
-    inputs: { rock: 6, magicPowder: 2, seed: 2, apple: 1 }
+    inputs: { apple: 3, rock: 30, seed: 10 }
   }
 ];
 

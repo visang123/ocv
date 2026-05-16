@@ -4074,7 +4074,7 @@ body #world-bag-inventory {
   padding: 22px 8px 8px;
   border-radius: 12px;
   border: 2px dashed rgba(196, 181, 253, 0.45);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(48, 32, 72, 0.35);
 }
 
 .alchemy-craft-requirements-block.is-hidden {
@@ -4118,8 +4118,8 @@ body #world-bag-inventory {
   height: 44px;
   flex: 0 0 44px;
   border-radius: 10px;
-  border: 1px dashed rgba(196, 181, 253, 0.45);
-  background: rgba(12, 6, 28, 0.42);
+  border: 1px dashed rgba(196, 181, 253, 0.5);
+  background: rgba(36, 24, 58, 0.72);
   display: block;
   cursor: pointer;
   padding: 0;
@@ -4129,14 +4129,17 @@ body #world-bag-inventory {
 
 .alchemy-craft-req-slot.is-partial {
   border-style: solid;
-  border-color: rgba(196, 181, 253, 0.55);
+  border-color: rgba(196, 181, 253, 0.7);
+  background: rgba(48, 32, 78, 0.78);
 }
 
 .alchemy-craft-req-slot.is-filled {
   border-style: solid;
-  border-color: rgba(216, 180, 254, 0.85);
-  background: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 10px rgba(167, 139, 250, 0.35);
+  border-color: rgba(167, 243, 208, 0.85);
+  background: rgba(52, 40, 88, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(167, 243, 208, 0.35),
+    0 0 8px rgba(134, 239, 172, 0.28);
 }
 
 .alchemy-craft-req-slot.is-many-segments {
@@ -4146,24 +4149,35 @@ body #world-bag-inventory {
 
 .alchemy-craft-req-segments {
   position: absolute;
-  inset: 2px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 7px;
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(var(--seg-count, 1), minmax(0, 1fr));
-  gap: 1px;
-  border-radius: 7px;
+  gap: 2px;
+  border-radius: 4px;
   overflow: hidden;
   pointer-events: none;
 }
 
 .alchemy-craft-req-seg {
   min-width: 0;
-  background: rgba(8, 4, 22, 0.72);
-  transition: background 0.14s ease-out;
+  background: rgba(0, 0, 0, 0.38);
+  transition:
+    background 0.14s ease-out,
+    box-shadow 0.14s ease-out;
 }
 
 .alchemy-craft-req-seg.is-filled {
-  background: rgba(255, 255, 255, 0.88);
+  background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%);
+  box-shadow: 0 0 5px rgba(167, 139, 250, 0.55);
+}
+
+.alchemy-craft-req-slot.is-filled .alchemy-craft-req-seg.is-filled {
+  background: linear-gradient(180deg, #bbf7d0 0%, #4ade80 100%);
+  box-shadow: 0 0 5px rgba(74, 222, 128, 0.45);
 }
 
 .alchemy-craft-req-icon {
@@ -4173,12 +4187,18 @@ body #world-bag-inventory {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-bottom: 5px;
   pointer-events: none;
 }
 
 .alchemy-craft-req-icon--ghost {
-  opacity: 0.48;
-  filter: grayscale(0.2) brightness(0.9);
+  opacity: 0.92;
+  filter: saturate(0.72) brightness(1.08);
+}
+
+.alchemy-craft-req-icon--partial {
+  opacity: 1;
+  filter: saturate(0.92) brightness(1.04);
 }
 
 .alchemy-craft-req-slot.is-filled .alchemy-craft-req-icon {

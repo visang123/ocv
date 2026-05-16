@@ -8186,6 +8186,8 @@ function getPlantVisibleHoverRectsWorld(plant) {
 const PLANT_DEPTH_Z_MIN = 3;
 const PLANT_DEPTH_Z_MAX = 14;
 let currentPlantHoverTarget = null;
+/** @type {HTMLElement[]} */
+let plantOccluderFadeElements = [];
 
 function getPlantHoverGeometryOptions() {
   return {
@@ -8228,18 +8230,39 @@ function syncAllPlantDepthStacking() {
 }
 
 function clearPlantOccluderFade() {
-  if (!ground) return;
-  ground.querySelectorAll(".is-plant-occluding-hover").forEach(function (el) {
-    el.classList.remove("is-plant-occluding-hover");
-  });
+  for (let i = 0; i < plantOccluderFadeElements.length; i += 1) {
+    const el = plantOccluderFadeElements[i];
+    if (el && el.isConnected) el.classList.remove("is-plant-occluding-hover");
+  }
+  plantOccluderFadeElements = [];
+}
+
+function setPlantOccluderFadeElements(nextEls) {
+  const nextSet = new Set(nextEls);
+  for (let i = 0; i < plantOccluderFadeElements.length; i += 1) {
+    const el = plantOccluderFadeElements[i];
+    if (!nextSet.has(el) && el && el.isConnected) {
+      el.classList.remove("is-plant-occluding-hover");
+    }
+  }
+  for (let i = 0; i < nextEls.length; i += 1) {
+    const el = nextEls[i];
+    if (el && el.isConnected && !el.classList.contains("is-plant-occluding-hover")) {
+      el.classList.add("is-plant-occluding-hover");
+    }
+  }
+  plantOccluderFadeElements = nextEls.slice();
 }
 
 function refreshPlantOccluderFade() {
-  clearPlantOccluderFade();
   const target = currentPlantHoverTarget;
-  if (!target) return;
+  if (!target) {
+    clearPlantOccluderFade();
+    return;
+  }
   const targetDepthY = getPlantDepthSortY(target);
   const targetRects = getPlantVisibleHoverRectsWorld(target);
+  const nextEls = [];
   function fadeOccluders(plant) {
     if (!plant || plant === target) return;
     if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
@@ -8247,11 +8270,12 @@ function refreshPlantOccluderFade() {
     if (getPlantDepthSortY(plant) <= targetDepthY) return;
     if (!worldRectsOverlap(targetRects, getPlantVisibleHoverRectsWorld(plant))) return;
     getPlantHoverDomElements(plant).forEach(function (el) {
-      el.classList.add("is-plant-occluding-hover");
+      nextEls.push(el);
     });
   }
   if (plantRuntime.isSeedPlanted) fadeOccluders(plantRuntime);
   appleState.extraPlants.forEach(fadeOccluders);
+  setPlantOccluderFadeElements(nextEls);
 }
 
 /** 포인터 아래 식물 중 가려진(뒤·작은 Y) 식물 우선 — 겹침 시 앞 식물이 아닌 뒤 식물 호버 */
@@ -8474,8 +8498,9 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
 
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
-  if (plant) showPlantHoverSignForPlant(plant);
-  else hidePlantHoverLabel();
+  if (plant) {
+    if (plant !== currentPlantHoverTarget) showPlantHoverSignForPlant(plant);
+  } else hidePlantHoverLabel();
 }
 
 function tickSproutEvolution(plant, now) {
@@ -10692,7 +10717,15 @@ function plantShowsUrgentWaterHoverEmphasis(plant, now) {
 }
 
 function applyPlantHoverVisuals(plant) {
-  clearPlantHoverVisuals();
+  clearPlantHoverRing();
+  if (ground) {
+    ground
+      .querySelectorAll(".is-plant-water-clickable")
+      .forEach(function (el) {
+        el.classList.remove("is-plant-water-clickable");
+        el.style.cursor = "";
+      });
+  }
   if (!plant) return;
   const now = getSharedPlantSimulationNow();
   const skipRing = shouldSkipPlantHoverVisualEmphasis(plant, now);

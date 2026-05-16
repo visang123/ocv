@@ -526,7 +526,11 @@ function renderAlchemyRequirementSlots() {
         segHtml +
         "</span>" +
         '<span class="alchemy-craft-req-icon' +
-        (complete ? "" : " alchemy-craft-req-icon--ghost") +
+        (complete
+          ? ""
+          : filled > 0
+            ? " alchemy-craft-req-icon--partial"
+            : " alchemy-craft-req-icon--ghost") +
         '">' +
         desc.iconHtml +
         "</span>" +
