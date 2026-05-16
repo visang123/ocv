@@ -175,6 +175,8 @@ export function loadSeedStateFromStorage(config) {
     grassOrdinal: null,
     matureKind: "",
     flowerOrdinal: null,
+    treeOrdinal: null,
+    cactusOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null,
     npcX: config.defaultNpcX,
@@ -268,6 +270,22 @@ export function loadSeedStateFromStorage(config) {
         planted.flowerOrdinal = Math.max(1, Number(savedPlantedState.flowerOrdinal));
       } else {
         planted.flowerOrdinal = null;
+      }
+      if (
+        savedPlantedState.treeOrdinal != null &&
+        Number.isFinite(Number(savedPlantedState.treeOrdinal))
+      ) {
+        planted.treeOrdinal = Math.max(1, Number(savedPlantedState.treeOrdinal));
+      } else {
+        planted.treeOrdinal = null;
+      }
+      if (
+        savedPlantedState.cactusOrdinal != null &&
+        Number.isFinite(Number(savedPlantedState.cactusOrdinal))
+      ) {
+        planted.cactusOrdinal = Math.max(1, Number(savedPlantedState.cactusOrdinal));
+      } else {
+        planted.cactusOrdinal = null;
       }
       if (Object.prototype.hasOwnProperty.call(savedPlantedState, "drySoilAt")) {
         const da = Number(savedPlantedState.drySoilAt);
@@ -502,6 +520,16 @@ export function loadAppleStateFromStorage(config) {
                 Number.isFinite(Number(plantData.flowerOrdinal))
                   ? Math.max(1, Number(plantData.flowerOrdinal))
                   : null,
+              treeOrdinal:
+                plantData.treeOrdinal != null &&
+                Number.isFinite(Number(plantData.treeOrdinal))
+                  ? Math.max(1, Number(plantData.treeOrdinal))
+                  : null,
+              cactusOrdinal:
+                plantData.cactusOrdinal != null &&
+                Number.isFinite(Number(plantData.cactusOrdinal))
+                  ? Math.max(1, Number(plantData.cactusOrdinal))
+                  : null,
               rottenAt: Number(plantData.rottenAt) || null,
               blockSproutRegrowthAfterDry: (function () {
                 if (Object.prototype.hasOwnProperty.call(plantData, "blockSproutRegrowthAfterDry")) {
@@ -634,6 +662,14 @@ export function saveAppleStateToStorage(config) {
           flowerOrdinal:
             plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
               ? plant.flowerOrdinal
+              : null,
+          treeOrdinal:
+            plant.treeOrdinal != null && Number.isFinite(Number(plant.treeOrdinal))
+              ? plant.treeOrdinal
+              : null,
+          cactusOrdinal:
+            plant.cactusOrdinal != null && Number.isFinite(Number(plant.cactusOrdinal))
+              ? plant.cactusOrdinal
               : null,
           rottenAt: plant.rottenAt || null,
           blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),

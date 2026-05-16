@@ -4548,6 +4548,8 @@ function applyDefaultState(options) {
   plantRuntime.plantedAt = null;
   plantRuntime.matureKind = "";
   plantRuntime.flowerOrdinal = null;
+  plantRuntime.treeOrdinal = null;
+  plantRuntime.cactusOrdinal = null;
   plantRuntime.blockSproutRegrowthAfterDry = false;
   plantRuntime.drySoilAt = null;
 
@@ -6457,6 +6459,14 @@ function getSharedWorldSnapshot() {
           flowerOrdinal:
             plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
               ? plant.flowerOrdinal
+              : null,
+          treeOrdinal:
+            plant.treeOrdinal != null && Number.isFinite(Number(plant.treeOrdinal))
+              ? plant.treeOrdinal
+              : null,
+          cactusOrdinal:
+            plant.cactusOrdinal != null && Number.isFinite(Number(plant.cactusOrdinal))
+              ? plant.cactusOrdinal
               : null,
           blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),
           drySoilAt:
@@ -10041,6 +10051,8 @@ function createExtraPlant(id, x, y) {
     grassOrdinal: null,
     matureKind: "",
     flowerOrdinal: null,
+    treeOrdinal: null,
+    cactusOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null
   };
@@ -12110,6 +12122,14 @@ function applyLoadedPlantState(loadedPlant) {
     loadedPlant.flowerOrdinal != null && Number.isFinite(Number(loadedPlant.flowerOrdinal))
       ? Math.max(1, Number(loadedPlant.flowerOrdinal))
       : null;
+  plantRuntime.treeOrdinal =
+    loadedPlant.treeOrdinal != null && Number.isFinite(Number(loadedPlant.treeOrdinal))
+      ? Math.max(1, Number(loadedPlant.treeOrdinal))
+      : null;
+  plantRuntime.cactusOrdinal =
+    loadedPlant.cactusOrdinal != null && Number.isFinite(Number(loadedPlant.cactusOrdinal))
+      ? Math.max(1, Number(loadedPlant.cactusOrdinal))
+      : null;
 
   if (Object.prototype.hasOwnProperty.call(loadedPlant, "blockSproutRegrowthAfterDry")) {
     plantRuntime.blockSproutRegrowthAfterDry = Boolean(loadedPlant.blockSproutRegrowthAfterDry);
@@ -12202,6 +12222,14 @@ function getPlantStateForStorage() {
     flowerOrdinal:
       plantRuntime.flowerOrdinal != null && Number.isFinite(Number(plantRuntime.flowerOrdinal))
         ? plantRuntime.flowerOrdinal
+        : null,
+    treeOrdinal:
+      plantRuntime.treeOrdinal != null && Number.isFinite(Number(plantRuntime.treeOrdinal))
+        ? plantRuntime.treeOrdinal
+        : null,
+    cactusOrdinal:
+      plantRuntime.cactusOrdinal != null && Number.isFinite(Number(plantRuntime.cactusOrdinal))
+        ? plantRuntime.cactusOrdinal
         : null,
     blockSproutRegrowthAfterDry: Boolean(plantRuntime.blockSproutRegrowthAfterDry),
     drySoilAt:

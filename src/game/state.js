@@ -70,9 +70,11 @@ export function createPlantState() {
     soilOrdinal: 0,
     sproutOrdinal: 0,
     grassOrdinal: null,
-    /** 4·5단 성숙 형태: grass(풀) | flower(꽃) */
+    /** 4·5단 성숙 형태: grass | flower | tree | cactus */
     matureKind: "",
     flowerOrdinal: null,
+    treeOrdinal: null,
+    cactusOrdinal: null,
     /** 마른 땅(작물 고사) 이후에는 물만으로 새싹 타이머가 다시 시작되지 않음 — 새로 심을 때만 false */
     blockSproutRegrowthAfterDry: false,
     /** status가 dry로 바뀐 시각(ms). plantDrySoilClearMs 후 칸 제거 */
