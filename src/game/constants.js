@@ -355,6 +355,7 @@ export const hasGuideBookKey = "hasGuideBookV1";
 export const worldBagFloorPickedAccountKey = "ovcWorldBagFloorPickedV1";
 export const npcDialogueCompleteKey = "npcDialogueCompleteV1";
 export const tradeMasterDialogueCompleteKey = "tradeMasterDialogueCompleteV1";
+export const alchemyMasterDialogueCompleteKey = "alchemyMasterDialogueCompleteV1";
 export const guidePlantPageUnlockedKey = "guidePlantPageUnlockedV1";
 export const appleStateKey = "appleStateV1";
 export const playerPositionKey = "playerPositionV1";
@@ -381,6 +382,7 @@ export const appStorageKeys = [
   worldBagFloorPickedAccountKey,
   npcDialogueCompleteKey,
   tradeMasterDialogueCompleteKey,
+  alchemyMasterDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
   playerPositionKey,

@@ -10,6 +10,7 @@ const tradeMaster = document.getElementById("trade-master");
 const alchemyMaster = document.getElementById("alchemy-master");
 const npcBubble = document.getElementById("npc-bubble");
 const tradeMasterBubble = document.getElementById("trade-master-bubble");
+const alchemyMasterBubble = document.getElementById("alchemy-master-bubble");
 const tradeExchangeOverlay = document.getElementById("trade-exchange-overlay");
 const tradeCounterSlot = document.getElementById("trade-counter-slot");
 const tradeOfferList = document.getElementById("trade-offer-list");
@@ -81,6 +82,7 @@ export {
   alchemyMaster,
   npcBubble,
   tradeMasterBubble,
+  alchemyMasterBubble,
   tradeExchangeOverlay,
   tradeCounterSlot,
   tradeOfferList,

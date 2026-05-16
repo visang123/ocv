@@ -96,7 +96,12 @@ export function tryTalkToTradeMaster() {
 
 export function updateTradeNpcPrompt() {
   if (!host || !host.tradeMasterBubble) return;
-  if (running || exchangeOpen || (host.isNpcDialogueRunning && host.isNpcDialogueRunning())) {
+  if (
+    running ||
+    exchangeOpen ||
+    (host.isNpcDialogueRunning && host.isNpcDialogueRunning()) ||
+    (host.isAlchemyMasterDialogueRunning && host.isAlchemyMasterDialogueRunning())
+  ) {
     return;
   }
 

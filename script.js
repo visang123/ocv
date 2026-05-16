@@ -167,6 +167,7 @@ import {
   hasGuideBookKey,
   npcDialogueCompleteKey,
   tradeMasterDialogueCompleteKey,
+  alchemyMasterDialogueCompleteKey,
   guidePlantPageUnlockedKey,
   appleStateKey,
   bucketStateKey,
@@ -193,6 +194,7 @@ import {
   alchemyMaster,
   npcBubble,
   tradeMasterBubble,
+  alchemyMasterBubble,
   tradeExchangeOverlay,
   tradeCounterSlot,
   tradeOfferList,
@@ -351,7 +353,7 @@ import {
   saveBagInventoryOrder as saveBagInventoryOrderCore,
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
   getBagItemDescriptor as getBagItemDescriptorCore
-} from "./src/game/bag-inventory.js";
+} from "./src/game/bag-inventory.js?v=20260516f";
 import {
   bindTradeMaster,
   closeTradeExchangePanel,
@@ -359,10 +361,19 @@ import {
   hydrateTradeMasterDialogueComplete,
   isNearTradeMaster,
   isTradeExchangeOpen,
+  isTradeMasterDialogueRunning,
   pickWorldNpcHover,
   tryTalkToTradeMaster,
   updateTradeNpcPrompt
 } from "./src/game/trade-master-ui.js";
+import {
+  bindAlchemyMaster,
+  hydrateAlchemyMasterDialogueComplete,
+  isAlchemyMasterDialogueRunning,
+  isNearAlchemyMaster,
+  tryTalkToAlchemyMaster,
+  updateAlchemyNpcPrompt
+} from "./src/game/alchemy-master-ui.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -412,6 +423,11 @@ let onboardingStep26OpenedSettingsWithEsc = false;
 let tutorialWorldNeedsFullReset = false;
 let heldItem = null;
 let isBucketFull = false;
+const MAIN_BUCKET_ID = "main";
+let heldBucketId = "";
+let heldExtraBucketMainX = 0;
+let heldExtraBucketMainY = 0;
+let heldExtraBucketMainIsFull = false;
 const plantRuntime = createPlantState();
 let lastPlantProximityBlockMessage = "";
 let plantProximityWarnUntil = 0;
@@ -1345,8 +1361,10 @@ const butterflyMotion = createButterflyMotionController({
 let hasSeededInitialButterflies = false;
 const butterflyCaughtCountsKey = "butterflyCaughtCountsV1";
 const magicPowderCountKey = "magicPowderCountV1";
+const rockInventoryCountKey = "rockInventoryCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
+let rockInventoryCount = 0;
 /** 관리자 ?버? ?물지???시·?개 ?에?가???제 ?물 ?산?별개) */
 let adminDebugPlantIndexBonus = 0;
 let ignoreSnapshotInventorySeedsUntil = 0;
@@ -2072,6 +2090,9 @@ document.addEventListener("keydown", function (event) {
     if (isTradeMasterVisible() && isNearTradeMaster()) {
       if (tryTalkToTradeMaster()) return;
     }
+    if (isAlchemyMasterVisible() && isNearAlchemyMaster()) {
+      if (tryTalkToAlchemyMaster()) return;
+    }
     if (hasGuideBook && tryCatchButterfly()) return;
     useHeldItem();
   }
@@ -2391,7 +2412,34 @@ bindTradeMaster({
   markWorldDirty: markWorldDirty,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
-  }
+  },
+  isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning
+});
+
+bindAlchemyMaster({
+  alchemyMasterBubble: alchemyMasterBubble,
+  playerBubble: playerBubble,
+  ALCHEMY_MASTER_START_X: ALCHEMY_MASTER_START_X,
+  ALCHEMY_MASTER_START_Y: ALCHEMY_MASTER_START_Y,
+  NPC_WIDTH: NPC_WIDTH,
+  NPC_HEIGHT: NPC_HEIGHT,
+  NPC_HEAD_TOP_TRIM_WORLD: NPC_HEAD_TOP_TRIM_WORLD,
+  NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD: NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
+  NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD: NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
+  getNpcHeadTopWorldY: getNpcHeadTopWorldY,
+  npcInteractDistance: npcInteractDistance,
+  alchemyMasterDialogueCompleteKey: alchemyMasterDialogueCompleteKey,
+  isAlchemyMasterVisible: isAlchemyMasterVisible,
+  getCenterDistance: getCenterDistance,
+  speechBubbleTopWorldYFromHead: speechBubbleTopWorldYFromHead,
+  setSpeechBubbleTransform: setSpeechBubbleTransform,
+  setStoredFlag: setStoredFlag,
+  updateNpcPosition: updateNpcPosition,
+  updatePlayerBubblePosition: updatePlayerBubblePosition,
+  isNpcDialogueRunning: function () {
+    return isNpcDialogueRunning;
+  },
+  isTradeMasterDialogueRunning: isTradeMasterDialogueRunning
 });
 
 signBoard.addEventListener("click", function () {
@@ -3068,8 +3116,16 @@ function createStarterSeedInventoryItem() {
   return starterSeed;
 }
 
+function isHoldingMainBucket() {
+  return heldItem === HELD_ITEM_BUCKET && (!heldBucketId || heldBucketId === MAIN_BUCKET_ID);
+}
+
+function isHoldingExtraBucket() {
+  return heldItem === HELD_ITEM_BUCKET && heldBucketId && heldBucketId !== MAIN_BUCKET_ID;
+}
+
 function isMainBucketOnGroundForPickup() {
-  if (!bucket || heldItem === HELD_ITEM_BUCKET) return false;
+  if (!bucket || isHoldingMainBucket()) return false;
   const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
   if (heldBy && heldBy !== currentSessionId) return false;
   return true;
@@ -4148,6 +4204,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
   hydrateTradeMasterDialogueComplete(getStoredFlag(tradeMasterDialogueCompleteKey));
+  hydrateAlchemyMasterDialogueComplete(getStoredFlag(alchemyMasterDialogueCompleteKey));
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
   isGuideBookClickPromptActive =
@@ -4273,6 +4330,10 @@ function applyDefaultState(options) {
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
   heldItem = null;
+  heldBucketId = "";
+  heldExtraBucketMainX = 0;
+  heldExtraBucketMainY = 0;
+  heldExtraBucketMainIsFull = false;
   plantingInventorySeedId = null;
 
   plantRuntime.spotX = 0;
@@ -4374,17 +4435,23 @@ function applyDefaultState(options) {
   });
   hasSeededInitialButterflies = false;
   magicPowderCount = 0;
+  rockInventoryCount = 0;
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     delete butterflyLocalCatchTombstoneById[id];
   });
   saveButterflyCaughtCounts();
   saveMagicPowderCount();
+  saveRockInventoryCount();
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
 
   wellState.water = maxWellWater;
   wellState.lastRefillAt = Date.now();
   isBucketFull = false;
+  heldBucketId = "";
+  heldExtraBucketMainX = 0;
+  heldExtraBucketMainY = 0;
+  heldExtraBucketMainIsFull = false;
   bucketX = wellX - BUCKET_SIZE - 8;
   bucketY = wellY + WELL_SIZE - BUCKET_SIZE;
 
@@ -4607,19 +4674,27 @@ function tryPickSharedBucket(bucketDistance) {
   const bucketSize = getBucketSize();
   const pickInfo = getNearestGroundBucketPickInfo();
   const dist = pickInfo ? pickInfo.distance : bucketDistance;
-  if (dist > pickupDistance || !canPickUpSharedBucket()) {
+  if (
+    dist > pickupDistance ||
+    (pickInfo && pickInfo.type === "main" && !canPickUpSharedBucket())
+  ) {
     return false;
   }
   if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12) {
     flashOnboardingOrderHint("");
     return true;
   }
+  heldBucketId = MAIN_BUCKET_ID;
   if (pickInfo && pickInfo.type === "extra" && Array.isArray(appleState.worldExtraBuckets)) {
     const extraIndex = appleState.worldExtraBuckets.findIndex(function (entry) {
       return entry && String(entry.id) === String(pickInfo.id);
     });
     if (extraIndex >= 0) {
       const extra = appleState.worldExtraBuckets[extraIndex];
+      heldBucketId = String(extra.id || pickInfo.id || "");
+      heldExtraBucketMainX = bucketX;
+      heldExtraBucketMainY = bucketY;
+      heldExtraBucketMainIsFull = Boolean(isBucketFull);
       isBucketFull = Boolean(extra.isFull);
       appleState.worldExtraBuckets.splice(extraIndex, 1);
       if (extra._el) {
@@ -4633,9 +4708,11 @@ function tryPickSharedBucket(bucketDistance) {
   bucketY = handPosition.y;
   heldItem = HELD_ITEM_BUCKET;
   lastBucketPickupAt = Date.now();
-  window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
+  window.OVC_SHARED_BUCKET_HELD_BY = heldBucketId === MAIN_BUCKET_ID ? currentSessionId : "";
   markWorldDirty();
-  broadcastBucketState(true);
+  if (heldBucketId === MAIN_BUCKET_ID) {
+    broadcastBucketState(true);
+  }
   syncWorldState(true);
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
@@ -4669,9 +4746,11 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
+    rockInventoryCount += 1;
     lastLocalWorldRockPickupAt = Date.now();
     flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
     plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
+    saveRockInventoryCount();
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
@@ -4767,9 +4846,11 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
       appleState.worldRockPickedIds.push(nearestRock.rock.id);
     }
+    rockInventoryCount += 1;
     lastLocalWorldRockPickupAt = Date.now();
     flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
     plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
+    saveRockInventoryCount();
     saveAppleState();
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
@@ -5713,6 +5794,10 @@ function loadBucketState() {
       bucketY = Number.isFinite(Number(saved.bucketY)) ? Number(saved.bucketY) : bucketY;
     }
     heldItem = null;
+    heldBucketId = "";
+    heldExtraBucketMainX = 0;
+    heldExtraBucketMainY = 0;
+    heldExtraBucketMainIsFull = false;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
   } catch (error) {
     removeStoredValue(bucketStateKey);
@@ -5926,7 +6011,10 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
 
 function getSharedWorldSnapshot() {
   flushPassiveSimulationBeforeSharedSnapshot();
-  const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
+  const bucketHeldBy = isHoldingMainBucket() ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
+  const snapshotBucketX = isHoldingExtraBucket() ? heldExtraBucketMainX : bucketX;
+  const snapshotBucketY = isHoldingExtraBucket() ? heldExtraBucketMainY : bucketY;
+  const snapshotBucketIsFull = isHoldingExtraBucket() ? heldExtraBucketMainIsFull : isBucketFull;
   const plantIndexBonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
   return {
     /** 멀?? ?물 ??스?프? 같? ?각축으??어 `rebasePlantModelTimestampsToLocalNow`??refTime?괴리 감소 */
@@ -5935,9 +6023,9 @@ function getSharedWorldSnapshot() {
     resetToken: pendingWorldResetToken || lastAppliedWorldResetToken || "",
     plantIndexBonus,
     bucket: {
-      x: bucketX,
-      y: bucketY,
-      isFull: isBucketFull,
+      x: snapshotBucketX,
+      y: snapshotBucketY,
+      isFull: snapshotBucketIsFull,
       heldBy: bucketHeldBy
     },
     well: {
@@ -6193,9 +6281,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
       const heldBy = String(snapshot.bucket.heldBy || "");
       const nextBucketX = Number(snapshot.bucket.x);
       const nextBucketY = Number(snapshot.bucket.y);
-      if (heldItem === HELD_ITEM_BUCKET) {
+      if (isHoldingMainBucket()) {
         // While local player is carrying the bucket, keep local ownership/state authoritative.
         window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
+      } else if (isHoldingExtraBucket()) {
+        window.OVC_SHARED_BUCKET_HELD_BY = heldBy === currentSessionId ? "" : heldBy;
       } else {
         window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
         if (heldBy !== currentSessionId) {
@@ -6930,10 +7020,43 @@ function dropExtraSeed() {
 function dropBucket() {
   const playerBox = getPlayerBox();
   const bucketSize = getBucketSize();
+  const dropX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
+  const dropY = playerBox.bottom - bucketSize.height;
 
-  bucketX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
-  bucketY = playerBox.bottom - bucketSize.height;
+  if (isHoldingExtraBucket()) {
+    if (!Array.isArray(appleState.worldExtraBuckets)) appleState.worldExtraBuckets = [];
+    const extraId = String(heldBucketId || "");
+    appleState.worldExtraBuckets.push({
+      id: extraId || ("world-bucket-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6)),
+      x: dropX,
+      y: dropY,
+      isFull: Boolean(isBucketFull)
+    });
+    bucketX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : bucketX;
+    bucketY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : bucketY;
+    heldItem = null;
+    heldBucketId = "";
+    heldExtraBucketMainX = 0;
+    heldExtraBucketMainY = 0;
+    isBucketFull = Boolean(heldExtraBucketMainIsFull);
+    heldExtraBucketMainIsFull = false;
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    rebuildWorldExtraBucketDom();
+    saveAppleState();
+    saveBucketState();
+    markWorldDirty();
+    syncWorldState(true);
+    onboardingHookDroppedBucketForTutorial();
+    return;
+  }
+
+  bucketX = dropX;
+  bucketY = dropY;
   heldItem = null;
+  heldBucketId = "";
+  heldExtraBucketMainX = 0;
+  heldExtraBucketMainY = 0;
+  heldExtraBucketMainIsFull = false;
   window.OVC_SHARED_BUCKET_HELD_BY = "";
   broadcastBucketState(true);
   saveBucketState();
@@ -8100,7 +8223,7 @@ function getBagInventoryCountsByKey() {
     seed: getBagInventorySeedCount(),
     overgrowthSeed: Math.max(0, Math.floor(Number(appleState.overgrowthSeedCount) || 0)),
     apple: Math.max(0, Number(appleState.count) || 0),
-    rock: Math.max(0, appleState.worldRockPickedIds ? appleState.worldRockPickedIds.length : 0),
+    rock: Math.max(0, Math.floor(Number(rockInventoryCount) || 0)),
     magicPowder: Math.max(0, Math.floor(magicPowderCount) || 0),
     "butterfly:brown": Math.max(0, Number(butterflyState.caughtCounts.brown) || 0),
     "butterfly:yellow": Math.max(0, Number(butterflyState.caughtCounts.yellow) || 0),
@@ -8112,12 +8235,10 @@ function removeOneBagItemForTrade(itemKey) {
   const counts = getBagInventoryCountsByKey();
   if (Number(counts[itemKey] || 0) <= 0) return false;
   if (itemKey === "rock") {
-    if (!Array.isArray(appleState.worldRockPickedIds) || !appleState.worldRockPickedIds.length) {
-      return false;
-    }
-    appleState.worldRockPickedIds.pop();
+    if (rockInventoryCount <= 0) return false;
+    rockInventoryCount = Math.max(0, Math.floor(Number(rockInventoryCount) || 0) - 1);
     updateBagInventorySlots();
-    saveAppleState();
+    saveRockInventoryCount();
     return true;
   }
   if (itemKey === "seed") {
@@ -8165,14 +8286,9 @@ function addBagItemsForTrade(itemKey, amount) {
   const n = Math.max(0, Math.floor(Number(amount) || 0));
   if (n <= 0) return;
   if (itemKey === "rock") {
-    if (!Array.isArray(appleState.worldRockPickedIds)) appleState.worldRockPickedIds = [];
-    for (let i = 0; i < n; i++) {
-      appleState.worldRockPickedIds.push(
-        "trade-ret-" + Date.now() + "-" + i + "-" + Math.random().toString(16).slice(2)
-      );
-    }
+    rockInventoryCount = Math.max(0, Math.floor(Number(rockInventoryCount) || 0)) + n;
     updateBagInventorySlots();
-    saveAppleState();
+    saveRockInventoryCount();
     return;
   }
   if (itemKey === "seed") {
@@ -8501,9 +8617,17 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
-    markWorldDirty();
-    broadcastBucketState(false);
-    bucket.style.display = "none";
+    if (isHoldingMainBucket()) {
+      markWorldDirty();
+      broadcastBucketState(false);
+      bucket.style.display = "none";
+    } else {
+      const mainX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : wellX - bucketSize.width - 8;
+      const mainY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : wellY + WELL_SIZE - bucketSize.height;
+      bucket.src = heldExtraBucketMainIsFull ? "?대?吏/bucket-full.png" : "?대?吏/bucket-empty.png";
+      bucket.style.display = "block";
+      setWorldPosition(bucket, mainX, mainY);
+    }
     playerBucketOverlay.style.display = "block";
     setWorldPosition(playerBucketOverlay, bucketX, bucketY);
   } else if (isBucketHeldByRemotePlayer) {
@@ -8522,13 +8646,17 @@ function updateBucketPosition() {
     broadcastBucketState(false);
   }
 
-  if (bucket.style.display === "block" && (!Number.isFinite(bucketX) || !Number.isFinite(bucketY))) {
+  if (
+    bucket.style.display === "block" &&
+    !isHoldingExtraBucket() &&
+    (!Number.isFinite(bucketX) || !Number.isFinite(bucketY))
+  ) {
     const bucketSize = getBucketSize();
     bucketX = wellX - bucketSize.width - 8;
     bucketY = wellY + WELL_SIZE - bucketSize.height;
   }
 
-  if (bucket.style.display === "block") {
+  if (bucket.style.display === "block" && !isHoldingExtraBucket()) {
     setWorldPosition(bucket, bucketX, bucketY);
     if (BUCKET_DEBUG_TRACE) {
       const mode =
@@ -9196,6 +9324,7 @@ function plantWorldOvergrowthSeedCount() {
       plantRuntime.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(plantRuntime);
       ensureGrassOrdinalIfNeeded(plantRuntime);
+      makePlantStableStage3FromOvergrowthSeed(plantRuntime, plantedAt);
       plantRuntime.blockSproutRegrowthAfterDry = false;
       plantRuntime.drySoilAt = null;
       plantSpot.style.display = "block";
@@ -9211,6 +9340,7 @@ function plantWorldOvergrowthSeedCount() {
       invPlant.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(invPlant);
       ensureGrassOrdinalIfNeeded(invPlant);
+      makePlantStableStage3FromOvergrowthSeed(invPlant, getSharedPlantSimulationNow());
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
@@ -9722,37 +9852,40 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverSignForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
-  restorePlantHoverLabelToWorldDom();
-  const anchor = getPlantWorldAnchorXY(plant);
-  if (!anchor) return;
+  if (plantCard && window.getComputedStyle(plantCard).display !== "none") {
+    hidePlantHoverLabel();
+    return;
+  }
   const label = getPlantWorldLabel(plant);
-  if (!String(label || "").trim()) {
+  const badTitle = getPlantSoilBadStateTitle(plant);
+  if (!String(label || "").trim() && !badTitle) {
     hidePlantHoverLabel();
     return;
   }
 
+  ensurePlantHoverLabelOnBodyForFixedUi();
   plantHoverLabel.classList.remove(
     "is-ui-shortcut-hint",
     "is-seed-inventory-hint",
-    "is-well-dock",
     "is-world-npc-name",
     "is-stage3-complete"
   );
-  plantHoverLabel.classList.add("is-plant-world-sign");
-  plantHoverLabel.style.position = "absolute";
-  plantHoverLabel.style.left = "";
+  plantHoverLabel.classList.add("is-well-dock", "is-plant-world-sign");
+  plantHoverLabel.style.position = "fixed";
+  plantHoverLabel.style.left = "auto";
   plantHoverLabel.style.top = "";
   plantHoverLabel.style.right = "";
-  plantHoverLabel.style.transform = "";
-  plantHoverLabel.style.zIndex = "85";
+  plantHoverLabel.style.transform = "none";
+  plantHoverLabel.style.zIndex = "11";
 
   plantHoverLabel.textContent = "";
-  const titleEl = document.createElement("div");
-  titleEl.className = "plant-world-sign-title";
-  titleEl.textContent = label;
-  plantHoverLabel.appendChild(titleEl);
+  if (String(label || "").trim()) {
+    const titleEl = document.createElement("div");
+    titleEl.className = "plant-world-sign-title";
+    titleEl.textContent = label;
+    plantHoverLabel.appendChild(titleEl);
+  }
 
-  const badTitle = getPlantSoilBadStateTitle(plant);
   const detailEl = document.createElement("div");
   detailEl.className = "plant-world-sign-water";
   if (badTitle) {
@@ -9771,12 +9904,6 @@ function showPlantHoverSignForPlant(plant) {
   plantHoverLabel.appendChild(detailEl);
 
   plantHoverLabel.style.display = "flex";
-  void plantHoverLabel.offsetWidth;
-  const lw = groundScreenPxToWorldX(plantHoverLabel.offsetWidth || 36);
-  const lh = groundScreenPxToWorldY(plantHoverLabel.offsetHeight || 18);
-  const lx = anchor.x + PLANT_SPOT_WIDTH / 2 - lw / 2;
-  const ly = anchor.y - lh - 3;
-  setWorldPosition(plantHoverLabel, lx, ly);
   applyPlantHoverVisuals(plant);
 }
 
@@ -9791,7 +9918,10 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
 
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (!plant || !canWaterPlantByClick(plant)) return false;
-  if (!isPlayerNearPlantWorld(plant)) return false;
+  if (!isPlayerNearPlantWorld(plant)) {
+    flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+    return false;
+  }
 
   const target = plantToWateringTarget(plant);
   const anchor = getPlantWorldAnchorXY(plant);
@@ -10222,7 +10352,28 @@ function useBucket() {
   }
 
 
-  // ??동?인??급수???물???고 ?물??가?? ?붓?불? ?내 + ?플?시??드?
+  if (wateringTarget) {
+    if (
+      !getStoredFlag(onboardingFlowDoneKey) &&
+      onboardingFlowStep === 14 &&
+      wateringTarget.type === "main"
+    ) {
+      onboardingFlowStep = 15;
+      persistOnboardingStep();
+    }
+    waterPlant(wateringTarget);
+    triggerWaterSplash();
+    isBucketFull = false;
+    markWorldDirty();
+    broadcastBucketState(false);
+    syncWorldState(true);
+    updateBucketPosition();
+    updatePlantState();
+    updateExtraSeedsAndPlants();
+    return;
+  }
+
+  // 찬 양동이인데 급수할 식물이 없고 우물이 가득: 되붓기 불가 안내 + 스플래시로 피드백.
   if (nearWellPour && wellState.water >= maxWellWater) {
     triggerWaterSplash();
     flashPlantProximityWarning(
@@ -10231,9 +10382,6 @@ function useBucket() {
     updatePlayerStatus();
     return;
   }
-
-  triggerWaterSplash();
-  isBucketFull = false;
 }
 
 function getNearestPlantForMagicPowder() {
@@ -10353,27 +10501,22 @@ function getNearestWateringTarget() {
     plantRuntime.isSeedPlanted &&
     plantRuntime.status !== "rotten" &&
     plantRuntime.status !== "dry" &&
-    !plantRuntime.isOverwatered
+    !plantRuntime.isOverwatered &&
+    isPlayerNearPlantWorld(plantRuntime)
   ) {
-    const distance = getCenterDistance(
-      plantRuntime.spotX,
-      plantRuntime.spotY,
-      PLANT_SPOT_WIDTH,
-      PLANT_SPOT_HEIGHT
-    );
-    if (distance <= plantWaterDistance) {
-      nearest = {
-        type: "main",
-        plant: plantRuntime,
-        distance
-      };
-    }
+    const distance = getPlayerDistanceToPlant(plantRuntime);
+    nearest = {
+      type: "main",
+      plant: plantRuntime,
+      distance
+    };
   }
 
   appleState.extraPlants.forEach(function (plant) {
     if (plant.status === "rotten" || plant.isOverwatered || plant.status === "dry") return;
-    const distance = getCenterDistance(plant.x, plant.y, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
-    if (distance <= plantWaterDistance && (!nearest || distance < nearest.distance)) {
+    if (!isPlayerNearPlantWorld(plant)) return;
+    const distance = getPlayerDistanceToPlant(plant);
+    if (!nearest || distance < nearest.distance) {
       nearest = {
         type: "extra",
         plant,
@@ -10968,8 +11111,10 @@ function updateNpcPosition() {
     if (isAlchemyMasterVisible()) {
       alchemyMaster.style.display = "block";
       setWorldPosition(alchemyMaster, ALCHEMY_MASTER_START_X, ALCHEMY_MASTER_START_Y);
+      updateAlchemyNpcPrompt();
     } else {
       alchemyMaster.style.display = "none";
+      if (alchemyMasterBubble) alchemyMasterBubble.style.display = "none";
     }
   }
 
@@ -10991,7 +11136,10 @@ function updatePlayerBubblePosition() {
     PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD;
   playerBubble.classList.toggle(
     "is-in-front-of-name",
-    Boolean(isNpcDialogueRunning && playerBubble.style.display === "block")
+    Boolean(
+      (isNpcDialogueRunning || isAlchemyMasterDialogueRunning()) &&
+        playerBubble.style.display === "block"
+    )
   );
   setPlayerBubbleWorldPosition(
     playerWorldLeft + PLAYER_WIDTH / 2 - bw / 2,
@@ -11000,7 +11148,7 @@ function updatePlayerBubblePosition() {
 }
 
 function updateNpcPrompt() {
-  if (isNpcDialogueRunning) return;
+  if (isNpcDialogueRunning || isAlchemyMasterDialogueRunning()) return;
 
   if (isNearPlantMaster()) {
     if (npcBubble.dataset.promptShown === "true") return;
@@ -11837,9 +11985,19 @@ function toggleWorldChatPanel() {
 function sanitizeWorldChatText(raw) {
   let s = String(raw || "")
     .trim()
-    .replace(/[\u0000-\u001F<>]/g, "");
+    .replace(/[\u0000-\u001F]/g, "");
   if (s.length > WORLD_CHAT_MAX_CHARS) s = truncateWorldChatString(s, WORLD_CHAT_MAX_CHARS);
   return s;
+}
+
+function isKnownWorldChatRecipientName(rawName) {
+  const want = nameForIngameUiDisplay(rawName);
+  if (!want) return false;
+  if (want === nameForIngameUiDisplay(accountDisplayNameForUi())) return true;
+  return Object.keys(remotePlayers).some(function (rid) {
+    const rp = remotePlayers[rid];
+    return want === nameForIngameUiDisplay(rp && rp.name ? rp.name : "");
+  });
 }
 
 /**
@@ -11868,6 +12026,13 @@ function parseWorldChatComposition(raw) {
   }
   if (parts.length === 1 && parts[0] === "\uC804\uCCB4") {
     return { kind: "world", body: right };
+  }
+  if (
+    parts.some(function (part) {
+      return !isKnownWorldChatRecipientName(part);
+    })
+  ) {
+    return { kind: "world", body: s };
   }
   return { kind: "whisper", recipientNames: parts, body: right };
 }
@@ -12889,7 +13054,7 @@ function broadcastBucketState(forceSend) {
 
   const payload = {
     id: currentSessionId,
-    held: heldItem === HELD_ITEM_BUCKET,
+    held: isHoldingMainBucket(),
     x: bucketX,
     y: bucketY,
     isFull: isBucketFull,
@@ -13764,6 +13929,11 @@ function loadMagicPowderCount() {
   magicPowderCount = Math.max(0, Math.floor(raw));
 }
 
+function loadRockInventoryCount() {
+  const raw = Number(getStoredValue(rockInventoryCountKey) || 0);
+  rockInventoryCount = Math.max(0, Math.floor(raw));
+}
+
 function saveButterflyCaughtCounts() {
   setStoredValue(
     butterflyCaughtCountsKey,
@@ -13773,6 +13943,10 @@ function saveButterflyCaughtCounts() {
 
 function saveMagicPowderCount() {
   setStoredValue(magicPowderCountKey, String(Math.max(0, Math.floor(magicPowderCount))));
+}
+
+function saveRockInventoryCount() {
+  setStoredValue(rockInventoryCountKey, String(Math.max(0, Math.floor(rockInventoryCount))));
 }
 
 function getTotalCaughtButterflies() {
@@ -14960,6 +15134,7 @@ try {
     loadPlayerPosition();
     loadButterflyCaughtCounts();
     loadMagicPowderCount();
+    loadRockInventoryCount();
     updateBagInventorySlots();
     updateMagicPowderInventoryUi();
     addNetworkDebugLog(
