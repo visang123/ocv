@@ -1,4 +1,4 @@
-/** @typedef {{ id: string, label: string, outputKey: string, inputs: Record<string, number> }} AlchemyCraftRecipe */
+/** @typedef {{ id: string, label: string, outputKey: string, outputAmount?: number, inputs: Record<string, number> }} AlchemyCraftRecipe */
 
 /** @type {AlchemyCraftRecipe[]} */
 export const ALCHEMY_CRAFT_RECIPES = [
@@ -19,6 +19,27 @@ export const ALCHEMY_CRAFT_RECIPES = [
     label: "\uAC08\uC0C9 \uB9C8\uBC95\uC758 \uAC00\uB8E8",
     outputKey: "magicPowderBrown",
     inputs: { "butterfly:brown": 10 }
+  },
+  {
+    id: "powderYellowRevert",
+    label: "\uB178\uB780 \uB098\uBE44 8\uB9C8\uB9AC",
+    outputKey: "butterfly:yellow",
+    outputAmount: 8,
+    inputs: { magicPowderYellow: 1 }
+  },
+  {
+    id: "powderWhiteRevert",
+    label: "\uD558\uC580 \uB098\uBE44 8\uB9C8\uB9AC",
+    outputKey: "butterfly:white",
+    outputAmount: 8,
+    inputs: { magicPowderWhite: 1 }
+  },
+  {
+    id: "powderBrownRevert",
+    label: "\uAC08\uC0C9 \uB098\uBE44 8\uB9C8\uB9AC",
+    outputKey: "butterfly:brown",
+    outputAmount: 8,
+    inputs: { magicPowderBrown: 1 }
   },
   {
     id: "powderMixed",
@@ -54,6 +75,9 @@ export const ALCHEMY_CRAFT_INPUT_KEYS = new Set([
   "overgrowthSeed",
   "apple",
   "magicPowder",
+  "magicPowderYellow",
+  "magicPowderWhite",
+  "magicPowderBrown",
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"

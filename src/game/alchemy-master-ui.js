@@ -585,20 +585,22 @@ function confirmAlchemyCraft() {
   ) {
     return;
   }
-  if (host.canAddBagItems && !host.canAddBagItems({ [recipe.outputKey]: 1 })) {
+  const outputAmount = Math.max(1, Math.floor(Number(recipe.outputAmount) || 0) || 1);
+  if (host.canAddBagItems && !host.canAddBagItems({ [recipe.outputKey]: outputAmount })) {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
   }
   requirementSlotFills = [];
   requirementSlotDefs = [];
   requirementsVisible = false;
-  host.addBagItems(recipe.outputKey, 1);
+  host.addBagItems(recipe.outputKey, outputAmount);
   closeAlchemyCraftPanelKeepInventory();
   spawnAlchemyCraftSmoke();
   showAlchemyCraftFinishLine();
   host.updateBagInventorySlots();
   if (host.saveCraftFurnitureCounts) host.saveCraftFurnitureCounts();
   if (host.saveColoredMagicPowderCounts) host.saveColoredMagicPowderCounts();
+  if (host.saveButterflyCaughtCounts) host.saveButterflyCaughtCounts();
   host.markWorldDirty();
 }
 

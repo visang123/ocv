@@ -240,9 +240,9 @@ export const appleEatMs = 3 * SECOND_MS;
 /** Planting (any seed) locks movement and shows status for this long (ms). */
 export const plantActionMs = 3 * SECOND_MS;
 export const appleRespawnMs = 90 * SECOND_MS;
-/** index + 온보딩 완료: 월드 공용 땅 씨앗 1슬롯 — 줍은 뒤 같은 좌표에서 10초 뒤 리스폰 */
+/** index + 온보딩 완료: 월드 공용 땅 씨앗 1슬롯 — 줍은 뒤 같은 좌표에서 5초 뒤 리스폰 */
 export const WORLD_LOOSE_SEED_ID = "world-loose-seed";
-export const WORLD_LOOSE_SEED_RESPAWN_MS = 10 * SECOND_MS;
+export const WORLD_LOOSE_SEED_RESPAWN_MS = 5 * SECOND_MS;
 /**
  * 월드 허브 느슨 씨 슬롯 좌표 = 튜토 땅 씨(SEED_START)와 동일.
  * 동작 차이는 src/game/groundSeed.js · script pickUp 분기 참고.

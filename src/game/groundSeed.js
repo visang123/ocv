@@ -78,6 +78,27 @@ export function scheduleWorldLooseRespawnAfterPickup(worldLooseSeed, nowMs) {
   worldLooseSeed.nextSpawnAt = nowMs + WORLD_LOOSE_SEED_RESPAWN_MS;
 }
 
+/**
+ * 멀티 스냅샷/브로드캐스트로 nextSpawnAt은 리스폰됐는데 pickup lock만 남아
+ * 씨앗이 보이지만 E로 못 줍는 경우를 정리한다.
+ */
+export function reconcileWorldLoosePickupLock(worldLooseSeed, lockUntilMs, nowMs) {
+  const nextSpawnAt = Math.max(0, Number(worldLooseSeed && worldLooseSeed.nextSpawnAt) || 0);
+  const lockUntil = Math.max(0, Number(lockUntilMs) || 0);
+  if (nowMs >= nextSpawnAt && lockUntil > nowMs) {
+    return nextSpawnAt;
+  }
+  return lockUntil;
+}
+
+export function canPickWorldLooseSeedAt(worldLooseSeed, lockUntilMs, nowMs) {
+  if (!isWorldLooseSpawnReady(nowMs, worldLooseSeed && worldLooseSeed.nextSpawnAt)) {
+    return false;
+  }
+  const lockUntil = reconcileWorldLoosePickupLock(worldLooseSeed, lockUntilMs, nowMs);
+  return nowMs >= lockUntil;
+}
+
 /** getNearestPickableExtraSeed 등에서 쓰는 합성 후보(worldLoosePick) 판별 */
 export function isWorldLooseSyntheticPickupCandidate(seedLike) {
   if (!seedLike || typeof seedLike !== "object") return false;

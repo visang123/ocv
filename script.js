@@ -9,10 +9,12 @@ import {
   isOverlappingRect
 } from "./src/world/collision.js";
 import {
+  canPickWorldLooseSeedAt,
   createDefaultWorldLooseSeedRecord,
   isWorldLooseSpawnReady,
   isWorldLooseSyntheticPickupCandidate,
   normalizeWorldLooseSeedRecord,
+  reconcileWorldLoosePickupLock,
   scheduleWorldLooseRespawnAfterPickup
 } from "./src/game/groundSeed.js";
 import {
@@ -458,16 +460,16 @@ let onboardingFinalHideTimerId = null;
 let onboardingButterflyCountBaseline = null;
 let onboardingTutorialEnteredTree = false;
 let onboardingSeedTutorialSecondLine = false;
-/** 25?계: 0 = ?매 ?내(2?, 1 = ?앗 ?용 ?내 */
+/** 25단계: 0 = 열매 안내(2초), 1 = 씨앗 사용 안내 */
 let onboardingPostAppleSeedIntroPhase = 0;
 let onboardingFruitIntroTimerId = null;
-/** 16?계: 0 = 축하 문구, 1 = ?어???내(????텝? 계속 16) */
+/** 16단계: 0 = 축하 문구, 1 = 이어서 안내(저장 스텝은 계속 16) */
 let onboardingPostWaterCongratsPhase = 0;
 const ONBOARDING_MAX_STEP = 27;
-/** tutorial.html: ?의 ?토리얼 ?앗???라????시 ?기까?(ms) */
+/** tutorial.html: 땅의 튜토리얼 씨앗이 사라진 뒤 다시 놓기까지(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
 let tutorialMainSeedRespawnTimerId = null;
-/** ????리스???후?는 ?벤·?앗 ?보???두?강조 ?략(??이?만). */
+/** 땅 씨 리스폰 이후에는 인벤·씨앗 온보딩 테두리 강조 생략(첫 사이클만). */
 let tutorialMainSeedRegenCompleted = false;
 let onboardingStep26OpenedSettingsWithEsc = false;
 let tutorialWorldNeedsFullReset = false;
@@ -501,7 +503,7 @@ let lastPickupToggleAt = 0;
 let lastWorldRockRespawnAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
-const guidePlaceholderHtml = "<p>?직 ?용???습?다!</p>";
+const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
 let cameraX = 0;
@@ -521,7 +523,7 @@ const guideBookClickPromptDismissedKeyBase = "ovcGuideBookClickPromptDismissedV1
 const currentSessionTokenKey = "ovcCurrentSessionTokenV1";
 const currentSessionKey = "ovcCurrentSessionV1";
 const loginHandoffKey = "ovcLoginHandoffV1";
-/** ???위 로그???원(ovc-login.js? ?일 ??. ?으?localStorage보다 ?선 */
+/** 탭 단위 로그인 신원(ovc-login.js와 동일 키). 있으면 localStorage보다 우선 */
 const ovcSessionUserIdKey = "ovcSessionUserIdV1";
 const ovcSessionUserNameKey = "ovcSessionUserNameV1";
 const ovcSessionTokenKey = "ovcSessionTokenV1";
@@ -715,7 +717,7 @@ function clearMainSeedPickedForCurrentRoom() {
   setStoredFlag(storageKeyMainSeedPickedForRoom(), false);
 }
 
-/** ??된 ?벤???????앗???으??드 메인 ?앗??기(리로????중복 방?) */
+/** 월드된 인벤에만 씨앗이 있으면 월드 메인 씨앗 숨기(리로드 시 중복 방지) */
 function syncMainSeedPickedStateFromLoadedExtraSeeds() {
   var found = false;
   appleState.extraSeeds.forEach(function (s) {
@@ -810,7 +812,7 @@ function setTutorialSessionWorldGuideBookOffGroundPicked() {
   } catch (e) {}
 }
 
-/** ?드(index): 로컬 ??? ?토리얼: ?번 ?이지 방문(session)????드? 별도. */
+/** 월드(index): 로컬 저장. 튜토리얼: 이번 페이지 방문(session)만 — 월드와 별도. */
 function isWorldFloorBagHiddenForCurrentView() {
   return shouldHideWorldFloorBagMesh(
     isWorldDocumentEntry,
@@ -829,7 +831,7 @@ function isWorldFloorGuideBookHiddenForCurrentView() {
   return tutorialSessionWorldGuideBookOffGroundPicked();
 }
 
-/** 가?UI ?롯?????바닥 책을 줍기 ?에??0(가방만 줍? 직후 ?벤? 비어 ?음). */
+/** 가방 UI 슬롯이 비면 바닥 책을 줍기 전에 0(가방만 줍은 직후 인벤이 비어 있음). */
 function hasGuideBookItemInBagCounts() {
   if (isWorldDocumentEntry()) {
     return hasPickedWorldGuideBookOffGroundInCurrentRoom();
@@ -995,7 +997,7 @@ function getPlantFogClearRectForCurrentScore() {
   return getPlantFogClearRectWorldPx(stage);
 }
 
-/** ?각??맑? 구역보다 ?동 ?용???간 ?? ?기 ?에 막히???낌??줄임 */
+/** 시각적 맑은 구역보다 이동 적용을 약간 늦게 막기 전에 막히는 느낌을 줄임 */
 function getPlantFogClearRectForMovementClamp() {
   return getPlantFogClearRectForCurrentScore();
 }
@@ -1320,9 +1322,9 @@ const WORLD_CHAT_LOG_CAP = 80;
 const WORLD_CHAT_HEAD_BUBBLE_MS = 10000;
 const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
-/** 로컬·멀??presence?????집 ?태 ?시 길이(?격? rock_pickup 종료 ??hold 별도) */
+/** 로컬·멀티 presence의 돌 수집 상태 표시 길이(원격은 rock_pickup 종료 후 hold 별도) */
 const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
-/** ?격 ?레?어: rock_pickup ?션???긴 ???태 ?스?? ????ms(?른 ?션? REMOTE_ACTION_STATUS_HOLD_MS) */
+/** 원격 플레이어: rock_pickup 액션이 끊긴 뒤 상태 텍스트를 유지할 ms(다른 액션은 REMOTE_ACTION_STATUS_HOLD_MS) */
 const WORLD_ROCK_REMOTE_STATUS_TAIL_MS = 0;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const REMOTE_PLAYER_SMOOTHING_MS = 130;
@@ -1353,14 +1355,14 @@ function createOvcSadFaceElement() {
     '<span class="ovc-sad-face__tear ovc-sad-face__tear--r"></span>';
   return face;
 }
-/** ?체 채팅 ?두(???는 모두?게 ?시). */
+/** 전체 채팅 접두(보이는 모두에게 표시). */
 const WORLD_CHAT_GLOBAL_PREFIX = "\uC804\uCCB4:";
-/** ?각 콜론(U+FF1A) ?을 반각(U+003A)?로 ?일 ??IME·모바?에??귓말/?체 구문??깨?지 ?게 */
+/** 전각 콜론(U+FF1A) 을 반각(U+003A)으로 통일 — IME·모바일에서 귓말/전체 구문이 깨지지 않게 */
 function normalizeWorldChatColonsForParsing(str) {
   return String(str || "").replace(/\uFF1A/g, ":");
 }
 
-/** UTF-16 ?로게이????중간?서 ?리지 ?게 ?름 */
+/** UTF-16 서로게이트를 중간에서 자르지 않게 자름 */
 function truncateWorldChatString(s, maxLen) {
   const n = Math.max(0, Number(maxLen) || 0);
   if (!s || s.length <= n) return s;
@@ -1429,7 +1431,7 @@ let lastLocalWorldRockPickupAt = 0;
 const butterflyLocalCatchTombstoneById = {};
 const BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS = 8000;
 let syncEventDedupeStore = null;
-/** ???환·백그?운????복? ?????레?에 ??간??건너?면 ?비 경로가 ?간?동처럼 보임 ???이?인??리셋 */
+/** 탭 전환·백그라운드 복귀 시 플레이어에 큰 간격이 건너뛰면 나비 경로가 순간이동처럼 보임 — 시뮬레인 리셋 */
 let lastButterflyWallClockMs = 0;
 let gameLoopCyclesForTutorialSync = 0;
 const butterflyState = {
@@ -1478,7 +1480,7 @@ let craftFurnitureCounts = {
 let placedCraftFurniture = [];
 /** @type {{ yellow: number, white: number, brown: number, mixed: number }} */
 let coloredMagicPowderCounts = { yellow: 0, white: 0, brown: 0, mixed: 0 };
-/** 관리자 ?버? ?물지???시·?개 ?에?가???제 ?물 ?산?별개) */
+/** 관리자 서버: 식물지수 표시·해제 시에만 실제 식물 산출(별개) */
 let adminDebugPlantIndexBonus = 0;
 let ignoreSnapshotInventorySeedsUntil = 0;
 let lastPresenceDbSyncAt = 0;
@@ -1542,7 +1544,7 @@ let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
 let hasHydratedSharedWorldFromServer = false;
 let pendingWorldResetToken = "";
-/** ?션??면 ??????비어 공유 리셋?로 ?인 ??appStorageKeysSharedWorldReset?로 가??래그까지 지?짐. local??기?? */
+/** 세션 끊기면 비어 공유 리셋으로 인식 — appStorageKeysSharedWorldReset으로 가방 플래그까지 지워짐. local은 기존 */
 const ovcLastWorldResetTokenStorageKey = "ovcLastWorldResetTokenV1";
 
 function readOvcLastAppliedWorldResetTokenFromStores() {
@@ -1590,7 +1592,7 @@ let networkDebugDomStale = false;
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
 ground.appendChild(playerBucketOverlay);
-/** 버킷 ?트?크 로그 ???요???만 true */
+/** 버킷 스택 로그 — 필요할 때만 true */
 const BUCKET_DEBUG_TRACE = false;
 const playerTintCache = new Map();
 const playerBaseImage = new Image();
@@ -1628,7 +1630,7 @@ const appleState = createAppleState([
 ]);
 let worldLooseSeedElement = null;
 
-/** index ?드 + ?보???료: ???앗? worldLooseSeed·seedCount ?책 (src/game/groundSeed.js 참고). */
+/** index 월드 + 튜토리얼: 땅 씨앗은 worldLooseSeed·seedCount 정책 (src/game/groundSeed.js 참고). */
 function usesWorldLooseSeedMode() {
   return isWorldDocumentEntry() && getStoredFlag(onboardingFlowDoneKey);
 }
@@ -1647,7 +1649,17 @@ function isWorldLooseSeedVisibleAt(now) {
   return isWorldLooseSpawnReady(now, appleState.worldLooseSeed.nextSpawnAt);
 }
 
-/** ?드 ?슨 ?앗 모드: 중복 id·과도??seedCount ?리 */
+function syncWorldLoosePickupLock(now) {
+  if (!usesWorldLooseSeedMode()) return;
+  ensureWorldLooseSeedShape();
+  worldLoosePickupLockUntil = reconcileWorldLoosePickupLock(
+    appleState.worldLooseSeed,
+    worldLoosePickupLockUntil,
+    now
+  );
+}
+
+/** 월드 느슨 씨앗 모드: 중복 id·과도한 seedCount 정리 */
 function sanitizeWorldLooseModeExtraSeeds() {
   if (!usesWorldLooseSeedMode()) return false;
   let changed = false;
@@ -1673,28 +1685,28 @@ const spawnPortalX = SPAWN_PORTAL_X;
 const spawnPortalY = SPAWN_PORTAL_Y;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = getMinGroundedPlayerDepth();
-/** ?무 ?로 ?용 범위??어?릴 ???레?당 최? 변??(?간?동 ?낌 ?화) */
+/** 나무 위로 이동 범위를 넓힐 때 플레이당 최대 변위(순간이동 느낌 완화) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 4;
 /**
- * 보이??뿌리?= style.css .big-tree-roots (left 39, w 68, h 16, bottom -2).
- * ?체 기둥 박스?겹치???지?갈 ??몸통?겹쳐???무 모드??어가 ?간?동처럼 보임 ??발·뿌리만 검??
+ * 보이는 뿌리만 = style.css .big-tree-roots (left 39, w 68, h 16, bottom -2).
+ * 전체 기둥 박스로 겹치면 옆 지나갈 때 몸통만 겹쳐도 나무 모드로 들어가 순간이동처럼 보임 → 발·뿌리만 검사.
  */
 const TREE_CSS_ROOTS_LEFT = 39;
 const TREE_CSS_ROOTS_WIDTH = 68;
 const TREE_CSS_ROOTS_HEIGHT = 16;
 const TREE_CSS_ROOTS_BOTTOM_EXTEND = 2;
-/** ?레?어·NPC 공통: 머리 ?선?말풍???이(?드 ?위) */
+/** 플레이어·NPC 공통: 머리 윗선과 말풍선 사이(월드 단위) */
 const SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 4;
-/** NPC 말풍?? 머리???간격(?레?어보다 좁게) */
+/** NPC 말풍선: 머리와의 간격(플레이어보다 좁게) */
 const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 0;
 /**
- * npcY???프?이??박스 ?선(?드 y가 ?을?록 ?면 ??.
- * PNG ?단 ?백만큼 ?래??려 ?제 머리 ???y.
+ * npcY는 스프라이트 박스 윗선(월드 y가 작을수록 화면 위).
+ * PNG 상단 여백만큼 아래로 내려 실제 머리 꼭대기 y.
  */
 const NPC_HEAD_TOP_TRIM_WORLD = 8;
-/** NPC 말풍?? ?수?수?y?줄여 머리 ??래)?로 ?동 */
+/** NPC 말풍선: 양수일수록 y를 줄여 머리 쪽(아래)으로 이동 */
 const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 4;
-/** ?레?어 말풍?만: ?네??머리 근처) ?에 ?실???리??드 ?위, ?수?말풍?????? */
+/** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
 const SPEECH_BUBBLE_SCREEN_NUDGE_Y_PX = 0;
 
@@ -1702,7 +1714,7 @@ function getActiveRemotePlayerCountForTick() {
   return countActiveRemotePlayers(remotePlayers, Date.now());
 }
 
-/** ?격 ?원??많을?록 ?링·???간격???간 ?려 DB·?라?언??부?? 줄임 */
+/** 원격 인원이 많을수록 폴링·저장 간격을 약간 늘려 DB·클라이언트 부하를 줄임 */
 function getMultiplayerWorldPollMinMs() {
   return getAdaptiveWorldPollMinMs(getActiveRemotePlayerCountForTick());
 }
@@ -1736,7 +1748,7 @@ function showThrottledWorldSyncToast(message) {
 
 const keys = createInputState();
 
-/** Other browser tabs use a different session id but the same account ??do not draw them as remotes. */
+/** Other browser tabs use a different session id but the same account — do not draw them as remotes. */
 function isRemotePresenceSameLoggedInAccount(state) {
   if (!state || !currentUserId) return false;
   const remoteUserId = state.userId != null ? String(state.userId).trim() : "";
@@ -1979,7 +1991,7 @@ function groundScreenPxToWorldX(px) {
   return (px * WORLD_WIDTH) / cw;
 }
 
-/** headTopWorldY: 캐릭??머리(?선) ?드 y. 말풍??transform 기? y(버블 ??? */
+/** headTopWorldY: 캐릭터 머리(윗선) 월드 y. 말풍선 transform 기준 y(버블 꼭대기) */
 function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld) {
   const gap =
     gapAboveHeadWorld != null ? gapAboveHeadWorld : SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD;
@@ -2026,7 +2038,7 @@ function layoutNpcSpeechBubble() {
   );
 }
 
-/** ?드(index) ?용: 공유 맵만 초기?? ?토리얼 ??값·tutorial.html ?동 ?음. */
+/** 월드(index) 전용: 공유 맵만 초기화, 튜토리얼 모드·tutorial.html 동기 없음. */
 function isWorldMapDevResetShortcut(event) {
   if (event.code !== "KeyR" || event.repeat) return false;
   if (!(event.ctrlKey || event.metaKey)) return false;
@@ -2313,7 +2325,7 @@ document.addEventListener("visibilitychange", function () {
     saveGameSnapshot();
     resetInputKeys(keys);
   } else {
-    // 백그?운??복? 직후 ???레?에??이??wallDelta가 비정?적?로 커??    // 비권???비 보간·최? ?텝 캡이 ??????것을 막음.
+    // 백그라운드 복귀 직후 한 프레임에만 쓰이는 wallDelta가 비정상적으로 커지면
     lastButterflyWallClockMs = 0;
     sendMultiplayerPresence(true);
   }
@@ -2619,6 +2631,7 @@ bindAlchemyMaster({
   showInventoryFullFail: showBagInventoryFullFailMessage,
   saveCraftFurnitureCounts: saveCraftFurnitureCounts,
   saveColoredMagicPowderCounts: saveColoredMagicPowderCounts,
+  saveButterflyCaughtCounts: saveButterflyCaughtCounts,
   markWorldDirty: markWorldDirty,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
@@ -2699,7 +2712,7 @@ seed.addEventListener("mouseleave", function () {
   isHoveringMainSeed = false;
 });
 
-/* 가?버튼(#world-bag-inventory) ?버??document ?인?로 ?기 ?트? ?기??*/
+/* 가방 버튼(#world-bag-inventory) 호버는 document 위임으로 처리 — 스크립트 주석 */
 if (plantHoverLabel) {
   document.addEventListener("pointermove", function (e) {
     syncPlantHoverFromPointerClient(e.clientX, e.clientY);
@@ -2855,15 +2868,15 @@ controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
   '<div class="controls-header"><strong>조작법</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / \u2191</span><p>?로 ?동</p></div>' +
-  '<div><span>A / \u2190</span><p>?쪽?로 ?동</p></div>' +
-  '<div><span>S / \u2193</span><p>?래??동</p></div>' +
-  '<div><span>D / \u2192</span><p>?른쪽으??동</p></div>' +
-  '<div><span>Space</span><p>?프</p></div>' +
-  '<div><span>E</span><p>줍기 / ?려?기</p></div>' +
+  '<div><span>W / \u2191</span><p>위로 이동</p></div>' +
+  '<div><span>A / \u2190</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / \u2193</span><p>아래로 이동</p></div>' +
+  '<div><span>D / \u2192</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>Space</span><p>점프</p></div>' +
+  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
   '<div><span>Q</span><p>사용 / 대화</p></div>' +
   '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
-  '<div><span>Esc</span><p>?정 ?기 / ?기</p></div>' +
+  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -2906,7 +2919,7 @@ function closeSettingsOverlayFromEscape() {
 }
 
 function skipTutorialFromSettings() {
-  if (!window.confirm("?토리얼??건너?고 ?유? ?레?할까요?")) {
+  if (!window.confirm("튜토리얼을 건너뛰고 자유롭게 플레이할까요?")) {
     return;
   }
   clearTutorialMainSeedRespawnTimer();
@@ -3078,7 +3091,7 @@ function getPlayerBox() {
   };
 }
 
-/** ?개 막힘 ?정: 발보??머리(?쪽)가 ?개???을 ?까지 ?동 ?용 */
+/** 안개 막힘 판정: 발보다 머리(위쪽)가 안개에 닿을 때까지 이동 허용 */
 function getPlayerHeadFogProbeBox() {
   return getPlayerHeadFogProbeBoxForPose(playerX, playerDepth, jumpY);
 }
@@ -3111,10 +3124,10 @@ function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) {
   };
 }
 
-/** rock-ground.svg(64×48) ??CSS `center bottom / contain` ??일?게 ?트박스 ?출 */
+/** rock-ground.svg(64×48) — CSS `center bottom / contain` 과 동일하게 히트박스 산출 */
 const ROCK_GROUND_SVG_W = 64;
 const ROCK_GROUND_SVG_H = 48;
-/** viewBox ?단 ??백 ?외 ?????어?잔?만(???y 18~44) */
+/** viewBox 상단 빈 여백 제외 — 돌 덩어리·잔디만(대략 y 18~44) */
 const ROCK_GROUND_HIT_LEFT = 10;
 const ROCK_GROUND_HIT_RIGHT = 54;
 const ROCK_GROUND_HIT_TOP = 19;
@@ -3134,7 +3147,7 @@ function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) {
   };
 }
 
-/** ry = ???소 ?선(?드). rockEl ?으??제 ?더 박스 기?(줌·CSS ?치) */
+/** ry = 돌 요소 윗선(월드). rockEl 있으면 실제 렌더 박스 기준(줌·CSS 일치) */
 function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) {
   const size = Number(sz) || WORLD_ROCK_SIZE;
   if (rockEl && ground && typeof rockEl.getBoundingClientRect === "function") {
@@ -3203,13 +3216,16 @@ function getCenterDistance(x, y, width, height) {
   return getCenterDistanceUtil(getPlayerBox(), x, y, width, height);
 }
 
-function getHandPosition(itemWidth, itemHeight) {
-  const playerBox = getPlayerBox();
-
+function getHandPositionFromPlayerPose(playerWorldX, playerWorldY, itemWidth, itemHeight) {
+  const top = GROUND_WORLD_HEIGHT - PLAYER_HEIGHT + playerWorldY;
   return {
-    x: playerBox.left + playerBox.width * 0.82 - itemWidth / 2,
-    y: playerBox.top + playerBox.height * 0.68 - itemHeight / 2
+    x: playerWorldX + PLAYER_WIDTH * 0.82 - itemWidth / 2,
+    y: top + PLAYER_HEIGHT * 0.68 - itemHeight / 2
   };
+}
+
+function getHandPosition(itemWidth, itemHeight) {
+  return getHandPositionFromPlayerPose(playerX, getPlayerWorldY(), itemWidth, itemHeight);
 }
 
 function isNearSeed() {
@@ -3253,14 +3269,14 @@ function hasTutorialStarterSeedInPlay() {
 }
 
 /**
- * 메인 ?물 미심?데 '줍힘'??고 ?앗 추적???으????앗?????옴 ???래그·건??태 ?리
+ * 메인 작물 미심인데 '줍힘'만 남고 씨앗 추적이 없으면 땅 씨앗이 안 나옴 → 플래그·건조 상태 정리
  */
 function recoverWorldMainSeedIfOnboardingStuck() {
   if (plantRuntime.isSeedPlanted || plantRuntime.isPlanting) return;
   if (!hasPickedMainSeedInCurrentRoom()) return;
   if (hasTutorialStarterSeedInPlay()) return;
-  // 마른 메인 ?앗 ?동 ?거(updateSeedPosition)가 picked?켜고 ???? ????.
-  // ?기???래그? 지?면 ?앗???살?나 ??머가 ?원???나지 ?음.
+  // 마른 메인 씨앗 자동 제거(updateSeedPosition)가 picked만 켜고 스타터를 안 남김.
+  // 여기서 플래그를 지우면 씨앗이 되살아나 타이머가 영원히 끝나지 않음.
   if (hasHandledDryMainSeed) return;
   clearMainSeedPickedForCurrentRoom();
   isMainSeedAvailable = true;
@@ -3300,7 +3316,7 @@ function tutorialRespawnMainSeedOnGround() {
   syncWorldState(true);
 }
 
-/** Tutorial ?용: ??#seed ??extraSeeds ???? ?드 ?브?서???출?면 ????(groundSeed.js). */
+/** Tutorial 전용: 땅 #seed → extraSeeds 스타터. 월드 허브에서는 호출되면 안 됨 (groundSeed.js). */
 function createStarterSeedInventoryItem() {
   if (hasPickedMainSeedInCurrentRoom()) return null;
 
@@ -3344,8 +3360,36 @@ function isHoldingExtraBucket() {
   return heldItem === HELD_ITEM_BUCKET && heldBucketId && heldBucketId !== MAIN_BUCKET_ID;
 }
 
+function isMainBucketHeldByRemotePlayer() {
+  const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+  return Boolean(heldBy) && heldBy !== currentSessionId && !isHoldingMainBucket();
+}
+
+function syncMainBucketToRemoteHolderHand() {
+  const holderId = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+  const remotePlayer = remotePlayers[holderId];
+  if (!remotePlayer) return false;
+  const bucketSize = getBucketSize();
+  const hand = getHandPositionFromPlayerPose(
+    Number(remotePlayer.renderX ?? remotePlayer.targetX ?? remotePlayer.worldX ?? 0),
+    Number(remotePlayer.renderY ?? remotePlayer.targetY ?? remotePlayer.worldY ?? 0),
+    bucketSize.width,
+    bucketSize.height
+  );
+  bucketX = hand.x;
+  bucketY = hand.y;
+  return true;
+}
+
 /** 메인 양동이(땅·우물 옆)의 좌표·찬/빈 — 추가 양동이를 들고 있을 때는 별도 보관값 사용 */
 function getMainBucketGroundState() {
+  if (isMainBucketHeldByRemotePlayer()) {
+    return {
+      x: bucketX,
+      y: bucketY,
+      isFull: Boolean(isBucketFull)
+    };
+  }
   if (isHoldingExtraBucket()) {
     const bucketSize = getBucketSize();
     return {
@@ -3418,7 +3462,7 @@ function isNearWellForPouring() {
   return getCenterDistance(wellX, wellY, wellSize.width, wellSize.height) < wellPourDistance;
 }
 
-/** ?에 ???동??중심???물????가까운???레?어 발만?로??거리 밖으?????경우 */
+/** 손에 든 양동이 중심이 우물에 더 가까운데 플레이어 발만으로는 거리 밖으로 나가는 경우 */
 function isNearWellIncludingBucketReach() {
   if (isNearWell()) return true;
   if (heldItem !== HELD_ITEM_BUCKET) return false;
@@ -3454,7 +3498,8 @@ function isNearWellForPouringIncludingBucketReach() {
 }
 
 /**
- * ?동???각?과 ?물 ?각?이 ?제?겹치??(?유 px). 중심거리??면 ?·통???물 ?쪽?로 ?어? * ?레?에?도 '멀????? ?기 ?패 ??같? ?레?에 Q가 뿌리???? 분기?가??문제가 ??.
+ * 양동이 사각형과 우물 사각형이 실제로 겹치는지(여유 px). 중심거리만 쓰면 손·통이 우물 안쪽으로 들어간
+ * 프레임에서도 '멀다'고 나와 퍼기 실패 → 같은 프레임에 Q가 뿌리기(찬 통) 분기로 가는 문제가 생김.
  */
 function isBucketOverlappingWellForInteraction(padPx) {
   if (heldItem !== HELD_ITEM_BUCKET) return false;
@@ -3577,7 +3622,7 @@ function persistOnboardingStep() {
 
 let lastAccountTutorialDoneRequestAt = 0;
 
-/** ?크????로컬?토리?가 비어???버??tutorial_done???으?index?보내??해 계정???기??*/
+/** 시크릿 창 등 로컬스토리지가 비어도 서버에 tutorial_done이 있으면 index로 보내기 위해 계정에 동기화 */
 function requestAccountTutorialDoneSync(options) {
   const force = Boolean(options && options.force);
   if (!getStoredFlag(onboardingFlowDoneKey) || !currentUserId) {
@@ -3612,10 +3657,10 @@ function requestAccountTutorialDoneSync(options) {
 }
 
 /**
- * ?토리얼????번이?도 ?낸 계정? 로컬???료 ?태가 ?아???다(리로?·탭 종료·로그?웃/로그???에???드).
- * done ?래그만 ?실??경우 ????텝?로 복구?다.
- * - "0": ?상 ?료/건너?기 ????값
- * - 27(ONBOARDING_MAX_STEP): 축하 ?계 직후·7???머가 done???기 ?에 리로?된 경우
+ * 튜토리얼을 한 번이라도 끝낸 계정은 로컬에 완료 상태가 남아야 한다(리로드·탭 종료·로그아웃/로그인 후에도 월드).
+ * done 플래그만 유실된 경우 저장 스텝으로 복구한다.
+ * - "0": 정상 완료/건너뛰기 등의 값
+ * - 27(ONBOARDING_MAX_STEP): 축하 단계 직후·7초 타이머가 done을 쓰기 전에 리로드된 경우
  */
 function repairOnboardingCompletionFromStoredStep() {
   if (!currentUserId) return;
@@ -3638,7 +3683,7 @@ function repairOnboardingCompletionFromStoredStep() {
 }
 
 /**
- * ??번이?도 ?드????계정: ?튜?리???기???션???니??토리얼 미완??태? * 본게?으??돌린다(리로?·로그아??로그?·탭 ?환 ?에???드).
+ * 한 번이라도 월드에 들어온 계정: 튜토리얼 재생 세션이 아니면 튜토리얼 미완료 상태를 * 본게임으로 되돌린다(리로드·로그아웃/로그인·탭 전환 후에도 월드).
  */
 function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!currentUserId) return;
@@ -3682,7 +3727,7 @@ function isSharedWorldSyncPausedForTutorial() {
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
-/** index ?드 + ?보???료 + ?버 ?기?? 메인 ?롯???? ?으??고 ?기??extraPlants로만 추? */
+/** index 월드 + 온보딩 완료 + 서버 동기화: 메인 슬롯이 이미 있으면 들고 심기는 extraPlants로만 추가 */
 function isSharedWorldMultiPlantMode() {
   if (!isWorldDocumentEntry()) return false;
   if (!getStoredFlag(onboardingFlowDoneKey)) return false;
@@ -3909,8 +3954,8 @@ function flashOnboardingOrderHint(message) {
 }
 
 function onboardingAllowsBucketQUse() {
-  // 13: ?물?서 긷기, 14~15: 메인 ?물??붓기, 16+: ?비·?정 ???후?도 ?반 물주?가??
-  // ?전?는 13·15??용??14?서 붓기/16 ?후 Q가 무반?처??보이??문제가 ?었??
+  // 13: 우물에서 긷기, 14~15: 메인 작물에 붓기, 16+: 나비·설정 등 이후에도 일반 물주기 가능.
+  // 이전에는 13·15만 허용해 14에서 붓기/16 이후 Q가 무반응처럼 보이는 문제가 있었음.
   return onboardingFlowStep >= 13;
 }
 
@@ -4098,7 +4143,7 @@ function updateOnboardingFlowUI() {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
         movementTutorial.hideOverlay();
-        setOnboardingCalloutVisible(true, "E?? ?러 가방을 ???세??");
+        setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -4115,7 +4160,7 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        setOnboardingCalloutVisible(true, "?벤?리(??소)가 ?립?다.");
+        setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -4125,18 +4170,18 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "space바? ?르??프??니?? ?보?요!"
+        "space바를 누르면 점프를 합니다. 해보세요!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
-      setOnboardingCalloutVisible(true, "?앗?로 ?동?세??");
+      setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
-      setOnboardingCalloutVisible(true, "e?? ?러 ?앗?????세??");
+      setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
@@ -4153,7 +4198,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 8: {
-      setOnboardingCalloutVisible(true, "?물???인??찾아가?요.");
+      setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
@@ -4163,14 +4208,14 @@ function updateOnboardingFlowUI() {
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      setOnboardingCalloutVisible(true, "q??러 ?물???인???하?요.");
+      setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case 10: {
       if (guideOpen) {
-        const line1 = "?명??참고?세??";
-        const line2 = "esc ?는 ?무곳이???릭???명창을 ?으?요.";
+        const line1 = "설명을 참고하세요.";
+        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
           onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
@@ -4185,7 +4230,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 11: {
-      setOnboardingCalloutVisible(true, "?물근처???동?로 ?동?세??");
+      setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4193,7 +4238,7 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "?동??근처?가??E?? ?러 ?동?? ?어 주세??"
+        "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4201,19 +4246,19 @@ function updateOnboardingFlowUI() {
     case 13: {
       setOnboardingCalloutVisible(
         true,
-        "?물??동????Q?? ?러 물을 길어 주세??"
+        "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
       );
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(true, "그???까 ?? ?앗?로 가?요.");
+      setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "Q?? ?러 물을 뿌리?요.");
+      setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
@@ -4221,13 +4266,13 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPostWaterCongratsPhase === 0
-          ? "축하?니?? ?물 ?우??법을 배우?습?다."
-          : "?직 ?았?니???까지 진행?주?요."
+          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
+          : "아직 남았습니다 끝까지 진행해주세요."
       );
       break;
     }
     case 17: {
-      setOnboardingCalloutVisible(true, "E?? ?러 ?동?? ?려?으?요.");
+      setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
@@ -4235,7 +4280,7 @@ function updateOnboardingFlowUI() {
     case 18: {
       setOnboardingCalloutVisible(
         true,
-        "?아?니???비??근접?여 e,q??으?요"
+        "날아다니는 나비에 근접하여 e,q로 잡으세요"
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -4246,34 +4291,34 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 19: {
-      setOnboardingCalloutVisible(true, "?크롤해 맵을 축소,?? ?보?요.");
+      setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
       break;
     }
     case 20: {
-      setOnboardingCalloutVisible(true, "가???게 축소 ?보?요.");
+      setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
       break;
     }
     case 21: {
-      setOnboardingCalloutVisible(true, "?중?????무??동?세??");
+      setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
     case 22: {
       setOnboardingCalloutVisible(
         true,
-        "?무??동?여 ?라???매??근처??동?세??"
+        "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
       );
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case 23: {
-      setOnboardingCalloutVisible(true, "e?? ?러 ?매??세??");
+      setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case 24: {
-      setOnboardingCalloutVisible(true, "가방을 ?????과 칸을 ?러 먹으?요.");
+      setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
@@ -4282,10 +4327,10 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 25: {
-      const lineSeed = "?앗???겼?니 ?하??곳에 ?릭???용?세??";
-      const lineB = "?무밖으??동?세??";
+      const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
+      const lineB = "나무밖으로 이동하세요.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "?앗???었?니??");
+        setOnboardingCalloutVisible(true, "씨앗을 얻었습니다.");
       } else {
         setOnboardingCalloutVisible(
           true,
@@ -4301,12 +4346,12 @@ function updateOnboardingFlowUI() {
     case 26: {
       setOnboardingCalloutVisible(
         true,
-        "Esc??러 ?정?????? ?시 Esc??아 보세??"
+        "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
       );
       break;
     }
     case 27: {
-      setOnboardingCalloutVisible(true, "축하?니?? ?토리얼???났?니??!");
+      setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
     default:
@@ -4785,7 +4830,7 @@ function isPlantMasterVisible() {
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     return true;
   }
-  /** 본편: ?????에??메인 ?물 ?기 ?에??찾을 ???게 */
+  /** 본편: 첫 대화 후에도 메인 작물 심기 전에는 찾을 수 있게 */
   if (!plantRuntime.isSeedPlanted) {
     return true;
   }
@@ -4991,7 +5036,7 @@ function tryPickSharedBucket(bucketDistance) {
 }
 
 /**
- * World hub: worldLooseSeed(?성 ?보) + extraSeeds + ????+ ?동??
+ * World hub: worldLooseSeed(합성 후보) + extraSeeds + 땅 돌 + 양동이.
  */
 function pickUpNearestItemWorldHub(bucketDistance) {
   const nearest = getNearestPickableExtraSeed();
@@ -5035,8 +5080,11 @@ function pickUpNearestItemWorldHub(bucketDistance) {
   ) {
     if (isWorldLooseSyntheticPickupCandidate(nearest.seed)) {
       ensureWorldLooseSeedShape();
-      const now = Date.now();
-      if (now < Number(worldLoosePickupLockUntil || 0)) return;
+      const now = getSynchronizedNow();
+      syncWorldLoosePickupLock(now);
+      if (!canPickWorldLooseSeedAt(appleState.worldLooseSeed, worldLoosePickupLockUntil, now)) {
+        return;
+      }
       appleState.seedCount += 1;
       scheduleWorldLooseRespawnAfterPickup(appleState.worldLooseSeed, now);
       lastWorldLooseSeedPickupAt = Math.max(lastWorldLooseSeedPickupAt, now);
@@ -5047,7 +5095,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       saveAppleState();
       broadcastWorldLooseSeedPickup();
       markWorldDirty();
-      holdLocalAppleStateAgainstStaleSnapshot(1200);
+      holdLocalAppleStateAgainstStaleSnapshot(3000);
       syncWorldState(true);
       updateExtraSeedsAndPlants();
       updateSeedInventory();
@@ -5071,7 +5119,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
 }
 
 /**
- * Tutorial / ?보???index: ??#seed(?토 메인) ?????? ???extraSeeds, ?동??
+ * Tutorial / 온보딩 중 index: 땅 #seed(튜토 메인) → 스타터, 그 외 extraSeeds, 양동이.
  */
 function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
   const tutorialMainDist = canPickUpSeed()
@@ -5191,15 +5239,15 @@ function canPickUpSharedBucket() {
   return false;
 }
 
-/** Tutorial: extraSeeds? World hub: 보이???안 ?성 worldLoose ?보가 ?선(같? 좌표 ?책? groundSeed.js). */
+/** Tutorial: extraSeeds만. World hub: 보이는 동안 합성 worldLoose 후보가 우선(같은 좌표 정책은 groundSeed.js). */
 function getNearestPickableExtraSeed() {
   let nearest = null;
-  const now = Date.now();
+  const now = getSynchronizedNow();
+  syncWorldLoosePickupLock(now);
 
   if (
     usesWorldLooseSeedMode() &&
-    now >= Number(worldLoosePickupLockUntil || 0) &&
-    isWorldLooseSeedVisibleAt(now)
+    canPickWorldLooseSeedAt(appleState.worldLooseSeed, worldLoosePickupLockUntil, now)
   ) {
     ensureWorldLooseSeedShape();
     const ws = appleState.worldLooseSeed;
@@ -5939,7 +5987,50 @@ function updateWorldExtraBuckets() {
   });
 }
 
-/** 거래 교환: 기존 ?동?는 ?고 맵에 ?동?? ?나 ??배치 */
+function serializeWorldExtraBucketsForSnapshot(buckets) {
+  return (Array.isArray(buckets) ? buckets : [])
+    .filter(Boolean)
+    .map(function (bucket) {
+      return {
+        id: String(bucket.id || ""),
+        x: Number(bucket.x) || 0,
+        y: Number(bucket.y) || 0,
+        isFull: Boolean(bucket.isFull)
+      };
+    })
+    .filter(function (bucket) {
+      return bucket.id !== "";
+    });
+}
+
+function parseWorldExtraBucketsFromSnapshot(raw) {
+  if (!Array.isArray(raw)) return null;
+  return raw
+    .filter(Boolean)
+    .map(function (bucket, index) {
+      return {
+        id: String(bucket.id || "world-bucket-" + (index + 1)),
+        x: Number(bucket.x) || 0,
+        y: Number(bucket.y) || 0,
+        isFull: Boolean(bucket.isFull)
+      };
+    });
+}
+
+function applyWorldExtraBucketsFromSharedSnapshot(raw) {
+  const parsed = parseWorldExtraBucketsFromSnapshot(raw);
+  if (!parsed) return;
+  if (isHoldingExtraBucket()) {
+    const heldId = String(heldBucketId || "");
+    appleState.worldExtraBuckets = parsed.filter(function (entry) {
+      return entry && String(entry.id) !== heldId;
+    });
+  } else {
+    appleState.worldExtraBuckets = parsed;
+  }
+}
+
+/** 거래 교환: 기존 양동이는 숨기고 맵에 양동이를 하나 더 배치 */
 function spawnWorldBucketBelowTradeMaster() {
   if (!ground || !isWorldDocumentEntry()) return;
   if (!Array.isArray(appleState.worldExtraBuckets)) appleState.worldExtraBuckets = [];
@@ -6306,7 +6397,7 @@ function sanitizeSharedPlantHydrationAfterRemoteSnapshot(plant, now, getDryAfter
   }
 }
 
-/** ?물 ?시?리필 ?과 맞춰 ?른 ?라? lastRefillAt ?석???긋?????기가 반복?는 것을 줄임 */
+/** 우물 패시브 리필 틱과 맞춰 다른 클라와 lastRefillAt 해석이 어긋나 덮어쓰기가 반복되는 것을 줄임 */
 function sanitizePrematureRemotePlantDryState(plant, now) {
   if (!plant || plant.status !== "dry") return;
   const plantedAt = Number(plant.plantedAt);
@@ -6406,7 +6497,7 @@ function getSharedWorldSnapshot() {
   const snapshotBucketIsFull = mainBucketSnapshot.isFull;
   const plantIndexBonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
   return {
-    /** 멀?? ?물 ??스?프? 같? ?각축으??어 `rebasePlantModelTimestampsToLocalNow`??refTime?괴리 감소 */
+    /** 멀티: 식물 타임스탬프와 같은 시각축으로 두어 `rebasePlantModelTimestampsToLocalNow`의 refTime과 괴리 감소 */
     savedAt: getSharedPlantSimulationNow(),
     savedBy: currentSessionId,
     resetToken: pendingWorldResetToken || lastAppliedWorldResetToken || "",
@@ -6444,7 +6535,7 @@ function getSharedWorldSnapshot() {
           size: apple.size
         };
       }),
-      // ?드(?보???료): ???앗? worldLooseSeed 1?롯?공유. ?? ?앗(stub)?extraSeeds.
+      // 월드(온보딩 완료): 땅 씨앗은 worldLooseSeed 1슬롯만 공유. 심은 씨앗(stub)만 extraSeeds.
       extraSeeds: usesWorldLooseSeedMode()
         ? appleState.extraSeeds
             .filter(function (extraSeed) {
@@ -6566,6 +6657,9 @@ function getSharedWorldSnapshot() {
         : undefined,
       placedCraftFurniture: isWorldDocumentEntry()
         ? serializePlacedCraftFurnitureForSnapshot(placedCraftFurniture)
+        : undefined,
+      worldExtraBuckets: isWorldDocumentEntry()
+        ? serializeWorldExtraBucketsForSnapshot(appleState.worldExtraBuckets)
         : undefined
     },
     butterflies: getButterflyStateForSnapshot()
@@ -6589,6 +6683,7 @@ function refreshUiAfterSharedWorldApply() {
   updateMagicPowderInventoryUi();
   rebuildWorldRockDom();
   rebuildPlacedCraftFurnitureDom();
+  rebuildWorldExtraBucketDom();
 }
 
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
@@ -6743,7 +6838,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
     }
 
     // Shared world rows are authoritative once the server reports a new updated_at.
-    // Do not gate well / main plant / apples on local timestamps or client clocks ??    // that drops remote plants when lastAppleStateChangeAt / lastMainPlantStateChangeAt
+/** 세션만 쓰면 새 탭에서 비어 공유 리셋으로 오인 → appStorageKeysSharedWorldReset으로 가방 플래그까지 지워짐. local과 동기화. */
     // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
     if (snapshot.well) {
       wellState.water = Math.max(0, Math.min(maxWellWater, Number(snapshot.well.water) || 0));
@@ -6923,6 +7018,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
             Number(worldLoosePickupLockUntil || 0),
             Number(mergedNextSpawnAt || 0)
           );
+          syncWorldLoosePickupLock(syncedNow);
         } else {
           ensureWorldLooseSeedShape();
         }
@@ -7129,6 +7225,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
             placedCraftFurniture = parsePlacedCraftFurnitureFromSnapshot(snapFurniture);
           }
         }
+        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
+          applyWorldExtraBucketsFromSharedSnapshot(snapApples.worldExtraBuckets);
+        }
       }
       if (snapshotSavedAt) {
         lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
@@ -7217,9 +7316,9 @@ function isSharedWorldMergeActive() {
 }
 
 /**
- * 멀??공유 ?드: ?냅?의 `rebasePlantModelTimestampsToLocalNow`·sanitize가
- * `getSynchronizedNow()`(?버 ???각 기? ?프???로 맞춰???는??
- * ?감소?`Date.now()`??면 ?프?만??경과가 벌어?????에 물이 ??빠?? * ?이 바로 마른 것처??보인?? ?시??물 ?? ???각?맞출 ?
+ * 멀티 공유 월드: 스냅샷의 `rebasePlantModelTimestampsToLocalNow`·sanitize가
+ * `getSynchronizedNow()`(서버 행 시각 기준 오프셋)으로 맞춰져 있는데,
+ * 물 감소만 `Date.now()`를 쓰면 오프셋만큼 경과가 벌어져 한 틱에 물이 다 빠지고
  */
 function getSharedPlantSimulationNow() {
   return isSharedWorldMergeActive() ? getSynchronizedNow() : Date.now();
@@ -7267,7 +7366,7 @@ function syncWorldState(forceSave) {
       return;
     }
     addNetworkDebugLog(
-      "world save error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "world save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
@@ -7309,7 +7408,7 @@ function saveSharedWorldAndReload(options) {
     applyServerWorldRowTimestamps(row);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world reset save error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "world reset save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
@@ -7349,7 +7448,7 @@ function pollWorldState(forcePoll) {
     applySharedWorldSnapshot(row.state, row.updated_at);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world poll error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "world poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
@@ -7536,7 +7635,7 @@ function updateSeedPosition() {
     dryMainSeedVisibleSince = 0;
   }
   // Main seed is a fixed world object (next to the book), not a roaming synced item.
-  // ?드 ?슨 ??모드: ???앗? worldLooseSeed ??개만 ???토??#seed????(?에 ??경우??시).
+  // 월드 느슨 씨 모드: 땅 씨앗은 worldLooseSeed 한 개만 — 튜토용 #seed는 숨김(손에 든 경우만 표시).
   if (shouldShowMainSeedOnGround && heldItem !== HELD_ITEM_SEED) {
     seedX = SEED_START_X;
     seedY = SEED_START_Y;
@@ -7565,8 +7664,8 @@ function updateSeedPosition() {
 }
 
 /**
- * 지???????롯(WORLD_LOOSE_SEED_* = SEED_START)??겹친 extraSeeds ???프?이?는 ??.
- * ?토 #seed·?드 ?슨 img? legacy ?롯???시??보이??경우 방?.
+ * 지정 땅 씨 슬롯(WORLD_LOOSE_SEED_* = SEED_START)에 겹친 extraSeeds 땅 스프라이트는 숨김.
+ * 튜토 #seed·월드 느슨 img와 legacy 슬롯이 동시에 보이는 경우 방지.
  */
 function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) {
   if (
@@ -7599,6 +7698,7 @@ function updateExtraSeedsAndPlants() {
 
   if (usesWorldLooseSeedMode()) {
     ensureWorldLooseSeedShape();
+    syncWorldLoosePickupLock(now);
     if (!worldLooseSeedElement) {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
@@ -7771,7 +7871,7 @@ function updateExtraSeedsAndPlants() {
   });
 }
 
-/** ??·스?샷???장 ms가 ?재 constants? ?르?맞춤(?? 가?2분→3초로 바꾼 ?에????duration???는 경우) */
+/** 저장·스냅샷의 성장 ms가 현재 constants와 다르면 맞춤(예: 가루 2분→3초로 바꾼 뒤에도 옛 duration이 남는 경우) */
 function clampPlantGrowthTimingToCurrentConstants(plant) {
   if (!plant) return;
   const evCap = sproutStage1Ms + sproutStage2GrowMs;
@@ -7962,8 +8062,8 @@ function isPowderUpgradeInProgress(plant) {
 }
 
 /**
- * ?? 직후 ?냅?? needsFirstWater가 false?데 ?Q 물을 ?직 ??준 ?태?????음.
- * wateredAtList가 [growthStartedAt] ??번뿐?면 "???요"?본다.
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
+ * wateredAtList가 [growthStartedAt] 한 번뿐이면 "첫 물 필요"로 본다.
  */
 function stabilizeFirstWaterHintFlags(plant) {
   if (!plant || plant.status === "rotten" || plant.status === "dry") return;
@@ -8001,7 +8101,7 @@ function isPlantAwaitingPlayerFirstPour(plant) {
   if (plant.lastWateredAt != null && Number(plant.lastWateredAt) > 0) return false;
   const wl = plant.wateredAtList;
   if (!Array.isArray(wl)) return false;
-  /** ?? 직후 로컬 ?태??wateredAtList가 비어 ?음. stabilizeFirstWaterHintFlags??머? ?에??출?? */
+  /** 심은 직후 로컬 상태는 wateredAtList가 비어 있음. stabilizeFirstWaterHintFlags는 머지 시에만 호출됨. */
   if (wl.length === 0) return true;
   if (wl.length !== 1) return false;
   return Math.abs(Number(wl[0]) - gs) < 20000;
@@ -8101,7 +8201,7 @@ function tickPowderUpgrade(plant, now) {
   return true;
 }
 
-/** 4??? ?존 ??가??이 level5GrowMs ???동 5??(가루는 3??? */
+/** 4단 풀 생존 시 가루 없이 level5GrowMs 후 자동 5단 (가루는 3→4만) */
 function tickGrassAutoAdvanceToTier5(plant, now) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier !== 4) {
@@ -8326,7 +8426,7 @@ function bagHasPlantableSeedsForHoverHint() {
   });
 }
 
-/** 고정 UI(?정·채팅·?트·?퍼?? ??브라?? title ???#plant-hover-label ???로 ?축???시 */
+/** 고정 UI(설정·채팅·하트·슬퍼요) — 브라우저 title 대신 #plant-hover-label 스타일로 단축키 표시 */
 function pickUiShortcutHoverTarget(clientX, clientY) {
   const pad = 4;
   function over(el) {
@@ -8341,22 +8441,22 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
     );
   }
   if (settingsButton && over(settingsButton)) {
-    return { anchorEl: settingsButton, text: "?정: Esc" };
+    return { anchorEl: settingsButton, text: "설정: Esc" };
   }
   if (!worldSocialUiReady) return null;
   if (worldChatToggleBtn && over(worldChatToggleBtn)) {
     return { anchorEl: worldChatToggleBtn, text: "채팅: C" };
   }
   if (worldHeartBtn && over(worldHeartBtn)) {
-    return { anchorEl: worldHeartBtn, text: "?트: H" };
+    return { anchorEl: worldHeartBtn, text: "하트: H" };
   }
   if (worldSadBtn && over(worldSadBtn)) {
-    return { anchorEl: worldSadBtn, text: "?퍼?? Ctrl+S" };
+    return { anchorEl: worldSadBtn, text: "슬퍼요: Ctrl+S" };
   }
   return null;
 }
 
-/** `.world`??transform???으???의 fixed??뷰포?? ?니???드 기????어 좌표가 ?긋????UI ?트?body?*/
+/** `.world`에 transform이 있으면 그 안의 fixed는 뷰포트가 아니라 월드 기준이 되어 좌표가 어긋남 → UI 힌트만 body로 */
 function ensurePlantHoverLabelOnBodyForFixedUi() {
   if (!plantHoverLabel || !ground) return;
   if (plantHoverLabel.parentNode === document.body) return;
@@ -8570,7 +8670,7 @@ function getSproutSizeForStage(stage, plant) {
   };
 }
 
-/** 4·5?계 ? PNG???? ??별도 spot)??겹쳐 보이?spot ?이?? ?다. */
+/** 4·5단계 풀 PNG에 심은 흙(별도 spot)이 겹쳐 보이면 spot 레이어를 끈다. */
 function shouldHideSeparateSoilUnderBigGrass(plant) {
   if (!plant || !plant.isSproutGrown) return false;
   if (plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) return false;
@@ -8620,7 +8720,7 @@ function getPlantGrowthRatio(plant, now) {
   return Math.min(1, Math.max(0, (now - plant.growthStartedAt) / getPlantFirstGrowthDurationMs(plant)));
 }
 
-/** ?어 4?? ?동 ?장(가??음) 구간??초록 게이지 비율; ?당 ?으?null */
+/** 티어 4→5 자동 성장(가루 없음) 구간의 초록 게이지 비율; 해당 없으면 null */
 function getGrassAutoTier5GrowthRatio(plant, now) {
   const tier = Math.max(0, Number(plant.growthTier) || 0);
   if (tier !== 4) return null;
@@ -8815,7 +8915,7 @@ function applyPlantWaterDecay(plant, now) {
     return;
   }
   let updatedAt = Number(plant.waterLevelUpdatedAt);
-  // Number(null) === 0 ??would drain all water in one frame after snapshot parse.
+/** 티어 4→5 자동 성장(가루 없음) 구간의 초록 게이지 비율; 해당 없으면 null */
   if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
     updatedAt = now;
     plant.waterLevelUpdatedAt = updatedAt;
@@ -9309,7 +9409,7 @@ function invalidateGroundSeedElementRefsOnly(seeds) {
   });
 }
 
-/** 공유 ?냅?? ???앗 ?드??거(?물/게이지????·?연결로 깜빡??방?) */
+/** 공유 스냅샷: 땅 씨앗 노드만 제거(식물/게이지는 유지·재연결로 깜빡임 방지) */
 function clearGroundExtraSeedElementsOnly() {
   document.querySelectorAll(".extra-seed:not(.world-loose-seed)").forEach(function (element) {
     element.remove();
@@ -9355,10 +9455,7 @@ function updateBucketPosition() {
   bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
   playerBucketOverlay.style.backgroundImage =
     'url("' + (isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png") + '")';
-  const isBucketHeldByRemotePlayer =
-    Boolean(window.OVC_SHARED_BUCKET_HELD_BY) &&
-    window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId &&
-    heldItem !== HELD_ITEM_BUCKET;
+  const isBucketHeldByRemotePlayer = isMainBucketHeldByRemotePlayer();
   if (isBucketHeldByRemotePlayer) {
     const holderId = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
     const lastUpdateAt = Number(remoteBucketUpdateAtById[holderId] || 0);
@@ -9384,6 +9481,11 @@ function updateBucketPosition() {
       markWorldDirty();
       broadcastBucketState(false);
       bucket.style.display = "none";
+    } else if (isBucketHeldByRemotePlayer) {
+      syncMainBucketToRemoteHolderHand();
+      bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
+      bucket.style.display = "block";
+      setWorldPosition(bucket, bucketX, bucketY);
     } else {
       const mainX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : wellX - bucketSize.width - 8;
       const mainY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : wellY + WELL_SIZE - bucketSize.height;
@@ -9396,10 +9498,13 @@ function updateBucketPosition() {
     setWorldPosition(playerBucketOverlay, bucketX, bucketY);
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
-    if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
-      bucketX = wellX - bucketSize.width - 8;
-      bucketY = wellY + WELL_SIZE - bucketSize.height;
+    if (!syncMainBucketToRemoteHolderHand()) {
+      if (!Number.isFinite(bucketX) || !Number.isFinite(bucketY)) {
+        bucketX = wellX - bucketSize.width - 8;
+        bucketY = wellY + WELL_SIZE - bucketSize.height;
+      }
     }
+    bucket.src = isBucketFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
     bucket.style.display = "block";
     playerBucketOverlay.style.display = "none";
   } else {
@@ -10307,7 +10412,7 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
   return false;
 }
 
-/** ?냅??병합: ?유??비어 ?으?false(?원 로컬?취급?? ?음) ???격 ?거? 충돌 ???령 ?앗 ?제 */
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
 function isOvergrowthSeedPlant(plant) {
   return String(plant && plant.seedKind || "") === "overgrowth";
 }
@@ -10376,7 +10481,7 @@ function plantWorldOrdinalSortTime(plant) {
   return Number(plant.growthStartedAt) || 0;
 }
 
-/** 브라?? 기본 title(지?? ???CSS data-ovc-tip?로 바로 ?는 ?명 */
+/** 브라우저 기본 title(지연) 대신 CSS data-ovc-tip으로 바로 뜨는 설명 */
 function setInstantHoverTip(el, text) {
   if (!el) return;
   if (text) {
@@ -11365,7 +11470,7 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   const trunkInset = 3;
   const trunkLeft = TREE_TRUNK_X - TREE_CLIMB_DISTANCE + trunkInset;
   const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE - trunkInset;
-  /** 줄기·뿌리가 그려??이?막음(?전??trunkBottom??지??까지 가??같? x???체 y?서 ?기 불???? */
+  /** 줄기·뿌리가 그려진 높이만 막음(이전엔 trunkBottom이 지면 끝까지 가서 같은 x열 전체 y에서 심기 불가였음) */
   const trunkVisualTop = TREE_TRUNK_TOP - 22;
   const trunkFeetBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
   if (overlap(trunkLeft, trunkVisualTop, trunkRight, trunkFeetBottom)) {
@@ -11375,8 +11480,8 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
 }
 
 /**
- * growthTier??면 ?싹??커도 ?랫?안 0?라 반경?????어????각 ?계(getSproutStage)? 같이 ?.
- * ?거???물? ?보?서 빼고, maturity??0????
+ * growthTier만 쓰면 새싹이 커도 오랫동안 0이라 반경이 안 넓어짐 → 시각 단계(getSproutStage)와 같이 씀.
+ * 제거된 식물은 후보에서 빼고, maturity는 0–5로 캡.
  */
 function getPlantMaturityLevelForPlantingSpacing(plant) {
   if (!plant || plant.removed) return null;
@@ -11473,7 +11578,7 @@ function useBucket() {
   if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return;
 
   refillWellIfNeeded();
-  // ???력? 보통 ?음 updateBucketPosition보다 먼? ??????좌표가 ?레?어 ???레?????  // ?물 '?음' ?정???긋????인?????분기(뿌리???어가???.
+  // 키 입력은 보통 다음 updateBucketPosition보다 먼저 옴 → 통 좌표가 플레이어 한 프레임 늦으면
   if (heldItem === HELD_ITEM_BUCKET) {
     const bucketSize = getBucketSize();
     const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
@@ -12066,7 +12171,7 @@ function updatePlantState() {
     plantRuntime.becameEmptyAt !== null &&
     now - plantRuntime.becameEmptyAt >= getMainDryAfterEmptyMsForPlant(plantRuntime, now)
   ) {
-    // 마른 ??말라 죽? ?물): ??비? · ?주기 불? · plantDrySoilClearMs ????거
+    // 마른 땅(말라 죽은 작물): 싹 비움 · 물 주기 불가 · plantDrySoilClearMs 후 칸 제거
     plantRuntime.status = "dry";
     plantRuntime.isOverwatered = false;
     plantRuntime.needsFirstWater = true;
@@ -12824,7 +12929,7 @@ function loadSeedState() {
 }
 
 /**
- * @param {{ bumpMergeGuard?: boolean, skipWorldDirty?: boolean }} [opts] - bumpMergeGuard:false
+ * 심은 직후 스냅샷은 needsFirstWater가 false인데 첫 Q 물을 아직 안 준 상태일 수 있음.
  *   for sim-only deltas. skipWorldDirty:true stops enqueueing a shared save (e.g. water decay online).
  */
 function saveSeedState(opts) {
@@ -12922,7 +13027,7 @@ function postJson(url, payload) {
   }).then(function (response) {
     return response.json().then(function (data) {
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "?청???패?습?다.");
+        throw new Error(data.message || "요청이 실패했습니다.");
       }
 
       return data;
@@ -13009,7 +13114,7 @@ function buildCharacterColorGrid() {
     button.type = "button";
     button.className = "character-color-option";
     button.style.background = color;
-    button.setAttribute("aria-label", color + " ?깔");
+    button.setAttribute("aria-label", color + " 색깔");
 
     if (color === selectedPlayerColor) {
       button.classList.add("is-selected");
@@ -13405,7 +13510,7 @@ function toggleWorldChatUserPicker() {
 }
 
 /**
- * "?길??" ??"?길?? ?람??" ?태??신???두??적. `?체:` 가 ?으??거 ??귓말 ?두??환.
+ * "홍길동:" → "홍길동, 사람인:" 형태로 수신자 접두를 누적. `전체:` 가 있으면 제거 후 귓말 접두로 전환.
  */
 function appendWhisperRecipientToWorldChatInput(pickedName) {
   if (!worldChatInputEl) return;
@@ -14274,7 +14379,7 @@ function sendMultiplayerPresence(forceSend) {
       payload: state
     })).catch(function (error) {
       addNetworkDebugLog(
-        "broadcast error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+        "broadcast error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
       );
     });
     lastBroadcastAt = now;
@@ -14339,9 +14444,8 @@ function broadcastBucketState(forceSend) {
 function handleRemoteBucketBroadcast(payload) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!payload || !payload.id || payload.id === currentSessionId) return;
-  // ?? ?동?? ?고 ?을 ?는 로컬?????태???일??기? ??? ?라?언??브로?캐?트가
-  // isBucketFull·좌표????Q가 ?기/붓기 ?이 ?플?시?반복?는 것처??보임.
-  if (heldItem === HELD_ITEM_BUCKET) {
+  // 메인 양동이를 들고 있을 때만 로컬 상태를 유지 — 추가 양동이만 든 경우 원격 메인 동기화 허용.
+  if (isHoldingMainBucket()) {
     return;
   }
   const remoteId = String(payload.id);
@@ -14395,7 +14499,7 @@ function syncPresenceToDatabase(state) {
   lastPresenceDbSyncAt = Date.now();
   window.OVCOnline.savePresence(state).catch(function (error) {
     addNetworkDebugLog(
-      "presence db save error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "presence db save error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isPresenceDbSyncing = false;
@@ -14439,7 +14543,7 @@ function pollPresenceDatabase() {
     updateRemotePlayerCount();
   }).catch(function (error) {
     addNetworkDebugLog(
-      "presence db poll error: " + (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "presence db poll error: " + (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   }).finally(function () {
     isPresenceDbPolling = false;
@@ -14824,8 +14928,8 @@ function syncPlayerColorToServer(forceSync) {
       addNetworkDebugLog("color synced online: " + colorToSync);
     }).catch(function (error) {
       showOnlineDebugMessage(
-      "로컬 ????패: " +
-        (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "로컬 저장 실패: " +
+        (error && error.message ? error.message : "온라인 서버 확인 필요")
       );
     });
     return;
@@ -14840,8 +14944,8 @@ function syncPlayerColorToServer(forceSync) {
     addNetworkDebugLog("color synced local: " + colorToSync);
   }).catch(function (error) {
     showOnlineDebugMessage(
-      "로컬 ????패: " +
-      (error && error.message ? error.message : "?라???버 ?인 ?요")
+      "로컬 저장 실패: " +
+      (error && error.message ? error.message : "온라인 서버 확인 필요")
     );
   });
 }
@@ -15047,7 +15151,7 @@ async function validateCurrentAccount() {
         if (typeof window.OVCOnline.getAccount === "function") {
           const account = await window.OVCOnline.getAccount(currentUserId);
           if (!account) {
-            showOnlineDebugMessage("????계정?니?? 로그?웃?니??");
+            showOnlineDebugMessage("삭제된 계정입니다. 로그아웃합니다.");
             setTimeout(logout, 800);
             return;
           }
@@ -15056,7 +15160,7 @@ async function validateCurrentAccount() {
       }
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
-        showOnlineDebugMessage("?른 기기?서 로그?되??로그?웃?니??");
+        showOnlineDebugMessage("다른 기기에서 로그인되어 로그아웃합니다.");
         setTimeout(logout, 1200);
         return;
       }
@@ -15285,7 +15389,7 @@ function dedupeButterfliesByIdStable(list) {
   return butterflyMotion.dedupe(list);
 }
 
-/** 공유 ?한(butterflyMaxAlive) 초과 ???래??개체부???거 */
+/** 공유 상한(butterflyMaxAlive) 초과 시 오래된 개체부터 제거 */
 function trimButterflyListToMaxCap(list) {
   return butterflyMotion.trim(list);
 }
@@ -15406,7 +15510,7 @@ function ensureButterflyWaypoint(butterfly, now) {
     const dx = target.x - butterfly.x;
     const dy = target.y - butterfly.y;
     const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    // Pixels-per-frame to ms @ ~60fps. 짧? ?리?도 2.4s?강제?면 거의 ?자리에 멈춘 것처??보임 ??거리 비? + ??? 바닥.
+    // Pixels-per-frame to ms @ ~60fps. 짧은 다리에도 2.4s를 강제하면 거의 제자리에 멈춘 것처럼 보임 → 거리 비례 + 낮은 바닥.
     const msPerFrame = 1000 / 60;
     const baseDuration = (distance / butterflySpeed) * msPerFrame;
     const wander = 140 + Math.random() * 420;
@@ -15435,7 +15539,7 @@ function authoritySpawnButterfliesIfNeeded(now) {
   if (butterflyState.list.length >= butterflyMaxAlive) return false;
   if (!butterflyState.lastSpawnAt) {
     // 최초 ?장(?직 ?비?채운 ???음)?즉시 cap까? 채?. ?? ?드가 ?았?데
-    // lastSpawnAt?0?면(?냅???락·병합) ?기??5마리??꺼번에 ?어 리스??주기가 무시??
+    // lastSpawnAt만 0이면(스냅샷 누락·병합) 여기서 5마리를 한꺼번에 넣어 리스폰 주기가 무시됨.
     if (hasSeededInitialButterflies) {
       butterflyState.lastSpawnAt = now;
       return false;
@@ -15629,7 +15733,7 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
     addSyncDebugLog("world_loose_seed_reject", { reason: "invalid_position" }, true);
     return;
   }
-  const now = Date.now();
+  const now = getSynchronizedNow();
   if (!consumeSyncEventId(payload.eventId, now)) return;
   const evtAt = Math.max(0, Number(payload.at) || 0);
   if (evtAt > 0 && evtAt <= Number(lastWorldLooseSeedPickupAt || 0)) {
@@ -15641,7 +15745,7 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
     return;
   }
   const nextAt = Math.max(0, Number(payload.nextSpawnAt) || 0);
-  if (nextAt <= now) {
+  if (nextAt <= now - 250) {
     addSyncDebugLog("world_loose_seed_reject", {
       reason: "expired_next_spawn",
       nextAt: nextAt,
@@ -15662,6 +15766,7 @@ function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
   if (evtAt > 0) lastWorldLooseSeedPickupAt = Math.max(lastWorldLooseSeedPickupAt, evtAt);
   appleState.worldLooseSeed.nextSpawnAt = nextAt;
   worldLoosePickupLockUntil = Math.max(Number(worldLoosePickupLockUntil || 0), nextAt);
+  syncWorldLoosePickupLock(now);
   const px = Number(payload.x);
   const py = Number(payload.y);
   if (Number.isFinite(px)) appleState.worldLooseSeed.x = px;
@@ -15895,7 +16000,7 @@ function updateButterflies() {
       }
     }
   }
-  // ?비 ?치 ??? 권한 ?라?언??가????? sessionId)??행. 비권????
+  // 나비 위치 시뮬은 권한 클라이언트(가장 낮은 sessionId)만 수행. 비권한 탭이
   // 같이 ?리??냅??좌표? ?워??2창·??에??????상???다.
   if (sharedHydrated && butterflyState.list.length > 0) {
     const runAuthorityButterflyMotion = !onlineAvailable || isButterflyAuthority();
@@ -15906,7 +16011,7 @@ function updateButterflies() {
       for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
         const stepNow =
           motionStepCount > 1
-            ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
+    // 백그라운드 복귀 직후 한 프레임에만 쓰이는 wallDelta가 비정상적으로 커지면
             : now;
         butterflyState.list.forEach(function (butterfly) {
           simulateButterflyAuthorityStep(butterfly, stepNow);
@@ -15917,7 +16022,7 @@ function updateButterflies() {
       }
     }
   }
-  // 비권?? ?냅?의 butterfly.x/y(권한???? ?치+?러???부?럽??라?
+  // 비권한: 스냅샷의 butterfly.x/y(권한이 넣은 위치+플러터)만 부드럽게 따라감.
   const smoothRemoteButterflies =
     sharedHydrated && onlineAvailable && !isButterflyAuthority();
   /** ?레??간격??맞춘 지??보간(짧? dt?서??곡선???기지 ?게). */
@@ -15943,7 +16048,7 @@ function updateButterflies() {
     });
   }
 
-  // Render (?기 ?정? 보간??중심 `_catchProbe*`? ?일 ??비권???????면??치)
+  // Render (잡기 판정은 보간된 중심 `_catchProbe*`와 동일 — 비권한 탭에서 화면과 일치)
   const aliveIds = {};
   let catchTarget = null;
   const renderButterflyBounds = getActiveButterflyBounds();
@@ -15973,7 +16078,7 @@ function updateButterflies() {
       const rdy = targetY - butterfly._renderY;
       const remaining = Math.hypot(rdx, rdy);
       const t = butterflyRemoteLerpAlpha;
-      const smoothT = remaining < 0.55 ? t * 0.35 : t * t * (3 - 2 * t);
+const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
       let nx = butterfly._renderX + rdx * smoothT;
       let ny = butterfly._renderY + rdy * smoothT;
       let mx = nx - butterfly._renderX;
@@ -16519,6 +16624,23 @@ function runMultiplayerWorldSyncTick() {
   pollWorldState(false);
   syncWorldState(false);
   window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
+}
+window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
+setInterval(function () {
+  if (isTabSessionSuperseded) return;
+  validateCurrentAccount();
+}, 5000);
+window.addEventListener("resize", function () {
+  setup();
+  zoomLevel = clampZoom(zoomLevel);
+  updateCamera();
+});
+window.addEventListener("load", function () {
+  updateCamera();
+  setTimeout(hideAppLoadingScreen, 450);
+});
+gameLoop();
+ window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
 }
 window.setTimeout(runMultiplayerWorldSyncTick, getMultiplayerWorldSyncLoopMs());
 setInterval(function () {
