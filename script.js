@@ -526,6 +526,41 @@ function setOnboardingFlowDoneStored(done) {
   } catch (eHint) {}
 }
 
+function accountTutorialDoneTruthy(account) {
+  if (!account) return false;
+  const v = account.tutorial_done;
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+
+/** 서버 계정 tutorial_done → 로컬 온보딩 완료(다른 기기·시크릿 창 복원) */
+function hydrateTutorialProgressFromServerAccount(account) {
+  if (!accountTutorialDoneTruthy(account)) return false;
+  setOnboardingFlowDoneStored(true);
+  setStoredFlag(everBeenToWorldKey, true);
+  setStoredValue(onboardingFlowStepKey, "0");
+  onboardingFlowStep = 0;
+  try {
+    sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+    sessionStorage.removeItem("ovcTutorialWorldResetPending");
+  } catch (eClr) {}
+  return true;
+}
+
+async function syncTutorialDoneFromServerIfNeeded() {
+  if (!currentUserId || getStoredFlag(onboardingFlowDoneKey)) {
+    return Boolean(getStoredFlag(onboardingFlowDoneKey));
+  }
+  if (!window.OVCOnline || typeof window.OVCOnline.getAccount !== "function") {
+    return false;
+  }
+  try {
+    const account = await window.OVCOnline.getAccount(currentUserId);
+    return hydrateTutorialProgressFromServerAccount(account);
+  } catch (eSync) {
+    return false;
+  }
+}
+
 function ovcApplyForceWorldHubBypassLoggedIn() {
   if (!currentUserId) return false;
   if (!ovcForceWorldHubIsRequested()) return false;
@@ -1189,6 +1224,9 @@ const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
 /** ?격 ?레?어: rock_pickup ?션???긴 ???태 ?스?? ????ms(?른 ?션? REMOTE_ACTION_STATUS_HOLD_MS) */
 const WORLD_ROCK_REMOTE_STATUS_TAIL_MS = 0;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
+const REMOTE_PLAYER_SMOOTHING_MS = 130;
+const REMOTE_PLAYER_SNAP_DISTANCE = 42;
+const REMOTE_PLAYER_SNAP_EPSILON = 0.04;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
@@ -1782,16 +1820,18 @@ function setWorldPosition(element, x, y) {
 }
 
 function accountDisplayNameForUi() {
+  const myUserId = String(currentUserId || "").trim();
   try {
     const sid = readOvcTabSessionUserId();
     const sname = readOvcTabSessionUserName();
-    if (sid && sname && sid === String(currentUserId).trim()) {
+    if (sid && sname && sid === myUserId) {
       return sname;
     }
   } catch (eSess) {}
   try {
+    const localUserId = (localStorage.getItem(currentUserIdKey) || "").trim();
     const fromStore = (localStorage.getItem(currentUserKey) || "").trim();
-    if (fromStore) {
+    if (fromStore && (!myUserId || localUserId === myUserId)) {
       return fromStore;
     }
   } catch (eStore) {}
@@ -2532,6 +2572,8 @@ adminDevMagicPowderButton.addEventListener("click", function () {
 adminDevPlantIndexPlusButton.addEventListener("click", function () {
   adminDebugPlantIndexBonus = Math.max(0, Math.floor(adminDebugPlantIndexBonus)) + 100;
   updatePlantProgressGauge();
+  markWorldDirty();
+  syncWorldState(true);
 });
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
@@ -2659,37 +2701,7 @@ function skipTutorialFromSettings() {
 }
 
 function replayTutorialFromSettings() {
-  if (
-    !window.confirm(
-      "?토리얼??처음부???시 진행?까?? ?토리얼 ?면?로 ?동?니??"
-    )
-  ) {
-    return;
-  }
-  let sid = "";
-  try {
-    sid = sessionStorage.getItem("ovcGameSessionId") || "";
-  } catch (e) {}
-  if (!sid) {
-    sid =
-      "tab-" +
-      Date.now().toString(36) +
-      "-" +
-      Math.random().toString(16).slice(2);
-    try {
-      sessionStorage.setItem("ovcGameSessionId", sid);
-    } catch (e2) {}
-  }
-  try {
-    sessionStorage.setItem(ovcTutorialReplaySessionKey, "1");
-  } catch (eReplay) {}
-  resetTutorialProgressInStorage();
-  setStoredValue(onboardingTutorialBindSessionKey, sid);
-  try {
-    sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
-  } catch (e3) {}
-  isReloadingForWorldReset = true;
-  window.location.replace(ovcTutorialPageUrl());
+  window.alert("\uD29C\uD1A0\uB9AC\uC5BC\uC740 \uACC4\uC815\uB2F9 \uCD5C\uCD08 1\uD68C\uB9CC \uC9C4\uD589\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
 }
 
 settingsButton.addEventListener("click", function () {
@@ -3346,6 +3358,7 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
 }
 
 function resetTutorialProgressInStorage() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
   clearTutorialMainSeedRespawnTimer();
   setOnboardingFlowDoneStored(false);
   setStoredValue(onboardingFlowStepKey, "1");
@@ -4349,6 +4362,7 @@ function applyDefaultState(options) {
   appleState.worldExtraBuckets = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
+  adminDebugPlantIndexBonus = 0;
 
   // Reset butterflies: drop any visible butterflies and zero out the player's
   // collected counts so the world starts fresh.
@@ -5913,11 +5927,13 @@ function flushPassiveSimulationBeforeSharedSnapshot() {
 function getSharedWorldSnapshot() {
   flushPassiveSimulationBeforeSharedSnapshot();
   const bucketHeldBy = heldItem === HELD_ITEM_BUCKET ? currentSessionId : window.OVC_SHARED_BUCKET_HELD_BY || "";
+  const plantIndexBonus = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
   return {
     /** 멀?? ?물 ??스?프? 같? ?각축으??어 `rebasePlantModelTimestampsToLocalNow`??refTime?괴리 감소 */
     savedAt: getSharedPlantSimulationNow(),
     savedBy: currentSessionId,
     resetToken: pendingWorldResetToken || lastAppliedWorldResetToken || "",
+    plantIndexBonus,
     bucket: {
       x: bucketX,
       y: bucketY,
@@ -6160,6 +6176,17 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   const shouldDeferRemoteAppleApply = Date.now() < localAppleActionLockUntil;
 
   try {
+    if (Object.prototype.hasOwnProperty.call(snapshot, "plantIndexBonus")) {
+      const incomingPlantIndexBonus = Math.max(
+        0,
+        Math.floor(Number(snapshot.plantIndexBonus) || 0)
+      );
+      adminDebugPlantIndexBonus = Math.max(
+        Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0)),
+        incomingPlantIndexBonus
+      );
+    }
+
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
     // Apply snapshot bucket fallback only when realtime channel is not subscribed.
     if (snapshot.bucket && !isMultiplayerSubscribed) {
@@ -11687,6 +11714,12 @@ function finishCharacterSelect() {
 
   restoreWorldHubIfVeteranWithoutActiveReplay();
   ovcApplyForceWorldHubBypassLoggedIn();
+  syncTutorialDoneFromServerIfNeeded().then(function () {
+    finishCharacterSelectAfterTutorialGate();
+  });
+}
+
+function finishCharacterSelectAfterTutorialGate() {
   if (
     isTutorialDocumentEntry() &&
     currentUserId &&
@@ -12166,12 +12199,11 @@ function handleWorldHeartBroadcast(payload) {
   const jy = Number(payload.jumpY);
   if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
     const wy = -depth + jy;
-    setWorldPosition(rp.element, px, wy);
+    setRemotePlayerVisualPosition(rp, px, wy);
     rp.worldX = px;
     rp.worldY = wy;
     rp.depth = depth;
     rp.jumpY = jy;
-    rp.positionKey = Math.round(px * 10) + "|" + Math.round(wy * 10);
   }
   window.requestAnimationFrame(function () {
     const rpp = remotePlayers[sid];
@@ -12191,12 +12223,11 @@ function handleWorldSadBroadcast(payload) {
   const jy = Number(payload.jumpY);
   if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
     const wy = -depth + jy;
-    setWorldPosition(rp.element, px, wy);
+    setRemotePlayerVisualPosition(rp, px, wy);
     rp.worldX = px;
     rp.worldY = wy;
     rp.depth = depth;
     rp.jumpY = jy;
-    rp.positionKey = Math.round(px * 10) + "|" + Math.round(wy * 10);
   }
   window.requestAnimationFrame(function () {
     const rpp = remotePlayers[sid];
@@ -13140,10 +13171,7 @@ function renderRemotePlayerState(state, source) {
   }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
-  if (remotePlayer.positionKey !== nextPositionKey) {
-    setWorldPosition(remotePlayer.element, nextX, nextY);
-    remotePlayer.positionKey = nextPositionKey;
-  }
+  setRemotePlayerMoveTarget(remotePlayer, nextX, nextY, nextPositionKey);
   remotePlayer.worldX = nextX;
   remotePlayer.worldY = nextY;
   remotePlayer.depth = Number(state.depth) || 0;
@@ -13202,6 +13230,12 @@ function createRemotePlayer(remoteId) {
     nameElement,
     statusElement,
     positionKey: "",
+    renderX: 0,
+    renderY: 0,
+    targetX: 0,
+    targetY: 0,
+    hasRenderPosition: false,
+    lastSmoothAt: 0,
     worldX: 0,
     worldY: 0,
     depth: 0,
@@ -13214,6 +13248,79 @@ function createRemotePlayer(remoteId) {
     lastSeenAt: Date.now()
   };
   return remotePlayers[remoteId];
+}
+
+function setRemotePlayerMoveTarget(remotePlayer, x, y, positionKey) {
+  const nextX = Number(x) || 0;
+  const nextY = Number(y) || 0;
+  remotePlayer.targetX = nextX;
+  remotePlayer.targetY = nextY;
+  remotePlayer.positionKey = positionKey || (Math.round(nextX * 10) + "|" + Math.round(nextY * 10));
+
+  if (!remotePlayer.hasRenderPosition) {
+    remotePlayer.renderX = nextX;
+    remotePlayer.renderY = nextY;
+    remotePlayer.hasRenderPosition = true;
+    remotePlayer.lastSmoothAt = performance.now();
+    setWorldPosition(remotePlayer.element, nextX, nextY);
+  }
+}
+
+function setRemotePlayerVisualPosition(remotePlayer, x, y) {
+  const nextX = Number(x) || 0;
+  const nextY = Number(y) || 0;
+  remotePlayer.renderX = nextX;
+  remotePlayer.renderY = nextY;
+  remotePlayer.targetX = nextX;
+  remotePlayer.targetY = nextY;
+  remotePlayer.hasRenderPosition = true;
+  remotePlayer.lastSmoothAt = performance.now();
+  remotePlayer.positionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
+  setWorldPosition(remotePlayer.element, nextX, nextY);
+}
+
+function updateRemotePlayerSmoothing() {
+  const now = performance.now();
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const remotePlayer = remotePlayers[remoteId];
+    if (!remotePlayer || !remotePlayer.element || !remotePlayer.hasRenderPosition) return;
+
+    const targetX = Number(remotePlayer.targetX) || 0;
+    const targetY = Number(remotePlayer.targetY) || 0;
+    const currentX = Number(remotePlayer.renderX) || 0;
+    const currentY = Number(remotePlayer.renderY) || 0;
+    const dx = targetX - currentX;
+    const dy = targetY - currentY;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance <= REMOTE_PLAYER_SNAP_EPSILON) {
+      if (currentX !== targetX || currentY !== targetY) {
+        remotePlayer.renderX = targetX;
+        remotePlayer.renderY = targetY;
+        setWorldPosition(remotePlayer.element, targetX, targetY);
+      }
+      remotePlayer.lastSmoothAt = now;
+      return;
+    }
+
+    if (distance >= REMOTE_PLAYER_SNAP_DISTANCE) {
+      remotePlayer.renderX = targetX;
+      remotePlayer.renderY = targetY;
+      remotePlayer.lastSmoothAt = now;
+      setWorldPosition(remotePlayer.element, targetX, targetY);
+      return;
+    }
+
+    const lastSmoothAt = Number(remotePlayer.lastSmoothAt || now);
+    const dt = Math.min(50, Math.max(0, now - lastSmoothAt));
+    const alpha = 1 - Math.exp(-dt / REMOTE_PLAYER_SMOOTHING_MS);
+    const nextX = currentX + dx * alpha;
+    const nextY = currentY + dy * alpha;
+    remotePlayer.renderX = nextX;
+    remotePlayer.renderY = nextY;
+    remotePlayer.lastSmoothAt = now;
+    setWorldPosition(remotePlayer.element, nextX, nextY);
+  });
 }
 
 function pruneStaleRemotePlayers() {
@@ -14670,6 +14777,7 @@ function gameLoop() {
   updateMagicPowderInventoryUi();
   updateCamera();
   updatePlayerName();
+  updateRemotePlayerSmoothing();
   updateWorldSocialOverlaysInGameLoop();
   sendMultiplayerPresence(false);
   savePlayerPosition(false);
@@ -14767,15 +14875,20 @@ function setup() {
   updateWorldRocks();
 }
 
+(async function ovcRunBootstrap() {
 try {
-  if (currentUserId) {
-    ovcApplyForceWorldHubBypassLoggedIn();
-  }
-  setup();
   if (currentUserId) {
     ovcApplyForceWorldHubBypassLoggedIn();
     repairOnboardingCompletionFromStoredStep();
     restoreWorldHubIfVeteranWithoutActiveReplay();
+    await syncTutorialDoneFromServerIfNeeded();
+    if (getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
+  }
+  setup();
+  if (currentUserId) {
+    ovcApplyForceWorldHubBypassLoggedIn();
     if (getStoredFlag(onboardingFlowDoneKey)) {
       setStoredFlag(everBeenToWorldKey, true);
     }
@@ -14882,6 +14995,7 @@ try {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   hideAppLoadingScreen();
 }
+})();
 setTimeout(function () {
   if (!isTabSessionSuperseded) {
     if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {

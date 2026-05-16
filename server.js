@@ -329,7 +329,8 @@ function handleApi(request, response, requestedPath) {
           id: account.id,
           name: account.name,
           color: account.color || null,
-          created_at: account.createdAt || null
+          created_at: account.createdAt || null,
+          tutorial_done: account.tutorial_done === true
         }
       });
     });

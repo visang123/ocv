@@ -102,7 +102,7 @@ export function updateTradeNpcPrompt() {
 
   if (isNearTradeMaster()) {
     const promptText = complete
-      ? "\uBB3C\uAC74\uC740 \uAC00\uC838\uC654\uB098?!"
+      ? "\uBB3C\uAC74\uC740 \uAC00\uC838\uC654\uB098?!\n(q\uB97C \uB20C\uB7EC \uAC70\uB798)"
       : "\uBC18\uAC11\uB124 \uC774\uBC29\uC778\uC774\uC5EC";
     if (!complete) {
       if (host.tradeMasterBubble.dataset.promptShown === "true") return;

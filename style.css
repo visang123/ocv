@@ -637,6 +637,12 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
+#trade-master-bubble {
+  max-width: 104px;
+  white-space: pre-line;
+  line-height: 1.22;
+}
+
 #player-bubble {
   position: absolute;
   left: 0;

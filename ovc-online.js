@@ -317,6 +317,9 @@
     if (!id || !token) {
       return { ok: false };
     }
+    if (!wantDone) {
+      return { ok: false, message: "tutorial_done cannot be cleared" };
+    }
 
     const supabaseClient = getClient();
     if (!supabaseClient) {
@@ -438,7 +441,7 @@
     try {
       const { data, error } = await supabaseClient
         .from(config.accountsTable)
-        .select("id, name, color, created_at")
+        .select("id, name, color, created_at, tutorial_done")
         .eq("id", accountId)
         .maybeSingle();
 
