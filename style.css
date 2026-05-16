@@ -3551,7 +3551,8 @@ body #world-bag-inventory {
     0 0 18px rgba(139, 92, 246, 0.28);
 }
 
-.bag-inventory-slot.is-magic-powder-usable .bag-slot-icon--magic-powder {
+.bag-inventory-slot.is-magic-powder-usable .bag-slot-icon--magic-powder,
+.bag-inventory-slot.is-magic-powder-usable .bag-slot-icon--magic-powder-img {
   filter: drop-shadow(0 0 6px rgba(196, 132, 255, 0.75));
 }
 
@@ -3773,8 +3774,8 @@ body #world-bag-inventory {
 
 #plant-hover-label.is-world-npc-name {
   z-index: 225;
-  font: 700 5px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
-  padding: 3px 8px;
+  font: 700 12px/1.25 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  padding: 4px 10px;
   border-radius: 8px;
 }
 

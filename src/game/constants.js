@@ -177,6 +177,9 @@ export const sproutStage3Image = "이미지/sprout-stage3.png?v=20260510f";
 /** 4·5단계 풀 — 시트 좌/우 분할 PNG (?v 캐시 무력화) */
 export const sproutStage4Image = "이미지/grass-stage4-front.png?v=20260510e";
 export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
+/** 노란 마법 가루 4·5단계 꽃 */
+export const flowerStage4Image = "이미지/flower-stage4-front.png?v=20260516f";
+export const flowerStage5Image = "이미지/flower-stage5-front.png?v=20260516f";
 /** Draw sizes per stage (world pixels). */
 /** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
 export const SPROUT_STAGE_WIDTHS = [7, 10, 15];

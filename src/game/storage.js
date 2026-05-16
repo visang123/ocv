@@ -173,6 +173,8 @@ export function loadSeedStateFromStorage(config) {
     ownerDisplayName: "",
     sproutOrdinal: 0,
     grassOrdinal: null,
+    matureKind: "",
+    flowerOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null,
     npcX: config.defaultNpcX,
@@ -255,6 +257,17 @@ export function loadSeedStateFromStorage(config) {
         planted.grassOrdinal = Math.max(1, Number(savedPlantedState.grassOrdinal));
       } else {
         planted.grassOrdinal = null;
+      }
+      planted.matureKind = Object.prototype.hasOwnProperty.call(savedPlantedState, "matureKind")
+        ? String(savedPlantedState.matureKind || "")
+        : "";
+      if (
+        savedPlantedState.flowerOrdinal != null &&
+        Number.isFinite(Number(savedPlantedState.flowerOrdinal))
+      ) {
+        planted.flowerOrdinal = Math.max(1, Number(savedPlantedState.flowerOrdinal));
+      } else {
+        planted.flowerOrdinal = null;
       }
       if (Object.prototype.hasOwnProperty.call(savedPlantedState, "drySoilAt")) {
         const da = Number(savedPlantedState.drySoilAt);
@@ -483,6 +496,12 @@ export function loadAppleStateFromStorage(config) {
                 Number.isFinite(Number(plantData.grassOrdinal))
                   ? Math.max(1, Number(plantData.grassOrdinal))
                   : null,
+              matureKind: plantData.matureKind != null ? String(plantData.matureKind) : "",
+              flowerOrdinal:
+                plantData.flowerOrdinal != null &&
+                Number.isFinite(Number(plantData.flowerOrdinal))
+                  ? Math.max(1, Number(plantData.flowerOrdinal))
+                  : null,
               rottenAt: Number(plantData.rottenAt) || null,
               blockSproutRegrowthAfterDry: (function () {
                 if (Object.prototype.hasOwnProperty.call(plantData, "blockSproutRegrowthAfterDry")) {
@@ -610,6 +629,11 @@ export function saveAppleStateToStorage(config) {
           grassOrdinal:
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
               ? plant.grassOrdinal
+              : null,
+          matureKind: plant.matureKind != null ? String(plant.matureKind) : "",
+          flowerOrdinal:
+            plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
+              ? plant.flowerOrdinal
               : null,
           rottenAt: plant.rottenAt || null,
           blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),

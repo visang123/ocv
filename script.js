@@ -115,6 +115,8 @@ import {
   sproutStage3Image,
   sproutStage4Image,
   sproutStage5Image,
+  flowerStage4Image,
+  flowerStage5Image,
   SPROUT_STAGE_WIDTHS,
   SPROUT_STAGE_HEIGHTS,
   grassStage4WorldScale,
@@ -294,6 +296,12 @@ import {
   parseSharedGroundSeedFromSnapshot,
   parseExtraPlantFromSnapshot
 } from "./src/game/worldSnapshot.js";
+import {
+  isMagicPowderBagType,
+  isFlowerMaturePlant,
+  getMatureKindForPowderBagType,
+  getColoredPowderCountField
+} from "./src/game/magic-powder.js";
 import {
   makeSyncEventId as makeSyncEventIdCore,
   getRemoteStateVersion as getRemoteStateVersionCore,
@@ -2448,11 +2456,11 @@ if (bagInventoryPanel) {
       useCraftFurnitureFromBag(kind);
       return;
     }
-    if (kind === "magicPowder") {
-      if (magicPowderCount <= 0) return;
+    if (isMagicPowderBagType(kind)) {
+      if (!getMagicPowderBagCount(kind)) return;
       event.preventDefault();
       event.stopPropagation();
-      tryUseMagicPowder();
+      tryUseMagicPowderBagType(kind);
     }
   });
 }
@@ -4487,6 +4495,8 @@ function applyDefaultState(options) {
   plantRuntime.powderUpgradeDurationMs = 0;
   plantRuntime.grassAuto5EligibleAt = null;
   plantRuntime.plantedAt = null;
+  plantRuntime.matureKind = "";
+  plantRuntime.flowerOrdinal = null;
   plantRuntime.blockSproutRegrowthAfterDry = false;
   plantRuntime.drySoilAt = null;
 
@@ -6392,6 +6402,11 @@ function getSharedWorldSnapshot() {
             plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
               ? plant.grassOrdinal
               : null,
+          matureKind: plant.matureKind != null ? String(plant.matureKind) : "",
+          flowerOrdinal:
+            plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
+              ? plant.flowerOrdinal
+              : null,
           blockSproutRegrowthAfterDry: Boolean(plant.blockSproutRegrowthAfterDry),
           drySoilAt:
             plant.drySoilAt != null && Number.isFinite(Number(plant.drySoilAt))
@@ -6646,7 +6661,8 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           incomingPlant = Object.assign({}, incomingPlant, {
             powderUpgradeTargetTier: plantRuntime.powderUpgradeTargetTier,
             powderUpgradeStartedAt: plantRuntime.powderUpgradeStartedAt,
-            powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs
+            powderUpgradeDurationMs: plantRuntime.powderUpgradeDurationMs,
+            matureKind: plantRuntime.matureKind || ""
           });
         }
         applyLoadedPlantState(incomingPlant);
@@ -7600,7 +7616,7 @@ function updateExtraSeedsAndPlants() {
       );
     }
     if (!isSproutGrown) return;
-    plant.sproutElement.src = getSproutImageForStage(stage);
+    plant.sproutElement.src = getSproutImageForPlant(plant, stage);
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage);
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
@@ -8260,9 +8276,10 @@ function tickSproutEvolution(plant, now) {
   }
 }
 
-function getSproutImageForStage(stage) {
-  if (stage >= 5) return sproutStage5Image;
-  if (stage >= 4) return sproutStage4Image;
+function getSproutImageForPlant(plant, stage) {
+  const flower = isFlowerMaturePlant(plant);
+  if (stage >= 5) return flower ? flowerStage5Image : sproutStage5Image;
+  if (stage >= 4) return flower ? flowerStage4Image : sproutStage4Image;
   if (stage >= 3) return sproutStage3Image;
   if (stage === 2) return sproutStage2Image;
   return sproutStage1Image;
@@ -8822,17 +8839,21 @@ function updateBagInventorySlots() {
   });
 
   if (bagInventoryPanel) {
-    const powderUsable = magicPowderCount > 0 && isMagicPowderUsableNow();
-    bagInventoryPanel.querySelectorAll('.bag-inventory-slot[data-bag-type="magicPowder"]').forEach(
-      function (slot) {
-        slot.classList.toggle("is-magic-powder-usable", powderUsable);
-        if (powderUsable) {
-          slot.setAttribute("data-ovc-tip", "\uB9C8\uBC95\uC758 \uAC00\uB8E8 \u00B7 \uC0AC\uC6A9 click");
-        } else if (magicPowderCount > 0) {
-          slot.setAttribute("data-ovc-tip", "\uB9C8\uBC95\uC758 \uAC00\uB8E8");
-        }
+    bagInventoryPanel.querySelectorAll(".bag-inventory-slot").forEach(function (slot) {
+      const bagType = slot.dataset.bagType;
+      if (!isMagicPowderBagType(bagType)) return;
+      const count = getMagicPowderBagCount(bagType);
+      const powderUsable = count > 0 && isMagicPowderBagTypeUsableNow(bagType);
+      slot.classList.toggle("is-magic-powder-usable", powderUsable);
+      const baseTip = getBagItemDescriptorCore(bagType).label || "";
+      if (powderUsable) {
+        slot.setAttribute("data-ovc-tip", baseTip + " \u00B7 \uC0AC\uC6A9 click");
+        slot.setAttribute("aria-label", baseTip + " \u00B7 \uC0AC\uC6A9 click");
+      } else if (baseTip) {
+        slot.setAttribute("data-ovc-tip", baseTip);
+        slot.setAttribute("aria-label", baseTip);
       }
-    );
+    });
   }
 }
 
@@ -9932,6 +9953,8 @@ function createExtraPlant(id, x, y) {
     soilOrdinal: 0,
     sproutOrdinal: 0,
     grassOrdinal: null,
+    matureKind: "",
+    flowerOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null
   };
@@ -10057,6 +10080,7 @@ function refreshPlantIdentityOrdinals() {
     plant.soilOrdinal = 0;
     plant.sproutOrdinal = 0;
     plant.grassOrdinal = null;
+    plant.flowerOrdinal = null;
   }
   clearOrdinals(plantRuntime);
   appleState.extraPlants.forEach(clearOrdinals);
@@ -10067,7 +10091,7 @@ function refreshPlantIdentityOrdinals() {
     if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
     const k = plantOrdinalGroupKey(plant);
     if (!groups[k]) {
-      groups[k] = { soils: [], sprouts: [], grasses: [] };
+      groups[k] = { soils: [], sprouts: [], grasses: [], flowers: [] };
     }
     const t = plantWorldOrdinalSortTime(plant);
     const entry = { plant: plant, t: t };
@@ -10080,7 +10104,11 @@ function refreshPlantIdentityOrdinals() {
     if (!isPlantAliveForWorldOrdinal(plant)) return;
     const tier = Math.max(0, Number(plant.growthTier) || 0);
     if (tier >= 4) {
-      groups[k].grasses.push(entry);
+      if (isFlowerMaturePlant(plant)) {
+        groups[k].flowers.push(entry);
+      } else {
+        groups[k].grasses.push(entry);
+      }
     } else if (plant.isSproutGrown) {
       groups[k].sprouts.push(entry);
     } else {
@@ -10101,6 +10129,9 @@ function refreshPlantIdentityOrdinals() {
     g.grasses.sort(function (a, b) {
       return a.t - b.t;
     });
+    g.flowers.sort(function (a, b) {
+      return a.t - b.t;
+    });
     g.soils.forEach(function (e, i) {
       e.plant.soilOrdinal = i + 1;
     });
@@ -10109,6 +10140,9 @@ function refreshPlantIdentityOrdinals() {
     });
     g.grasses.forEach(function (e, i) {
       e.plant.grassOrdinal = i + 1;
+    });
+    g.flowers.forEach(function (e, i) {
+      e.plant.flowerOrdinal = i + 1;
     });
   });
 }
@@ -10121,6 +10155,8 @@ function assignSproutIdentityToNewPlant(plant) {
   plant.soilOrdinal = 0;
   plant.sproutOrdinal = 0;
   plant.grassOrdinal = null;
+  plant.matureKind = "";
+  plant.flowerOrdinal = null;
 }
 
 function ensureGrassOrdinalIfNeeded(plant) {
@@ -10151,7 +10187,14 @@ function getPlantWorldLabel(plant) {
     plant.grassOrdinal != null && Number.isFinite(Number(plant.grassOrdinal))
       ? Math.max(0, Number(plant.grassOrdinal))
       : 0;
+  const flowerOrd =
+    plant.flowerOrdinal != null && Number.isFinite(Number(plant.flowerOrdinal))
+      ? Math.max(0, Number(plant.flowerOrdinal))
+      : 0;
   if (tier >= 4) {
+    if (isFlowerMaturePlant(plant)) {
+      return name + "\uC758 \uAF43" + (flowerOrd > 0 ? flowerOrd : "");
+    }
     return name + "\uC758 \uD480" + (grassOrd > 0 ? grassOrd : "");
   }
   if (plant.isSproutGrown) {
@@ -10350,7 +10393,7 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
     onboardingFlowStep = 15;
     persistOnboardingStep();
   }
-  waterPlant(target);
+  waterPlant(target, { fillToCapacity: true });
   if (anchor) {
     createWaterSplashAt(anchor.x + PLANT_SPOT_WIDTH / 2, anchor.y + PLANT_SPOT_HEIGHT * 0.55, null);
   } else {
@@ -10839,10 +10882,11 @@ function getNextPowderTargetTier(plant) {
   return 4;
 }
 
-function applyMagicPowderToPlant(plant) {
+function applyMagicPowderToPlant(plant, bagType) {
   const nextTier = getNextPowderTargetTier(plant);
   if (!nextTier || isPowderUpgradeInProgress(plant)) return false;
   const now = Date.now();
+  plant.matureKind = getMatureKindForPowderBagType(bagType);
   plant.powderUpgradeTargetTier = nextTier;
   plant.powderUpgradeStartedAt = now;
   plant.powderUpgradeDurationMs = level4GrowMs;
@@ -10852,10 +10896,33 @@ function applyMagicPowderToPlant(plant) {
   return true;
 }
 
-/** ?릭 ???제?가루? ?비?는지(거리·?어·진행 ???? ?일 조건 */
-function isMagicPowderUsableNow() {
+function getMagicPowderBagCount(bagType) {
+  if (bagType === "magicPowder") {
+    return Math.max(0, Math.floor(magicPowderCount) || 0);
+  }
+  const field = getColoredPowderCountField(bagType);
+  if (!field) return 0;
+  return Math.max(0, Math.floor(Number(coloredMagicPowderCounts[field]) || 0));
+}
+
+function consumeMagicPowderBagItem(bagType) {
+  if (bagType === "magicPowder") {
+    if (magicPowderCount <= 0) return false;
+    magicPowderCount = Math.max(0, magicPowderCount - 1);
+    saveMagicPowderCount();
+    return true;
+  }
+  const field = getColoredPowderCountField(bagType);
+  if (!field || (Number(coloredMagicPowderCounts[field]) || 0) <= 0) return false;
+  coloredMagicPowderCounts[field] = Math.max(0, coloredMagicPowderCounts[field] - 1);
+  saveColoredMagicPowderCounts();
+  return true;
+}
+
+function isMagicPowderBagTypeUsableNow(bagType) {
   if (isOnboardingLinearGateActive()) return false;
-  if (magicPowderCount <= 0) return false;
+  if (!isMagicPowderBagType(bagType)) return false;
+  if (getMagicPowderBagCount(bagType) <= 0) return false;
   const target = getNearestPlantForMagicPowder();
   if (!target) return false;
   const nextTier = getNextPowderTargetTier(target.plant);
@@ -10863,18 +10930,22 @@ function isMagicPowderUsableNow() {
   return true;
 }
 
-function tryUseMagicPowder() {
+/** 회색 마법 가루 사용 가능(거리·수량·진행 중 여부) */
+function isMagicPowderUsableNow() {
+  return isMagicPowderBagTypeUsableNow("magicPowder");
+}
+
+function tryUseMagicPowderBagType(bagType) {
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
     return false;
   }
-  if (magicPowderCount <= 0) return false;
+  if (!isMagicPowderBagType(bagType) || getMagicPowderBagCount(bagType) <= 0) return false;
   const target = getNearestPlantForMagicPowder();
   if (!target) return false;
-  if (!applyMagicPowderToPlant(target.plant)) return false;
+  if (!applyMagicPowderToPlant(target.plant, bagType)) return false;
+  if (!consumeMagicPowderBagItem(bagType)) return false;
 
-  magicPowderCount = Math.max(0, magicPowderCount - 1);
-  saveMagicPowderCount();
   if (target.type === "main") {
     saveSeedState();
     holdLocalPlantStateAgainstStaleSnapshot(1600);
@@ -10885,9 +10956,14 @@ function tryUseMagicPowder() {
   }
   syncWorldState(true);
   updateMagicPowderInventoryUi();
+  updateBagInventorySlots();
   updatePlantState();
   updateExtraSeedsAndPlants();
   return true;
+}
+
+function tryUseMagicPowder() {
+  return tryUseMagicPowderBagType("magicPowder");
 }
 
 function triggerWaterSplash() {
@@ -11001,9 +11077,10 @@ function createWaterSplashAt(startX, startY, refElement) {
   }
 }
 
-function waterPlant(target) {
+function waterPlant(target, pourOptions) {
+  const fillToCapacity = Boolean(pourOptions && pourOptions.fillToCapacity);
   if (target && target.type === "extra") {
-    waterExtraPlant(target.plant);
+    waterExtraPlant(target.plant, pourOptions);
     return;
   }
 
@@ -11040,7 +11117,7 @@ function waterPlant(target) {
   }
 
   if (isFirstWater || plantRuntime.waterLevel <= 0) {
-    plantRuntime.waterLevel = 1;
+    plantRuntime.waterLevel = fillToCapacity ? waterCapacity : 1;
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   } else if (plantRuntime.waterLevel >= waterCapacity) {
@@ -11065,7 +11142,9 @@ function waterPlant(target) {
       plantRuntime.needsFirstWater = false;
     }
   } else {
-    plantRuntime.waterLevel = Math.min(waterCapacity, plantRuntime.waterLevel + 1);
+    plantRuntime.waterLevel = fillToCapacity
+      ? waterCapacity
+      : Math.min(waterCapacity, plantRuntime.waterLevel + 1);
     plantRuntime.isOverwatered = false;
     plantRuntime.status = "normal";
   }
@@ -11080,7 +11159,8 @@ function waterPlant(target) {
   onboardingHookWateredMainPlantFromTutorial();
 }
 
-function waterExtraPlant(plant) {
+function waterExtraPlant(plant, pourOptions) {
+  const fillToCapacity = Boolean(pourOptions && pourOptions.fillToCapacity);
   const now = getSharedPlantSimulationNow();
   normalizeExtraPlantState(plant);
   updateExtraPlantWaterLevel(plant, now);
@@ -11113,7 +11193,7 @@ function waterExtraPlant(plant) {
   }
 
   if (isFirstWater || plant.waterLevel <= 0) {
-    plant.waterLevel = 1;
+    plant.waterLevel = fillToCapacity ? waterCapacity : 1;
     plant.isOverwatered = false;
     plant.status = "normal";
   } else if (plant.waterLevel >= waterCapacity) {
@@ -11134,7 +11214,9 @@ function waterExtraPlant(plant) {
       plant.needsFirstWater = false;
     }
   } else {
-    plant.waterLevel = Math.min(waterCapacity, plant.waterLevel + 1);
+    plant.waterLevel = fillToCapacity
+      ? waterCapacity
+      : Math.min(waterCapacity, plant.waterLevel + 1);
     plant.isOverwatered = false;
     plant.status = "normal";
   }
@@ -11488,7 +11570,7 @@ function updateSproutPosition() {
   const sproutSize = getSproutSizeForStage(stage);
   sprout.style.display = "block";
   sprout.classList.toggle("is-big", stage >= 2);
-  sprout.src = getSproutImageForStage(stage);
+  sprout.src = getSproutImageForPlant(plantRuntime, stage);
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
   const sproutPos = getSproutWorldPositionForPlant(
     plantRuntime.spotX,
@@ -11838,6 +11920,13 @@ function applyLoadedPlantState(loadedPlant) {
     loadedPlant.grassOrdinal != null && Number.isFinite(Number(loadedPlant.grassOrdinal))
       ? Math.max(1, Number(loadedPlant.grassOrdinal))
       : null;
+  plantRuntime.matureKind = Object.prototype.hasOwnProperty.call(loadedPlant, "matureKind")
+    ? String(loadedPlant.matureKind || "")
+    : "";
+  plantRuntime.flowerOrdinal =
+    loadedPlant.flowerOrdinal != null && Number.isFinite(Number(loadedPlant.flowerOrdinal))
+      ? Math.max(1, Number(loadedPlant.flowerOrdinal))
+      : null;
 
   if (Object.prototype.hasOwnProperty.call(loadedPlant, "blockSproutRegrowthAfterDry")) {
     plantRuntime.blockSproutRegrowthAfterDry = Boolean(loadedPlant.blockSproutRegrowthAfterDry);
@@ -11925,6 +12014,11 @@ function getPlantStateForStorage() {
     grassOrdinal:
       plantRuntime.grassOrdinal != null && Number.isFinite(Number(plantRuntime.grassOrdinal))
         ? plantRuntime.grassOrdinal
+        : null,
+    matureKind: plantRuntime.matureKind != null ? String(plantRuntime.matureKind) : "",
+    flowerOrdinal:
+      plantRuntime.flowerOrdinal != null && Number.isFinite(Number(plantRuntime.flowerOrdinal))
+        ? plantRuntime.flowerOrdinal
         : null,
     blockSproutRegrowthAfterDry: Boolean(plantRuntime.blockSproutRegrowthAfterDry),
     drySoilAt:

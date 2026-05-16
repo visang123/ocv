@@ -152,6 +152,18 @@ export function parseMainPlantFromSnapshot(mp) {
   } else if (Object.prototype.hasOwnProperty.call(mp, "grassOrdinal")) {
     plantedFromSnapshot.grassOrdinal = null;
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "matureKind")) {
+    plantedFromSnapshot.matureKind = mp.matureKind != null ? String(mp.matureKind) : "";
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(mp, "flowerOrdinal") &&
+    mp.flowerOrdinal != null &&
+    Number.isFinite(Number(mp.flowerOrdinal))
+  ) {
+    plantedFromSnapshot.flowerOrdinal = Math.max(1, Number(mp.flowerOrdinal));
+  } else if (Object.prototype.hasOwnProperty.call(mp, "flowerOrdinal")) {
+    plantedFromSnapshot.flowerOrdinal = null;
+  }
   if (Object.prototype.hasOwnProperty.call(mp, "plantedAt")) {
     plantedFromSnapshot.plantPlantedAt = Number(mp.plantedAt) || null;
   } else if (Object.prototype.hasOwnProperty.call(mp, "plantPlantedAt")) {
@@ -290,6 +302,15 @@ export function parseExtraPlantFromSnapshot(plant) {
       plant.grassOrdinal != null &&
       Number.isFinite(Number(plant.grassOrdinal))
         ? Math.max(1, Number(plant.grassOrdinal))
+        : null,
+    matureKind: Object.prototype.hasOwnProperty.call(plant, "matureKind")
+      ? String(plant.matureKind || "")
+      : "",
+    flowerOrdinal:
+      Object.prototype.hasOwnProperty.call(plant, "flowerOrdinal") &&
+      plant.flowerOrdinal != null &&
+      Number.isFinite(Number(plant.flowerOrdinal))
+        ? Math.max(1, Number(plant.flowerOrdinal))
         : null
   };
   if (Object.prototype.hasOwnProperty.call(plant, "drySoilAt")) {
