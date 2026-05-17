@@ -3793,9 +3793,9 @@ body #world-bag-inventory {
 }
 
 :root {
-  --ovc-bag-inventory-left: calc(18px + 78px + 10px);
+  --ovc-bag-inventory-left: calc(18px + 78px);
   --ovc-bag-inventory-width: calc(3 * 60px + 2 * 9px + 30px);
-  --ovc-npc-ui-gap: 12px;
+  --ovc-npc-ui-gap: 0px;
   --ovc-npc-side-panel-left: calc(
     var(--ovc-bag-inventory-left) + var(--ovc-bag-inventory-width) + var(--ovc-npc-ui-gap)
   );

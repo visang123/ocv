@@ -7519,26 +7519,83 @@ function isPointerInElementRect(clientX, clientY, el) {
   );
 }
 
-function isPointerOverTradeCounterDropZone(clientX, clientY) {
-  return isPointerInElementRect(clientX, clientY, tradeCounterSlot);
+function getTradeExchangePanelEl() {
+  return tradeExchangeOverlay
+    ? tradeExchangeOverlay.querySelector(".trade-exchange-panel")
+    : null;
 }
 
-function isAlchemyCraftRequirementDropZoneVisible() {
-  if (!isAlchemyCraftOpen() || !alchemyCraftRequirementsBlock) return false;
-  return !alchemyCraftRequirementsBlock.classList.contains("is-hidden");
+function getAlchemyCraftPanelEl() {
+  return alchemyCraftOverlay ? alchemyCraftOverlay.querySelector(".alchemy-craft-panel") : null;
 }
 
-function isPointerOverAlchemyRequirementDropZone(clientX, clientY) {
-  if (!isAlchemyCraftRequirementDropZoneVisible()) return false;
-  return isPointerInElementRect(clientX, clientY, alchemyCraftRequirementSlots);
+function isPointerOverTradeExchangePanel(clientX, clientY) {
+  return isPointerInElementRect(clientX, clientY, getTradeExchangePanelEl());
+}
+
+function isPointerOverAlchemyCraftPanel(clientX, clientY) {
+  if (!isAlchemyCraftOpen()) return false;
+  return isPointerInElementRect(clientX, clientY, getAlchemyCraftPanelEl());
+}
+
+function unionElementBoundingRects(elements) {
+  const rects = (elements || [])
+    .filter(Boolean)
+    .map(function (el) {
+      return el.getBoundingClientRect();
+    })
+    .filter(function (rect) {
+      return rect.width > 0 || rect.height > 0;
+    });
+  if (!rects.length) return null;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  rects.forEach(function (rect) {
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  });
+  return { left: left, top: top, right: right, bottom: bottom };
+}
+
+/** ??????? ?????/?? ?? ?? ???? ??? ??? ?? ??? ?? ?? ?? */
+function getCraftTradeCombinedBoundingRect(dragMode) {
+  const elements = [];
+  if (bagInventoryPanel && bagInventoryPanel.style.display !== "none") {
+    elements.push(bagInventoryPanel);
+  }
+  if (worldBagInventory && worldBagInventory.style.display !== "none") {
+    elements.push(worldBagInventory);
+  }
+  const sidePanel =
+    dragMode === "alchemy" ? getAlchemyCraftPanelEl() : getTradeExchangePanelEl();
+  if (sidePanel) elements.push(sidePanel);
+  return unionElementBoundingRects(elements);
+}
+
+function isPointerOverCraftTradeCombinedZone(clientX, clientY, dragMode) {
+  const rect = getCraftTradeCombinedBoundingRect(dragMode);
+  if (!rect) return false;
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
 }
 
 function shouldDiscardBagDragAt(clientX, clientY, dragMode) {
   if (isPointerInsideBagInventoryPanel(clientX, clientY)) return false;
-  if (dragMode === "trade" && isPointerOverTradeCounterDropZone(clientX, clientY)) {
+  if (dragMode === "trade" || dragMode === "alchemy") {
+    if (isPointerOverCraftTradeCombinedZone(clientX, clientY, dragMode)) return false;
+  }
+  if (dragMode === "trade" && isPointerOverTradeExchangePanel(clientX, clientY)) {
     return false;
   }
-  if (dragMode === "alchemy" && isPointerOverAlchemyRequirementDropZone(clientX, clientY)) {
+  if (dragMode === "alchemy" && isPointerOverAlchemyCraftPanel(clientX, clientY)) {
     return false;
   }
   return true;
@@ -7589,6 +7646,10 @@ async function finishBagInventoryDrag(event) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
     if (canDragBagItemToAlchemyCraft(itemKey)) {
       if (tryDropBagItemOnAlchemyRequirement(itemKey, target)) return;
+      if (isPointerOverCraftTradeCombinedZone(event.clientX, event.clientY, "alchemy")) {
+        const panel = getAlchemyCraftPanelEl();
+        if (panel && tryDropBagItemOnAlchemyRequirement(itemKey, panel)) return;
+      }
     }
     if (shouldDiscardBagDragAt(event.clientX, event.clientY, "alchemy")) {
       await tryDiscardBagItemFromDrag(itemKey);
@@ -7599,6 +7660,10 @@ async function finishBagInventoryDrag(event) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
     if (canDragBagItemToTradeCounter(itemKey)) {
       if (tryDropBagItemOnTradeCounter(itemKey, target)) return;
+      if (isPointerOverCraftTradeCombinedZone(event.clientX, event.clientY, "trade")) {
+        const panel = getTradeExchangePanelEl();
+        if (panel && tryDropBagItemOnTradeCounter(itemKey, panel)) return;
+      }
     }
     if (shouldDiscardBagDragAt(event.clientX, event.clientY, "trade")) {
       await tryDiscardBagItemFromDrag(itemKey);

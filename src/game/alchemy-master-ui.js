@@ -336,9 +336,29 @@ export function addInventoryItemsToAlchemySlots(itemKey, preferredSlotIndex) {
   return addedAny;
 }
 
+function getAlchemyCraftPanelEl() {
+  if (!host || !host.alchemyCraftOverlay) return null;
+  return host.alchemyCraftOverlay.querySelector(".alchemy-craft-panel");
+}
+
 /** @param {Element | null | undefined} targetEl */
 export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
   if (!itemKey || !(targetEl instanceof Element) || !host) return false;
+  const panel = getAlchemyCraftPanelEl();
+  if (!panel || (!panel.contains(targetEl) && targetEl !== panel)) return false;
+  if (!requirementsVisible) {
+    if (selectedRecipeId) {
+      showAlchemyRequirements();
+    } else if (host.showPlayerAlert) {
+      host.showPlayerAlert({
+        message: "\uBA3C\uC800 \uC81C\uC791\uD560 \uC544\uC774\uD15C\uC744 \uACE0\uB974\uC138\uC694.",
+        durationMs: 2200
+      });
+      return false;
+    } else {
+      return false;
+    }
+  }
   const slotsRoot = host.alchemyCraftRequirementSlots;
   if (!slotsRoot) return false;
   const slotEl = targetEl.closest(".alchemy-craft-req-slot");
@@ -348,7 +368,6 @@ export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
       return addInventoryItemsToAlchemySlots(itemKey, index);
     }
   }
-  if (!slotsRoot.contains(targetEl) && targetEl !== slotsRoot) return false;
   return addInventoryItemsToAlchemySlots(itemKey);
 }
 

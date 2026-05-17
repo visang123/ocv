@@ -398,13 +398,17 @@ export function addFullInventoryStackToTradeCounter(itemKey) {
   return true;
 }
 
+function getTradeExchangePanelEl() {
+  if (!host || !host.tradeExchangeOverlay) return null;
+  return host.tradeExchangeOverlay.querySelector(".trade-exchange-panel");
+}
+
 /** @param {Element | null | undefined} targetEl */
 export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
-  if (!itemKey || !exchangeOpen || !host || !host.tradeCounterSlot) return false;
+  if (!itemKey || !exchangeOpen || !host) return false;
   if (!(targetEl instanceof Element)) return false;
-  if (!host.tradeCounterSlot.contains(targetEl) && targetEl !== host.tradeCounterSlot) {
-    return false;
-  }
+  const panel = getTradeExchangePanelEl();
+  if (!panel || (!panel.contains(targetEl) && targetEl !== panel)) return false;
   return addFullInventoryStackToTradeCounter(itemKey);
 }
 
