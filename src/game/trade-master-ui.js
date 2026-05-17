@@ -394,6 +394,10 @@ function bagSlotToItemKey(slotEl) {
   return kind;
 }
 
+export function relayoutTradeMasterSpeechBubble() {
+  layoutTradeSpeechBubble();
+}
+
 function layoutTradeSpeechBubble() {
   if (!host || !host.tradeMasterBubble) return;
   const bubble = host.tradeMasterBubble;
@@ -403,12 +407,17 @@ function layoutTradeSpeechBubble() {
   const headTop = host.getNpcHeadTopWorldY
     ? host.getNpcHeadTopWorldY(host.TRADE_MASTER_START_Y)
     : host.TRADE_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
+  const hoverShift = host.getWorldNpcPromptBubbleExtraShiftWorld
+    ? host.getWorldNpcPromptBubbleExtraShiftWorld(host.tradeMaster)
+    : 0;
   const bubbleWorldY =
     host.speechBubbleTopWorldYFromHead(
       headTop,
       host.tradeMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
-    ) - host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
+    ) -
+    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD -
+    hoverShift;
   host.setSpeechBubbleTransform(
     host.tradeMasterBubble,
     host.TRADE_MASTER_START_X + host.NPC_WIDTH / 2 - bubbleWidth / 2,

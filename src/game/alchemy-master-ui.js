@@ -365,18 +365,27 @@ function bagSlotToItemKey(slotEl) {
   return kind;
 }
 
+export function relayoutAlchemyMasterSpeechBubble() {
+  layoutAlchemySpeechBubble();
+}
+
 function layoutAlchemySpeechBubble() {
   if (!host || !host.alchemyMasterBubble) return;
   const bubbleWidth = host.alchemyMasterBubble.offsetWidth || 48;
   const headTop = host.getNpcHeadTopWorldY
     ? host.getNpcHeadTopWorldY(host.ALCHEMY_MASTER_START_Y)
     : host.ALCHEMY_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
+  const hoverShift = host.getWorldNpcPromptBubbleExtraShiftWorld
+    ? host.getWorldNpcPromptBubbleExtraShiftWorld(host.alchemyMaster)
+    : 0;
   const bubbleWorldY =
     host.speechBubbleTopWorldYFromHead(
       headTop,
       host.alchemyMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
-    ) - host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
+    ) -
+    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD -
+    hoverShift;
   host.setSpeechBubbleTransform(
     host.alchemyMasterBubble,
     host.ALCHEMY_MASTER_START_X + host.NPC_WIDTH / 2 - bubbleWidth / 2,
