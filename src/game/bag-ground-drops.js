@@ -3,6 +3,8 @@
 export const BAG_DROP_WORLD_SIZE = 9;
 export const BAG_DROP_SNAP_GRID = 10;
 export const BAG_DROP_FOOT_OFFSET_Y = 8;
+/** 주우지 않은 바닥 아이템이 사라지기까지(ms) */
+export const BAG_DROP_DESPAWN_MS = 60000;
 
 const DROP_VISUALS = {
   seed: {
@@ -82,6 +84,18 @@ export function snapBagDropCoord(value) {
 
 export function getBagDropStackKey(x, y) {
   return snapBagDropCoord(x) + "," + snapBagDropCoord(y);
+}
+
+export function getWorldBagDropAgeMs(drop, nowMs) {
+  if (!drop) return Infinity;
+  const now = Number(nowMs);
+  const droppedAt = Number(drop.droppedAt) || 0;
+  if (!Number.isFinite(now) || droppedAt <= 0) return Infinity;
+  return Math.max(0, now - droppedAt);
+}
+
+export function isWorldBagDropExpired(drop, nowMs) {
+  return getWorldBagDropAgeMs(drop, nowMs) >= BAG_DROP_DESPAWN_MS;
 }
 
 export function getBagDropGroundVisual(itemKey) {

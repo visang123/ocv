@@ -24,6 +24,7 @@ FILES = [
     "magic-powder-brown-inv.png",
     "magic-powder-mixed-inv.png",
     "magic-powder-gray.png",
+    "bucket-inv.png",
 ]
 
 

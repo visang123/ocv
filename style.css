@@ -1345,6 +1345,7 @@ body::-webkit-scrollbar {
   animation: onboarding-target-glow 1.1s ease-in-out infinite;
 }
 
+#bag-inventory-panel .bag-book-storage-slot.onboarding-highlight,
 #bag-inventory-panel .bag-inventory-slot.onboarding-highlight {
   z-index: 28 !important;
   outline: 4px solid #ea580c;
@@ -1877,9 +1878,15 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 12px;
   top: 18px;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: url("이미지/bucket-empty.png") center / contain no-repeat;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.remote-player.is-carrying-bucket.is-carrying-bucket-full::after {
+  background-image: url("이미지/bucket-full.png");
 }
 
 .remote-player-body {
@@ -3650,7 +3657,7 @@ body #world-bag-inventory {
 
 :root {
   --ovc-bag-inventory-left: calc(18px + 78px + 10px);
-  --ovc-bag-inventory-width: calc(3 * 60px + 2 * 9px + 30px);
+  --ovc-bag-inventory-width: calc(5 * 60px + 4 * 9px + 30px);
   --ovc-npc-ui-gap: 12px;
   --ovc-npc-side-panel-left: calc(
     var(--ovc-bag-inventory-left) + var(--ovc-bag-inventory-width) + var(--ovc-npc-ui-gap)
@@ -3701,10 +3708,34 @@ body #world-bag-inventory {
   outline-offset: 2px;
 }
 
+.bag-book-storage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 15px 0;
+  box-sizing: border-box;
+}
+
+.bag-book-storage-label {
+  margin: 0;
+  font: 700 13px/1.2 Arial, sans-serif;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.02em;
+}
+
+.bag-book-storage-slot {
+  cursor: pointer;
+}
+
+.bag-book-storage-slot.is-empty {
+  cursor: default;
+}
+
 .bag-inventory-slots {
   display: grid;
-  grid-template-columns: repeat(3, 60px);
-  grid-template-rows: repeat(3, 60px);
+  grid-template-columns: repeat(5, 60px);
+  grid-template-rows: repeat(2, 60px);
   gap: 9px;
   padding: 12px 15px;
   background: rgba(8, 12, 24, 0.38);
@@ -3793,6 +3824,13 @@ body #world-bag-inventory {
   width: 46px;
   height: 46px;
   object-fit: contain;
+}
+
+.bag-slot-icon--bucket {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.22));
 }
 
 .bag-slot-icon--magic-powder {
@@ -4058,8 +4096,8 @@ body #world-bag-inventory {
   position: fixed;
   left: var(--ovc-npc-side-panel-left);
   bottom: 18px;
-  width: 200px;
-  padding: 10px 12px 12px;
+  width: 300px;
+  padding: 12px 14px 14px;
   border-radius: 16px;
   background: rgba(8, 12, 24, 0.52);
   border: 1px solid rgba(255, 255, 255, 0.32);
@@ -4078,7 +4116,7 @@ body #world-bag-inventory {
 
 .trade-exchange-header h2 {
   margin: 0;
-  font: 800 14px/1.2 Arial, sans-serif;
+  font: 800 16px/1.2 Arial, sans-serif;
   color: #f8fafc;
 }
 
@@ -4095,13 +4133,13 @@ body #world-bag-inventory {
 
 .trade-exchange-hint {
   margin: 0 0 8px;
-  font: 600 10px/1.35 Arial, sans-serif;
+  font: 600 11px/1.4 Arial, sans-serif;
   color: rgba(248, 250, 252, 0.88);
 }
 
 .trade-tradeable-label {
-  margin: 0 0 4px;
-  font: 700 10px/1.2 Arial, sans-serif;
+  margin: 0 0 6px;
+  font: 700 12px/1.2 Arial, sans-serif;
   color: rgba(251, 191, 36, 0.95);
   letter-spacing: 0.02em;
 }
@@ -4109,14 +4147,25 @@ body #world-bag-inventory {
 .trade-tradeable-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 8px;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(0, 0, 0, 0.18);
-  max-height: 140px;
+  max-height: 280px;
   overflow-y: auto;
+}
+
+.trade-tradeable-step-hint {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  font: 700 11px/1.4 Arial, sans-serif;
+  color: rgba(253, 230, 138, 0.98);
+  text-align: center;
 }
 
 .trade-tradeable-recipe {
@@ -4124,7 +4173,7 @@ body #world-bag-inventory {
   align-items: center;
   width: 100%;
   margin: 0;
-  padding: 4px 6px;
+  padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -4181,15 +4230,15 @@ button.trade-tradeable-recipe.is-selected {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  min-height: 26px;
+  min-width: 32px;
+  min-height: 32px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.22);
 }
 
 .trade-recipe-io .bag-slot-icon {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 }
 
 .trade-recipe-io-count {
@@ -4217,13 +4266,13 @@ button.trade-tradeable-recipe.is-selected {
 }
 
 .trade-recipe-io-icons .bag-slot-icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .trade-recipe-arrow {
   flex-shrink: 0;
-  font: 800 11px/1 Arial, sans-serif;
+  font: 800 13px/1 Arial, sans-serif;
   color: rgba(251, 191, 36, 0.95);
 }
 
@@ -4398,12 +4447,12 @@ button.trade-tradeable-recipe.is-selected {
 
 .trade-exchange-confirm {
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: none;
   border-radius: 10px;
   background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
   color: #111;
-  font: 800 12px/1.2 Arial, sans-serif;
+  font: 800 13px/1.2 Arial, sans-serif;
   cursor: pointer;
 }
 

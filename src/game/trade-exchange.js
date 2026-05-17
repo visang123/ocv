@@ -212,18 +212,51 @@ export function getMatchingTradeRecipes(counter) {
   });
 }
 
-export function recipeMatchesCounter(counter, recipe) {
-  if (!recipe) return false;
-  return Object.keys(recipe.inputs).every(function (key) {
-    return tradeInputSatisfied(counter, key, recipe.inputs[key]);
+export function getRecipeTradeBatchCount(counter, recipe) {
+  if (!recipe) return 0;
+  const inputKeys = Object.keys(recipe.inputs || {});
+  if (!inputKeys.length) return 0;
+  let minBatch = Infinity;
+  inputKeys.forEach(function (key) {
+    const required = Math.max(1, Math.floor(Number(recipe.inputs[key]) || 0));
+    let available = 0;
+    if (key === TRADE_INPUT_ANY_BUTTERFLY) {
+      available = getTradeCounterButterflyTotal(counter);
+    } else {
+      available = Math.max(0, Math.floor(Number(counter[key]) || 0));
+    }
+    minBatch = Math.min(minBatch, Math.floor(available / required));
   });
+  return minBatch === Infinity ? 0 : Math.max(0, minBatch);
 }
 
-export function subtractRecipeInputsFromCounter(counter, recipe) {
+/** @param {Record<string, number>} side @param {number} multiplier */
+export function scaleTradeItemCounts(side, multiplier) {
+  const mult = Math.max(0, Math.floor(Number(multiplier) || 0));
+  if (mult <= 0) return {};
+  const scaled = {};
+  Object.keys(side || {}).forEach(function (key) {
+    const base = Math.max(0, Math.floor(Number(side[key]) || 0));
+    if (base > 0) scaled[key] = base * mult;
+  });
+  return scaled;
+}
+
+export function recipeMatchesCounter(counter, recipe) {
+  return getRecipeTradeBatchCount(counter, recipe) >= 1;
+}
+
+export function subtractRecipeInputsFromCounter(counter, recipe, batchCount) {
   const next = cloneTradeCounter(counter);
   if (!recipe) return next;
+  const batches =
+    batchCount === undefined
+      ? 1
+      : Math.max(0, Math.floor(Number(batchCount) || 0));
+  if (batches <= 0) return next;
   Object.keys(recipe.inputs).forEach(function (key) {
-    subtractTradeInputFromCounter(next, key, recipe.inputs[key]);
+    const perBatch = Math.max(0, Math.floor(Number(recipe.inputs[key]) || 0));
+    subtractTradeInputFromCounter(next, key, perBatch * batches);
   });
   return next;
 }

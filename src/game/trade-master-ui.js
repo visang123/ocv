@@ -6,7 +6,9 @@ import {
   getMatchingRecipesForCatalogEntry,
   getTradeCatalogEntries,
   getTradeRecipeById,
+  getRecipeTradeBatchCount,
   recipeMatchesCounter,
+  scaleTradeItemCounts,
   subtractRecipeInputsFromCounter
 } from "./trade-exchange.js";
 
@@ -590,9 +592,10 @@ function buildTradeRecipeSideIconsHtml(side) {
 function buildTradeButterflyAnyIconsHtml(total) {
   const n = Math.max(0, Math.floor(Number(total) || 0));
   if (n <= 0) return "";
+  const iconCount = Math.min(n, 5);
   const colors = ["brown", "yellow", "white"];
   let html = "";
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < iconCount; i++) {
     const color = colors[i % colors.length];
     html +=
       '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-' +
@@ -646,9 +649,17 @@ function renderTradeTradeableList() {
       const classNames = ["trade-tradeable-recipe"];
       if (isAvailable) classNames.push("is-available");
       if (isSelected) classNames.push("is-selected");
-      const flow = activeRecipe
-        ? buildTradeRecipeFlowHtml(activeRecipe.inputs, activeRecipe.outputs, "→")
-        : buildTradeRecipeFlowHtml(entry.inputs, entry.outputs, "↔");
+      const batchCount = activeRecipe
+        ? getRecipeTradeBatchCount(counterByKey, activeRecipe)
+        : 0;
+      const flow =
+        activeRecipe && batchCount > 0
+          ? buildTradeRecipeFlowHtml(
+              scaleTradeItemCounts(activeRecipe.inputs, batchCount),
+              scaleTradeItemCounts(activeRecipe.outputs, batchCount),
+              "→"
+            )
+          : buildTradeRecipeFlowHtml(entry.inputs, entry.outputs, "↔");
       if (isAvailable) {
         return (
           '<button type="button" class="' +
@@ -702,19 +713,25 @@ function renderTradeOffers() {
 function updateTradeConfirmButton() {
   if (!host.tradeExchangeConfirm) return;
   const recipe = getTradeRecipeById(selectedRecipeId);
-  const ok = Boolean(recipe && recipeMatchesCounter(counterByKey, recipe));
+  const batchCount = recipe ? getRecipeTradeBatchCount(counterByKey, recipe) : 0;
+  const ok = batchCount >= 1;
   host.tradeExchangeConfirm.disabled = !ok;
+  host.tradeExchangeConfirm.textContent =
+    batchCount > 1 ? "\uAD50\uD658 \u00D7" + batchCount : "\uAD50\uD658";
 }
 
 function confirmSelectedTrade() {
   const recipe = getTradeRecipeById(selectedRecipeId);
-  if (!recipe || !recipeMatchesCounter(counterByKey, recipe)) return;
-  const expandedOutputs = expandTradeItemCounts(recipe.outputs);
+  const batchCount = recipe ? getRecipeTradeBatchCount(counterByKey, recipe) : 0;
+  if (!recipe || batchCount < 1) return;
+  const expandedOutputs = expandTradeItemCounts(
+    scaleTradeItemCounts(recipe.outputs, batchCount)
+  );
   if (host.canAddBagItems && !host.canAddBagItems(expandedOutputs)) {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
   }
-  counterByKey = subtractRecipeInputsFromCounter(counterByKey, recipe);
+  counterByKey = subtractRecipeInputsFromCounter(counterByKey, recipe, batchCount);
   Object.keys(expandedOutputs).forEach(function (key) {
     host.addBagItems(key, Number(expandedOutputs[key] || 0));
   });
@@ -724,4 +741,7 @@ function confirmSelectedTrade() {
   host.updateBagInventorySlots();
   host.saveAppleState();
   host.markWorldDirty();
+  if (typeof host.syncWorldState === "function") {
+    host.syncWorldState(true);
+  }
 }

@@ -1,5 +1,4 @@
 export const BAG_SLOT_ITEM_KEYS = [
-  "book",
   "seed",
   "overgrowthSeed",
   "apple",
@@ -19,8 +18,11 @@ export const BAG_SLOT_ITEM_KEYS = [
 
 export const bagInventoryOrderKey = "ovcBagInventoryOrderV1";
 
-/** 가방 UI 슬롯 수(3×3) */
-export const BAG_INVENTORY_SLOT_COUNT = 9;
+/** 가방 UI 슬롯 수(5×2, 책 제외) */
+export const BAG_INVENTORY_SLOT_COUNT = 10;
+
+/** 책 전용 보관 슬롯 수(가방 칸과 별도) */
+export const BAG_BOOK_STORAGE_SLOT_COUNT = 1;
 
 const BAG_INVENTORY_WORLD_ONLY_KEYS = new Set(["worldBucket"]);
 
@@ -54,7 +56,7 @@ export function loadBagInventoryOrder(readValue) {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(function (key) {
-      return BAG_SLOT_ITEM_KEYS.includes(key);
+      return key !== "book" && BAG_SLOT_ITEM_KEYS.includes(key);
     });
   } catch (e) {
     return [];
@@ -123,9 +125,9 @@ export function getBagItemDescriptor(itemKey) {
     return {
       bagType: "book",
       butterflyColor: "",
-      label: "\uC2DD\uBB3C\uC758 \uCC45",
+      label: "OVC 백과사전",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512x" alt="plant book" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon" src="이미지/plant-book-icon.png?v=20260512x" alt="OVC 백과사전" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "seed") {
@@ -169,7 +171,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC591\uB3D9\uC774",
       iconHtml:
-        '<img class="bag-slot-icon" src="이미지/bucket-empty.png" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--bucket" src="이미지/bucket-inv.png?v=20260517a" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "magicPowder") {

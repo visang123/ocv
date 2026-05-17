@@ -1,5 +1,28 @@
 /** 설정 「튜토리얼 하기」로 연 일회성 재생 세션(탭 단위). 없으면 월드 경험 계정은 튜토리얼에 갇히지 않게 복구한다. */
 export const ovcTutorialReplaySessionKey = "ovcTutorialReplaySessionV1";
+export const ovcTutorialWorldResetPendingKey = "ovcTutorialWorldResetPending";
+
+export function ovcTutorialReplaySessionActive() {
+  try {
+    return sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+/** 설정 「튜토리얼 하기」 직후 tutorial.html 로드·월드 초기화 대기 */
+export function ovcTutorialWorldResetPending() {
+  try {
+    return sessionStorage.getItem(ovcTutorialWorldResetPendingKey) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+export function ovcTutorialIntentionalEntryActive() {
+  return ovcTutorialReplaySessionActive() || ovcTutorialWorldResetPending();
+}
+
 /** 튜토리얼 갇힘 탈출: `?ovc_world=1` 또는 sessionStorage 플래그 → index(월드)로 두고 온보딩 완료 저장 */
 export const ovcForceWorldHubSessionKey = "ovcForceWorldHubV1";
 export const ovcForceWorldHubUrlParam = "ovc_world";

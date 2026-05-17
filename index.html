@@ -76,8 +76,8 @@
         <img
           id="guide-book"
           src="이미지/plant-book-ground.png?v=20260512w"
-          alt="식물의 책"
-          title="식물의 책"
+          alt="OVC 백과사전"
+          title="OVC 백과사전"
           draggable="false"
         >
         <img
@@ -214,7 +214,7 @@
       <button id="guide-next" type="button">&#8250;</button>
     </div>
   </div>
-  <button id="guide-book-button" type="button" hidden aria-hidden="true">식물의 책</button>
+  <button id="guide-book-button" type="button" hidden aria-hidden="true">OVC 백과사전</button>
   <button id="world-bag-inventory" type="button" aria-label="가방 인벤토리" style="display: none">
     <img
       class="world-bag-inventory-img"
@@ -367,7 +367,16 @@
         &#215;
       </button>
     </div>
-    <div class="bag-inventory-slots" role="group" aria-label="가방 칸 3×3">
+    <section class="bag-book-storage" aria-label="책 보관">
+      <p class="bag-book-storage-label">책 보관</p>
+      <div
+        id="bag-book-storage-slot"
+        class="bag-book-storage-slot bag-inventory-slot bag-inventory-slot--empty is-empty"
+        data-slot="book"
+        data-bag-type="empty"
+      ></div>
+    </section>
+    <div class="bag-inventory-slots" role="group" aria-label="가방 칸 5×2">
       <div class="bag-inventory-slot" data-slot="0" data-bag-type="seed">
         <img class="bag-slot-icon" src="이미지/seed.png" alt="" width="42" height="42" draggable="false">
         <span class="bag-slot-count">0</span>
@@ -392,6 +401,7 @@
       <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="6" data-bag-type="empty"></div>
       <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="7" data-bag-type="empty"></div>
       <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="8" data-bag-type="empty"></div>
+      <div class="bag-inventory-slot bag-inventory-slot--empty" data-slot="9" data-bag-type="empty"></div>
     </div>
   </div>
 
@@ -406,6 +416,7 @@
       <p class="trade-exchange-hint">가방에서 아이템을 클릭해 교환대에 올리세요. 바깥으로 끌면 버릴 수 있습니다.</p>
       <p class="trade-tradeable-label">거래 가능</p>
       <div id="trade-tradeable-list" class="trade-tradeable-list" aria-label="거래 가능 아이템"></div>
+      <p class="trade-tradeable-step-hint">거래가능 목록 클릭 후, 교환 버튼을 클릭하세요.</p>
       <div id="trade-counter-slot" class="trade-counter-slot" aria-label="교환대"></div>
       <ul id="trade-offer-list" class="trade-offer-list" aria-label="교환 가능 목록"></ul>
       <button type="button" id="trade-exchange-confirm" class="trade-exchange-confirm" disabled>

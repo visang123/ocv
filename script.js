@@ -238,6 +238,7 @@ import {
   worldBagInventory,
   bagInventoryPanel,
   bagInventoryClose,
+  bagBookStorageSlot,
   guideCard,
   guideCloseButton,
   guidePages,
@@ -378,6 +379,8 @@ import {
 } from "./src/app/settings-panel.js";
 import {
   ovcTutorialReplaySessionKey,
+  ovcTutorialWorldResetPendingKey,
+  ovcTutorialIntentionalEntryActive,
   ovcClearPendingWorldHubMarkers,
   ovcTutorialPageUrl,
   ovcWorldIndexUrl,
@@ -394,8 +397,9 @@ import {
   saveBagInventoryOrder as saveBagInventoryOrderCore,
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
   getBagItemDescriptor as getBagItemDescriptorCore,
-  canBagInventoryFitItems
-} from "./src/game/bag-inventory.js?v=20260517a";
+  canBagInventoryFitItems,
+  BAG_INVENTORY_SLOT_COUNT
+} from "./src/game/bag-inventory.js?v=20260517b";
 import {
   BAG_DROP_WORLD_SIZE,
   BAG_DROP_FOOT_OFFSET_Y,
@@ -405,6 +409,7 @@ import {
   getBagDropGroundVisual,
   getBagDropStackKey,
   getWorldBagDropZIndex,
+  isWorldBagDropExpired,
   parseWorldBagDropFromSnapshot,
   serializeWorldBagDropForSnapshot,
   snapBagDropCoord,
@@ -657,6 +662,7 @@ function accountTutorialDoneTruthy(account) {
 
 /** 서버 계정 tutorial_done → 로컬 온보딩 완료(다른 기기·시크릿 창 복원) */
 function hydrateTutorialProgressFromServerAccount(account) {
+  if (ovcTutorialIntentionalEntryActive()) return false;
   if (!accountTutorialDoneTruthy(account)) return false;
   setOnboardingFlowDoneStored(true);
   setStoredFlag(everBeenToWorldKey, true);
@@ -670,6 +676,9 @@ function hydrateTutorialProgressFromServerAccount(account) {
 }
 
 async function syncTutorialDoneFromServerIfNeeded() {
+  if (ovcTutorialIntentionalEntryActive()) {
+    return false;
+  }
   if (!currentUserId || getStoredFlag(onboardingFlowDoneKey)) {
     return Boolean(getStoredFlag(onboardingFlowDoneKey));
   }
@@ -903,6 +912,7 @@ function loadBagInventoryOrder() {
   return loadBagInventoryOrderCore(getStoredValue)
     .map(normalizeBagItemKey)
     .filter(function (key) {
+      if (key === "book") return false;
       if (key !== "magicPowder") return true;
       if (seenMagicPowder.has("magicPowder")) return false;
       seenMagicPowder.add("magicPowder");
@@ -944,6 +954,12 @@ function migrateLegacyMixedMagicPowderIntoBase() {
 }
 
 bagInventoryItemOrder = loadBagInventoryOrder();
+if (bagInventoryItemOrder.some(function (key) { return key === "book"; })) {
+  bagInventoryItemOrder = bagInventoryItemOrder.filter(function (key) {
+    return key !== "book";
+  });
+  saveBagInventoryOrder();
+}
 
 let plantProgressScoreTickRowBound = false;
 /** 현재 식물지수 숫자를 500 눈금 행과 한 줄에 배치(겹침 방지) */
@@ -1628,7 +1644,11 @@ let localPlantActionLockUntil = 0;
 let localAppleActionLockUntil = 0;
 /** Extra-bucket id -> ms until local drop must win over stale shared snapshots */
 let pendingLocalExtraBucketDropUntilById = Object.create(null);
+/** Extra-bucket id -> ms until local craft/spawn must win over stale shared snapshots */
+let pendingLocalExtraBucketSpawnUntilById = Object.create(null);
 let lastWorldBagDropChangeAt = 0;
+let lastWorldBagDropDespawnAt = 0;
+const WORLD_BAG_DROP_DESPAWN_TICK_MS = 1000;
 let bagInventoryDragState = null;
 let bagInventoryDragGhostEl = null;
 let craftTradeDragClickSuppress = false;
@@ -2591,6 +2611,23 @@ if (bagInventoryPanel) {
     }
     const slot = event.target.closest(".bag-inventory-slot");
     if (!slot || !bagInventoryPanel.contains(slot)) return;
+    if (slot === bagBookStorageSlot) {
+      if (!hasGuideBookItemInBagCounts()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const wasOpen = isGuideBookOpen || guideCard.style.display === "block";
+      isGuideDismissedAtSign = false;
+      isGuideBookOpen = !wasOpen;
+      if (wasOpen) {
+        dismissGuideBookClickPrompt();
+      }
+      updateGuideCard();
+      if (wasOpen) {
+        maybeAdvanceOnboardingAfterGuideBookClosed();
+      }
+      updateOnboardingFlowUI();
+      return;
+    }
     if (isAlchemyCraftOpen()) {
       event.preventDefault();
       event.stopPropagation();
@@ -2731,6 +2768,7 @@ bindTradeMaster({
   showInventoryFullFail: showBagInventoryFullFailMessage,
   saveAppleState: saveAppleState,
   markWorldDirty: markWorldDirty,
+  syncWorldState: syncWorldState,
   showPlayerAlert: showPlayerAlert,
   consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
   isNpcDialogueRunning: function () {
@@ -3174,10 +3212,11 @@ function replayTutorialFromSettings() {
   try {
     sessionStorage.setItem(ovcTutorialReplaySessionKey, "1");
   } catch (eReplay) {}
+  setOnboardingFlowDoneStored(false);
   resetTutorialProgressInStorage();
   setStoredValue(onboardingTutorialBindSessionKey, sid);
   try {
-    sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+    sessionStorage.setItem(ovcTutorialWorldResetPendingKey, "1");
   } catch (e3) {}
   isReloadingForWorldReset = true;
   window.location.replace(ovcTutorialPageUrl());
@@ -3793,8 +3832,11 @@ function clearOnboardingHighlights() {
   if (worldBagInventory) {
     worldBagInventory.classList.remove("onboarding-highlight-book-inv");
   }
+  if (bagBookStorageSlot) {
+    bagBookStorageSlot.classList.remove("onboarding-highlight");
+  }
   if (bagInventoryPanel) {
-    bagInventoryPanel.querySelectorAll(".bag-inventory-slot").forEach(function (el) {
+    bagInventoryPanel.querySelectorAll(".bag-inventory-slots .bag-inventory-slot").forEach(function (el) {
       el.classList.remove("onboarding-highlight");
     });
   }
@@ -4599,6 +4641,9 @@ function updateOnboardingFlowUI() {
       if (guideOpen) {
         setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
+        if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
+          bagBookStorageSlot.classList.add("onboarding-highlight");
+        }
       } else {
         setOnboardingCalloutVisible(false, "");
       }
@@ -6804,11 +6849,56 @@ function tryPickWorldBagDrop(bucketDistance) {
   return true;
 }
 
+function removeExpiredWorldBagDrops(now) {
+  ensureWorldBagDropsArray();
+  if (!appleState.worldBagDrops.length) return false;
+  const t = now != null ? now : getSynchronizedNow();
+  let removed = false;
+  const kept = [];
+  appleState.worldBagDrops.forEach(function (drop) {
+    if (!drop || isWorldBagDropExpired(drop, t)) {
+      if (drop) {
+        teardownWorldBagDropDom(drop);
+        removed = true;
+      }
+    } else {
+      kept.push(drop);
+    }
+  });
+  if (!removed) return false;
+  appleState.worldBagDrops = kept;
+  lastWorldBagDropChangeAt = t;
+  lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, t);
+  updateWorldBagDropDom();
+  markWorldDirty();
+  syncWorldState(true);
+  return true;
+}
+
+function tickWorldBagDropDespawn(now) {
+  if (!isWorldDocumentEntry()) return;
+  ensureWorldBagDropsArray();
+  if (!appleState.worldBagDrops.length) return;
+  const t = now != null ? now : Date.now();
+  if (
+    lastWorldBagDropDespawnAt > 0 &&
+    t - lastWorldBagDropDespawnAt < WORLD_BAG_DROP_DESPAWN_TICK_MS
+  ) {
+    return;
+  }
+  lastWorldBagDropDespawnAt = t;
+  removeExpiredWorldBagDrops(getSynchronizedNow());
+}
+
 function mergeWorldBagDropsFromSnapshot(incoming) {
   ensureWorldBagDropsArray();
+  const syncNow = getSynchronizedNow();
   const parsed = (Array.isArray(incoming) ? incoming : [])
     .map(parseWorldBagDropFromSnapshot)
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter(function (drop) {
+      return !isWorldBagDropExpired(drop, syncNow);
+    });
   const localPending = appleState.worldBagDrops.filter(function (drop) {
     const t = Number(drop.droppedAt) || 0;
     return t > 0 && Date.now() - t < 2500;
@@ -6837,7 +6927,11 @@ function mergeWorldBagDropsFromSnapshot(incoming) {
 
 function serializeWorldBagDropsForSnapshot() {
   ensureWorldBagDropsArray();
+  const syncNow = getSynchronizedNow();
   return appleState.worldBagDrops
+    .filter(function (drop) {
+      return drop && !isWorldBagDropExpired(drop, syncNow);
+    })
     .map(serializeWorldBagDropForSnapshot)
     .filter(Boolean);
 }
@@ -6888,7 +6982,7 @@ function handleRemoteWorldBagDropBroadcast(payload) {
   if (!consumeSyncEventId(payload.eventId, now)) return;
   const raw = payload.drop;
   const drop = parseWorldBagDropFromSnapshot(raw);
-  if (!drop) return;
+  if (!drop || isWorldBagDropExpired(drop, now)) return;
   ensureWorldBagDropsArray();
   const id = String(drop.id);
   const existing = appleState.worldBagDrops.findIndex(function (d) {
@@ -6963,6 +7057,7 @@ function onBagInventorySlotPointerDown(event) {
   if (event.button !== 0) return;
   const slot = event.target.closest(".bag-inventory-slot");
   if (!slot || !bagInventoryPanel.contains(slot)) return;
+  if (slot === bagBookStorageSlot) return;
   const itemKey = getBagItemKeyFromInventorySlot(slot);
   const craftTradeOpen = isTradeExchangeOpen() || isAlchemyCraftOpen();
   if (craftTradeOpen) {
@@ -7230,11 +7325,22 @@ function notePendingLocalExtraBucketDrop(bucketId) {
   pendingLocalExtraBucketDropUntilById[id] = Date.now() + 4500;
 }
 
+function notePendingLocalExtraBucketSpawn(bucketId) {
+  const id = String(bucketId || "");
+  if (!id) return;
+  pendingLocalExtraBucketSpawnUntilById[id] = Date.now() + 4500;
+}
+
 function prunePendingLocalExtraBucketDrops() {
   const now = Date.now();
   Object.keys(pendingLocalExtraBucketDropUntilById).forEach(function (id) {
     if (pendingLocalExtraBucketDropUntilById[id] <= now) {
       delete pendingLocalExtraBucketDropUntilById[id];
+    }
+  });
+  Object.keys(pendingLocalExtraBucketSpawnUntilById).forEach(function (id) {
+    if (pendingLocalExtraBucketSpawnUntilById[id] <= now) {
+      delete pendingLocalExtraBucketSpawnUntilById[id];
     }
   });
 }
@@ -7258,6 +7364,15 @@ function applyWorldExtraBucketsFromSharedSnapshot(raw) {
       if (isHoldingExtraBucket() && id === String(heldBucketId || "")) return;
       if (mergedById[id]) return;
       if (Number(pendingLocalExtraBucketDropUntilById[id] || 0) > Date.now()) {
+        mergedById[id] = {
+          id: id,
+          x: Number(entry.x) || 0,
+          y: Number(entry.y) || 0,
+          isFull: Boolean(entry.isFull)
+        };
+        return;
+      }
+      if (Number(pendingLocalExtraBucketSpawnUntilById[id] || 0) > Date.now()) {
         mergedById[id] = {
           id: id,
           x: Number(entry.x) || 0,
@@ -7301,9 +7416,12 @@ function spawnWorldBucketBelowTradeMaster() {
     ground.appendChild(el);
   }
   entry._el = el;
+  notePendingLocalExtraBucketSpawn(entry.id);
   updateWorldExtraBuckets();
   markWorldDirty();
+  holdLocalAppleStateAgainstStaleSnapshot(3000);
   saveAppleState();
+  syncWorldState(true);
 }
 
 function isAppleInTrunkArea(localX, localY, size) {
@@ -10462,10 +10580,15 @@ function canAddBagItemsForTrade(itemsToAdd) {
       (Number(normalized[nk]) || 0) + Math.max(0, Math.floor(Number(itemsToAdd[key]) || 0));
   });
   const counts = getBagInventoryCountsByKey();
-  const slotCount = bagInventoryPanel
-    ? bagInventoryPanel.querySelectorAll(".bag-inventory-slot").length
-    : undefined;
-  return canBagInventoryFitItems(bagInventoryItemOrder, counts, normalized, slotCount);
+  const orderWithoutBook = bagInventoryItemOrder.filter(function (key) {
+    return key !== "book";
+  });
+  return canBagInventoryFitItems(
+    orderWithoutBook,
+    counts,
+    normalized,
+    BAG_INVENTORY_SLOT_COUNT
+  );
 }
 
 function showBagInventoryFullFailMessage() {
@@ -10575,8 +10698,33 @@ function normalizeBagInventoryOrderByCounts(counts) {
   if (normalized.changed) saveBagInventoryOrder();
 }
 
+function updateBookStorageSlot() {
+  if (!bagBookStorageSlot) return;
+  const hasBook = hasGuideBookItemInBagCounts();
+  if (!hasBook) {
+    bagBookStorageSlot.dataset.bagType = "empty";
+    bagBookStorageSlot.removeAttribute("data-ovc-tip");
+    bagBookStorageSlot.removeAttribute("aria-label");
+    bagBookStorageSlot.classList.add("bag-inventory-slot--empty");
+    bagBookStorageSlot.classList.add("is-empty");
+    bagBookStorageSlot.innerHTML = "";
+    return;
+  }
+  const descriptor = getBagItemDescriptorCore("book");
+  bagBookStorageSlot.dataset.bagType = descriptor.bagType;
+  if (descriptor.label) {
+    bagBookStorageSlot.setAttribute("data-ovc-tip", descriptor.label);
+    bagBookStorageSlot.setAttribute("aria-label", descriptor.label);
+  }
+  bagBookStorageSlot.classList.remove("bag-inventory-slot--empty");
+  bagBookStorageSlot.classList.remove("is-empty");
+  bagBookStorageSlot.innerHTML =
+    descriptor.iconHtml + '<span class="bag-slot-count">1</span>';
+}
+
 function updateBagInventorySlots() {
   if (!bagInventoryPanel) return;
+  updateBookStorageSlot();
   const counts = getBagInventoryCountsByKey();
   const seedCount = Number(counts.seed || 0);
   const looseVisible = usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(Date.now());
@@ -10585,7 +10733,9 @@ function updateBagInventorySlots() {
   }
   normalizeBagInventoryOrderByCounts(counts);
 
-  const slots = Array.from(bagInventoryPanel.querySelectorAll(".bag-inventory-slot")).sort(function (a, b) {
+  const slots = Array.from(
+    bagInventoryPanel.querySelectorAll(".bag-inventory-slots .bag-inventory-slot")
+  ).sort(function (a, b) {
     return Number(a.dataset.slot || 0) - Number(b.dataset.slot || 0);
   });
   slots.forEach(function (slot, index) {
@@ -10621,7 +10771,7 @@ function updateBagInventorySlots() {
   });
 
   if (bagInventoryPanel) {
-    bagInventoryPanel.querySelectorAll(".bag-inventory-slot").forEach(function (slot) {
+    bagInventoryPanel.querySelectorAll(".bag-inventory-slots .bag-inventory-slot").forEach(function (slot) {
       const bagType = slot.dataset.bagType;
       if (!isMagicPowderBagType(bagType)) return;
       const count = getMagicPowderBagCount(bagType);
@@ -15263,7 +15413,8 @@ function finishCharacterSelectAfterTutorialGate() {
   if (
     isTutorialDocumentEntry() &&
     currentUserId &&
-    getStoredFlag(onboardingFlowDoneKey)
+    getStoredFlag(onboardingFlowDoneKey) &&
+    !ovcTutorialIntentionalEntryActive()
   ) {
     isReloadingForWorldReset = true;
     ovcHardNavigateToWorldIndex();
@@ -18566,6 +18717,7 @@ function gameLoop() {
     }
     respawnApplesIfNeeded();
     tickWorldRockRespawn(Date.now());
+    tickWorldBagDropDespawn(Date.now());
     refillWellIfNeeded();
     movementTutorial.prepareBeforeMove();
     updatePlayerPosition();
@@ -18712,7 +18864,8 @@ try {
   if (
     isTutorialDocumentEntry() &&
     currentUserId &&
-    getStoredFlag(onboardingFlowDoneKey)
+    getStoredFlag(onboardingFlowDoneKey) &&
+    !ovcTutorialIntentionalEntryActive()
   ) {
     ovcAbortedPageInit = true;
     ovcHardNavigateToWorldIndex();
