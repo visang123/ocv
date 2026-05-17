@@ -466,7 +466,7 @@ import {
   canDragBagItemToTradeCounter,
   tryDropBagItemOnTradeCounter,
   returnTradeCounterStackToInventory
-} from "./src/game/trade-master-ui.js?v=20260517x";
+} from "./src/game/trade-master-ui.js?v=20260517y";
 import {
   bindAlchemyMaster,
   closeAlchemyCraftPanel,
@@ -7645,7 +7645,7 @@ function onBagInventorySlotPointerCancel(event) {
 function onTradeCounterChipPointerDown(event) {
   if (!isTradeExchangeOpen() || !tradeCounterSlot) return;
   if (event.button !== 0) return;
-  const chip = event.target.closest(".trade-counter-chip");
+  const chip = event.target.closest(".trade-counter-slot-cell");
   if (!chip || !tradeCounterSlot.contains(chip)) return;
   const itemKey = chip.dataset.itemKey || "";
   if (!itemKey) return;
@@ -11975,7 +11975,7 @@ function syncLocalPlayerPoseVisual() {
     player.classList.toggle("needs-outline", needsDarkOutline(selectedPlayerColor));
     player.classList.add("is-colorized");
   } else {
-    player.src = sitting ? PLAYER_SIT_IMAGE_SRC : playerBaseImage.src;
+    player.src = sitting ? getTintedPlayerSrc("#ffffff", true) : playerBaseImage.src;
     player.classList.remove("is-colorized");
   }
 }
@@ -16201,6 +16201,69 @@ function applyPlayerColor(color) {
   syncPlayerColorToServer();
 }
 
+function parseTintRgb(hexColor) {
+  const hex = /^#[0-9a-fA-F]{6}$/.test(hexColor || "") ? hexColor : "#ffffff";
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16)
+  };
+}
+
+function fillSitSpriteInterior(imageData, rgb) {
+  const w = imageData.width;
+  const h = imageData.height;
+  const d = imageData.data;
+  const fillR = rgb.r;
+  const fillG = rgb.g;
+  const fillB = rgb.b;
+  let i = 0;
+  while (i < d.length) {
+    const a = d[i + 3];
+    const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+    if (a > 40 && lum > 150) {
+      d[i] = fillR;
+      d[i + 1] = fillG;
+      d[i + 2] = fillB;
+      d[i + 3] = 255;
+    } else if (a > 40 && lum <= 150) {
+      d[i] = fillR;
+      d[i + 1] = fillG;
+      d[i + 2] = fillB;
+      d[i + 3] = 255;
+    }
+    i += 4;
+  }
+  const visited = new Uint8Array(w * h);
+  const stack = [];
+  function tryPush(x, y) {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const idx = y * w + x;
+    if (visited[idx]) return;
+    const pi = idx * 4;
+    if (d[pi + 3] > 40) return;
+    visited[idx] = 1;
+    stack.push(x, y);
+  }
+  const cx = (w / 2) | 0;
+  for (let y = 0; y < h; y++) {
+    tryPush(cx, y);
+  }
+  while (stack.length) {
+    const x = stack.pop();
+    const y = stack.pop();
+    const pi = (y * w + x) * 4;
+    d[pi] = fillR;
+    d[pi + 1] = fillG;
+    d[pi + 2] = fillB;
+    d[pi + 3] = 255;
+    tryPush(x + 1, y);
+    tryPush(x - 1, y);
+    tryPush(x, y + 1);
+    tryPush(x, y - 1);
+  }
+}
+
 function getTintedPlayerSrc(color, sitting) {
   const tintColor = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color.toLowerCase() : "#ffffff";
   const useSit = Boolean(sitting);
@@ -16233,10 +16296,17 @@ function getTintedPlayerSrc(color, sitting) {
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.drawImage(baseImage, 0, 0);
-  context.globalCompositeOperation = "source-atop";
-  context.fillStyle = tintColor;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.globalCompositeOperation = "source-over";
+
+  if (useSit) {
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    fillSitSpriteInterior(imageData, parseTintRgb(tintColor));
+    context.putImageData(imageData, 0, 0);
+  } else {
+    context.globalCompositeOperation = "source-atop";
+    context.fillStyle = tintColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.globalCompositeOperation = "source-over";
+  }
 
   const tintedSrc = canvas.toDataURL("image/png");
   cache.set(tintColor, tintedSrc);

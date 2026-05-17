@@ -1,5 +1,6 @@
 /** Player health drain, recharge, and placement helpers. */
 
+import { PLAYER_SIT_VISUAL_LIFT_Y } from "./constants.js";
 import {
   getCraftChairSeatWorldPoint,
   getCraftChairSitAnchorOffsets
@@ -150,7 +151,7 @@ export function getCraftChairSitPose(chair, playerWidth, playerSitHeight) {
   const offsets = getCraftChairSitAnchorOffsets(chair);
   const seat = getCraftChairSeatWorldPoint(chair);
   if (!seat) return null;
-  const footY = Number(chair.y) + offsets.footOffsetY;
+  const footY = Number(chair.y) + offsets.footOffsetY - PLAYER_SIT_VISUAL_LIFT_Y;
   return {
     playerX: seat.x - width / 2,
     playerDepth: null,

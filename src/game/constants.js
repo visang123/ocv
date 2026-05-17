@@ -70,12 +70,14 @@ export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 5;
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;
 /** Seated pose — shorter silhouette aligned to craft chair seat. */
-export const PLAYER_SIT_WIDTH = 26;
-export const PLAYER_SIT_HEIGHT = 33;
+export const PLAYER_SIT_WIDTH = 21;
+export const PLAYER_SIT_HEIGHT = 26;
+/** Shift seated foot anchor up (world Y−) so the body sits on the chair seat. */
+export const PLAYER_SIT_VISUAL_LIFT_Y = 6;
 const IMAGE_DIR = "\uC774\uBBF8\uC9C0";
 
 export const PLAYER_BASE_IMAGE_SRC = IMAGE_DIR + "/player-white.png";
-export const PLAYER_SIT_IMAGE_SRC = IMAGE_DIR + "/player-sit-white.png?v=20260517c";
+export const PLAYER_SIT_IMAGE_SRC = IMAGE_DIR + "/player-sit-white.png?v=20260517d";
 export const IMG_BUCKET_EMPTY = IMAGE_DIR + "/bucket-empty.png";
 export const IMG_BUCKET_FULL = IMAGE_DIR + "/bucket-full.png";
 export const IMG_SEED = IMAGE_DIR + "/seed.png";

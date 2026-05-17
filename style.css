@@ -2027,7 +2027,8 @@ body::-webkit-scrollbar {
 #player.remote-player-body.is-sitting,
 .remote-player-body.is-sitting {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   transform: none;
   transform-origin: bottom center;
   object-fit: contain;
@@ -4330,12 +4331,6 @@ body #world-bag-inventory {
   box-sizing: border-box;
 }
 
-.trade-tradeable-recipe-label {
-  font: 700 11px/1.25 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
-  color: rgba(248, 250, 252, 0.96);
-  letter-spacing: -0.02em;
-}
-
 button.trade-tradeable-recipe {
   cursor: pointer;
 }
@@ -4370,6 +4365,21 @@ button.trade-tradeable-recipe.is-selected {
   }
 }
 
+.trade-recipe-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.trade-recipe-formula-text {
+  margin: 0;
+  font: 700 11px/1.45 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
+  color: rgba(248, 250, 252, 0.96);
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
 .trade-recipe-flow {
   display: flex;
   flex-wrap: wrap;
@@ -4381,39 +4391,19 @@ button.trade-tradeable-recipe.is-selected {
 .trade-recipe-io {
   position: relative;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-width: 40px;
-  max-width: 58px;
+  min-width: 32px;
   min-height: 32px;
-  padding: 3px 4px 4px;
+  padding: 2px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.22);
   box-sizing: border-box;
 }
 
-.trade-recipe-io-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .trade-recipe-io .bag-slot-icon {
   width: 28px;
   height: 28px;
-}
-
-.trade-recipe-io-label {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: 700 10px/1.2 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
-  color: rgba(248, 250, 252, 0.96);
-  text-align: center;
 }
 
 .trade-recipe-io-count {
@@ -4462,18 +4452,54 @@ button.trade-tradeable-recipe.is-selected {
   border-radius: 12px;
   border: 2px dashed rgba(255, 255, 255, 0.45);
   background: rgba(255, 255, 255, 0.06);
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
 .trade-counter-slot.is-empty::before {
-  content: "교환대";
-  width: 100%;
+  content: "교환대 — 맞는 칸에 올리세요";
+  grid-column: 1 / -1;
   text-align: center;
   font: 600 11px/1.3 Arial, sans-serif;
   color: rgba(248, 250, 252, 0.55);
+}
+
+.trade-counter-slot-cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 40px;
+  max-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.trade-counter-slot-cell--filled {
+  background: rgba(255, 255, 255, 0.1);
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.trade-counter-slot-cell:hover {
+  border-color: rgba(251, 191, 36, 0.75);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.trade-counter-slot-cell.is-bag-drag-source,
+.alchemy-craft-req-slot.is-bag-drag-source {
+  opacity: 0.55;
+}
+
+.trade-counter-slot-cell .bag-slot-icon {
+  width: 30px;
+  height: 30px;
 }
 
 .trade-counter-chip {
@@ -4492,11 +4518,6 @@ button.trade-tradeable-recipe.is-selected {
 .trade-counter-chip:hover {
   border-color: rgba(251, 191, 36, 0.75);
   background: rgba(245, 158, 11, 0.14);
-}
-
-.trade-counter-chip.is-bag-drag-source,
-.alchemy-craft-req-slot.is-bag-drag-source {
-  opacity: 0.55;
 }
 
 .trade-counter-chip .bag-slot-icon {

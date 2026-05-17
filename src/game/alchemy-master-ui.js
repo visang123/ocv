@@ -297,7 +297,14 @@ export function handleBagSlotClickWhileAlchemyCraftOpen(slotEl) {
     }
     if (!requirementsVisible) return true;
   }
-  addOneInventoryItemToAlchemySlots(key);
+  if (!addOneInventoryItemToAlchemySlots(key)) {
+    if (host && host.showPlayerAlert) {
+      host.showPlayerAlert({
+        message: "\uB9DE\uB294 \uC7AC\uB8CC \uCE78\uC5D0 \uB193\uC5B4 \uC8FC\uC138\uC694.",
+        durationMs: 2200
+      });
+    }
+  }
   return true;
 }
 
@@ -362,21 +369,21 @@ export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
     return false;
   }
   const slotEl = targetEl.closest(".alchemy-craft-req-slot");
-  if (slotEl && slotsRoot.contains(slotEl)) {
-    const index = Number(slotEl.dataset.slotIndex);
-    if (Number.isFinite(index) && index >= 0) {
-      return addInventoryItemsToAlchemySlots(itemKey, index);
-    }
-  }
-  if (slotsRoot.contains(targetEl) || targetEl === slotsRoot) {
-    return addInventoryItemsToAlchemySlots(itemKey);
-  }
-  return false;
+  if (!slotEl || !slotsRoot.contains(slotEl)) return false;
+  const slotItemKey = slotEl.dataset.itemKey || "";
+  if (slotItemKey !== itemKey) return false;
+  const index = Number(slotEl.dataset.slotIndex);
+  if (!Number.isFinite(index) || index < 0) return false;
+  return addInventoryItemsToAlchemySlots(itemKey, index);
 }
 
 export function canDragBagItemToAlchemyCraft(itemKey) {
   if (!craftOpen || !requirementsVisible || !itemKey) return false;
-  return ALCHEMY_CRAFT_INPUT_KEYS.has(itemKey);
+  if (!ALCHEMY_CRAFT_INPUT_KEYS.has(itemKey)) return false;
+  return requirementSlotDefs.some(function (def, i) {
+    const filled = Math.max(0, Math.floor(Number(requirementSlotFills[i]) || 0));
+    return def.key === itemKey && filled < def.required;
+  });
 }
 
 export function updateAlchemyCraftEffects(now) {

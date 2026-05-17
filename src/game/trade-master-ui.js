@@ -186,7 +186,7 @@ export function bindTradeMaster(h) {
   }
   if (host.tradeCounterSlot) {
     host.tradeCounterSlot.addEventListener("click", function (event) {
-      const chip = event.target.closest(".trade-counter-chip");
+      const chip = event.target.closest(".trade-counter-slot-cell");
       if (!chip || !exchangeOpen) return;
       if (host.consumeCraftTradeDragClickSuppress && host.consumeCraftTradeDragClickSuppress()) {
         return;
@@ -460,7 +460,11 @@ export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
   if (!itemKey || !exchangeOpen || !host) return false;
   if (!(targetEl instanceof Element)) return false;
   const counter = host.tradeCounterSlot;
-  if (!counter || (!counter.contains(targetEl) && targetEl !== counter)) return false;
+  if (!counter) return false;
+  const cell = targetEl.closest(".trade-counter-slot-cell");
+  if (!cell || !counter.contains(cell)) return false;
+  const slotKey = cell.dataset.itemKey || "";
+  if (slotKey !== itemKey) return false;
   return addFullInventoryStackToTradeCounter(itemKey);
 }
 
@@ -687,6 +691,44 @@ function getTradeRecipeItemLabel(itemKey, count) {
 }
 
 /** @param {string} itemKey @param {number} count */
+function formatTradeRecipeItemPhrase(itemKey, count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n <= 0) return "";
+  const pseudo = formatTradeRecipePseudoLabel(itemKey, n);
+  if (pseudo) return pseudo;
+  const label = getBagItemDescriptor(itemKey).label;
+  return n > 1 ? label + " \u00D7" + n : label;
+}
+
+/** @param {number} countPerColor */
+function formatTradeButterflyAnyOrPhrase(countPerColor) {
+  const n = Math.max(0, Math.floor(Number(countPerColor) || 0));
+  if (n <= 0) return "";
+  return TRADE_BUTTERFLY_OR_DISPLAY_KEYS.map(function (bfKey) {
+    return formatTradeRecipeItemPhrase(bfKey, n);
+  }).join(" \uB610\uB294 ");
+}
+
+/** @param {Record<string, number>} side @param {Record<string, number>} counter @param {boolean} expandButterflyAny */
+function formatTradeRecipeSideText(side, counter, expandButterflyAny) {
+  const displaySide = expandButterflyAny
+    ? expandTradeItemCounts(side || {})
+    : resolveTradeRecipeDisplaySide(side || {}, counter || {});
+  const keys = sortTradeRecipeDisplayKeys(Object.keys(displaySide));
+  const parts = [];
+  keys.forEach(function (itemKey) {
+    const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
+    if (count <= 0) return;
+    if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
+      parts.push(formatTradeButterflyAnyOrPhrase(count));
+      return;
+    }
+    parts.push(formatTradeRecipeItemPhrase(itemKey, count));
+  });
+  return parts.join(" + ");
+}
+
+/** @param {string} itemKey @param {number} count */
 function buildTradeRecipeIoChipHtml(itemKey, count) {
   const n = Math.max(0, Math.floor(Number(count) || 0));
   if (n <= 0) return "";
@@ -696,12 +738,7 @@ function buildTradeRecipeIoChipHtml(itemKey, count) {
     '<span class="trade-recipe-io" title="' +
     escapeTradeHtml(label) +
     '">' +
-    '<span class="trade-recipe-io-icon">' +
     desc.iconHtml +
-    "</span>" +
-    '<span class="trade-recipe-io-label">' +
-    escapeTradeHtml(label) +
-    "</span>" +
     (n > 1 ? '<span class="trade-recipe-io-count">×' + n + "</span>" : "") +
     "</span>"
   );
@@ -762,15 +799,24 @@ function sortTradeRecipeDisplayKeys(keys) {
 }
 
 function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol, counter) {
-  const displayInputs = resolveTradeRecipeDisplaySide(inputs, counter || {});
+  const c = counter || {};
+  const inputText = formatTradeRecipeSideText(inputs, c, false);
+  const outputText = formatTradeRecipeSideText(outputs, c, true);
+  const formulaText = [inputText, outputText].filter(Boolean).join(" " + arrowSymbol + " ");
+  const displayInputs = resolveTradeRecipeDisplaySide(inputs, c);
   return (
-    '<span class="trade-recipe-flow">' +
+    '<div class="trade-recipe-entry">' +
+    '<p class="trade-recipe-formula-text">' +
+    escapeTradeHtml(formulaText) +
+    "</p>" +
+    '<div class="trade-recipe-flow" aria-hidden="true">' +
     buildTradeRecipeSideIconsHtml(displayInputs, { expandButterflyAny: false }) +
-    '<span class="trade-recipe-arrow" aria-hidden="true">' +
+    '<span class="trade-recipe-arrow">' +
     arrowSymbol +
     "</span>" +
     buildTradeRecipeSideIconsHtml(outputs, { expandButterflyAny: true }) +
-    "</span>"
+    "</div>" +
+    "</div>"
   );
 }
 
@@ -840,51 +886,40 @@ function renderTradeTradeableList() {
           '" aria-label="' +
           escapeTradeHtml(entry.label) +
           '">' +
-          '<span class="trade-tradeable-recipe-label">' +
-          escapeTradeHtml(entry.label) +
-          "</span>" +
           flow +
           "</button>"
         );
       }
-      return (
-        '<div class="' +
-        classNames.join(" ") +
-        '"><span class="trade-tradeable-recipe-label">' +
-        escapeTradeHtml(entry.label) +
-        "</span>" +
-        flow +
-        "</div>"
-      );
+      return '<div class="' + classNames.join(" ") + '">' + flow + "</div>";
     })
     .join("");
 }
 
 function renderTradeCounter() {
   if (!host.tradeCounterSlot) return;
-  const keys = Object.keys(counterByKey).filter(function (k) {
-    return Number(counterByKey[k] || 0) > 0;
+  const hasAny = TRADEABLE_ITEM_KEYS.some(function (key) {
+    return Number(counterByKey[key] || 0) > 0;
   });
-  host.tradeCounterSlot.classList.toggle("is-empty", keys.length === 0);
-  if (!keys.length) {
-    host.tradeCounterSlot.innerHTML = "";
-    return;
-  }
-  host.tradeCounterSlot.innerHTML = keys
-    .map(function (key) {
-      const desc = getBagItemDescriptor(key);
-      const count = Number(counterByKey[key] || 0);
-      return (
-        '<div class="trade-counter-chip" data-item-key="' +
-        key +
-        '">' +
-        desc.iconHtml +
-        '<span class="trade-counter-chip-count">' +
-        count +
-        "</span></div>"
-      );
-    })
-    .join("");
+  host.tradeCounterSlot.classList.toggle("is-empty", !hasAny);
+  host.tradeCounterSlot.innerHTML = TRADEABLE_ITEM_KEYS.map(function (key) {
+    const desc = getBagItemDescriptor(key);
+    const count = Math.max(0, Math.floor(Number(counterByKey[key] || 0)));
+    const filledClass =
+      count > 0 ? " trade-counter-slot-cell--filled" : " trade-counter-slot-cell--empty";
+    return (
+      '<button type="button" class="trade-counter-slot-cell' +
+      filledClass +
+      '" data-item-key="' +
+      key +
+      '" aria-label="' +
+      escapeTradeHtml(desc.label) +
+      (count > 0 ? " " + count + "\uAC1C" : "") +
+      '">' +
+      desc.iconHtml +
+      (count > 0 ? '<span class="trade-counter-chip-count">' + count + "</span>" : "") +
+      "</button>"
+    );
+  }).join("");
 }
 
 function renderTradeOffers() {
