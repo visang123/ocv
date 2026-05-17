@@ -443,6 +443,7 @@ import {
 } from "./src/game/bag-discard-ui.js";
 import {
   bindTradeMaster,
+  cancelTradeOnPlayerHealthDepleted,
   closeTradeExchangePanel,
   handleBagSlotClickWhileTradeOpen,
   hydrateTradeMasterDialogueComplete,
@@ -603,7 +604,7 @@ let lastPickupToggleAt = 0;
 let lastWorldRockRespawnAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
-const guidePlaceholderHtml = "<p>??? ?????????????????!</p>";
+const guidePlaceholderHtml = "<p>?? ??? ????!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
 let cameraX = 0;
@@ -2251,9 +2252,10 @@ function isWorldMapDevResetShortcut(event) {
     event.code === "KeyR" || event.key === "r" || event.key === "R";
   if (!isRKey) return false;
   if (!(event.ctrlKey || event.metaKey)) return false;
-  const altHeld = event.altKey || event.getModifierState("Alt");
-  if (event.shiftKey && !altHeld) return true;
-  if (altHeld && !event.shiftKey) return true;
+  // Ctrl+Shift+R ? Shift? ?? ?(getModifierState Alt? IME?? Shift+R? ??)
+  if (event.shiftKey) return !event.altKey;
+  // Ctrl+Alt+R ? AltGr ? altKey? ? ??? ??? getModifierState ??
+  if (event.altKey || event.getModifierState("Alt")) return true;
   return false;
 }
 
@@ -3089,7 +3091,11 @@ const playerHealthGaugeTrack = document.createElement("div");
 playerHealthGaugeTrack.className = "player-health-gauge-track";
 const playerHealthGaugeFill = document.createElement("div");
 playerHealthGaugeFill.className = "player-health-gauge-fill";
+const playerHealthGaugeLabel = document.createElement("span");
+playerHealthGaugeLabel.className = "player-health-gauge-label";
+playerHealthGaugeLabel.setAttribute("aria-hidden", "true");
 playerHealthGaugeTrack.appendChild(playerHealthGaugeFill);
+playerHealthGaugeTrack.appendChild(playerHealthGaugeLabel);
 playerHealthGaugeEl.appendChild(playerHealthGaugeTrack);
 const playerHealthCluster = document.createElement("div");
 playerHealthCluster.className = "player-health-cluster";
@@ -3105,6 +3111,7 @@ playerHealthHeartBtn.addEventListener("click", function (event) {
   event.preventDefault();
   event.stopPropagation();
   togglePlayerHealthGaugeVisible();
+  playerHealthHeartBtn.blur();
 });
 if (localPlayerRoot) {
   if (playerName && playerName.parentNode === localPlayerRoot) {
@@ -3119,7 +3126,7 @@ if (localPlayerRoot) {
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
-networkDebugButton.setAttribute("aria-label", "???");
+networkDebugButton.setAttribute("aria-label", "??");
 document.body.appendChild(networkDebugButton);
 function appendAdminDevGrantButton(id, ariaLabel) {
   const button = document.createElement("button");
@@ -3134,27 +3141,27 @@ function appendAdminDevGrantButton(id, ariaLabel) {
 }
 const adminDevButterfliesButton = appendAdminDevGrantButton(
   "admin-dev-butterflies-button",
-  "???? ??????+10 (??????)"
+  "?? ??? +10 (???)"
 );
 const adminDevRocksButton = appendAdminDevGrantButton(
   "admin-dev-rocks-button",
-  "??+10 (??????)"
+  "? +10 (???)"
 );
 const adminDevSeedsButton = appendAdminDevGrantButton(
   "admin-dev-seeds-button",
-  "????? +10 (??????)"
+  "?? +10 (???)"
 );
 const adminDevApplesButton = appendAdminDevGrantButton(
   "admin-dev-apples-button",
-  "??? +10 (??????)"
+  "?? +10 (???)"
 );
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
-adminDevPlantIndexPlusButton.setAttribute("aria-label", "???????+100 (??????)");
-adminDevPlantIndexPlusButton.setAttribute("title", "???????+100 (??????)");
+adminDevPlantIndexPlusButton.setAttribute("aria-label", "???? +100 (???)");
+adminDevPlantIndexPlusButton.setAttribute("title", "???? +100 (???)");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -3201,17 +3208,17 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>??????</strong></div>' +
+  '<div class="controls-header"><strong>???</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / ???</span><p>????? ???</p></div>' +
-  '<div><span>A / ???</span><p>????????? ???</p></div>' +
-  '<div><span>S / ???</span><p>???????? ???</p></div>' +
-  '<div><span>D / ???</span><p>?????????? ???</p></div>' +
-  '<div><span>Space</span><p>????</p></div>' +
-  '<div><span>E</span><p>??? / ????????</p></div>' +
-  '<div><span>Q</span><p>?????? / ??????</p></div>' +
-  '<div><span>???????? ???</span><p>?????? / ?????</p></div>' +
-  '<div><span>Esc</span><p>????? ???? / ????</p></div>' +
+  '<div><span>W / \u2191</span><p>?? ??</p></div>' +
+  '<div><span>A / \u2190</span><p>???? ??</p></div>' +
+  '<div><span>S / \u2193</span><p>??? ??</p></div>' +
+  '<div><span>D / \u2192</span><p>????? ??</p></div>' +
+  '<div><span>Space</span><p>??</p></div>' +
+  '<div><span>E</span><p>?? / ????</p></div>' +
+  '<div><span>Q</span><p>?? / ??</p></div>' +
+  '<div><span>??? ?</span><p>?? / ??</p></div>' +
+  '<div><span>Esc</span><p>?? ?? / ??</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -3258,7 +3265,7 @@ function closeSettingsOverlayFromEscape() {
 }
 
 function skipTutorialFromSettings() {
-  if (!window.confirm("?????????????????? ????????? ???????????????")) {
+  if (!window.confirm("????? ???? ???? ???????")) {
     return;
   }
   clearTutorialMainSeedRespawnTimer();
@@ -3324,7 +3331,7 @@ function skipTutorialFromSettings() {
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
-      "???????????????????????? ??????????? ????????? ??????? ???????????"
+      "????? ???? ?? ?????? ???? ???? ?????."
     )
   ) {
     return;
@@ -4766,7 +4773,7 @@ function updateOnboardingFlowUI() {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
         movementTutorial.hideOverlay();
-        setOnboardingCalloutVisible(true, "E???? ????? ????? ???????????");
+        setOnboardingCalloutVisible(true, "E?? ?? ??? ?????.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -4783,7 +4790,7 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        setOnboardingCalloutVisible(true, "??????(???????)?? ????????.");
+        setOnboardingCalloutVisible(true, "????(???)? ????.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
         if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
           bagBookStorageSlot.classList.add("onboarding-highlight");
@@ -4796,18 +4803,18 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "space???? ??????????????????? ????????!"
+        "space?? ??? ??? ???. ????!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
-      setOnboardingCalloutVisible(true, "????????? ???????????");
+      setOnboardingCalloutVisible(true, "???? ?????.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
-      setOnboardingCalloutVisible(true, "e???? ????? ??????????????????");
+      setOnboardingCalloutVisible(true, "e?? ?? ??? ?????.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
@@ -4824,7 +4831,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 8: {
-      setOnboardingCalloutVisible(true, "?????????????????????.");
+      setOnboardingCalloutVisible(true, "??? ??? ?????.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
@@ -4834,14 +4841,14 @@ function updateOnboardingFlowUI() {
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      setOnboardingCalloutVisible(true, "q??????? ??????????????????????.");
+      setOnboardingCalloutVisible(true, "q? ?? ??? ??? ?????.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case 10: {
       if (guideOpen) {
-        const line1 = "???????????????";
-        const line2 = "esc ????? ??????????????????? ??????????.";
+        const line1 = "??? ?????.";
+        const line2 = "esc ?? ????? ??? ???? ????.";
         setOnboardingCalloutVisible(
           true,
           onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
@@ -4856,7 +4863,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 11: {
-      setOnboardingCalloutVisible(true, "???????????????? ???????????");
+      setOnboardingCalloutVisible(true, "????? ???? ?????.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4864,7 +4871,7 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "???????????????E???? ????? ???????? ????? ??????"
+        "??? ??? ?? E?? ?? ???? ?? ???."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4872,19 +4879,19 @@ function updateOnboardingFlowUI() {
     case 13: {
       setOnboardingCalloutVisible(
         true,
-        "?????????????Q???? ????? ??? ???? ??????"
+        "??? ??? ? Q?? ?? ?? ?? ???."
       );
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(true, "????????? ???? ????????? ???????.");
+      setOnboardingCalloutVisible(true, "??? ?? ?? ???? ???.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "Q???? ????? ??? ????????.");
+      setOnboardingCalloutVisible(true, "Q?? ?? ?? ????.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
@@ -4892,8 +4899,8 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPostWaterCongratsPhase === 0
-          ? "???????????? ??? ??????????? ??????????????."
-          : "??? ?????????????????? ?????????????."
+          ? "?????! ?? ??? ?? ??????."
+          : "?? ????? ??? ??????."
       );
       break;
     }
@@ -4906,13 +4913,13 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPlantIndexIntroPhase === 0
-          ? "?????????? ??????????????????????"
-          : "??? ?????? ????????? ???????????"
+          ? "????? ??? ??? ?????."
+          : "?? ??? ???? ? ?????!"
       );
       break;
     }
     case ONBOARDING_STEP_DROP_BUCKET: {
-      setOnboardingCalloutVisible(true, "E???? ????? ???????? ?????????????.");
+      setOnboardingCalloutVisible(true, "E?? ?? ???? ??????.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
@@ -4920,7 +4927,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_CHAT: {
       setOnboardingCalloutVisible(
         true,
-        "??? ???????????? ??????????, ?????????????????????????????"
+        "?? ??? ?? ??? ??, ???? ??? ? ??? ???."
       );
       if (worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
       if (worldChatPanelOpen && worldChatSendBtn) {
@@ -4931,7 +4938,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_HEART: {
       setOnboardingCalloutVisible(
         true,
-        "??? ???????????? ??????????? ?????? ??? ????????????? ??????????? ?????????"
+        "?? ??? ?? ??? ?? ???. ?? ?????? ??? ?? ? ???."
       );
       if (worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
       break;
@@ -4939,13 +4946,13 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SAD: {
       setOnboardingCalloutVisible(
         true,
-        "??? ???????????? ??????? ???? ??????"
+        "?? ??? ?? ???? ?? ???."
       );
       if (worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ROCK: {
-      setOnboardingCalloutVisible(true, "???? ????? ????? ????E???? ???? ??????");
+      setOnboardingCalloutVisible(true, "?? ?? ??? ?? E?? ?? ???.");
       if (Array.isArray(appleState.worldRocks)) {
         appleState.worldRocks.forEach(function (rock) {
           if (rock && rock._el && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID) {
@@ -4958,7 +4965,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_BUTTERFLY: {
       setOnboardingCalloutVisible(
         true,
-        "?????????????????????????? E ????? Q??????? ??????"
+        "????? ??? ???? E ?? Q? ?? ???."
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -4969,44 +4976,44 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_TRADE_MASTER: {
-      setOnboardingCalloutVisible(true, "????????????? ????Q???? ??????? ??????");
+      setOnboardingCalloutVisible(true, "??? ???? ?? Q?? ??? ???.");
       if (tradeMaster) tradeMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ALCHEMY_MASTER: {
-      setOnboardingCalloutVisible(true, "???????? ??????? ????Q???? ??????? ??????");
+      setOnboardingCalloutVisible(true, "???? ???? ?? Q?? ??? ???.");
       if (alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ZOOM_INTRO: {
-      setOnboardingCalloutVisible(true, "??????? ??? ?????,???? ????????.");
+      setOnboardingCalloutVisible(true, "???? ?? ??,?? ????.");
       break;
     }
     case ONBOARDING_STEP_ZOOM_MIN: {
-      setOnboardingCalloutVisible(true, "???????? ????? ????????.");
+      setOnboardingCalloutVisible(true, "?? ?? ?? ????.");
       break;
     }
     case ONBOARDING_STEP_TREE_APPROACH: {
-      setOnboardingCalloutVisible(true, "????????????????????????");
+      setOnboardingCalloutVisible(true, "??? ? ??? ?????.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_TREE_CLIMB: {
       setOnboardingCalloutVisible(
         true,
-        "?????????????? ????????????????????????????"
+        "??? ???? ???? ??? ??? ?????."
       );
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_PICK_APPLE: {
-      setOnboardingCalloutVisible(true, "e???? ????? ????????????");
+      setOnboardingCalloutVisible(true, "e?? ?? ??? ???.");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_EAT_APPLE: {
-      setOnboardingCalloutVisible(true, "????? ??????? ??? ????? ?????????.");
+      setOnboardingCalloutVisible(true, "??? ? ? ?? ?? ?? ????.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
@@ -5015,10 +5022,10 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_EXTRA_SEED: {
-      const lineSeed = "??????????????? ??????????? ?????????????????";
-      const lineB = "?????????????????????";
+      const lineSeed = "??? ???? ??? ?? ??? ?????.";
+      const lineB = "????? ?????.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "???????????????????");
+        setOnboardingCalloutVisible(true, "??? ?????.");
       } else {
         setOnboardingCalloutVisible(
           true,
@@ -5034,16 +5041,17 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SETTINGS_ESC: {
       setOnboardingCalloutVisible(
         true,
-        "Esc??????? ?????????? ????? Esc??????? ??????"
+        "Esc? ?? ??? ? ?, ?? Esc? ?? ???."
       );
       break;
     }
     case ONBOARDING_STEP_COMPLETE: {
-      setOnboardingCalloutVisible(true, "???????????? ???????????????????????!");
+      setOnboardingCalloutVisible(true, "?????! ????? ?????!!");
       break;
     }
     default:
       setOnboardingCalloutVisible(false, "");
+  }
   }
   updateSettingsTutorialButtons();
 }
@@ -8225,6 +8233,8 @@ function refreshUiAfterSharedWorldApply() {
   rebuildPlacedCraftFurnitureDom();
   rebuildWorldExtraBucketDom();
   rebuildWorldBagDropDom();
+  updatePlantProgressGauge();
+  updateNpcPosition();
 }
 
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
@@ -8913,7 +8923,7 @@ function syncWorldState(forceSave) {
       return;
     }
     addNetworkDebugLog(
-      "world save error: " + (error && error.message ? error.message : "????????? ??? ?????")
+      "world save error: " + (error && error.message ? error.message : "??? ?? ?? ??")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
@@ -8955,7 +8965,7 @@ function saveSharedWorldAndReload(options) {
     applyServerWorldRowTimestamps(row);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world reset save error: " + (error && error.message ? error.message : "????????? ??? ?????")
+      "world reset save error: " + (error && error.message ? error.message : "??? ?? ?? ??")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
@@ -8995,7 +9005,7 @@ function pollWorldState(forcePoll) {
     applySharedWorldSnapshot(row.state, row.updated_at);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world poll error: " + (error && error.message ? error.message : "????????? ??? ?????")
+      "world poll error: " + (error && error.message ? error.message : "??? ?? ?? ??")
     );
     showThrottledWorldSyncToast(
       "\uC6D4\uB4DC \uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
@@ -10095,17 +10105,17 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
     );
   }
   if (settingsButton && over(settingsButton)) {
-    return { anchorEl: settingsButton, text: "????: Esc" };
+    return { anchorEl: settingsButton, text: "??: Esc" };
   }
   if (!worldSocialUiReady) return null;
   if (worldChatToggleBtn && over(worldChatToggleBtn)) {
-    return { anchorEl: worldChatToggleBtn, text: "?????: C" };
+    return { anchorEl: worldChatToggleBtn, text: "??: C" };
   }
   if (worldHeartBtn && over(worldHeartBtn)) {
-    return { anchorEl: worldHeartBtn, text: "?????: H" };
+    return { anchorEl: worldHeartBtn, text: "??: H" };
   }
   if (worldSadBtn && over(worldSadBtn)) {
-    return { anchorEl: worldSadBtn, text: "????? Ctrl+S" };
+    return { anchorEl: worldSadBtn, text: "???: Ctrl+S" };
   }
   return null;
 }
@@ -11633,7 +11643,7 @@ function syncLocalPlayerPoseVisual() {
   const bodyW = sitting ? PLAYER_SIT_WIDTH : PLAYER_WIDTH;
   const bodyH = sitting ? PLAYER_SIT_HEIGHT : PLAYER_HEIGHT;
   player.classList.toggle("is-sitting", sitting);
-  setWorldSize(localPlayerRoot, bodyW);
+  setWorldSize(localPlayerRoot, bodyW, sitting ? bodyH : undefined);
   setWorldSize(playerColorBody, bodyW, bodyH);
   if (hasChosenPlayerColor && selectedPlayerColor) {
     player.src = getTintedPlayerSrc(selectedPlayerColor, sitting);
@@ -11823,6 +11833,7 @@ function getPlayerHealthTickContext(healthPosePrev) {
 function tickPlayerHealth(nowMs) {
   if (!hasSpawnedCharacter || isCharacterSelecting || isTabSessionSuperseded) return;
 
+  const healthBefore = playerHealth;
   const healthPosePrev = playerHealthPoseInitialized
     ? playerHealthPosePrev
     : { x: playerX, depth: playerDepth, jumpY: jumpY };
@@ -11836,7 +11847,8 @@ function tickPlayerHealth(nowMs) {
         footCenterX: ctx.footCenterX,
         footY: ctx.footY,
         placedCraftFurniture: ctx.placedCraftFurniture,
-        isSittingOnChair: ctx.isSittingOnChair
+        isSittingOnChair: ctx.isSittingOnChair,
+        isInsideEnteredCraftHouse: ctx.isInsideEnteredCraftHouse
       }
     },
     nowMs
@@ -11845,6 +11857,12 @@ function tickPlayerHealth(nowMs) {
   playerLastHealthTickAt = result.lastTickAt;
   if (result.changed) {
     savePlayerHealthState();
+  }
+  if (
+    isPlayerHealthDepleted(playerHealth) &&
+    !isPlayerHealthDepleted(healthBefore)
+  ) {
+    cancelTradeOnPlayerHealthDepleted();
   }
 }
 
@@ -11865,6 +11883,9 @@ function updatePlayerHealthUi() {
   if (playerHealthGaugeFill) {
     playerHealthGaugeFill.style.width = pct + "%";
   }
+  if (playerHealthGaugeLabel) {
+    playerHealthGaugeLabel.textContent = String(hp);
+  }
   if (playerHealthGaugeEl) {
     playerHealthGaugeEl.hidden = !playerHealthGaugeVisible;
     playerHealthGaugeEl.setAttribute("aria-hidden", playerHealthGaugeVisible ? "false" : "true");
@@ -11878,6 +11899,12 @@ function updatePlayerHealthUi() {
   }
   if (localPlayerRoot) {
     localPlayerRoot.classList.toggle("is-health-recharging", isPlayerHealthDepleted(hp));
+  }
+  if (
+    isPlayerHealthDepleted(hp) &&
+    (isTradeExchangeOpen() || isTradeMasterDialogueRunning())
+  ) {
+    cancelTradeOnPlayerHealthDepleted();
   }
 }
 
@@ -15792,7 +15819,7 @@ function postJson(url, payload) {
   }).then(function (response) {
     return response.json().then(function (data) {
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "????????????????????.");
+        throw new Error(data.message || "??? ??????.");
       }
 
       return data;
@@ -15830,7 +15857,12 @@ function getTintedPlayerSrc(color, sitting) {
   const baseReady = useSit ? playerSitBaseImageReady : playerBaseImageReady;
   const fallback = useSit ? PLAYER_SIT_IMAGE_SRC : playerBaseImage.src;
 
-  if (!baseReady || !baseImage.naturalWidth || !baseImage.naturalHeight) {
+  if (
+    !baseReady ||
+    !baseImage.naturalWidth ||
+    !baseImage.naturalHeight ||
+    /\.svg(?:\?|$)/i.test(String(baseImage.src || ""))
+  ) {
     return fallback;
   }
 
@@ -15883,7 +15915,7 @@ function buildCharacterColorGrid() {
     button.type = "button";
     button.className = "character-color-option";
     button.style.background = color;
-    button.setAttribute("aria-label", color + " ????");
+    button.setAttribute("aria-label", color + " ??");
 
     if (color === selectedPlayerColor) {
       button.classList.add("is-selected");
@@ -17188,7 +17220,7 @@ function sendMultiplayerPresence(forceSend) {
       payload: state
     })).catch(function (error) {
       addNetworkDebugLog(
-        "broadcast error: " + (error && error.message ? error.message : "????????? ??? ?????")
+        "broadcast error: " + (error && error.message ? error.message : "??? ?? ?? ??")
       );
     });
     lastBroadcastAt = now;
@@ -17337,7 +17369,7 @@ function syncPresenceToDatabase(state) {
   lastPresenceDbSyncAt = Date.now();
   window.OVCOnline.savePresence(state).catch(function (error) {
     addNetworkDebugLog(
-      "presence db save error: " + (error && error.message ? error.message : "????????? ??? ?????")
+      "presence db save error: " + (error && error.message ? error.message : "??? ?? ?? ??")
     );
   }).finally(function () {
     isPresenceDbSyncing = false;
@@ -17394,7 +17426,7 @@ function pollPresenceDatabase() {
     updateRemotePlayerCount();
   }).catch(function (error) {
     addNetworkDebugLog(
-      "presence db poll error: " + (error && error.message ? error.message : "????????? ??? ?????")
+      "presence db poll error: " + (error && error.message ? error.message : "??? ?? ?? ??")
     );
   }).finally(function () {
     isPresenceDbPolling = false;
@@ -17861,8 +17893,8 @@ function syncPlayerColorToServer(forceSync) {
       addNetworkDebugLog("color synced online: " + colorToSync);
     }).catch(function (error) {
       showOnlineDebugMessage(
-      "??? ?????????: " +
-        (error && error.message ? error.message : "????????? ??? ?????")
+      "?? ?? ??: " +
+        (error && error.message ? error.message : "??? ?? ?? ??")
       );
     });
     return;
@@ -17877,8 +17909,8 @@ function syncPlayerColorToServer(forceSync) {
     addNetworkDebugLog("color synced local: " + colorToSync);
   }).catch(function (error) {
     showOnlineDebugMessage(
-      "??? ?????????: " +
-      (error && error.message ? error.message : "????????? ??? ?????")
+      "?? ?? ??: " +
+      (error && error.message ? error.message : "??? ?? ?? ??")
     );
   });
 }
@@ -18084,7 +18116,7 @@ async function validateCurrentAccount() {
         if (typeof window.OVCOnline.getAccount === "function") {
           const account = await window.OVCOnline.getAccount(currentUserId);
           if (!account) {
-            showOnlineDebugMessage("????????????????? ???????????????");
+            showOnlineDebugMessage("??? ?????. ???????.");
             setTimeout(logout, 800);
             return;
           }
@@ -18093,7 +18125,7 @@ async function validateCurrentAccount() {
       }
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
-        showOnlineDebugMessage("??? ??????? ????????????????????????");
+        showOnlineDebugMessage("?? ???? ????? ???????.");
         setTimeout(logout, 1200);
         return;
       }
@@ -19373,8 +19405,11 @@ function setup() {
   const bucketSize = getBucketSize();
   const wellSize = getWellSize();
 
-  setWorldSize(localPlayerRoot, PLAYER_WIDTH);
-  setWorldSize(playerColorBody, PLAYER_WIDTH, PLAYER_HEIGHT);
+  setWorldSize(localPlayerRoot, getLocalPlayerBodyWidth(), playerSittingChairId ? getLocalPlayerBodyHeight() : undefined);
+  setWorldSize(playerColorBody, getLocalPlayerBodyWidth(), getLocalPlayerBodyHeight());
+  if (playerSittingChairId) {
+    syncLocalPlayerPoseVisual();
+  }
   Object.keys(remotePlayers).forEach(function (remoteId) {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
   });

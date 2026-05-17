@@ -27,6 +27,8 @@ export function setWorldSize(
   if (height) {
     element.style.height =
       toScreenY(height, groundElement, groundWorldHeight) + "px";
+  } else {
+    element.style.height = "";
   }
 }
 

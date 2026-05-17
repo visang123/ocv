@@ -171,7 +171,7 @@ export function getBagItemDescriptor(itemKey) {
       butterflyColor: "",
       label: "\uC591\uB3D9\uC774",
       iconHtml:
-        '<img class="bag-slot-icon bag-slot-icon--bucket" src="이미지/bucket-inv.png?v=20260517a" alt="" width="42" height="42" draggable="false">'
+        '<img class="bag-slot-icon bag-slot-icon--bucket" src="이미지/bucket-empty.png" alt="" width="42" height="42" draggable="false">'
     };
   }
   if (itemKey === "magicPowder") {

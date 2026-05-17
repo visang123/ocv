@@ -362,11 +362,6 @@
     </button>
   </div>
   <div id="bag-inventory-panel" class="bag-inventory-panel" style="display: none" aria-hidden="true">
-    <div class="bag-inventory-panel-header">
-      <button type="button" id="bag-inventory-close" class="bag-inventory-close" aria-label="닫기">
-        &#215;
-      </button>
-    </div>
     <section class="bag-book-storage" aria-label="책 보관">
       <p class="bag-book-storage-label">책 보관</p>
       <div
@@ -377,6 +372,9 @@
       ></div>
     </section>
     <div class="bag-inventory-slots" role="group" aria-label="가방 칸 9">
+      <button type="button" id="bag-inventory-close" class="bag-inventory-close" aria-label="닫기">
+        &#215;
+      </button>
       <div class="bag-inventory-slot" data-slot="0" data-bag-type="seed">
         <img class="bag-slot-icon" src="이미지/seed.png" alt="" width="42" height="42" draggable="false">
         <span class="bag-slot-count">0</span>
@@ -502,7 +500,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260517o"></script>
+  <script type="module" src="src/main.js?v=20260517p"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

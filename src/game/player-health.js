@@ -179,6 +179,13 @@ export function shouldDrainPlayerHealth(opts) {
   return true;
 }
 
+/** 체력이 최대가 아니고, 정지·의자·집 안일 때 초당 회복 */
+export function shouldRechargePlayerHealth(health, shouldDrain) {
+  if (clampPlayerHealth(health) >= PLAYER_MAX_HEALTH) return false;
+  if (isPlayerHealthDepleted(health)) return true;
+  return !shouldDrain;
+}
+
 /**
  * @returns {{
  *   health: number,
@@ -193,15 +200,26 @@ export function tickPlayerHealthState(state, nowMs) {
   const now = Number(nowMs) || Date.now();
   let lastTickAt = Number(state.lastTickAt) || 0;
   const rechargeCtx = state.rechargeContext || {};
+  const shouldDrain = Boolean(state.shouldDrain);
 
-  if (isPlayerHealthDepleted(health)) {
+  if (shouldRechargePlayerHealth(health, shouldDrain)) {
     const rate = getPlayerHealthRechargePerSecond(rechargeCtx);
     if (!lastTickAt) {
-      return { health: 0, lastTickAt: now, changed: false, depleted: true };
+      return {
+        health: health,
+        lastTickAt: now,
+        changed: false,
+        depleted: isPlayerHealthDepleted(health)
+      };
     }
     const elapsed = now - lastTickAt;
     if (elapsed < PLAYER_HEALTH_RECHARGE_MS) {
-      return { health: health, lastTickAt: lastTickAt, changed: false, depleted: true };
+      return {
+        health: health,
+        lastTickAt: lastTickAt,
+        changed: false,
+        depleted: isPlayerHealthDepleted(health)
+      };
     }
     const ticks = Math.floor(elapsed / PLAYER_HEALTH_RECHARGE_MS);
     const nextHealth = clampPlayerHealth(health + ticks * rate);
@@ -213,7 +231,7 @@ export function tickPlayerHealthState(state, nowMs) {
     };
   }
 
-  if (!state.shouldDrain) {
+  if (!shouldDrain) {
     return { health: health, lastTickAt: lastTickAt, changed: false, depleted: false };
   }
   if (!lastTickAt) {

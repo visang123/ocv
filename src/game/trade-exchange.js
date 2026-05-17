@@ -66,6 +66,42 @@ export const TRADE_RECIPES = [
     label: "\uC528\uC557 1\uAC1C"
   },
   {
+    id: "butterfly3_apple1_rock3",
+    inputs: { [TRADE_INPUT_ANY_BUTTERFLY]: 3, apple: 1 },
+    outputs: { rock: 3 },
+    label: "\uB3CC 3\uAC1C"
+  },
+  {
+    id: "butterfly3_apple1_seed3",
+    inputs: { [TRADE_INPUT_ANY_BUTTERFLY]: 3, apple: 1 },
+    outputs: { seed: 3 },
+    label: "\uC528\uC557 3\uAC1C"
+  },
+  {
+    id: "rock3_apple1_seed3",
+    inputs: { rock: 3, apple: 1 },
+    outputs: { seed: 3 },
+    label: "\uC528\uC557 3\uAC1C"
+  },
+  {
+    id: "rock3_apple1_butterfly3",
+    inputs: { rock: 3, apple: 1 },
+    outputs: { [TRADE_INPUT_ANY_BUTTERFLY]: 3 },
+    label: "\uB098\uBE44 3\uB9C8\uB9AC"
+  },
+  {
+    id: "seed3_apple1_rock3",
+    inputs: { seed: 3, apple: 1 },
+    outputs: { rock: 3 },
+    label: "\uB3CC 3\uAC1C"
+  },
+  {
+    id: "seed3_apple1_butterfly3",
+    inputs: { seed: 3, apple: 1 },
+    outputs: { [TRADE_INPUT_ANY_BUTTERFLY]: 3 },
+    label: "\uB098\uBE44 3\uB9C8\uB9AC"
+  },
+  {
     id: "rock7_bucket1",
     inputs: { rock: 7 },
     outputs: { worldBucket: 1 },

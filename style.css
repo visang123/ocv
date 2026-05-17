@@ -1923,7 +1923,7 @@ body::-webkit-scrollbar {
   position: relative;
   display: inline-block;
   min-width: 34px;
-  min-height: 4px;
+  min-height: 5px;
 }
 
 .player-health-gauge {
@@ -1932,7 +1932,6 @@ body::-webkit-scrollbar {
   padding: 1px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.52);
-  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.2);
 }
 
 .player-health-gauge[hidden] {
@@ -1940,8 +1939,9 @@ body::-webkit-scrollbar {
 }
 
 .player-health-gauge-track {
+  position: relative;
   width: 100%;
-  height: 4px;
+  height: 5px;
   border-radius: 3px;
   background: rgba(40, 10, 10, 0.85);
   overflow: hidden;
@@ -1954,6 +1954,22 @@ body::-webkit-scrollbar {
   border-radius: inherit;
   background: linear-gradient(90deg, #ef4444, #f87171);
   transition: width 120ms linear;
+}
+
+.player-health-gauge-label {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #fff;
+  font-size: 3.6px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.95);
 }
 
 .player-health-heart-toggle {
@@ -1975,12 +1991,21 @@ body::-webkit-scrollbar {
   font-size: 5px;
   line-height: 1;
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.player-health-heart-toggle:focus,
+.player-health-heart-toggle:focus-visible,
+.player-health-heart-toggle:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .player-health-heart-toggle.is-active {
   background: #dc2626;
   color: #fff;
-  box-shadow: 0 0 3px rgba(248, 113, 113, 0.85);
 }
 
 .remote-player.is-health-recharging .remote-player-body,
@@ -1989,8 +2014,11 @@ body::-webkit-scrollbar {
 }
 
 #player.remote-player-body.is-sitting {
+  width: 100%;
+  height: 100%;
   transform: none;
   transform-origin: bottom center;
+  object-fit: contain;
   object-position: center bottom;
 }
 
@@ -3775,14 +3803,11 @@ body #world-bag-inventory {
   max-width: calc(100vw - 18px - 78px - 24px);
 }
 
-.bag-inventory-panel-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 28px;
-}
-
 .bag-inventory-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 2;
   width: 32px;
   height: 32px;
   padding: 0;
@@ -3831,6 +3856,7 @@ body #world-bag-inventory {
 }
 
 .bag-inventory-slots {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 60px);
   grid-template-rows: repeat(3, 60px);

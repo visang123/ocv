@@ -119,6 +119,14 @@ function abortTradeMasterDialogue() {
   window.clearTimeout(promptHideTimeout);
 }
 
+/** 체력 0 — 진행 중인 거래 대화·교환 패널 중도 취소(교환대 아이템은 가방으로 반환) */
+export function cancelTradeOnPlayerHealthDepleted() {
+  abortTradeMasterDialogue();
+  if (exchangeOpen) {
+    closeTradeExchangePanel({ keepInventory: true });
+  }
+}
+
 export function resetTradeMasterDialogueIfStuck() {
   if (!running) return;
   if (Date.now() - dialogueStartedAt < 12000) return;
