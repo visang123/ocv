@@ -97,23 +97,52 @@ export function isPlayerInsideCraftHouse(footCenterX, footY, placedFurniture) {
   return false;
 }
 
-export function findNearestCraftHouse(footCenterX, footY, placedFurniture, maxDistance) {
+function worldRectsOverlapSimple(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+function rectOverlapArea(a, b) {
+  const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  if (w <= 0 || h <= 0) return 0;
+  return w * h;
+}
+
+/** 집 월드 스프라이트와 플레이어 몸통이 겹칠 때만 입장 가능 */
+export function findCraftHousePlayerIsTouching(
+  playerX,
+  footY,
+  playerWidth,
+  playerHeight,
+  placedFurniture
+) {
   if (!Array.isArray(placedFurniture) || placedFurniture.length === 0) return null;
-  const limit = Number.isFinite(Number(maxDistance))
-    ? Number(maxDistance)
-    : PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE;
+  const px = Number(playerX);
+  const fy = Number(footY);
+  const pw = Number(playerWidth) || 25;
+  const ph = Number(playerHeight) || 50;
+  if (!Number.isFinite(px) || !Number.isFinite(fy)) return null;
+  const playerRect = {
+    left: px,
+    right: px + pw,
+    top: fy - ph,
+    bottom: fy
+  };
   let best = null;
-  let bestDist = Infinity;
+  let bestOverlap = 0;
   for (let i = 0; i < placedFurniture.length; i++) {
     const entry = placedFurniture[i];
     if (!entry || entry.kind !== "craftHouse") continue;
-    const doorX = Number(entry.x) + Number(entry.width) / 2;
-    const doorY = Number(entry.y) + Number(entry.height);
-    const dx = Number(footCenterX) - doorX;
-    const dy = Number(footY) - doorY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < bestDist && dist <= limit) {
-      bestDist = dist;
+    const houseRect = {
+      left: Number(entry.x) || 0,
+      right: Number(entry.x) + Number(entry.width),
+      top: Number(entry.y) || 0,
+      bottom: Number(entry.y) + Number(entry.height)
+    };
+    if (!worldRectsOverlapSimple(playerRect, houseRect)) continue;
+    const overlap = rectOverlapArea(playerRect, houseRect);
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
       best = entry;
     }
   }

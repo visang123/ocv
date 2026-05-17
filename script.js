@@ -501,13 +501,12 @@ import {
   PLAYER_APPLE_HEAL_AMOUNT,
   PLAYER_HEALTH_DRAIN_INTERVAL_MS,
   PLAYER_CHAIR_INTERACT_DISTANCE,
-  PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE,
   clampPlayerHealth,
   healPlayerHealth,
   canPlayerMoveByHealth,
   isPlayerHealthDepleted,
   findNearestCraftChair,
-  findNearestCraftHouse,
+  findCraftHousePlayerIsTouching,
   getCraftChairSitPose,
   shouldDrainPlayerHealth,
   isPlayerMovementKeyActive,
@@ -7518,6 +7517,32 @@ function isPointerInsideBagInventoryPanel(clientX, clientY) {
   return !isPointerOutsideBagInventoryPanel(clientX, clientY);
 }
 
+/** ?? ?? ?? + ?? ?? ??(??/?? ? ?? ?? UI) */
+function isPointerOverBagInventoryUi(clientX, clientY) {
+  if (isPointerInsideBagInventoryPanel(clientX, clientY)) return true;
+  if (
+    worldBagInventory &&
+    worldBagInventory.style.display !== "none" &&
+    !worldBagInventory.hidden
+  ) {
+    return isPointerInElementRect(clientX, clientY, worldBagInventory);
+  }
+  return false;
+}
+
+function getBagDragDropTargetAt(clientX, clientY) {
+  const ghost = bagInventoryDragGhostEl;
+  const prevDisplay = ghost ? ghost.style.display : "";
+  if (ghost) ghost.style.display = "none";
+  let target = null;
+  try {
+    target = document.elementFromPoint(clientX, clientY);
+  } finally {
+    if (ghost) ghost.style.display = prevDisplay;
+  }
+  return target instanceof Element ? target : null;
+}
+
 function isPointerInElementRect(clientX, clientY, el) {
   if (!el) return false;
   const rect = el.getBoundingClientRect();
@@ -7545,15 +7570,35 @@ function isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY) {
   return isPointerInElementRect(clientX, clientY, alchemyCraftRequirementSlots);
 }
 
-function shouldDiscardBagDragAt(clientX, clientY, dragMode) {
-  if (isPointerInsideBagInventoryPanel(clientX, clientY)) return false;
-  if (dragMode === "trade" && isPointerOverTradeCounterDropZone(clientX, clientY)) {
-    return false;
+/**
+ * ??/?? ??? ??: placed | cancelled(?????????? ?) | discard(? ?)
+ * @returns {"placed"|"cancelled"|"discard"}
+ */
+function resolveBagCraftTradeDropAt(clientX, clientY, itemKey, dragMode) {
+  if (isPointerOverBagInventoryUi(clientX, clientY)) return "cancelled";
+  const target = getBagDragDropTargetAt(clientX, clientY);
+  if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
+    if (isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY)) {
+      if (
+        canDragBagItemToAlchemyCraft(itemKey) &&
+        tryDropBagItemOnAlchemyRequirement(itemKey, target)
+      ) {
+        return "placed";
+      }
+      return "cancelled";
+    }
+    return "discard";
   }
-  if (dragMode === "alchemy" && isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY)) {
-    return false;
+  if (dragMode === "trade" && isTradeExchangeOpen()) {
+    if (isPointerOverTradeCounterDropZone(clientX, clientY)) {
+      if (canDragBagItemToTradeCounter(itemKey) && tryDropBagItemOnTradeCounter(itemKey, target)) {
+        return "placed";
+      }
+      return "cancelled";
+    }
+    return "discard";
   }
-  return true;
+  return "cancelled";
 }
 
 async function tryDiscardBagItemFromDrag(itemKey) {
@@ -7583,13 +7628,13 @@ async function finishBagInventoryDrag(event) {
   if (!wasDragging) return;
   craftTradeDragClickSuppress = true;
   if (dragMode === "tradeReturn" && isTradeExchangeOpen()) {
-    if (isPointerInsideBagInventoryPanel(event.clientX, event.clientY)) {
+    if (isPointerOverBagInventoryUi(event.clientX, event.clientY)) {
       returnTradeCounterStackToInventory(itemKey);
     }
     return;
   }
   if (dragMode === "alchemyReturn" && isAlchemyCraftOpen()) {
-    if (isPointerInsideBagInventoryPanel(event.clientX, event.clientY)) {
+    if (isPointerOverBagInventoryUi(event.clientX, event.clientY)) {
       const slotIndex = Number(state.alchemySlotIndex);
       if (Number.isFinite(slotIndex) && slotIndex >= 0) {
         returnAlchemySlotStackToInventory(slotIndex);
@@ -7598,23 +7643,25 @@ async function finishBagInventoryDrag(event) {
     return;
   }
   if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (canDragBagItemToAlchemyCraft(itemKey) && tryDropBagItemOnAlchemyRequirement(itemKey, target)) {
-      return;
-    }
-    if (shouldDiscardBagDragAt(event.clientX, event.clientY, "alchemy")) {
-      await tryDiscardBagItemFromDrag(itemKey);
-    }
+    const dropResult = resolveBagCraftTradeDropAt(
+      event.clientX,
+      event.clientY,
+      itemKey,
+      "alchemy"
+    );
+    if (dropResult === "placed") return;
+    if (dropResult === "discard") await tryDiscardBagItemFromDrag(itemKey);
     return;
   }
   if (dragMode === "trade" && isTradeExchangeOpen()) {
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (canDragBagItemToTradeCounter(itemKey) && tryDropBagItemOnTradeCounter(itemKey, target)) {
-      return;
-    }
-    if (shouldDiscardBagDragAt(event.clientX, event.clientY, "trade")) {
-      await tryDiscardBagItemFromDrag(itemKey);
-    }
+    const dropResult = resolveBagCraftTradeDropAt(
+      event.clientX,
+      event.clientY,
+      itemKey,
+      "trade"
+    );
+    if (dropResult === "placed") return;
+    if (dropResult === "discard") await tryDiscardBagItemFromDrag(itemKey);
     return;
   }
   if (!isPointerOutsideBagInventoryPanel(event.clientX, event.clientY)) return;
@@ -11877,6 +11924,18 @@ function getCraftChairById(chairId) {
   return null;
 }
 
+function getCraftHouseById(houseId) {
+  const id = String(houseId || "");
+  if (!id) return null;
+  for (let i = 0; i < placedCraftFurniture.length; i++) {
+    const entry = placedCraftFurniture[i];
+    if (entry && entry.kind === "craftHouse" && String(entry.id) === id) {
+      return entry;
+    }
+  }
+  return null;
+}
+
 function getRemotePlayerOccupyingChair(chairId) {
   const id = String(chairId || "");
   if (!id) return null;
@@ -11907,6 +11966,16 @@ function showCraftChairOccupiedAlert(chair) {
   });
 }
 
+function syncRemotePlayerInsideCraftHouseVisual(remotePlayer) {
+  if (!remotePlayer || !remotePlayer.element) return;
+  const houseId = String(remotePlayer.insideCraftHouseId || "");
+  const inside = Boolean(houseId && getCraftHouseById(houseId));
+  if (!inside) {
+    remotePlayer.insideCraftHouseId = "";
+  }
+  remotePlayer.element.classList.toggle("is-inside-craft-house", inside);
+}
+
 function syncRemotePlayerPoseVisual(remotePlayer, color) {
   if (!remotePlayer || !remotePlayer.bodyElement || !remotePlayer.element) return;
   const seatedChair = getCraftChairById(remotePlayer.sittingChairId);
@@ -11915,6 +11984,7 @@ function syncRemotePlayerPoseVisual(remotePlayer, color) {
     remotePlayer.sittingChairId = "";
   }
   remotePlayer.bodyElement.classList.toggle("is-sitting", sitting);
+  syncRemotePlayerInsideCraftHouseVisual(remotePlayer);
   setWorldSize(
     remotePlayer.element,
     sitting ? PLAYER_SIT_WIDTH : PLAYER_WIDTH,
@@ -12056,6 +12126,7 @@ function enterCraftHouse(house) {
   playerInsideCraftHouseId = String(house.id || "");
   syncLocalPlayerInsideCraftHouseVisual();
   updatePlayerHealthUi();
+  sendMultiplayerPresence(true);
 }
 
 function exitCraftHouse() {
@@ -12074,6 +12145,7 @@ function exitCraftHouse() {
   setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updatePlayerHealthUi();
+  sendMultiplayerPresence(true);
 }
 
 function tryToggleCraftHouseEnter() {
@@ -12091,11 +12163,12 @@ function tryToggleCraftHouseEnter() {
   }
   if (heldItem || playerSittingChairId) return false;
 
-  const house = findNearestCraftHouse(
-    getPlayerCenterX(),
+  const house = findCraftHousePlayerIsTouching(
+    playerX,
     getPlayerFootY(),
-    placedCraftFurniture,
-    PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE
+    getLocalPlayerBodyWidth(),
+    getLocalPlayerBodyHeight(),
+    placedCraftFurniture
   );
   if (!house) return false;
 
@@ -17614,6 +17687,7 @@ function sendMultiplayerPresence(forceSend) {
     depth: playerDepth,
     jumpY,
     sittingChairId: playerSittingChairId ? String(playerSittingChairId) : "",
+    insideCraftHouseId: playerInsideCraftHouseId ? String(playerInsideCraftHouseId) : "",
     waterSplashAt: lastWaterSplashAt,
     waterSplashX: lastWaterSplashX,
     waterSplashY: lastWaterSplashY,
@@ -17627,6 +17701,7 @@ function sendMultiplayerPresence(forceSend) {
     Math.round(state.jumpY * 10),
     state.action,
     state.sittingChairId || "",
+    state.insideCraftHouseId || "",
     Math.round(state.waterSplashAt || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
@@ -18031,6 +18106,9 @@ function renderRemotePlayerState(state, source) {
     }
   }
   remotePlayer.sittingChairId = isRemoteSittingOnChair ? nextSittingChairId : "";
+  const nextInsideCraftHouseId = String(state.insideCraftHouseId || "");
+  const insideHouse = Boolean(nextInsideCraftHouseId && getCraftHouseById(nextInsideCraftHouseId));
+  remotePlayer.insideCraftHouseId = insideHouse ? nextInsideCraftHouseId : "";
   syncRemotePlayerPoseVisual(remotePlayer, remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
   setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey, nextJumpY);
@@ -18142,6 +18220,7 @@ function createRemotePlayer(remoteId) {
     lastShownAction: "",
     lastSeenAt: Date.now(),
     sittingChairId: "",
+    insideCraftHouseId: "",
     appliedSitTintKey: ""
   };
   return remotePlayers[remoteId];

@@ -1,5 +1,5 @@
 /** @typedef {{ id: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string, oneWay?: boolean }} TradeRecipe */
-/** @typedef {{ catalogKey?: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string }} TradeCatalogEntry */
+/** @typedef {{ catalogKey?: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string, oneWay?: boolean }} TradeCatalogEntry */
 
 export const TRADE_BUTTERFLY_ITEM_KEYS = [
   "butterfly:brown",
@@ -87,7 +87,8 @@ export const TRADE_RECIPES = [
     id: "rock7_bucket1",
     inputs: { rock: 7 },
     outputs: { worldBucket: 1 },
-    label: "\uC591\uB3D9\uC774"
+    label: "\uC591\uB3D9\uC774",
+    oneWay: true
   },
   {
     id: "seed7_overgrowth1",
@@ -198,7 +199,8 @@ export function getTradeCatalogEntries() {
       catalogKey: key,
       inputs: Object.assign({}, recipe.inputs),
       outputs: Object.assign({}, recipe.outputs),
-      label: recipe.label
+      label: recipe.label,
+      oneWay: Boolean(recipe.oneWay)
     });
   });
   return entries;
