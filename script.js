@@ -1622,6 +1622,8 @@ let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
 let lastWorldUpdatedAt = "";
 let lastWorldSyncUserToastAt = 0;
+/** world_state_conflict 직후 짧은 저장 유예 — 연속 충돌·폴링 루프 완화 */
+let worldSaveConflictBackoffUntil = 0;
 let localPlantActionLockUntil = 0;
 let localAppleActionLockUntil = 0;
 /** Extra-bucket id -> ms until local drop must win over stale shared snapshots */
@@ -8553,6 +8555,7 @@ function syncWorldState(forceSave) {
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
   if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!forceSave && now < worldSaveConflictBackoffUntil) return;
   if (
     isWorldSyncing ||
     !window.OVCOnline ||
@@ -8586,6 +8589,7 @@ function syncWorldState(forceSave) {
         String(error.message || "").indexOf("world_state_conflict") !== -1)
     ) {
       addNetworkDebugLog("world save conflict: polling latest snapshot before retry");
+      worldSaveConflictBackoffUntil = Date.now() + 1200;
       isWorldDirty = true;
       pollWorldState(true);
       return;
@@ -16565,6 +16569,15 @@ function pollPresenceDatabase() {
     });
     Object.keys(remotePlayers).forEach(function (remoteId) {
       if (idsInDb[remoteId]) return;
+      const remotePlayer = remotePlayers[remoteId];
+      // Realtime broadcast can be ahead of ovc_presence upsert; don't despawn on a stale DB row.
+      if (
+        remotePlayer &&
+        remotePlayer.lastSeenAt &&
+        now - remotePlayer.lastSeenAt < 45000
+      ) {
+        return;
+      }
       removeRemotePlayer(remoteId);
     });
     updateRemotePlayerCount();
