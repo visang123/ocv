@@ -353,28 +353,31 @@ function getAlchemyCraftPanelEl() {
 /** @param {Element | null | undefined} targetEl */
 export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
   if (!itemKey || !(targetEl instanceof Element) || !host) return false;
+  const panel = getAlchemyCraftPanelEl();
+  if (!panel || !panel.contains(targetEl)) return false;
   const slotsRoot = host.alchemyCraftRequirementSlots;
-  if (!slotsRoot) return false;
   if (!requirementsVisible) {
-    if (slotsRoot.contains(targetEl) || targetEl === slotsRoot) {
-      if (selectedRecipeId) {
-        showAlchemyRequirements();
-      } else if (host.showPlayerAlert) {
-        host.showPlayerAlert({
-          message: "\uBA3C\uC800 \uC81C\uC791\uD560 \uC544\uC774\uD15C\uC744 \uACE0\uB974\uC138\uC694.",
-          durationMs: 2200
-        });
-      }
+    if (selectedRecipeId) {
+      showAlchemyRequirements();
+    } else if (host.showPlayerAlert) {
+      host.showPlayerAlert({
+        message: "\uBA3C\uC800 \uC81C\uC791\uD560 \uC544\uC774\uD15C\uC744 \uACE0\uB974\uC138\uC694.",
+        durationMs: 2200
+      });
     }
-    return false;
+    if (!requirementsVisible) return false;
   }
-  const slotEl = targetEl.closest(".alchemy-craft-req-slot");
-  if (!slotEl || !slotsRoot.contains(slotEl)) return false;
-  const slotItemKey = slotEl.dataset.itemKey || "";
-  if (slotItemKey !== itemKey) return false;
-  const index = Number(slotEl.dataset.slotIndex);
-  if (!Number.isFinite(index) || index < 0) return false;
-  return addInventoryItemsToAlchemySlots(itemKey, index);
+  if (!ALCHEMY_CRAFT_INPUT_KEYS.has(itemKey)) return false;
+  const slotEl = slotsRoot ? targetEl.closest(".alchemy-craft-req-slot") : null;
+  if (slotEl && slotsRoot.contains(slotEl)) {
+    const slotItemKey = slotEl.dataset.itemKey || "";
+    if (slotItemKey !== itemKey) return false;
+    const index = Number(slotEl.dataset.slotIndex);
+    if (Number.isFinite(index) && index >= 0) {
+      return addInventoryItemsToAlchemySlots(itemKey, index);
+    }
+  }
+  return addInventoryItemsToAlchemySlots(itemKey);
 }
 
 export function canDragBagItemToAlchemyCraft(itemKey) {

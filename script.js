@@ -7566,15 +7566,16 @@ function isPointerOverTradeExchangeDropZone(clientX, clientY) {
   return isPointerInElementRect(clientX, clientY, panel);
 }
 
-function isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY) {
-  if (!isAlchemyCraftOpen() || !alchemyCraftRequirementSlots) return false;
-  if (
-    alchemyCraftRequirementsBlock &&
-    alchemyCraftRequirementsBlock.classList.contains("is-hidden")
-  ) {
-    return false;
-  }
-  return isPointerInElementRect(clientX, clientY, alchemyCraftRequirementSlots);
+function getAlchemyCraftPanelElement() {
+  if (!alchemyCraftOverlay || alchemyCraftOverlay.style.display === "none") return null;
+  return alchemyCraftOverlay.querySelector(".alchemy-craft-panel");
+}
+
+function isPointerOverAlchemyCraftDropZone(clientX, clientY) {
+  if (!isAlchemyCraftOpen()) return false;
+  const panel = getAlchemyCraftPanelElement();
+  if (!panel) return false;
+  return isPointerInElementRect(clientX, clientY, panel);
 }
 
 /**
@@ -7585,7 +7586,7 @@ function resolveBagCraftTradeDropAt(clientX, clientY, itemKey, dragMode) {
   if (isPointerOverBagInventoryUi(clientX, clientY)) return "cancelled";
   const target = getBagDragDropTargetAt(clientX, clientY);
   if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
-    if (isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY)) {
+    if (isPointerOverAlchemyCraftDropZone(clientX, clientY)) {
       if (
         canDragBagItemToAlchemyCraft(itemKey) &&
         tryDropBagItemOnAlchemyRequirement(itemKey, target)
@@ -11798,10 +11799,6 @@ function updatePlayerPosition() {
     velocityY = 0;
     isOnGround = true;
     isTreeFalling = false;
-  } else {
-    jumpY = 0;
-    velocityY = 0;
-    isOnGround = true;
   }
 
   if (isPlayerInWellWaterArea()) {

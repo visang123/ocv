@@ -7,8 +7,6 @@ const OPEN_UI_ROOT_IDS = [
   "admin-overlay",
   "character-select-overlay",
   "trade-exchange-overlay",
-  "alchemy-craft-overlay",
-  "bag-inventory-panel",
   "guide-card"
 ];
 
@@ -136,9 +134,20 @@ function applyWheelScroll(el, event) {
   el.scrollTop = next;
 }
 
+function isPointerOverTradeBagPassthrough(hit) {
+  for (let i = 0; i < hit.length; i += 1) {
+    if (isTradeExchangeBagWheelPassthrough(hit[i])) return true;
+  }
+  return false;
+}
+
 function resolveScrollTarget(event, openRoots) {
   const hit = document.elementsFromPoint(event.clientX, event.clientY);
   const tradeRoot = findOpenTradeExchangeRoot(openRoots);
+
+  if (tradeRoot && isPointerOverTradeBagPassthrough(hit)) {
+    return null;
+  }
 
   for (let i = 0; i < hit.length; i += 1) {
     const root = findOpenUiRootForElement(hit[i], openRoots);
@@ -159,24 +168,20 @@ function resolveScrollTarget(event, openRoots) {
     );
   }
 
-  if (tradeRoot) {
-    return getTradeExchangeScrollable(tradeRoot);
-  }
-
-  const topRoot = openRoots[0];
-  return topRoot ? findBestScrollableInRoot(topRoot) : null;
+  return null;
 }
 
-/** 열린 UI가 있으면 휠로 해당 창을 스크롤하고 true. 없으면 false(월드 줌 처리). */
+/** 스크롤 가능한 열린 UI 위에서 휠을 처리하면 true. 없으면 false(월드 줌 처리). */
 export function tryConsumeWheelForOpenUi(event) {
   const openRoots = collectOpenUiRoots();
   if (!openRoots.length) return false;
 
-  event.preventDefault();
-
   const scrollTarget = resolveScrollTarget(event, openRoots);
-  if (scrollTarget && scrollTarget.scrollHeight > scrollTarget.clientHeight) {
-    applyWheelScroll(scrollTarget, event);
+  if (!scrollTarget || scrollTarget.scrollHeight <= scrollTarget.clientHeight) {
+    return false;
   }
+
+  event.preventDefault();
+  applyWheelScroll(scrollTarget, event);
   return true;
 }
