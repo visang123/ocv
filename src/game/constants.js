@@ -431,6 +431,7 @@ export const coloredMagicPowderCountsKey = "coloredMagicPowderCountsV1";
 export const guidePlantPageUnlockedKey = "guidePlantPageUnlockedV1";
 export const appleStateKey = "appleStateV1";
 export const playerPositionKey = "playerPositionV1";
+export const playerHealthKey = "playerHealthV1";
 export const bucketStateKey = "bucketStateV1";
 export const mainDrySeedHandledKey = "mainDrySeedHandledV1";
 export const mainSeedCollectedKey = "mainSeedCollectedV1";
@@ -458,6 +459,7 @@ export const appStorageKeys = [
   guidePlantPageUnlockedKey,
   appleStateKey,
   playerPositionKey,
+  playerHealthKey,
   bucketStateKey,
   mainDrySeedHandledKey,
   mainSeedCollectedKey,

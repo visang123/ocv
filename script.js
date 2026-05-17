@@ -171,6 +171,7 @@ import {
   butterflyBoundsTop,
   butterflyBoundsBottom,
   playerPositionKey,
+  playerHealthKey,
   wellWaterKey,
   lastWellRefillKey,
   seedCreatedAtKey,
@@ -460,6 +461,16 @@ import {
   serializePlacedCraftFurnitureForSnapshot,
   parsePlacedCraftFurnitureFromSnapshot
 } from "./src/game/craft-furniture-world.js";
+import {
+  PLAYER_MAX_HEALTH,
+  PLAYER_HEALTH_DRAIN_INTERVAL_MS,
+  PLAYER_CHAIR_INTERACT_DISTANCE,
+  clampPlayerHealth,
+  findNearestCraftChair,
+  getCraftChairSitPose,
+  shouldDrainPlayerHealth,
+  tickPlayerHealthDrain
+} from "./src/game/player-health.js";
 
 let playerX = 100;
 let playerDepth = 0;
@@ -1742,6 +1753,11 @@ const gravity = 0.8;
 const MOVEMENT_REFERENCE_HZ = 60;
 const MOVEMENT_DT_CAP_SEC = 0.05;
 let lastMovementTickMs = 0;
+let playerHealth = PLAYER_MAX_HEALTH;
+let playerLastHealthDrainAt = 0;
+let playerSittingChairId = "";
+let playerHealthPosePrev = { x: 0, depth: 0, jumpY: 0 };
+let playerHealthPoseInitialized = false;
 const appleState = createAppleState([
   { id: "apple-1", x: BIG_TREE_X + 31, y: BIG_TREE_Y + 45, size: 10 },
   { id: "apple-2", x: BIG_TREE_X + 76, y: BIG_TREE_Y + 21, size: 10 },
@@ -2321,6 +2337,7 @@ document.addEventListener("keydown", function (event) {
     if (isPlayerGameplayBlockedByNpcDialogue()) return;
     if (isInteractKeyLatched) return;
     isInteractKeyLatched = true;
+    if (tryToggleChairSit()) return;
     performInteractAction();
   }
 
@@ -2358,6 +2375,14 @@ document.addEventListener("keydown", function (event) {
   }
 
   if (key === "Escape") {
+    if (playerSittingChairId) {
+      event.preventDefault();
+      standUpFromChair();
+      savePlayerHealthState();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (isAlchemyCraftOpen()) {
       event.preventDefault();
       closeAlchemyCraftPanel({ keepInventory: true });
@@ -2977,7 +3002,16 @@ if (player && player.parentNode) {
 } else if (player) {
   player.insertAdjacentElement("afterend", playerColorBody);
 }
+const playerHealthEl = document.createElement("div");
+playerHealthEl.id = "player-health";
+playerHealthEl.className = "remote-player-health";
+playerHealthEl.setAttribute("aria-hidden", "true");
 if (localPlayerRoot) {
+  if (playerName && playerName.parentNode === localPlayerRoot) {
+    localPlayerRoot.insertBefore(playerHealthEl, playerName);
+  } else {
+    localPlayerRoot.appendChild(playerHealthEl);
+  }
   localPlayerRoot.appendChild(playerBucketOverlay);
 } else if (ground) {
   ground.appendChild(playerBucketOverlay);
@@ -5051,6 +5085,7 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   hydrateTradeMasterDialogueComplete(getStoredFlag(tradeMasterDialogueCompleteKey));
   hydrateAlchemyMasterDialogueComplete(getStoredFlag(alchemyMasterDialogueCompleteKey));
   loadCraftFurnitureCounts();
+  loadPlayerHealth();
   loadColoredMagicPowderCounts();
   isGuidePlantPageUnlocked = getStoredFlag(guidePlantPageUnlockedKey);
   const promptDismissed = getStoredFlag(guideBookClickPromptDismissedKey);
@@ -5085,6 +5120,7 @@ function resetGameForTesting() {
 
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
+  savePlayerHealthState();
   saveWellState();
   saveSeedState();
   saveAppleState();
@@ -5094,6 +5130,7 @@ function persistDefaultStateAfterReset() {
 function saveGameSnapshot() {
   if (isReloadingForWorldReset) return;
   savePlayerPosition(true);
+  savePlayerHealthState();
   saveWellState();
   saveSeedState();
   saveAppleState();
@@ -5140,6 +5177,12 @@ function applyDefaultState(options) {
     } catch (ePending) {}
   }
   resetInputKeys(keys);
+
+  playerHealth = PLAYER_MAX_HEALTH;
+  playerLastHealthDrainAt = 0;
+  playerSittingChairId = "";
+  playerHealthPoseInitialized = false;
+  standUpFromChair();
 
   playerX = spawnPlayerX;
   playerDepth = spawnPlayerDepth;
@@ -11089,10 +11132,29 @@ function isPlayerGameplayBlockedByNpcDialogue() {
 }
 
 function updatePlayerPosition() {
+  const healthPosePrev = playerHealthPoseInitialized
+    ? playerHealthPosePrev
+    : { x: playerX, depth: playerDepth, jumpY: jumpY };
+
   if (isCharacterSelecting || !hasSpawnedCharacter) {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
+    playerHealthPosePrev = { x: playerX, depth: playerDepth, jumpY: jumpY };
+    playerHealthPoseInitialized = true;
+    return;
+  }
+
+  if (playerSittingChairId) {
+    const seatedChair = getCraftChairById(playerSittingChairId);
+    if (seatedChair) {
+      snapPlayerToCraftChair(seatedChair);
+    } else {
+      standUpFromChair();
+    }
+    lastMovementTickMs = performance.now();
+    playerHealthPosePrev = { x: playerX, depth: playerDepth, jumpY: jumpY };
+    playerHealthPoseInitialized = true;
     return;
   }
 
@@ -11100,6 +11162,8 @@ function updatePlayerPosition() {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
+    playerHealthPosePrev = { x: playerX, depth: playerDepth, jumpY: jumpY };
+    playerHealthPoseInitialized = true;
     return;
   }
 
@@ -11107,6 +11171,8 @@ function updatePlayerPosition() {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
+    playerHealthPosePrev = { x: playerX, depth: playerDepth, jumpY: jumpY };
+    playerHealthPoseInitialized = true;
     return;
   }
 
@@ -11254,6 +11320,9 @@ function updatePlayerPosition() {
   ) {
     refreshPlantHoverAfterPlayerMove();
   }
+
+  playerHealthPosePrev = healthPosePrev;
+  playerHealthPoseInitialized = true;
 }
 
 function isPlayerInWellWaterArea() {
@@ -11299,6 +11368,164 @@ function getPlayerCenterX() {
 
 function getPlayerFootY() {
   return GROUND_WORLD_HEIGHT - playerDepth + jumpY;
+}
+
+function getCraftChairById(chairId) {
+  const id = String(chairId || "");
+  if (!id) return null;
+  for (let i = 0; i < placedCraftFurniture.length; i++) {
+    const entry = placedCraftFurniture[i];
+    if (entry && entry.kind === "craftChair" && String(entry.id) === id) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+function standUpFromChair() {
+  if (!playerSittingChairId) return;
+  playerSittingChairId = "";
+  if (player) player.classList.remove("is-sitting");
+}
+
+function snapPlayerToCraftChair(chair) {
+  if (!chair) return;
+  const pose = getCraftChairSitPose(chair, PLAYER_WIDTH);
+  if (!pose) return;
+  playerX = pose.playerX;
+  playerDepth = GROUND_WORLD_HEIGHT - pose.footY;
+  jumpY = 0;
+  velocityY = 0;
+  isOnGround = true;
+  isTreeFalling = false;
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
+}
+
+function sitOnCraftChair(chair) {
+  if (!chair) return false;
+  playerSittingChairId = String(chair.id || "");
+  if (player) player.classList.add("is-sitting");
+  snapPlayerToCraftChair(chair);
+  return true;
+}
+
+function tryToggleChairSit() {
+  if (!hasSpawnedCharacter || isCharacterSelecting) return false;
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return false;
+  }
+  if (heldItem) return false;
+
+  if (playerSittingChairId) {
+    standUpFromChair();
+    savePlayerHealthState();
+    return true;
+  }
+
+  const chair = findNearestCraftChair(
+    getPlayerCenterX(),
+    getPlayerFootY(),
+    placedCraftFurniture,
+    PLAYER_CHAIR_INTERACT_DISTANCE
+  );
+  if (!chair) return false;
+  sitOnCraftChair(chair);
+  savePlayerHealthState();
+  return true;
+}
+
+function loadPlayerHealth() {
+  const raw = getStoredValue(playerHealthKey);
+  if (raw == null || raw === "") {
+    playerHealth = PLAYER_MAX_HEALTH;
+    playerLastHealthDrainAt = 0;
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      playerHealth = clampPlayerHealth(parsed.health);
+      const savedAt = Number(parsed.savedAt);
+      const lastDrainAt = Number(parsed.lastDrainAt);
+      playerLastHealthDrainAt = Number.isFinite(lastDrainAt) && lastDrainAt > 0 ? lastDrainAt : 0;
+      if (Number.isFinite(savedAt) && savedAt > 0 && playerLastHealthDrainAt > savedAt + 600000) {
+        playerLastHealthDrainAt = 0;
+      }
+      playerSittingChairId = "";
+      return;
+    }
+  } catch (e) {}
+  const legacy = clampPlayerHealth(raw);
+  playerHealth = legacy;
+  playerLastHealthDrainAt = 0;
+  playerSittingChairId = "";
+}
+
+function savePlayerHealthState() {
+  setStoredValue(
+    playerHealthKey,
+    JSON.stringify({
+      health: clampPlayerHealth(playerHealth),
+      lastDrainAt: playerLastHealthDrainAt || 0,
+      savedAt: Date.now()
+    })
+  );
+}
+
+function getPlayerHealthDrainContext(healthPosePrev) {
+  return {
+    hasSpawnedCharacter: hasSpawnedCharacter,
+    isCharacterSelecting: isCharacterSelecting,
+    isTabSessionSuperseded: isTabSessionSuperseded,
+    keys: keys,
+    isSittingOnChair: Boolean(playerSittingChairId),
+    isPlanting: Boolean(plantRuntime.isPlanting),
+    isEating: Boolean(appleState.isEating),
+    isGameplayBlockedByNpcDialogue: isPlayerGameplayBlockedByNpcDialogue(),
+    velocityY: velocityY,
+    previousPose: healthPosePrev,
+    currentPose: { x: playerX, depth: playerDepth, jumpY: jumpY },
+    footCenterX: getPlayerCenterX(),
+    footY: getPlayerFootY(),
+    placedCraftFurniture: placedCraftFurniture
+  };
+}
+
+function tickPlayerHealth(nowMs) {
+  if (!hasSpawnedCharacter || isCharacterSelecting || isTabSessionSuperseded) return;
+
+  const healthPosePrev = playerHealthPoseInitialized
+    ? playerHealthPosePrev
+    : { x: playerX, depth: playerDepth, jumpY: jumpY };
+  const ctx = getPlayerHealthDrainContext(healthPosePrev);
+  const result = tickPlayerHealthDrain(
+    {
+      health: playerHealth,
+      lastDrainAt: playerLastHealthDrainAt,
+      shouldDrain: shouldDrainPlayerHealth(ctx)
+    },
+    nowMs
+  );
+  playerHealth = result.health;
+  playerLastHealthDrainAt = result.lastDrainAt;
+  if (result.drained) {
+    savePlayerHealthState();
+  }
+}
+
+function updatePlayerHealthUi() {
+  if (!playerHealthEl) return;
+  if (
+    !hasSpawnedCharacter ||
+    !player ||
+    player.classList.contains("is-hidden-before-spawn")
+  ) {
+    playerHealthEl.style.display = "none";
+    return;
+  }
+  playerHealthEl.style.display = "block";
+  playerHealthEl.textContent = "\uCCB4\uB825 " + clampPlayerHealth(playerHealth);
 }
 
 function isPlayerNearTreeTrunk() {
@@ -18728,6 +18955,8 @@ function gameLoop() {
     updateSeedInventory();
     updateBucketPosition();
     updatePlayerStatus();
+    tickPlayerHealth(Date.now());
+    updatePlayerHealthUi();
     updateSeedCard();
     refreshPlantIdentityOrdinals();
     updatePlantState();
@@ -18926,6 +19155,7 @@ try {
       setStoredFlag(everBeenToWorldKey, true);
     }
     loadPlayerPosition();
+    loadPlayerHealth();
     loadButterflyCaughtCounts();
     loadMagicPowderCount();
     loadRockInventoryCount();
