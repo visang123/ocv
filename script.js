@@ -466,12 +466,16 @@ import {
 } from "./src/game/craft-furniture-world.js";
 import {
   PLAYER_MAX_HEALTH,
+  PLAYER_APPLE_HEAL_AMOUNT,
   PLAYER_HEALTH_DRAIN_INTERVAL_MS,
   PLAYER_CHAIR_INTERACT_DISTANCE,
+  PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE,
   clampPlayerHealth,
+  healPlayerHealth,
   canPlayerMoveByHealth,
   isPlayerHealthDepleted,
   findNearestCraftChair,
+  findNearestCraftHouse,
   getCraftChairSitPose,
   shouldDrainPlayerHealth,
   tickPlayerHealthState
@@ -1732,18 +1736,32 @@ playerBucketOverlay.id = "player-bucket-overlay";
 /** ????? ????? ??? ????????????? true */
 const BUCKET_DEBUG_TRACE = false;
 const playerTintCache = new Map();
+const playerSitTintCache = new Map();
 const playerBaseImage = new Image();
+const playerSitBaseImage = new Image();
 let playerBaseImageReady = false;
+let playerSitBaseImageReady = false;
 playerBaseImage.addEventListener("load", function () {
   playerBaseImageReady = true;
   playerTintCache.clear();
-  if (hasChosenPlayerColor && selectedPlayerColor) {
+  if (hasChosenPlayerColor && selectedPlayerColor && !playerSittingChairId) {
     applyPlayerColor(selectedPlayerColor);
   }
 });
+playerSitBaseImage.addEventListener("load", function () {
+  playerSitBaseImageReady = true;
+  playerSitTintCache.clear();
+  if (playerSittingChairId) {
+    syncLocalPlayerPoseVisual();
+  }
+});
 playerBaseImage.src = "??????/player-white.png";
+playerSitBaseImage.src = PLAYER_SIT_IMAGE_SRC;
 if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
+}
+if (playerSitBaseImage.complete && playerSitBaseImage.naturalWidth) {
+  playerSitBaseImageReady = true;
 }
 
 /** World-units per frame at ~60 Hz; multiplied by frameScale so real speed is monitor-independent. */
@@ -1762,6 +1780,8 @@ let playerHealth = PLAYER_MAX_HEALTH;
 let playerLastHealthTickAt = 0;
 let playerHealthGaugeVisible = false;
 let playerSittingChairId = "";
+let playerInsideCraftHouseId = "";
+let playerOutsideCraftHousePose = null;
 let playerHealthPosePrev = { x: 0, depth: 0, jumpY: 0 };
 let playerHealthPoseInitialized = false;
 const appleState = createAppleState([
@@ -2323,13 +2343,19 @@ document.addEventListener("keydown", function (event) {
 
   if (key in keys) {
     event.preventDefault();
-    if (!isPlayerGameplayBlockedByNpcDialogue() && !isPlayerHealthGameplayBlocked()) {
+    if (
+      !playerSittingChairId &&
+      !isPlayerInsideEnteredCraftHouse() &&
+      !isPlayerGameplayBlockedByNpcDialogue() &&
+      !isPlayerHealthGameplayBlocked()
+    ) {
       keys[key] = true;
     }
   }
 
   if (key === " " && isOnGround) {
     event.preventDefault();
+    if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
     if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
     if (isPlayerInTreeSpace()) {
@@ -2343,6 +2369,7 @@ document.addEventListener("keydown", function (event) {
     event.preventDefault();
     if (isInteractKeyLatched) return;
     isInteractKeyLatched = true;
+    if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
     if (isPlayerGameplayBlockedByNpcDialogue()) return;
     performInteractAction();
@@ -2352,6 +2379,7 @@ document.addEventListener("keydown", function (event) {
     event.preventDefault();
     if (tryToggleChairSit()) return;
     if (playerSittingChairId) return;
+    if (tryToggleCraftHouseEnter()) return;
     if (isPlayerHealthGameplayBlocked()) return;
     if (heldItem === HELD_ITEM_BUCKET) {
       if (isPlayerGameplayBlockedByNpcDialogue()) return;
@@ -2385,6 +2413,22 @@ document.addEventListener("keydown", function (event) {
   }
 
   if (key === "Escape") {
+    if (playerInsideCraftHouseId) {
+      event.preventDefault();
+      exitCraftHouse();
+      savePlayerHealthState();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
+    if (playerSittingChairId && canPlayerMoveByHealth(playerHealth)) {
+      event.preventDefault();
+      standUpFromChair();
+      savePlayerHealthState();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (isAlchemyCraftOpen()) {
       event.preventDefault();
       closeAlchemyCraftPanel({ keepInventory: true });
@@ -3117,24 +3161,24 @@ adminDevPlantIndexPlusButton.addEventListener("click", function () {
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
 controlsButton.type = "button";
-controlsButton.textContent = "??????;
+controlsButton.textContent = "\uC870\uC791\uBC95";
 settingsModal.insertBefore(controlsButton, logoutButton);
 const controlsOverlay = document.createElement("div");
 controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>??????/strong></div>' +
+  '<div class="controls-header"><strong>조작법</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / \u2191</span><p>???? ????</p></div>' +
-  '<div><span>A / \u2190</span><p>??????? ????</p></div>' +
-  '<div><span>S / \u2193</span><p>???????????</p></div>' +
-  '<div><span>D / \u2192</span><p>?????????????</p></div>' +
-  '<div><span>Space</span><p>?????</p></div>' +
-  '<div><span>E</span><p>?? / ??????</p></div>' +
-  '<div><span>Q</span><p>????? / ????/p></div>' +
-  '<div><span>?????????/span><p>???? / ?????</p></div>' +
-  '<div><span>Esc</span><p>???? ??? / ???</p></div>' +
+  '<div><span>W / ↑</span><p>위로 이동</p></div>' +
+  '<div><span>A / ←</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / ↓</span><p>아래로 이동</p></div>' +
+  '<div><span>D / →</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>Space</span><p>점프</p></div>' +
+  '<div><span>E</span><p>줄기 / 내려놓기</p></div>' +
+  '<div><span>Q</span><p>사용 / 대화</p></div>' +
+  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -5215,8 +5259,11 @@ function applyDefaultState(options) {
   playerLastHealthTickAt = 0;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
+  playerInsideCraftHouseId = "";
+  playerOutsideCraftHousePose = null;
   playerHealthPoseInitialized = false;
   standUpFromChair();
+  exitCraftHouse();
 
   playerX = spawnPlayerX;
   playerDepth = spawnPlayerDepth;
@@ -6213,6 +6260,8 @@ function eatApple() {
     appleState.isEating = false;
     sendMultiplayerPresence(true);
     playerStatus.textContent = "";
+    playerHealth = healPlayerHealth(playerHealth, PLAYER_APPLE_HEAL_AMOUNT);
+    savePlayerHealthState();
     createSeedFromApple();
     if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_EAT_APPLE) {
       onboardingFlowStep = ONBOARDING_STEP_EXTRA_SEED;
@@ -11180,6 +11229,15 @@ function updatePlayerPosition() {
     return;
   }
 
+  if (playerInsideCraftHouseId) {
+    lastMovementTickMs = performance.now();
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+    updatePlayerColorBodyPosition();
+    playerHealthPosePrev = { x: playerX, depth: playerDepth, jumpY: jumpY };
+    playerHealthPoseInitialized = true;
+    return;
+  }
+
   if (playerSittingChairId) {
     const seatedChair = getCraftChairById(playerSittingChairId);
     if (seatedChair) {
@@ -11412,7 +11470,7 @@ function getPlayerRenderedHeight() {
 }
 
 function getPlayerCenterX() {
-  return playerX + PLAYER_WIDTH / 2;
+  return playerX + getLocalPlayerBodyWidth() / 2;
 }
 
 function getPlayerFootY() {
@@ -11505,11 +11563,83 @@ function tryToggleChairSit() {
     getPlayerCenterX(),
     getPlayerFootY(),
     placedCraftFurniture,
-    PLAYER_CHAIR_INTERACT_DISTANCE
+    PLAYER_CHAIR_INTERACT_DISTANCE + 6
   );
   if (!chair) return false;
   sitOnCraftChair(chair);
   savePlayerHealthState();
+  return true;
+}
+
+function isPlayerInsideEnteredCraftHouse() {
+  return Boolean(playerInsideCraftHouseId);
+}
+
+function syncLocalPlayerInsideCraftHouseVisual() {
+  if (!localPlayerRoot) return;
+  const inside = isPlayerInsideEnteredCraftHouse();
+  localPlayerRoot.classList.toggle("is-inside-craft-house", inside);
+  if (player) {
+    player.classList.toggle("is-inside-craft-house", inside);
+  }
+}
+
+function enterCraftHouse(house) {
+  if (!house) return;
+  playerOutsideCraftHousePose = {
+    x: playerX,
+    depth: playerDepth,
+    jumpY: jumpY
+  };
+  playerInsideCraftHouseId = String(house.id || "");
+  syncLocalPlayerInsideCraftHouseVisual();
+  updatePlayerHealthUi();
+}
+
+function exitCraftHouse() {
+  if (!playerInsideCraftHouseId) return;
+  const pose = playerOutsideCraftHousePose;
+  if (pose) {
+    playerX = Number(pose.x) || playerX;
+    playerDepth = Number(pose.depth) || playerDepth;
+    jumpY = Number(pose.jumpY) || 0;
+    velocityY = 0;
+    isOnGround = true;
+  }
+  playerInsideCraftHouseId = "";
+  playerOutsideCraftHousePose = null;
+  syncLocalPlayerInsideCraftHouseVisual();
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
+  updatePlayerHealthUi();
+}
+
+function tryToggleCraftHouseEnter() {
+  if (!hasSpawnedCharacter || isCharacterSelecting) return false;
+
+  if (playerInsideCraftHouseId) {
+    exitCraftHouse();
+    savePlayerHealthState();
+    resetInputKeys(keys);
+    return true;
+  }
+
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return false;
+  }
+  if (heldItem || playerSittingChairId) return false;
+
+  const house = findNearestCraftHouse(
+    getPlayerCenterX(),
+    getPlayerFootY(),
+    placedCraftFurniture,
+    PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE
+  );
+  if (!house) return false;
+
+  enterCraftHouse(house);
+  savePlayerHealthState();
+  resetInputKeys(keys);
   return true;
 }
 
@@ -11533,6 +11663,9 @@ function loadPlayerHealth() {
       }
       playerHealthGaugeVisible = parsed.gaugeVisible === true;
       playerSittingChairId = "";
+      playerInsideCraftHouseId = "";
+      playerOutsideCraftHousePose = null;
+      syncLocalPlayerInsideCraftHouseVisual();
       return;
     }
   } catch (e) {}
@@ -11541,6 +11674,9 @@ function loadPlayerHealth() {
   playerLastHealthTickAt = 0;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
+  playerInsideCraftHouseId = "";
+  playerOutsideCraftHousePose = null;
+  syncLocalPlayerInsideCraftHouseVisual();
 }
 
 function savePlayerHealthState() {
@@ -11563,6 +11699,7 @@ function getPlayerHealthTickContext(healthPosePrev) {
     health: playerHealth,
     keys: keys,
     isSittingOnChair: Boolean(playerSittingChairId),
+    isInsideEnteredCraftHouse: isPlayerInsideEnteredCraftHouse(),
     isPlanting: Boolean(plantRuntime.isPlanting),
     isEating: Boolean(appleState.isEating),
     isGameplayBlockedByNpcDialogue: isPlayerGameplayBlockedByNpcDialogue(),
@@ -11608,7 +11745,8 @@ function updatePlayerHealthUi() {
   if (
     !hasSpawnedCharacter ||
     !player ||
-    player.classList.contains("is-hidden-before-spawn")
+    player.classList.contains("is-hidden-before-spawn") ||
+    isPlayerInsideEnteredCraftHouse()
   ) {
     playerHealthRoot.style.display = "none";
     return;
@@ -12867,6 +13005,7 @@ function performInteractActionCore() {
 }
 
 function performInteractAction() {
+  if (isPlayerInsideEnteredCraftHouse()) return;
   if (isPlayerHealthGameplayBlocked()) return;
   if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
   const now = Date.now();
@@ -14034,6 +14173,7 @@ function isExtraSeedDry(extraSeed, now) {
 }
 
 function useHeldItem() {
+  if (isPlayerInsideEnteredCraftHouse()) return;
   if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
     return;
   }
@@ -15564,41 +15704,45 @@ function applyPlayerColor(color) {
   }
   player.style.setProperty("--player-color", normalizedColor);
   playerColorBody.style.display = "none";
-  player.src = getTintedPlayerSrc(normalizedColor);
-  player.classList.toggle("needs-outline", needsDarkOutline(normalizedColor));
-  player.classList.add("is-colorized");
+  syncLocalPlayerPoseVisual();
   addNetworkDebugLog("apply color: " + normalizedColor);
   syncPlayerColorToServer();
 }
 
-function getTintedPlayerSrc(color) {
+function getTintedPlayerSrc(color, sitting) {
   const tintColor = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color.toLowerCase() : "#ffffff";
+  const useSit = Boolean(sitting);
+  const cache = useSit ? playerSitTintCache : playerTintCache;
 
-  if (playerTintCache.has(tintColor)) {
-    return playerTintCache.get(tintColor);
+  if (cache.has(tintColor)) {
+    return cache.get(tintColor);
   }
 
-  if (!playerBaseImageReady || !playerBaseImage.naturalWidth || !playerBaseImage.naturalHeight) {
-    return "??????/player-white.png";
+  const baseImage = useSit ? playerSitBaseImage : playerBaseImage;
+  const baseReady = useSit ? playerSitBaseImageReady : playerBaseImageReady;
+  const fallback = useSit ? PLAYER_SIT_IMAGE_SRC : playerBaseImage.src;
+
+  if (!baseReady || !baseImage.naturalWidth || !baseImage.naturalHeight) {
+    return fallback;
   }
 
   const canvas = document.createElement("canvas");
-  canvas.width = playerBaseImage.naturalWidth;
-  canvas.height = playerBaseImage.naturalHeight;
+  canvas.width = baseImage.naturalWidth;
+  canvas.height = baseImage.naturalHeight;
   const context = canvas.getContext("2d");
   if (!context) {
-    return "??????/player-white.png";
+    return fallback;
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(playerBaseImage, 0, 0);
+  context.drawImage(baseImage, 0, 0);
   context.globalCompositeOperation = "source-atop";
   context.fillStyle = tintColor;
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.globalCompositeOperation = "source-over";
 
   const tintedSrc = canvas.toDataURL("image/png");
-  playerTintCache.set(tintColor, tintedSrc);
+  cache.set(tintColor, tintedSrc);
   return tintedSrc;
 }
 
@@ -16712,7 +16856,7 @@ function setupMultiplayer() {
   if (isSharedWorldSyncPausedForTutorial()) {
     teardownMultiplayerForTutorial();
     updateMultiplayerStatus(
-      "?????????: ??? ?????????/????? ?????? ??????????
+      "\uD29C\uD1A0\uB9AC\uC5BC: \uB2E4\uB978 \uD50C\uB808\uC774\uC5B4/\uC138\uC0C1 \uBE44\uACF5\uC720 \u00B7 \uBA40\uD2F0 \uBBF8\uC5F0\uACB0"
     );
     addNetworkDebugLog("multiplayer skipped: tutorial single-player world");
     return;
@@ -17566,16 +17710,16 @@ function updateMultiplayerStatus(statusText) {
   if (!multiplayerStatus) return;
 
   const statusLabel =
-    multiplayerStatusText === "????? ||
-    multiplayerStatusText === "????? ||
-    multiplayerStatusText === "????????? ?? ||
-    multiplayerStatusText === "??????? ||
+    multiplayerStatusText === "\uC5F0\uACB0\uB428" ||
+    multiplayerStatusText === "\uC5F0\uACB0\uC911" ||
+    multiplayerStatusText === "\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804" ||
+    multiplayerStatusText === "\uCD08\uAE30\uD654 \uC911" ||
     (typeof multiplayerStatusText === "string" &&
-      multiplayerStatusText.indexOf("?????????") !== -1)
+      multiplayerStatusText.indexOf("\uD29C\uD1A0\uB9AC\uC5BC") !== -1)
       ? multiplayerStatusText
-      : "??? ???";
+      : "\uC5F0\uACB0 \uC548\uB428";
   multiplayerStatus.textContent =
-    "????" + statusLabel + " / ?????" + getOnlinePlayerCount();
+    "\uBA40\uD2F0 " + statusLabel + " / \uB85C\uADF8\uC778 " + getOnlinePlayerCount();
 }
 
 function clearMultiplayerReconnectTimeout() {

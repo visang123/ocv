@@ -1986,6 +1986,17 @@ body::-webkit-scrollbar {
   object-position: center bottom;
 }
 
+.remote-player.local-player-avatar.is-inside-craft-house #player,
+.remote-player.local-player-avatar.is-inside-craft-house #player-color-body,
+.remote-player.local-player-avatar.is-inside-craft-house #player-name,
+.remote-player.local-player-avatar.is-inside-craft-house #player-bubble,
+.remote-player.local-player-avatar.is-inside-craft-house #player-status,
+.remote-player.local-player-avatar.is-inside-craft-house #player-bucket-overlay,
+.remote-player.local-player-avatar.is-inside-craft-house #player-alert {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .remote-player-name {
   position: absolute;
   left: 50%;

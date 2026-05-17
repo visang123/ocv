@@ -6,12 +6,14 @@ import {
 } from "./craft-furniture-world.js";
 
 export const PLAYER_MAX_HEALTH = 100;
+export const PLAYER_APPLE_HEAL_AMOUNT = 15;
 export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 5000;
 export const PLAYER_HEALTH_RECHARGE_MS = 1000;
 export const PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC = 1;
 export const PLAYER_HEALTH_RECHARGE_CHAIR_PER_SEC = 2;
 export const PLAYER_HEALTH_RECHARGE_HOME_PER_SEC = 4;
 export const PLAYER_CHAIR_INTERACT_DISTANCE = 42;
+export const PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE = 52;
 const POSITION_IDLE_EPSILON = 0.05;
 
 const MOVEMENT_KEY_NAMES = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "a", "d", "w", "s"];
@@ -20,6 +22,11 @@ export function clampPlayerHealth(value) {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n)) return PLAYER_MAX_HEALTH;
   return Math.max(0, Math.min(PLAYER_MAX_HEALTH, n));
+}
+
+export function healPlayerHealth(currentHealth, amount) {
+  const heal = Math.max(0, Math.floor(Number(amount)) || 0);
+  return clampPlayerHealth(clampPlayerHealth(currentHealth) + heal);
 }
 
 /** 체력 0 — 충전 모드, 이동·행동 불가 */
@@ -49,8 +56,13 @@ export function isPlayerPoseUnchanged(prev, next, epsilon) {
   );
 }
 
+export function isPlayerEnteredCraftHouse(opts) {
+  return Boolean(opts && opts.isInsideEnteredCraftHouse);
+}
+
 export function isPlayerIdleForHealth(opts) {
   if (!opts || !opts.hasSpawnedCharacter || opts.isCharacterSelecting) return false;
+  if (isPlayerEnteredCraftHouse(opts)) return true;
   if (opts.isSittingOnChair) return false;
   if (opts.isPlanting || opts.isEating) return false;
   if (opts.isGameplayBlockedByNpcDialogue) return false;
@@ -78,6 +90,29 @@ export function isPlayerInsideCraftHouse(footCenterX, footY, placedFurniture) {
     }
   }
   return false;
+}
+
+export function findNearestCraftHouse(footCenterX, footY, placedFurniture, maxDistance) {
+  if (!Array.isArray(placedFurniture) || placedFurniture.length === 0) return null;
+  const limit = Number.isFinite(Number(maxDistance))
+    ? Number(maxDistance)
+    : PLAYER_CRAFT_HOUSE_INTERACT_DISTANCE;
+  let best = null;
+  let bestDist = Infinity;
+  for (let i = 0; i < placedFurniture.length; i++) {
+    const entry = placedFurniture[i];
+    if (!entry || entry.kind !== "craftHouse") continue;
+    const doorX = Number(entry.x) + Number(entry.width) / 2;
+    const doorY = Number(entry.y) + Number(entry.height);
+    const dx = Number(footCenterX) - doorX;
+    const dy = Number(footY) - doorY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < bestDist && dist <= limit) {
+      bestDist = dist;
+      best = entry;
+    }
+  }
+  return best;
 }
 
 export function findNearestCraftChair(footCenterX, footY, placedFurniture, maxDistance) {
@@ -121,6 +156,9 @@ export function getCraftChairSitPose(chair, playerWidth, playerSitHeight) {
 
 export function getPlayerHealthRechargePerSecond(opts) {
   if (!opts) return PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC;
+  if (isPlayerEnteredCraftHouse(opts)) {
+    return PLAYER_HEALTH_RECHARGE_HOME_PER_SEC;
+  }
   if (isPlayerInsideCraftHouse(opts.footCenterX, opts.footY, opts.placedCraftFurniture)) {
     return PLAYER_HEALTH_RECHARGE_HOME_PER_SEC;
   }
@@ -134,6 +172,7 @@ export function shouldDrainPlayerHealth(opts) {
   if (isPlayerHealthDepleted(opts.health)) return false;
   if (isPlayerIdleForHealth(opts)) return false;
   if (opts.isSittingOnChair) return false;
+  if (isPlayerEnteredCraftHouse(opts)) return false;
   if (isPlayerInsideCraftHouse(opts.footCenterX, opts.footY, opts.placedCraftFurniture)) {
     return false;
   }
