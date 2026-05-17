@@ -1675,6 +1675,8 @@ let lastAppliedWorldResetToken = readOvcLastAppliedWorldResetTokenFromStores();
 let lastWorldResetAt = 0;
 let isReloadingForWorldReset = false;
 let remoteBucketUpdateAtById = {};
+/** 원격 플레이어가 메인이 아닌 추가 양동이를 들고 있을 때 (sessionId -> { isFull, bucketId }) */
+let remotePlayerHeldBucketById = Object.create(null);
 /**
  * Session ids recently seen in this room (DB presence + realtime broadcasts).
  * Includes same-login tabs so butterfly authority is a single elected client.
@@ -5540,6 +5542,7 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
     broadcastBucketState(true);
     syncWorldState(true);
   } else {
+    broadcastBucketState(true);
     holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
     saveBucketState();
@@ -6522,6 +6525,12 @@ function rebuildWorldExtraBucketDom() {
   updateWorldExtraBuckets();
 }
 
+function getGroundBucketZIndex(worldY) {
+  const y = Number(worldY);
+  if (!Number.isFinite(y)) return 17;
+  return Math.min(18, Math.max(4, 4 + Math.floor(y / 28)));
+}
+
 function updateWorldExtraBuckets() {
   if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldExtraBuckets)) return;
   const bucketSz = getBucketSize();
@@ -6529,6 +6538,7 @@ function updateWorldExtraBuckets() {
     if (!entry || !entry._el) return;
     setWorldSize(entry._el, bucketSz.width, bucketSz.height);
     setWorldPosition(entry._el, entry.x, entry.y);
+    entry._el.style.zIndex = String(getGroundBucketZIndex(entry.y));
     entry._el.src = entry.isFull ? "이미지/bucket-full.png" : "이미지/bucket-empty.png";
   });
 }
@@ -8800,6 +8810,7 @@ function dropBucket() {
     isBucketFull = Boolean(heldExtraBucketMainIsFull);
     heldExtraBucketMainIsFull = false;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
+    broadcastBucketState(true);
     rebuildWorldExtraBucketDom();
     holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
@@ -10827,7 +10838,16 @@ function updateBucketPosition() {
   Object.keys(remotePlayers).forEach(function (remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.element) return;
-    remotePlayer.element.classList.remove("is-carrying-bucket");
+    remotePlayer.element.classList.remove("is-carrying-bucket", "is-carrying-bucket-full");
+    const holdsMain = String(window.OVC_SHARED_BUCKET_HELD_BY || "") === remoteId;
+    const extraHold = remotePlayerHeldBucketById[remoteId];
+    if (holdsMain || extraHold) {
+      remotePlayer.element.classList.add("is-carrying-bucket");
+      const carryFull = holdsMain ? Boolean(isBucketFull) : Boolean(extraHold.isFull);
+      if (carryFull) {
+        remotePlayer.element.classList.add("is-carrying-bucket-full");
+      }
+    }
   });
 
   if (heldItem === HELD_ITEM_BUCKET) {
@@ -10836,7 +10856,7 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
-    if (isHoldingMainBucket()) {
+    if (isHoldingMainBucket() || isHoldingExtraBucket()) {
       markWorldDirty();
       broadcastBucketState(false);
       bucket.style.display = "none";
@@ -10885,6 +10905,7 @@ function updateBucketPosition() {
 
   if (bucket.style.display === "block" && !isHoldingExtraBucket()) {
     setWorldPosition(bucket, bucketX, bucketY);
+    bucket.style.zIndex = String(getGroundBucketZIndex(bucketY));
     if (BUCKET_DEBUG_TRACE) {
       const mode =
         heldItem === HELD_ITEM_BUCKET
@@ -13578,6 +13599,7 @@ function useBucket() {
       wellState.lastRefillAt = snapWellRefillToGrid(Date.now());
       saveWellState();
       syncWorldState(true);
+      broadcastBucketState(false);
       updateWellImage();
       updateWellCard();
       onboardingHookFilledBucketAtWell();
@@ -13604,6 +13626,7 @@ function useBucket() {
     updateWellCard();
     triggerWaterSplash();
     isBucketFull = false;
+    broadcastBucketState(false);
     return;
   }
 
@@ -16464,12 +16487,15 @@ function broadcastBucketState(forceSend) {
   }
 
   const mainBucket = getMainBucketGroundState();
+  const holdingBucket = heldItem === HELD_ITEM_BUCKET;
   const payload = {
     id: currentSessionId,
-    held: isHoldingMainBucket(),
+    held: holdingBucket,
+    heldMain: isHoldingMainBucket(),
+    heldBucketId: holdingBucket ? String(heldBucketId || MAIN_BUCKET_ID) : "",
     x: mainBucket.x,
     y: mainBucket.y,
-    isFull: mainBucket.isFull,
+    isFull: holdingBucket ? Boolean(isBucketFull) : mainBucket.isFull,
     updatedAt: now
   };
   Promise.resolve(multiplayerChannel.send({
@@ -16500,34 +16526,60 @@ function handleRemoteBucketBroadcast(payload) {
   if (nextUpdatedAt < prevUpdatedAt) return;
   remoteBucketUpdateAtById[remoteId] = nextUpdatedAt;
 
-  if (payload.held === true) {
+  const held = payload.held === true;
+  const heldMain =
+    held &&
+    (payload.heldMain === undefined || payload.heldMain === null || Boolean(payload.heldMain));
+
+  if (held && heldMain) {
     window.OVC_SHARED_BUCKET_HELD_BY = remoteId;
+    delete remotePlayerHeldBucketById[remoteId];
     const nextX = Number(payload.x);
     const nextY = Number(payload.y);
     if (Number.isFinite(nextX)) bucketX = nextX;
     if (Number.isFinite(nextY)) bucketY = nextY;
     isBucketFull = Boolean(payload.isFull);
+    markWorldDirty();
     addBucketTrace(
       "recv",
-      "from=" + remoteId + " held=true x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
+      "from=" + remoteId + " held=main x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
       350
     );
     return;
   }
 
-  if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
-    window.OVC_SHARED_BUCKET_HELD_BY = "";
-    const nextX = Number(payload.x);
-    const nextY = Number(payload.y);
-    if (Number.isFinite(nextX)) bucketX = nextX;
-    if (Number.isFinite(nextY)) bucketY = nextY;
-    isBucketFull = Boolean(payload.isFull);
+  if (held && !heldMain) {
+    if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
+      window.OVC_SHARED_BUCKET_HELD_BY = "";
+    }
+    remotePlayerHeldBucketById[remoteId] = {
+      isFull: Boolean(payload.isFull),
+      bucketId: String(payload.heldBucketId || "")
+    };
+    markWorldDirty();
     addBucketTrace(
       "recv",
-      "from=" + remoteId + " held=false x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
+      "from=" + remoteId + " held=extra id=" + remotePlayerHeldBucketById[remoteId].bucketId + " t=" + nextUpdatedAt,
       350
     );
+    return;
   }
+
+  delete remotePlayerHeldBucketById[remoteId];
+  if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+  }
+  const nextX = Number(payload.x);
+  const nextY = Number(payload.y);
+  if (Number.isFinite(nextX)) bucketX = nextX;
+  if (Number.isFinite(nextY)) bucketY = nextY;
+  isBucketFull = Boolean(payload.isFull);
+  markWorldDirty();
+  addBucketTrace(
+    "recv",
+    "from=" + remoteId + " held=false x=" + Math.round(bucketX || 0) + " y=" + Math.round(bucketY || 0) + " t=" + nextUpdatedAt,
+    350
+  );
 }
 
 function syncPresenceToDatabase(state) {
