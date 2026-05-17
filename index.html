@@ -461,6 +461,19 @@
       <button id="logout-button" type="button">로그아웃</button>
     </div>
   </div>
+  <div id="bag-discard-overlay" class="bag-discard-overlay" aria-hidden="true">
+    <div id="bag-discard-modal" class="bag-discard-modal" role="dialog" aria-labelledby="bag-discard-title">
+      <p id="bag-discard-title" class="bag-discard-title">몇 개를 버릴까요?</p>
+      <div class="bag-discard-row">
+        <input id="bag-discard-amount" type="number" min="1" value="1" inputmode="numeric" aria-label="버릴 개수" />
+        <button id="bag-discard-all" type="button" class="bag-discard-all">모두</button>
+      </div>
+      <div class="bag-discard-actions">
+        <button id="bag-discard-cancel" type="button">취소</button>
+        <button id="bag-discard-confirm" type="button">버리기</button>
+      </div>
+    </div>
+  </div>
   <div id="logout-confirm-overlay" aria-hidden="true">
     <div id="logout-confirm-modal">
       <p>로그아웃할까요?</p>

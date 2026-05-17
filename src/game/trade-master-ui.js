@@ -154,6 +154,10 @@ export function bindTradeMaster(h) {
 
 export function hydrateTradeMasterDialogueComplete(flag) {
   complete = Boolean(flag);
+  if (complete || !host || !host.tradeMasterBubble) return;
+  host.tradeMasterBubble.dataset.promptShown = "false";
+  host.tradeMasterBubble.style.display = "none";
+  window.clearTimeout(promptHideTimeout);
 }
 
 export function isTradeMasterDialogueComplete() {
@@ -302,15 +306,27 @@ export function pickWorldNpcHover(clientX, clientY) {
 
 export function handleBagSlotClickWhileTradeOpen(slotEl) {
   if (!exchangeOpen || !slotEl) return true;
+  if (slotEl.classList.contains("is-empty")) return true;
   const key = bagSlotToItemKey(slotEl);
-  if (!key || !TRADEABLE_KEYS.has(key)) return true;
+  if (!key) return true;
+  if (key.indexOf("butterfly:") === 0) {
+    if (host && host.showPlayerAlert) {
+      host.showPlayerAlert({
+        message:
+          "\uB098\uBE44\uB294 \uC5F0\uAE08\uC220\uC758 \uB2EC\uC778\uC5D0\uC11C \uC81C\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+        durationMs: 2600
+      });
+    }
+    return true;
+  }
+  if (!TRADEABLE_KEYS.has(key)) return true;
   addOneInventoryItemToTradeCounter(key);
   return true;
 }
 
 function bagSlotToItemKey(slotEl) {
   const kind = slotEl.dataset.bagType;
-  if (!kind || kind === "empty" || kind === "book" || kind === "butterfly") return null;
+  if (!kind || kind === "empty" || kind === "book") return null;
   if (kind === "butterfly") {
     const color = slotEl.dataset.butterflyColor;
     return color ? "butterfly:" + color : null;

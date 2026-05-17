@@ -16,6 +16,10 @@ export function updateSettingsTutorialButtons(options) {
       options.onboardingFlowStep > 0
   );
   tutorialExitButton.style.display = inTutorial ? "block" : "none";
-  // 튜토리얼은 계정당 최초 1회만 — 설정에서 다시 시작 불가
-  tutorialReplayButton.style.display = "none";
+  const canReplay = Boolean(
+    options.currentUserId &&
+      options.hasSpawnedCharacter &&
+      options.onboardingDone
+  );
+  tutorialReplayButton.style.display = canReplay && !inTutorial ? "block" : "none";
 }

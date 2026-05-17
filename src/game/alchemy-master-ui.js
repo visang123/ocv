@@ -11,7 +11,7 @@ import {
 /** @type {Record<string, any>} */
 let host = null;
 
-const ALCHEMY_IDLE_PROMPT = "\uC624\uD638\uB77C..\uC774\uAC74\uB610 \uC2E0\uAE30\uD558\uAD6C..";
+const ALCHEMY_IDLE_PROMPT = "\uC624\uD638\uB77C, \uC774\uAC74 \uC2E0\uAE30\uD558\uAD70..";
 const ALCHEMY_POST_DIALOGUE_PROMPT =
   "\uC9C0\uAE08 \uB9C8\uBC95\uC744 \uBD10\uB3C4 \uAD1C\uCC2E\uACA0\uB098?\n(q\uB97C \uB20C\uB7EC \uBCF4\uAE30)";
 const ALCHEMY_CRAFT_FINISH_LINE = "\uC5B4\uB5A4\uAC00..? \uC544\uB984\uB2F5\uC9C0 \uC54A\uB098?!";
@@ -177,6 +177,10 @@ export function bindAlchemyMaster(h) {
 
 export function hydrateAlchemyMasterDialogueComplete(flag) {
   complete = Boolean(flag);
+  if (complete || !host || !host.alchemyMasterBubble) return;
+  host.alchemyMasterBubble.style.display = "none";
+  host.alchemyMasterBubble.classList.remove("is-alchemy-idle-prompt");
+  window.clearTimeout(promptHideTimeout);
 }
 
 export function isAlchemyMasterDialogueComplete() {
@@ -254,9 +258,21 @@ export function updateAlchemyNpcPrompt() {
 }
 
 export function handleBagSlotClickWhileAlchemyCraftOpen(slotEl) {
-  if (!craftOpen || !slotEl || !requirementsVisible) return true;
+  if (!craftOpen || !slotEl) return true;
   const key = bagSlotToItemKey(slotEl);
   if (!key || !ALCHEMY_CRAFT_INPUT_KEYS.has(key)) return true;
+  if (slotEl.classList.contains("is-empty")) return true;
+  if (!requirementsVisible) {
+    if (selectedRecipeId) {
+      showAlchemyRequirements();
+    } else if (host && host.showPlayerAlert) {
+      host.showPlayerAlert({
+        message: "\uBA3C\uC800 \uC81C\uC791\uD560 \uC544\uC774\uD15C\uC744 \uACE0\uB974\uC138\uC694.",
+        durationMs: 2200
+      });
+    }
+    if (!requirementsVisible) return true;
+  }
   addOneInventoryItemToAlchemySlots(key);
   return true;
 }

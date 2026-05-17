@@ -30,7 +30,8 @@ export function createAppleState(initialApples) {
     },
     worldRocks: [],
     worldRockPickedIds: [],
-    worldExtraBuckets: []
+    worldExtraBuckets: [],
+    worldBagDrops: []
   };
 }
 

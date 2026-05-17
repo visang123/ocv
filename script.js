@@ -395,6 +395,25 @@ import {
   canBagInventoryFitItems
 } from "./src/game/bag-inventory.js?v=20260517a";
 import {
+  BAG_DROP_WORLD_SIZE,
+  BAG_DROP_FOOT_OFFSET_Y,
+  canDiscardBagItemKey,
+  createWorldBagDropId,
+  findNearestWorldBagDropPickup,
+  getBagDropGroundVisual,
+  getBagDropStackKey,
+  getWorldBagDropZIndex,
+  parseWorldBagDropFromSnapshot,
+  serializeWorldBagDropForSnapshot,
+  snapBagDropCoord,
+  sortWorldBagDropsForRender
+} from "./src/game/bag-ground-drops.js";
+import {
+  cancelBagDiscardQuantityModal,
+  isBagDiscardModalOpen,
+  openBagDiscardQuantityModal
+} from "./src/game/bag-discard-ui.js";
+import {
   bindTradeMaster,
   closeTradeExchangePanel,
   handleBagSlotClickWhileTradeOpen,
@@ -1592,6 +1611,11 @@ let lastWorldUpdatedAt = "";
 let lastWorldSyncUserToastAt = 0;
 let localPlantActionLockUntil = 0;
 let localAppleActionLockUntil = 0;
+/** Extra-bucket id -> ms until local drop must win over stale shared snapshots */
+let pendingLocalExtraBucketDropUntilById = Object.create(null);
+let lastWorldBagDropChangeAt = 0;
+let bagInventoryDragState = null;
+let bagInventoryDragGhostEl = null;
 let serverClockOffsetMs = 0;
 let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
@@ -1644,7 +1668,6 @@ const networkDebugLines = [];
 let networkDebugDomStale = false;
 const playerBucketOverlay = document.createElement("div");
 playerBucketOverlay.id = "player-bucket-overlay";
-ground.appendChild(playerBucketOverlay);
 /** 버킷 스택 로그 — 필요할 때만 true */
 const BUCKET_DEBUG_TRACE = false;
 const playerTintCache = new Map();
@@ -2302,8 +2325,16 @@ document.addEventListener("keydown", function (event) {
       isInteractKeyLatched = false;
       return;
     }
+    if (isBagDiscardModalOpen()) {
+      event.preventDefault();
+      cancelBagDiscardQuantityModal();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (bagInventoryPanelOpen) {
       event.preventDefault();
+      clearBagInventoryDragVisual();
       setBagInventoryPanelOpen(false);
       updateOnboardingFlowUI();
       resetInputKeys(keys);
@@ -2506,7 +2537,16 @@ if (bagInventoryClose) {
 }
 
 if (bagInventoryPanel) {
+  bagInventoryPanel.addEventListener("pointerdown", onBagInventorySlotPointerDown);
+  bagInventoryPanel.addEventListener("pointermove", onBagInventorySlotPointerMove);
+  bagInventoryPanel.addEventListener("pointerup", onBagInventorySlotPointerUp);
+  bagInventoryPanel.addEventListener("pointercancel", onBagInventorySlotPointerCancel);
   bagInventoryPanel.addEventListener("click", function (event) {
+    if (bagInventoryDragState && bagInventoryDragState.dragging) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (worldSocialUiReady && worldChatPanelOpen) {
       setWorldChatPanelOpen(false);
     }
@@ -2644,6 +2684,7 @@ bindTradeMaster({
   showInventoryFullFail: showBagInventoryFullFailMessage,
   saveAppleState: saveAppleState,
   markWorldDirty: markWorldDirty,
+  showPlayerAlert: showPlayerAlert,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
@@ -2695,6 +2736,7 @@ bindAlchemyMaster({
   saveColoredMagicPowderCounts: saveColoredMagicPowderCounts,
   saveButterflyCaughtCounts: saveButterflyCaughtCounts,
   markWorldDirty: markWorldDirty,
+  showPlayerAlert: showPlayerAlert,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
@@ -2843,6 +2885,11 @@ if (player && player.parentNode) {
   localPlayerRoot.appendChild(playerColorBody);
 } else if (player) {
   player.insertAdjacentElement("afterend", playerColorBody);
+}
+if (localPlayerRoot) {
+  localPlayerRoot.appendChild(playerBucketOverlay);
+} else if (ground) {
+  ground.appendChild(playerBucketOverlay);
 }
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
@@ -3050,7 +3097,37 @@ function skipTutorialFromSettings() {
 }
 
 function replayTutorialFromSettings() {
-  window.alert("\uD29C\uD1A0\uB9AC\uC5BC\uC740 \uACC4\uC815\uB2F9 \uCD5C\uCD08 1\uD68C\uB9CC \uC9C4\uD589\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+  if (
+    !window.confirm(
+      "튜토리얼을 처음부터 다시 진행할까요? 튜토리얼 화면으로 이동합니다."
+    )
+  ) {
+    return;
+  }
+  let sid = "";
+  try {
+    sid = sessionStorage.getItem("ovcGameSessionId") || "";
+  } catch (e) {}
+  if (!sid) {
+    sid =
+      "tab-" +
+      Date.now().toString(36) +
+      "-" +
+      Math.random().toString(16).slice(2);
+    try {
+      sessionStorage.setItem("ovcGameSessionId", sid);
+    } catch (e2) {}
+  }
+  try {
+    sessionStorage.setItem(ovcTutorialReplaySessionKey, "1");
+  } catch (eReplay) {}
+  resetTutorialProgressInStorage();
+  setStoredValue(onboardingTutorialBindSessionKey, sid);
+  try {
+    sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+  } catch (e3) {}
+  isReloadingForWorldReset = true;
+  window.location.replace(ovcTutorialPageUrl());
 }
 
 settingsButton.addEventListener("click", function () {
@@ -3763,6 +3840,11 @@ function repairOnboardingCompletionFromStoredStep() {
  */
 function restoreWorldHubIfVeteranWithoutActiveReplay() {
   if (!currentUserId) return;
+  var replay = "";
+  try {
+    replay = sessionStorage.getItem(ovcTutorialReplaySessionKey) || "";
+  } catch (e) {}
+  if (replay === "1") return;
   if (getStoredFlag(onboardingFlowDoneKey)) {
     try {
       sessionStorage.removeItem(ovcTutorialReplaySessionKey);
@@ -3770,11 +3852,6 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
     setStoredFlag(everBeenToWorldKey, true);
     return;
   }
-  var replay = "";
-  try {
-    replay = sessionStorage.getItem(ovcTutorialReplaySessionKey) || "";
-  } catch (e) {}
-  if (replay === "1") return;
   if (!getStoredFlag(everBeenToWorldKey)) return;
   setOnboardingFlowDoneStored(true);
   setStoredValue(onboardingFlowStepKey, "0");
@@ -3782,7 +3859,15 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
 }
 
 function resetTutorialProgressInStorage() {
-  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  let allowReset = !getStoredFlag(onboardingFlowDoneKey);
+  if (!allowReset) {
+    try {
+      allowReset =
+        sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1" ||
+        sessionStorage.getItem("ovcTutorialWorldResetPending") === "1";
+    } catch (eAllow) {}
+  }
+  if (!allowReset) return;
   abortPlantMasterDialogue();
   clearTutorialMainSeedRespawnTimer();
   setOnboardingFlowDoneStored(false);
@@ -3849,7 +3934,11 @@ function applyTutorialWorldResetIfPending() {
       pendingWorld = true;
     }
   } catch (e) {}
-  if (getStoredFlag(onboardingFlowDoneKey)) {
+  let replayActive = false;
+  try {
+    replayActive = sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1";
+  } catch (eReplayActive) {}
+  if (getStoredFlag(onboardingFlowDoneKey) && !replayActive && !pendingWorld) {
     try {
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
     } catch (eClear) {}
@@ -5088,6 +5177,10 @@ function applyDefaultState(options) {
   appleState.worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
   appleState.worldRockPickedIds = [];
   appleState.worldExtraBuckets = [];
+  appleState.worldBagDrops = [];
+  ground.querySelectorAll(".world-bag-drop").forEach(function (node) {
+    node.remove();
+  });
   placedCraftFurniture = [];
   worldLooseSeedElement = null;
   localApplePickedAtById = {};
@@ -5394,12 +5487,13 @@ function tryPickSharedBucket(bucketDistance) {
   markWorldDirty();
   if (heldBucketId === MAIN_BUCKET_ID) {
     broadcastBucketState(true);
+    syncWorldState(true);
   } else {
+    holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
     saveBucketState();
-    broadcastBucketState(true);
+    syncWorldState(true);
   }
-  syncWorldState(true);
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
       onboardingFlowStep = 13;
@@ -5414,6 +5508,8 @@ function tryPickSharedBucket(bucketDistance) {
  * World hub: worldLooseSeed(합성 후보) + extraSeeds + 땅 돌 + 양동이.
  */
 function pickUpNearestItemWorldHub(bucketDistance) {
+  if (tryPickWorldBagDrop(bucketDistance)) return;
+
   const nearest = getNearestPickableExtraSeed();
   const extraDist = nearest ? nearest.distance : Infinity;
   const nearestRock = getNearestPickableWorldRock();
@@ -5497,6 +5593,8 @@ function pickUpNearestItemWorldHub(bucketDistance) {
  * Tutorial / 온보딩 중 index: 땅 #seed(튜토 메인) → 스타터, 그 외 extraSeeds, 양동이.
  */
 function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
+  if (tryPickWorldBagDrop(bucketDistance)) return;
+
   const tutorialMainDist = canPickUpSeed()
     ? getCenterDistance(seedX, seedY, seedSize.width, seedSize.height)
     : Infinity;
@@ -6377,6 +6475,457 @@ function updateWorldExtraBuckets() {
   });
 }
 
+function ensureWorldBagDropsArray() {
+  if (!Array.isArray(appleState.worldBagDrops)) {
+    appleState.worldBagDrops = [];
+  }
+}
+
+function teardownWorldBagDropDom(drop) {
+  if (drop && drop._el) {
+    drop._el.remove();
+    drop._el = null;
+  }
+}
+
+function rebuildWorldBagDropDom() {
+  if (!ground) return;
+  ensureWorldBagDropsArray();
+  ground.querySelectorAll(".world-bag-drop").forEach(function (node) {
+    node.remove();
+  });
+  appleState.worldBagDrops.forEach(function (drop) {
+    drop._el = null;
+  });
+  updateWorldBagDropDom(true);
+}
+
+function buildWorldBagDropElement(drop, stackIndex) {
+  const visual = getBagDropGroundVisual(drop.itemKey);
+  if (!visual) return null;
+
+  const root = document.createElement("div");
+  root.className = "world-bag-drop";
+  root.dataset.dropId = String(drop.id);
+  root.setAttribute("aria-hidden", "true");
+  root.style.zIndex = String(getWorldBagDropZIndex(drop, stackIndex));
+
+  const inner = document.createElement("div");
+  inner.className = "world-bag-drop__inner";
+
+  if (visual.kind === "img") {
+    const img = document.createElement("img");
+    img.className = "world-bag-drop__icon";
+    img.src = visual.src;
+    img.alt = visual.alt || "";
+    img.draggable = false;
+    inner.appendChild(img);
+  } else {
+    const icon = document.createElement("span");
+    icon.className = "world-bag-drop__icon " + (visual.className || "bag-drop-icon");
+    icon.setAttribute("aria-hidden", "true");
+    inner.appendChild(icon);
+  }
+
+  const count = Math.max(1, Math.floor(Number(drop.count) || 0));
+  if (count > 1) {
+    const countEl = document.createElement("span");
+    countEl.className = "world-bag-drop__count";
+    countEl.textContent = String(count);
+    inner.appendChild(countEl);
+  }
+
+  root.appendChild(inner);
+  return root;
+}
+
+function updateWorldBagDropDom(forceRebuild) {
+  if (!ground) return;
+  ensureWorldBagDropsArray();
+  const stackIndexById = Object.create(null);
+  const stacks = Object.create(null);
+  sortWorldBagDropsForRender(appleState.worldBagDrops).forEach(function (drop) {
+    const key = drop.stackKey || getBagDropStackKey(drop.x, drop.y);
+    const idx = stacks[key] || 0;
+    stacks[key] = idx + 1;
+    stackIndexById[String(drop.id)] = idx;
+  });
+
+  appleState.worldBagDrops = appleState.worldBagDrops.filter(function (drop) {
+    return drop && canDiscardBagItemKey(drop.itemKey);
+  });
+
+  appleState.worldBagDrops.forEach(function (drop) {
+    const stackIndex = stackIndexById[String(drop.id)] || 0;
+    if (!drop._el || forceRebuild || !document.contains(drop._el)) {
+      teardownWorldBagDropDom(drop);
+      const el = buildWorldBagDropElement(drop, stackIndex);
+      if (!el) return;
+      ground.appendChild(el);
+      drop._el = el;
+    } else {
+      drop._el.style.zIndex = String(getWorldBagDropZIndex(drop, stackIndex));
+      const countEl = drop._el.querySelector(".world-bag-drop__count");
+      const count = Math.max(1, Math.floor(Number(drop.count) || 0));
+      if (count > 1) {
+        if (countEl) {
+          countEl.textContent = String(count);
+        } else {
+          const inner = drop._el.querySelector(".world-bag-drop__inner");
+          if (inner) {
+            const next = document.createElement("span");
+            next.className = "world-bag-drop__count";
+            next.textContent = String(count);
+            inner.appendChild(next);
+          }
+        }
+      } else if (countEl) {
+        countEl.remove();
+      }
+    }
+    setWorldSize(drop._el, BAG_DROP_WORLD_SIZE, BAG_DROP_WORLD_SIZE);
+    setWorldPosition(drop._el, Number(drop.x) || 0, Number(drop.y) || 0);
+  });
+}
+
+function getLocalBagDropSpawnPosition() {
+  const x = snapBagDropCoord(getPlayerCenterX() - BAG_DROP_WORLD_SIZE / 2);
+  const y = snapBagDropCoord(getPlayerFootY() + BAG_DROP_FOOT_OFFSET_Y);
+  return { x: x, y: y };
+}
+
+function canDiscardBagItemNow(itemKey) {
+  if (!canDiscardBagItemKey(itemKey)) return false;
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return false;
+  if (!bagInventoryPanelOpen) return false;
+  const counts = getBagInventoryCountsByKey();
+  if (Number(counts[itemKey] || 0) <= 0) return false;
+  if (itemKey === "seed" && !usesWorldLooseSeedMode()) {
+    const seedIndex = appleState.extraSeeds.findIndex(function (extraSeed) {
+      return (
+        extraSeed.inInventory &&
+        !extraSeed.planted &&
+        extraSeed.id !== plantingInventorySeedId
+      );
+    });
+    if (seedIndex < 0) return false;
+    const seed = appleState.extraSeeds[seedIndex];
+    if (
+      isOnboardingLinearGateActive() &&
+      (seed.isStarter || seed.id === "starter-seed")
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function removeBagItemsFromInventory(itemKey, amount) {
+  const n = Math.max(0, Math.floor(Number(amount) || 0));
+  for (let i = 0; i < n; i++) {
+    if (!removeOneBagItemForTrade(itemKey)) return false;
+  }
+  return true;
+}
+
+function spawnWorldBagDropAt(itemKey, amount, x, y) {
+  if (!canDiscardBagItemKey(itemKey)) return null;
+  ensureWorldBagDropsArray();
+  const count = Math.max(1, Math.floor(Number(amount) || 0));
+  const sx = snapBagDropCoord(x);
+  const sy = snapBagDropCoord(y);
+  const now = Date.now();
+  const drop = {
+    id: createWorldBagDropId(),
+    itemKey: itemKey,
+    count: count,
+    x: sx,
+    y: sy,
+    stackKey: getBagDropStackKey(sx, sy),
+    droppedAt: now,
+    droppedBySessionId: currentSessionId || "",
+    _el: null
+  };
+  appleState.worldBagDrops.push(drop);
+  lastWorldBagDropChangeAt = now;
+  lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, now);
+  updateWorldBagDropDom();
+  markWorldDirty();
+  broadcastWorldBagDrop(drop);
+  syncWorldState(true);
+  return drop;
+}
+
+function discardBagItemsToGround(itemKey, amount) {
+  itemKey = normalizeBagItemKey(itemKey);
+  const max = Math.max(0, Math.floor(Number(amount) || 0));
+  if (max <= 0 || !canDiscardBagItemNow(itemKey)) return false;
+  const pos = getLocalBagDropSpawnPosition();
+  if (!removeBagItemsFromInventory(itemKey, max)) return false;
+  spawnWorldBagDropAt(itemKey, max, pos.x, pos.y);
+  return true;
+}
+
+function tryPickWorldBagDrop(bucketDistance) {
+  ensureWorldBagDropsArray();
+  if (!appleState.worldBagDrops.length) return false;
+  const info = findNearestWorldBagDropPickup(
+    appleState.worldBagDrops,
+    getPlayerCenterX(),
+    getPlayerFootY(),
+    Math.min(pickupDistance, bucketDistance)
+  );
+  if (!info) return false;
+  const drop = info.drop;
+  const itemKey = normalizeBagItemKey(drop.itemKey);
+  const count = Math.max(1, Math.floor(Number(drop.count) || 0));
+  if (!canAddBagItemsForTrade({ [itemKey]: count })) {
+    showBagInventoryFullFailMessage();
+    return true;
+  }
+  const dropId = String(drop.id);
+  const idx = appleState.worldBagDrops.findIndex(function (d) {
+    return d && String(d.id) === dropId;
+  });
+  if (idx < 0) return false;
+  teardownWorldBagDropDom(appleState.worldBagDrops[idx]);
+  appleState.worldBagDrops.splice(idx, 1);
+  addBagItemsForTrade(itemKey, count);
+  const now = Date.now();
+  lastWorldBagDropChangeAt = now;
+  lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, now);
+  holdLocalAppleStateAgainstStaleSnapshot(1200);
+  updateWorldBagDropDom();
+  markWorldDirty();
+  broadcastWorldBagDropPickup(dropId);
+  syncWorldState(true);
+  sendMultiplayerPresence(true);
+  return true;
+}
+
+function mergeWorldBagDropsFromSnapshot(incoming) {
+  ensureWorldBagDropsArray();
+  const parsed = (Array.isArray(incoming) ? incoming : [])
+    .map(parseWorldBagDropFromSnapshot)
+    .filter(Boolean);
+  const localPending = appleState.worldBagDrops.filter(function (drop) {
+    const t = Number(drop.droppedAt) || 0;
+    return t > 0 && Date.now() - t < 2500;
+  });
+  const byId = Object.create(null);
+  parsed.forEach(function (drop) {
+    byId[String(drop.id)] = drop;
+  });
+  localPending.forEach(function (drop) {
+    const id = String(drop.id);
+    const existing = byId[id];
+    if (!existing || Number(drop.droppedAt) > Number(existing.droppedAt)) {
+      byId[id] = drop;
+    }
+  });
+  const next = Object.keys(byId).map(function (id) {
+    return byId[id];
+  });
+  appleState.worldBagDrops.forEach(function (drop) {
+    if (!byId[String(drop.id)]) {
+      teardownWorldBagDropDom(drop);
+    }
+  });
+  appleState.worldBagDrops = next;
+}
+
+function serializeWorldBagDropsForSnapshot() {
+  ensureWorldBagDropsArray();
+  return appleState.worldBagDrops
+    .map(serializeWorldBagDropForSnapshot)
+    .filter(Boolean);
+}
+
+function broadcastWorldBagDrop(drop) {
+  if (!multiplayerChannel || !currentSessionId || !drop) return;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_bag_drop", String(drop.id), at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_bag_drop",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        drop: serializeWorldBagDropForSnapshot(drop)
+      }
+    })
+  ).catch(function () {});
+}
+
+function broadcastWorldBagDropPickup(dropId) {
+  if (!multiplayerChannel || !currentSessionId) return;
+  const rid = String(dropId || "");
+  if (!rid) return;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_bag_drop_pickup", rid, at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_bag_drop_pickup",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        dropId: rid
+      }
+    })
+  ).catch(function () {});
+}
+
+function handleRemoteWorldBagDropBroadcast(payload) {
+  if (!payload || payload.from === currentSessionId) return;
+  const now = getSynchronizedNow();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const raw = payload.drop;
+  const drop = parseWorldBagDropFromSnapshot(raw);
+  if (!drop) return;
+  ensureWorldBagDropsArray();
+  const id = String(drop.id);
+  const existing = appleState.worldBagDrops.findIndex(function (d) {
+    return d && String(d.id) === id;
+  });
+  if (existing >= 0) {
+    teardownWorldBagDropDom(appleState.worldBagDrops[existing]);
+    appleState.worldBagDrops[existing] = drop;
+  } else {
+    appleState.worldBagDrops.push(drop);
+  }
+  updateWorldBagDropDom();
+}
+
+function handleRemoteWorldBagDropPickupBroadcast(payload) {
+  if (!payload || payload.from === currentSessionId) return;
+  const now = getSynchronizedNow();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const dropId = String(payload.dropId || "");
+  if (!dropId) return;
+  ensureWorldBagDropsArray();
+  const idx = appleState.worldBagDrops.findIndex(function (d) {
+    return d && String(d.id) === dropId;
+  });
+  if (idx < 0) return;
+  teardownWorldBagDropDom(appleState.worldBagDrops[idx]);
+  appleState.worldBagDrops.splice(idx, 1);
+  updateWorldBagDropDom();
+}
+
+function getBagItemKeyFromInventorySlot(slot) {
+  if (!slot) return "";
+  const index = Number(slot.dataset.slot);
+  if (!Number.isFinite(index)) return "";
+  return bagInventoryItemOrder[index] || "";
+}
+
+function clearBagInventoryDragVisual() {
+  if (bagInventoryDragGhostEl) {
+    bagInventoryDragGhostEl.remove();
+    bagInventoryDragGhostEl = null;
+  }
+  if (bagInventoryDragState && bagInventoryDragState.sourceSlot) {
+    bagInventoryDragState.sourceSlot.classList.remove("is-bag-drag-source");
+  }
+  bagInventoryDragState = null;
+}
+
+function ensureBagInventoryDragGhost(html) {
+  if (!bagInventoryDragGhostEl) {
+    bagInventoryDragGhostEl = document.createElement("div");
+    bagInventoryDragGhostEl.id = "bag-discard-drag-ghost";
+    document.body.appendChild(bagInventoryDragGhostEl);
+  }
+  bagInventoryDragGhostEl.innerHTML = html || "";
+}
+
+function onBagInventorySlotPointerDown(event) {
+  if (!bagInventoryPanelOpen || !bagInventoryPanel) return;
+  if (event.button !== 0) return;
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen()) return;
+  const slot = event.target.closest(".bag-inventory-slot");
+  if (!slot || !bagInventoryPanel.contains(slot)) return;
+  const itemKey = getBagItemKeyFromInventorySlot(slot);
+  if (!canDiscardBagItemNow(itemKey)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const descriptor = getBagItemDescriptorCore(itemKey);
+  bagInventoryDragState = {
+    itemKey: itemKey,
+    sourceSlot: slot,
+    startX: event.clientX,
+    startY: event.clientY,
+    dragging: false
+  };
+  slot.classList.add("is-bag-drag-source");
+  slot.setPointerCapture(event.pointerId);
+}
+
+function onBagInventorySlotPointerMove(event) {
+  if (!bagInventoryDragState) return;
+  const dx = event.clientX - bagInventoryDragState.startX;
+  const dy = event.clientY - bagInventoryDragState.startY;
+  if (!bagInventoryDragState.dragging && dx * dx + dy * dy < 36) return;
+  bagInventoryDragState.dragging = true;
+  const descriptor = getBagItemDescriptorCore(bagInventoryDragState.itemKey);
+  ensureBagInventoryDragGhost(descriptor.iconHtml);
+  if (bagInventoryDragGhostEl) {
+    bagInventoryDragGhostEl.style.left = event.clientX - 24 + "px";
+    bagInventoryDragGhostEl.style.top = event.clientY - 24 + "px";
+  }
+}
+
+function isPointerOutsideBagInventoryPanel(clientX, clientY) {
+  if (!bagInventoryPanel || bagInventoryPanel.style.display === "none") return true;
+  const rect = bagInventoryPanel.getBoundingClientRect();
+  return (
+    clientX < rect.left ||
+    clientX > rect.right ||
+    clientY < rect.top ||
+    clientY > rect.bottom
+  );
+}
+
+async function finishBagInventoryDrag(event) {
+  if (!bagInventoryDragState) return;
+  const state = bagInventoryDragState;
+  const itemKey = state.itemKey;
+  const wasDragging = state.dragging;
+  const slot = state.sourceSlot;
+  if (slot && slot.hasPointerCapture(event.pointerId)) {
+    try {
+      slot.releasePointerCapture(event.pointerId);
+    } catch (eCap) {}
+  }
+  clearBagInventoryDragVisual();
+  if (!wasDragging) return;
+  if (!isPointerOutsideBagInventoryPanel(event.clientX, event.clientY)) return;
+  if (!canDiscardBagItemNow(itemKey)) return;
+  const counts = getBagInventoryCountsByKey();
+  const maxCount = Math.max(0, Math.floor(Number(counts[itemKey] || 0)));
+  if (maxCount <= 0) return;
+  const amount = await openBagDiscardQuantityModal(itemKey, maxCount);
+  if (amount > 0) {
+    discardBagItemsToGround(itemKey, amount);
+  }
+}
+
+function onBagInventorySlotPointerUp(event) {
+  if (!bagInventoryDragState) return;
+  finishBagInventoryDrag(event);
+}
+
+function onBagInventorySlotPointerCancel(event) {
+  if (!bagInventoryDragState) return;
+  clearBagInventoryDragVisual();
+}
+
 function serializeWorldExtraBucketsForSnapshot(buckets) {
   return (Array.isArray(buckets) ? buckets : [])
     .filter(Boolean)
@@ -6407,17 +6956,52 @@ function parseWorldExtraBucketsFromSnapshot(raw) {
     });
 }
 
+function notePendingLocalExtraBucketDrop(bucketId) {
+  const id = String(bucketId || "");
+  if (!id) return;
+  pendingLocalExtraBucketDropUntilById[id] = Date.now() + 4500;
+}
+
+function prunePendingLocalExtraBucketDrops() {
+  const now = Date.now();
+  Object.keys(pendingLocalExtraBucketDropUntilById).forEach(function (id) {
+    if (pendingLocalExtraBucketDropUntilById[id] <= now) {
+      delete pendingLocalExtraBucketDropUntilById[id];
+    }
+  });
+}
+
 function applyWorldExtraBucketsFromSharedSnapshot(raw) {
   const parsed = parseWorldExtraBucketsFromSnapshot(raw);
   if (!parsed) return;
+  prunePendingLocalExtraBucketDrops();
+  const mergedById = Object.create(null);
+  parsed.forEach(function (entry) {
+    if (!entry || !entry.id) return;
+    mergedById[String(entry.id)] = entry;
+  });
   if (isHoldingExtraBucket()) {
-    const heldId = String(heldBucketId || "");
-    appleState.worldExtraBuckets = parsed.filter(function (entry) {
-      return entry && String(entry.id) !== heldId;
-    });
-  } else {
-    appleState.worldExtraBuckets = parsed;
+    delete mergedById[String(heldBucketId || "")];
   }
+  (Array.isArray(appleState.worldExtraBuckets) ? appleState.worldExtraBuckets : []).forEach(
+    function (entry) {
+      if (!entry || !entry.id) return;
+      const id = String(entry.id);
+      if (isHoldingExtraBucket() && id === String(heldBucketId || "")) return;
+      if (mergedById[id]) return;
+      if (Number(pendingLocalExtraBucketDropUntilById[id] || 0) > Date.now()) {
+        mergedById[id] = {
+          id: id,
+          x: Number(entry.x) || 0,
+          y: Number(entry.y) || 0,
+          isFull: Boolean(entry.isFull)
+        };
+      }
+    }
+  );
+  appleState.worldExtraBuckets = Object.keys(mergedById).map(function (id) {
+    return mergedById[id];
+  });
 }
 
 /** 거래 교환: 기존 양동이는 숨기고 맵에 양동이를 하나 더 배치 */
@@ -7051,7 +7635,8 @@ function getSharedWorldSnapshot() {
         : undefined,
       worldExtraBuckets: isWorldDocumentEntry()
         ? serializeWorldExtraBucketsForSnapshot(appleState.worldExtraBuckets)
-        : undefined
+        : undefined,
+      worldBagDrops: serializeWorldBagDropsForSnapshot()
     },
     butterflies: getButterflyStateForSnapshot()
   };
@@ -7075,6 +7660,7 @@ function refreshUiAfterSharedWorldApply() {
   rebuildWorldRockDom();
   rebuildPlacedCraftFurnitureDom();
   rebuildWorldExtraBucketDom();
+  rebuildWorldBagDropDom();
 }
 
 function holdLocalPlantStateAgainstStaleSnapshot(ms) {
@@ -7619,6 +8205,9 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
           applyWorldExtraBucketsFromSharedSnapshot(snapApples.worldExtraBuckets);
         }
+        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldBagDrops)) {
+          mergeWorldBagDropsFromSnapshot(snapApples.worldBagDrops);
+        }
       }
       if (snapshotSavedAt) {
         lastAppleStateChangeAt = Math.max(lastAppleStateChangeAt, snapshotSavedAt);
@@ -7929,12 +8518,15 @@ function dropBucket() {
   if (isHoldingExtraBucket()) {
     if (!Array.isArray(appleState.worldExtraBuckets)) appleState.worldExtraBuckets = [];
     const extraId = String(heldBucketId || "");
+    const droppedExtraId =
+      extraId || "world-bucket-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6);
     appleState.worldExtraBuckets.push({
-      id: extraId || ("world-bucket-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6)),
+      id: droppedExtraId,
       x: dropX,
       y: dropY,
       isFull: Boolean(isBucketFull)
     });
+    notePendingLocalExtraBucketDrop(droppedExtraId);
     bucketX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : bucketX;
     bucketY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : bucketY;
     heldItem = null;
@@ -7945,6 +8537,7 @@ function dropBucket() {
     heldExtraBucketMainIsFull = false;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     rebuildWorldExtraBucketDom();
+    holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
     saveBucketState();
     markWorldDirty();
@@ -9886,7 +10479,6 @@ function updateBucketPosition() {
       setWorldPosition(bucket, mainX, mainY);
     }
     playerBucketOverlay.style.display = "block";
-    setWorldPosition(playerBucketOverlay, bucketX, bucketY);
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = getBucketSize();
     if (!syncMainBucketToRemoteHolderHand()) {
@@ -14721,6 +15313,14 @@ function setupMultiplayer() {
       if (channel !== multiplayerChannel) return;
       handleRemoteWorldRockPickupBroadcast(payload.payload || {});
     })
+    .on("broadcast", { event: "world_bag_drop" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteWorldBagDropBroadcast(payload.payload || {});
+    })
+    .on("broadcast", { event: "world_bag_drop_pickup" }, function (payload) {
+      if (channel !== multiplayerChannel) return;
+      handleRemoteWorldBagDropPickupBroadcast(payload.payload || {});
+    })
     .on("broadcast", { event: "world_chat" }, function (payload) {
       if (channel !== multiplayerChannel) return;
       handleWorldChatBroadcast(payload.payload || {});
@@ -16590,11 +17190,9 @@ function updateButterflies() {
       }
       const rdx = targetX - butterfly._renderX;
       const rdy = targetY - butterfly._renderY;
-      const remaining = Math.hypot(rdx, rdy);
       const t = butterflyRemoteLerpAlpha;
-const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
-      let nx = butterfly._renderX + rdx * smoothT;
-      let ny = butterfly._renderY + rdy * smoothT;
+      let nx = butterfly._renderX + rdx * t;
+      let ny = butterfly._renderY + rdy * t;
       let mx = nx - butterfly._renderX;
       let my = ny - butterfly._renderY;
       const mlen = Math.hypot(mx, my);
@@ -16860,43 +17458,44 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
 }
 
 function gameLoop() {
-  if (isTabSessionSuperseded) return;
-  syncLocalPlayerVisibility();
-  gameLoopCyclesForTutorialSync += 1;
-  if (gameLoopCyclesForTutorialSync >= 420) {
-    gameLoopCyclesForTutorialSync = 0;
-    requestAccountTutorialDoneSync();
+  if (!isTabSessionSuperseded) {
+    syncLocalPlayerVisibility();
+    gameLoopCyclesForTutorialSync += 1;
+    if (gameLoopCyclesForTutorialSync >= 420) {
+      gameLoopCyclesForTutorialSync = 0;
+      requestAccountTutorialDoneSync();
+    }
+    respawnApplesIfNeeded();
+    tickWorldRockRespawn(Date.now());
+    refillWellIfNeeded();
+    movementTutorial.prepareBeforeMove();
+    updatePlayerPosition();
+    onboardingCheckJumpFinish();
+    movementTutorial.advanceAfterMove();
+    updateSeedPosition();
+    updateExtraSeedsAndPlants();
+    updateSeedInventory();
+    updateBucketPosition();
+    updatePlayerStatus();
+    updateSeedCard();
+    refreshPlantIdentityOrdinals();
+    updatePlantState();
+    updateNpcPosition();
+    updateAlchemyCraftEffects(Date.now());
+    updateGuideCard();
+    updatePlantProgressGauge();
+    updateOnboardingFlowUI();
+    pruneStaleRemotePlayers();
+    updatePlayerAlert();
+    updateButterflies();
+    updateMagicPowderInventoryUi();
+    updateCamera();
+    updatePlayerName();
+    updateRemotePlayerSmoothing();
+    updateWorldSocialOverlaysInGameLoop();
+    sendMultiplayerPresence(false);
+    savePlayerPosition(false);
   }
-  respawnApplesIfNeeded();
-  tickWorldRockRespawn(Date.now());
-  refillWellIfNeeded();
-  movementTutorial.prepareBeforeMove();
-  updatePlayerPosition();
-  onboardingCheckJumpFinish();
-  movementTutorial.advanceAfterMove();
-  updateSeedPosition();
-  updateExtraSeedsAndPlants();
-  updateSeedInventory();
-  updateBucketPosition();
-  updatePlayerStatus();
-  updateSeedCard();
-  refreshPlantIdentityOrdinals();
-  updatePlantState();
-  updateNpcPosition();
-  updateAlchemyCraftEffects(Date.now());
-  updateGuideCard();
-  updatePlantProgressGauge();
-  updateOnboardingFlowUI();
-  pruneStaleRemotePlayers();
-  updatePlayerAlert();
-  updateButterflies();
-  updateMagicPowderInventoryUi();
-  updateCamera();
-  updatePlayerName();
-  updateRemotePlayerSmoothing();
-  updateWorldSocialOverlaysInGameLoop();
-  sendMultiplayerPresence(false);
-  savePlayerPosition(false);
   requestAnimationFrame(gameLoop);
 }
 
@@ -16948,6 +17547,7 @@ function setup() {
     if (plant.sproutElement) setWorldSize(plant.sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   });
   setWorldSize(bucket, BUCKET_SIZE);
+  setWorldSize(playerBucketOverlay, BUCKET_SIZE);
   setWorldSize(well, WELL_SIZE);
   setWorldSize(plantSpot, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   setWorldSize(waterNeeded, WATER_NEEDED_SIZE);

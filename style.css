@@ -420,6 +420,208 @@ body::-webkit-scrollbar {
   image-rendering: auto;
 }
 
+.world-bag-drop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(-14deg);
+  transform-origin: center center;
+  filter: drop-shadow(0 0 0.4px #000) drop-shadow(0 0 0.4px #000);
+}
+
+.world-bag-drop__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: bag-drop-wiggle 3.6s ease-in-out infinite;
+}
+
+.world-bag-drop__icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
+  border: 1px solid #000;
+  border-radius: 4px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.world-bag-drop__icon.bag-drop-icon {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.world-bag-drop__count {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.88);
+  border: 1px solid #000;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.bag-drop-icon--apple {
+  background: radial-gradient(circle at 35% 30%, #ff6b6b, #c62828 68%);
+}
+
+.bag-drop-icon.bag-drop-icon--bf-brown,
+.bag-drop-icon.bag-drop-icon--bf-yellow,
+.bag-drop-icon.bag-drop-icon--bf-white {
+  background-image: url("이미지/butterfly-sheet.png");
+  background-repeat: no-repeat;
+  background-size: 500% 300%;
+}
+
+.bag-drop-icon--bf-brown {
+  background-position: 0% 0%;
+}
+
+.bag-drop-icon--bf-yellow {
+  background-position: 0% 50%;
+}
+
+.bag-drop-icon--bf-white {
+  background-position: 0% 100%;
+}
+
+@keyframes bag-drop-wiggle {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(0.6px, -0.5px);
+  }
+  50% {
+    transform: translate(-0.5px, 0.4px);
+  }
+  75% {
+    transform: translate(0.4px, 0.5px);
+  }
+}
+
+.bag-inventory-slot.is-bag-drag-source {
+  opacity: 0.55;
+}
+
+#bag-discard-drag-ghost {
+  position: fixed;
+  z-index: 400;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  opacity: 0.92;
+  transform: rotate(-8deg);
+}
+
+#bag-discard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 340;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+#bag-discard-overlay.is-open {
+  display: flex;
+}
+
+.bag-discard-modal {
+  width: min(300px, 86vw);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: #061016;
+  color: #fff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+.bag-discard-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bag-discard-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+#bag-discard-amount {
+  width: 88px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.bag-discard-all {
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bag-discard-actions {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#bag-discard-cancel,
+#bag-discard-confirm {
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#bag-discard-cancel {
+  background: #dbeafe;
+  color: #0f172a;
+}
+
+#bag-discard-confirm {
+  background: #e11d48;
+  color: #fff;
+}
+
 #plant-spot {
   position: absolute;
   left: 0;
@@ -1443,7 +1645,14 @@ body::-webkit-scrollbar {
   height: 16px;
   background: url("이미지/bucket-empty.png") center / contain no-repeat;
   pointer-events: none;
-  z-index: 23;
+  z-index: 1;
+}
+
+/* 손에 든 양동이는 로컬 아바타 자식 — 월드 z-index로 원격 플레이어를 가리지 않음 */
+.remote-player.local-player-avatar #player-bucket-overlay {
+  left: 82%;
+  top: 68%;
+  transform: translate(-50%, -50%);
 }
 
 #player.is-colorized {
