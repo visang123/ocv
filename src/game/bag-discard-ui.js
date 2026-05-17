@@ -110,7 +110,16 @@ export function openBagDiscardQuantityModal(itemKey, maxCount) {
 }
 
 export function isBagDiscardModalOpen() {
+  ensureElements();
   return Boolean(overlayEl && overlayEl.classList.contains("is-open"));
+}
+
+/** 거래·제작 패널 바깥 클릭 닫기에서 제외할 대상(버리기 모달) */
+export function isBagDiscardOverlayInteractionTarget(target) {
+  ensureElements();
+  if (!(target instanceof Element) || !overlayEl) return false;
+  if (!overlayEl.classList.contains("is-open")) return false;
+  return overlayEl.contains(target);
 }
 
 export function cancelBagDiscardQuantityModal() {

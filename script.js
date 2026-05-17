@@ -1857,7 +1857,7 @@ let playerLastHealthTickAt = 0;
 let playerWasDrainingHealth = false;
 let playerIdleRechargeSince = 0;
 let playerIdleRechargeHealTicks = 0;
-let playerHealthGaugeVisible = false;
+let playerHealthGaugeVisible = true;
 let playerSittingChairId = "";
 let playerInsideCraftHouseId = "";
 let playerOutsideCraftHousePose = null;
@@ -2487,6 +2487,13 @@ document.addEventListener("keydown", function (event) {
       isInteractKeyLatched = false;
       return;
     }
+    if (isBagDiscardModalOpen()) {
+      event.preventDefault();
+      cancelBagDiscardQuantityModal();
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
     if (isAlchemyCraftOpen()) {
       event.preventDefault();
       closeAlchemyCraftPanel({ keepInventory: true });
@@ -2497,13 +2504,6 @@ document.addEventListener("keydown", function (event) {
     if (isTradeExchangeOpen()) {
       event.preventDefault();
       closeTradeExchangePanel({ keepInventory: true });
-      resetInputKeys(keys);
-      isInteractKeyLatched = false;
-      return;
-    }
-    if (isBagDiscardModalOpen()) {
-      event.preventDefault();
-      cancelBagDiscardQuantityModal();
       resetInputKeys(keys);
       isInteractKeyLatched = false;
       return;
@@ -2665,6 +2665,10 @@ function setBagInventoryPanelOpen(open) {
 }
 
 function closeBagInventoryPanel() {
+  if (isBagDiscardModalOpen()) {
+    cancelBagDiscardQuantityModal();
+    return;
+  }
   if (isAlchemyCraftOpen()) {
     closeAlchemyCraftPanel();
     return;
@@ -2734,6 +2738,11 @@ if (bagInventoryPanel) {
   bagInventoryPanel.addEventListener("pointerup", onBagInventorySlotPointerUp);
   bagInventoryPanel.addEventListener("pointercancel", onBagInventorySlotPointerCancel);
   bagInventoryPanel.addEventListener("click", function (event) {
+    if (consumeCraftTradeDragClickSuppress()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (bagInventoryDragState && bagInventoryDragState.dragging) {
       event.preventDefault();
       event.stopPropagation();
@@ -3118,8 +3127,8 @@ playerHealthRoot.id = "player-health";
 playerHealthRoot.className = "remote-player-health-root";
 const playerHealthGaugeEl = document.createElement("div");
 playerHealthGaugeEl.className = "player-health-gauge";
-playerHealthGaugeEl.hidden = true;
-playerHealthGaugeEl.setAttribute("aria-hidden", "true");
+playerHealthGaugeEl.hidden = false;
+playerHealthGaugeEl.setAttribute("aria-hidden", "false");
 const playerHealthGaugeTrack = document.createElement("div");
 playerHealthGaugeTrack.className = "player-health-gauge-track";
 const playerHealthGaugeFill = document.createElement("div");
@@ -5406,7 +5415,7 @@ function applyDefaultState(options) {
   playerWasDrainingHealth = false;
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
-  playerHealthGaugeVisible = false;
+  playerHealthGaugeVisible = true;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;
@@ -7683,7 +7692,11 @@ async function finishBagInventoryDrag(event) {
 
 function onBagInventorySlotPointerUp(event) {
   if (!bagInventoryDragState) return;
+  const wasDragging = bagInventoryDragState.dragging;
   finishBagInventoryDrag(event);
+  if (wasDragging) {
+    event.preventDefault();
+  }
 }
 
 function onBagInventorySlotPointerCancel(event) {
@@ -12078,7 +12091,7 @@ function loadPlayerHealth() {
     playerWasDrainingHealth = false;
     playerIdleRechargeSince = 0;
     playerIdleRechargeHealTicks = 0;
-    playerHealthGaugeVisible = false;
+    playerHealthGaugeVisible = true;
     return;
   }
   try {
@@ -12091,7 +12104,7 @@ function loadPlayerHealth() {
       if (Number.isFinite(savedAt) && savedAt > 0 && playerLastHealthTickAt > savedAt + 600000) {
         playerLastHealthTickAt = 0;
       }
-      playerHealthGaugeVisible = parsed.gaugeVisible === true;
+      playerHealthGaugeVisible = parsed.gaugeVisible !== false;
       playerSittingChairId = "";
       playerInsideCraftHouseId = "";
       playerOutsideCraftHousePose = null;
@@ -12105,7 +12118,7 @@ function loadPlayerHealth() {
   playerWasDrainingHealth = false;
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
-  playerHealthGaugeVisible = false;
+  playerHealthGaugeVisible = true;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;

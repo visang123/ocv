@@ -4395,20 +4395,20 @@ button.trade-tradeable-recipe.is-selected {
   text-align: center;
 }
 
-.trade-recipe-io--any {
-  padding: 2px 4px;
-  min-width: auto;
-}
-
-.trade-recipe-io-icons {
+.trade-recipe-or-options {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1px;
+  gap: 2px 4px;
 }
 
-.trade-recipe-io-icons .bag-slot-icon {
-  width: 22px;
-  height: 22px;
+.trade-recipe-or-sep {
+  flex-shrink: 0;
+  padding: 0 1px;
+  color: rgba(248, 250, 252, 0.72);
+  font: 700 9px/1 Arial, sans-serif;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .trade-recipe-arrow {

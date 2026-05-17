@@ -1,4 +1,4 @@
-/** @typedef {{ id: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string }} TradeRecipe */
+/** @typedef {{ id: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string, oneWay?: boolean }} TradeRecipe */
 /** @typedef {{ catalogKey?: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string }} TradeCatalogEntry */
 
 export const TRADE_BUTTERFLY_ITEM_KEYS = [
@@ -99,19 +99,22 @@ export const TRADE_RECIPES = [
     id: "powderYellow_to_butterflies",
     inputs: { magicPowderYellow: 1 },
     outputs: { "butterfly:yellow": 8 },
-    label: "\uB178\uB780 \uB098\uBE44 8\uB9C8\uB9AC"
+    label: "\uB178\uB780 \uB098\uBE44 8\uB9C8\uB9AC",
+    oneWay: true
   },
   {
     id: "powderWhite_to_butterflies",
     inputs: { magicPowderWhite: 1 },
     outputs: { "butterfly:white": 8 },
-    label: "\uD558\uC580 \uB098\uBE44 8\uB9C8\uB9AC"
+    label: "\uD558\uC580 \uB098\uBE44 8\uB9C8\uB9AC",
+    oneWay: true
   },
   {
     id: "powderBrown_to_butterflies",
     inputs: { magicPowderBrown: 1 },
     outputs: { "butterfly:brown": 8 },
-    label: "\uAC08\uC0C9 \uB098\uBE44 8\uB9C8\uB9AC"
+    label: "\uAC08\uC0C9 \uB098\uBE44 8\uB9C8\uB9AC",
+    oneWay: true
   }
 ];
 
@@ -154,6 +157,7 @@ function buildAllTradeRecipes() {
   /** @type {TradeRecipe[]} */
   const all = TRADE_RECIPES.slice();
   TRADE_RECIPES.forEach(function (recipe) {
+    if (recipe.oneWay) return;
     const reverse = createReverseTradeRecipe(recipe);
     if (!reverse) return;
     if (all.some(function (existing) { return recipesEquivalent(existing, reverse); })) {

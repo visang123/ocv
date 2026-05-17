@@ -1,8 +1,8 @@
 import { getBagItemDescriptor } from "./bag-inventory.js";
+import { isBagDiscardOverlayInteractionTarget } from "./bag-discard-ui.js";
 import {
   cloneTradeCounter,
   expandTradeItemCounts,
-  formatTradeRecipePseudoLabel,
   getMatchingRecipesForCatalogEntry,
   getTradeCatalogEntries,
   getTradeRecipeById,
@@ -30,6 +30,13 @@ const TRADEABLE_ITEM_KEYS = [
 
 const TRADEABLE_KEYS = new Set(TRADEABLE_ITEM_KEYS);
 
+/** Catalog preview order for butterfly:any alternatives (white → yellow → brown). */
+const TRADE_BUTTERFLY_OR_DISPLAY_KEYS = [
+  "butterfly:white",
+  "butterfly:yellow",
+  "butterfly:brown"
+];
+
 /** @type {Record<string, any>} */
 let host = null;
 
@@ -48,6 +55,7 @@ let outsideDismissBound = false;
 
 function isTradeExchangeKeepOpenTarget(target) {
   if (!(target instanceof Element) || !host) return false;
+  if (isBagDiscardOverlayInteractionTarget(target)) return true;
   const panel = host.tradeExchangeOverlay
     ? host.tradeExchangeOverlay.querySelector(".trade-exchange-panel")
     : null;
@@ -593,6 +601,72 @@ export function returnTradeCounterStackToInventory(itemKey) {
   return true;
 }
 
+/** Replace butterfly:any with colors actually on the trade counter for display. */
+function resolveTradeRecipeDisplaySide(side, counter) {
+  const resolved = Object.assign({}, side || {});
+  const need = Math.max(0, Math.floor(Number(resolved[TRADE_INPUT_ANY_BUTTERFLY]) || 0));
+  if (need <= 0) {
+    delete resolved[TRADE_INPUT_ANY_BUTTERFLY];
+    return resolved;
+  }
+  const hasOnCounter = TRADE_BUTTERFLY_ITEM_KEYS.some(function (bfKey) {
+    return Math.max(0, Math.floor(Number(counter[bfKey]) || 0)) > 0;
+  });
+  if (!hasOnCounter) return resolved;
+  delete resolved[TRADE_INPUT_ANY_BUTTERFLY];
+  let remaining = need;
+  TRADE_BUTTERFLY_ITEM_KEYS.forEach(function (bfKey) {
+    if (remaining <= 0) return;
+    const have = Math.max(0, Math.floor(Number(counter[bfKey]) || 0));
+    if (have <= 0) return;
+    const show = Math.min(have, remaining);
+    resolved[bfKey] = (Number(resolved[bfKey]) || 0) + show;
+    remaining -= show;
+  });
+  if (remaining > 0) resolved[TRADE_INPUT_ANY_BUTTERFLY] = remaining;
+  return resolved;
+}
+
+/** @param {string} itemKey @param {number} count */
+function buildTradeRecipeIoChipHtml(itemKey, count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n <= 0) return "";
+  const desc = getBagItemDescriptor(itemKey);
+  return (
+    '<span class="trade-recipe-io" title="' +
+    desc.label +
+    (n > 1 ? " ×" + n : "") +
+    '">' +
+    desc.iconHtml +
+    (n > 1 ? '<span class="trade-recipe-io-count">×' + n + "</span>" : "") +
+    "</span>"
+  );
+}
+
+/** @param {number} countPerColor */
+function buildTradeButterflyAnyOrOptionsHtml(countPerColor) {
+  const n = Math.max(0, Math.floor(Number(countPerColor) || 0));
+  if (n <= 0) return "";
+  const title = TRADE_BUTTERFLY_OR_DISPLAY_KEYS.map(function (bfKey) {
+    const desc = getBagItemDescriptor(bfKey);
+    return desc.label + " \u00D7" + n;
+  }).join(" or ");
+  const parts = [];
+  TRADE_BUTTERFLY_OR_DISPLAY_KEYS.forEach(function (bfKey, index) {
+    if (index > 0) {
+      parts.push('<span class="trade-recipe-or-sep" aria-hidden="true">or</span>');
+    }
+    parts.push(buildTradeRecipeIoChipHtml(bfKey, n));
+  });
+  return (
+    '<span class="trade-recipe-or-options" title="' +
+    title +
+    '">' +
+    parts.join("") +
+    "</span>"
+  );
+}
+
 /** @param {Record<string, number>} side @param {{ expandButterflyAny?: boolean }} [options] */
 function buildTradeRecipeSideIconsHtml(side, options) {
   const expandButterflyAny = Boolean(options && options.expandButterflyAny);
@@ -603,31 +677,10 @@ function buildTradeRecipeSideIconsHtml(side, options) {
     .map(function (itemKey) {
       const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
       if (count <= 0) return "";
-      const pseudoLabel =
-        itemKey === TRADE_INPUT_ANY_BUTTERFLY
-          ? formatTradeRecipePseudoLabel(itemKey, count)
-          : null;
-      if (pseudoLabel) {
-        return (
-          '<span class="trade-recipe-io trade-recipe-io--any" title="' +
-          pseudoLabel +
-          '"><span class="trade-recipe-io-icons">' +
-          buildTradeButterflyAnyIconsHtml(count) +
-          '</span><span class="trade-recipe-io-count">×' +
-          count +
-          "</span></span>"
-        );
+      if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
+        return buildTradeButterflyAnyOrOptionsHtml(count);
       }
-      const desc = getBagItemDescriptor(itemKey);
-      return (
-        '<span class="trade-recipe-io" title="' +
-        desc.label +
-        (count > 1 ? " ×" + count : "") +
-        '">' +
-        desc.iconHtml +
-        (count > 1 ? '<span class="trade-recipe-io-count">×' + count + "</span>" : "") +
-        "</span>"
-      );
+      return buildTradeRecipeIoChipHtml(itemKey, count);
     })
     .join("");
 }
@@ -644,26 +697,11 @@ function sortTradeRecipeDisplayKeys(keys) {
   });
 }
 
-function buildTradeButterflyAnyIconsHtml(total) {
-  const n = Math.max(0, Math.floor(Number(total) || 0));
-  if (n <= 0) return "";
-  const iconCount = Math.min(n, 5);
-  const colors = ["brown", "yellow", "white"];
-  let html = "";
-  for (let i = 0; i < iconCount; i++) {
-    const color = colors[i % colors.length];
-    html +=
-      '<span class="bag-slot-icon bag-slot-icon--butterfly bag-slot-icon--bf-' +
-      color +
-      '" aria-hidden="true"></span>';
-  }
-  return html;
-}
-
-function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol) {
+function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol, counter) {
+  const displayInputs = resolveTradeRecipeDisplaySide(inputs, counter || {});
   return (
     '<span class="trade-recipe-flow">' +
-    buildTradeRecipeSideIconsHtml(inputs, { expandButterflyAny: false }) +
+    buildTradeRecipeSideIconsHtml(displayInputs, { expandButterflyAny: false }) +
     '<span class="trade-recipe-arrow" aria-hidden="true">' +
     arrowSymbol +
     "</span>" +
@@ -719,9 +757,10 @@ function renderTradeTradeableList() {
           ? buildTradeRecipeFlowHtml(
               scaleTradeItemCounts(activeRecipe.inputs, batchCount),
               scaleTradeItemCounts(activeRecipe.outputs, batchCount),
-              "→"
+              "→",
+              counterByKey
             )
-          : buildTradeRecipeFlowHtml(entry.inputs, entry.outputs, "↔");
+          : buildTradeRecipeFlowHtml(entry.inputs, entry.outputs, "↔", counterByKey);
       if (isAvailable) {
         return (
           '<button type="button" class="' +

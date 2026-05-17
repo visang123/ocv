@@ -1,4 +1,5 @@
 import { getBagItemDescriptor } from "./bag-inventory.js";
+import { isBagDiscardOverlayInteractionTarget } from "./bag-discard-ui.js";
 import {
   ALCHEMY_CRAFT_INPUT_KEYS,
   ALCHEMY_CRAFT_RECIPES,
@@ -37,6 +38,7 @@ let outsideDismissBound = false;
 
 function isAlchemyCraftKeepOpenTarget(target) {
   if (!(target instanceof Element) || !host) return false;
+  if (isBagDiscardOverlayInteractionTarget(target)) return true;
   const panel = host.alchemyCraftOverlay
     ? host.alchemyCraftOverlay.querySelector(".alchemy-craft-panel")
     : null;
