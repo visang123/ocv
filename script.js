@@ -424,7 +424,9 @@ import {
   pickWorldNpcHover,
   clearWorldNpcHoverSticky,
   tryTalkToTradeMaster,
-  updateTradeNpcPrompt
+  updateTradeNpcPrompt,
+  canDragBagItemToTradeCounter,
+  tryDropBagItemOnTradeCounter
 } from "./src/game/trade-master-ui.js";
 import {
   bindAlchemyMaster,
@@ -436,7 +438,9 @@ import {
   isNearAlchemyMaster,
   tryTalkToAlchemyMaster,
   updateAlchemyCraftEffects,
-  updateAlchemyNpcPrompt
+  updateAlchemyNpcPrompt,
+  canDragBagItemToAlchemyCraft,
+  tryDropBagItemOnAlchemyRequirement
 } from "./src/game/alchemy-master-ui.js";
 import {
   isCraftFurnitureKind,
@@ -2679,6 +2683,8 @@ bindTradeMaster({
   updateBagInventorySlots: updateBagInventorySlots,
   updateNpcPosition: updateNpcPosition,
   removeOneBagItem: removeOneBagItemForTrade,
+  removeBagItems: removeBagItemsFromInventory,
+  getBagItemCount: getBagInventoryItemCount,
   addBagItems: addBagItemsForTrade,
   canAddBagItems: canAddBagItemsForTrade,
   showInventoryFullFail: showBagInventoryFullFailMessage,
@@ -2729,6 +2735,8 @@ bindAlchemyMaster({
   updateNpcPosition: updateNpcPosition,
   updatePlayerBubblePosition: updatePlayerBubblePosition,
   removeOneBagItem: removeOneBagItemForTrade,
+  removeBagItems: removeBagItemsFromInventory,
+  getBagItemCount: getBagInventoryItemCount,
   addBagItems: addBagItemsForTrade,
   canAddBagItems: canAddBagItemsForTrade,
   showInventoryFullFail: showBagInventoryFullFailMessage,
@@ -6825,6 +6833,18 @@ function getBagItemKeyFromInventorySlot(slot) {
   return bagInventoryItemOrder[index] || "";
 }
 
+function getBagInventoryItemCount(itemKey) {
+  const counts = getBagInventoryCountsByKey();
+  return Math.max(0, Math.floor(Number(counts[normalizeBagItemKey(itemKey)] || 0)));
+}
+
+function canStartBagPanelCraftTradeDrag(itemKey) {
+  if (!itemKey) return false;
+  if (isAlchemyCraftOpen()) return canDragBagItemToAlchemyCraft(itemKey);
+  if (isTradeExchangeOpen()) return canDragBagItemToTradeCounter(itemKey);
+  return false;
+}
+
 function clearBagInventoryDragVisual() {
   if (bagInventoryDragGhostEl) {
     bagInventoryDragGhostEl.remove();
@@ -6848,20 +6868,50 @@ function ensureBagInventoryDragGhost(html) {
 function onBagInventorySlotPointerDown(event) {
   if (!bagInventoryPanelOpen || !bagInventoryPanel) return;
   if (event.button !== 0) return;
-  if (isTradeExchangeOpen() || isAlchemyCraftOpen()) return;
   const slot = event.target.closest(".bag-inventory-slot");
   if (!slot || !bagInventoryPanel.contains(slot)) return;
   const itemKey = getBagItemKeyFromInventorySlot(slot);
+  const craftTradeOpen = isTradeExchangeOpen() || isAlchemyCraftOpen();
+  if (craftTradeOpen) {
+    if (!itemKey || slot.classList.contains("is-empty")) return;
+    if (!canStartBagPanelCraftTradeDrag(itemKey)) {
+      if (
+        isTradeExchangeOpen() &&
+        itemKey.indexOf("butterfly:") === 0 &&
+        typeof showPlayerAlert === "function"
+      ) {
+        showPlayerAlert({
+          message:
+            "\uB098\uBE44\uB294 \uC5F0\uAE08\uC220\uC758 \uB2EC\uC778\uC5D0\uC11C \uC81C\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+          durationMs: 2600
+        });
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    bagInventoryDragState = {
+      itemKey: itemKey,
+      sourceSlot: slot,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      mode: isAlchemyCraftOpen() ? "alchemy" : "trade"
+    };
+    slot.classList.add("is-bag-drag-source");
+    slot.setPointerCapture(event.pointerId);
+    return;
+  }
   if (!canDiscardBagItemNow(itemKey)) return;
   event.preventDefault();
   event.stopPropagation();
-  const descriptor = getBagItemDescriptorCore(itemKey);
   bagInventoryDragState = {
     itemKey: itemKey,
     sourceSlot: slot,
     startX: event.clientX,
     startY: event.clientY,
-    dragging: false
+    dragging: false,
+    mode: "discard"
   };
   slot.classList.add("is-bag-drag-source");
   slot.setPointerCapture(event.pointerId);
@@ -6897,6 +6947,7 @@ async function finishBagInventoryDrag(event) {
   const state = bagInventoryDragState;
   const itemKey = state.itemKey;
   const wasDragging = state.dragging;
+  const dragMode = state.mode || "discard";
   const slot = state.sourceSlot;
   if (slot && slot.hasPointerCapture(event.pointerId)) {
     try {
@@ -6905,6 +6956,16 @@ async function finishBagInventoryDrag(event) {
   }
   clearBagInventoryDragVisual();
   if (!wasDragging) return;
+  if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    tryDropBagItemOnAlchemyRequirement(itemKey, target);
+    return;
+  }
+  if (dragMode === "trade" && isTradeExchangeOpen()) {
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    tryDropBagItemOnTradeCounter(itemKey, target);
+    return;
+  }
   if (!isPointerOutsideBagInventoryPanel(event.clientX, event.clientY)) return;
   if (!canDiscardBagItemNow(itemKey)) return;
   const counts = getBagInventoryCountsByKey();

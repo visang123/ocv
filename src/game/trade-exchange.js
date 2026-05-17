@@ -19,6 +19,24 @@ export const TRADE_RECIPES = [
     inputs: { seed: 7 },
     outputs: { overgrowthSeed: 1 },
     label: "\uACFC\uC131\uC7A5 \uC528\uC557 1\uAC1C"
+  },
+  {
+    id: "powderYellow_to_butterflies",
+    inputs: { magicPowderYellow: 1 },
+    outputs: { "butterfly:yellow": 8 },
+    label: "\uB178\uB780 \uB098\uBE44 8\uB9C8\uB9AC"
+  },
+  {
+    id: "powderWhite_to_butterflies",
+    inputs: { magicPowderWhite: 1 },
+    outputs: { "butterfly:white": 8 },
+    label: "\uD558\uC580 \uB098\uBE44 8\uB9C8\uB9AC"
+  },
+  {
+    id: "powderBrown_to_butterflies",
+    inputs: { magicPowderBrown: 1 },
+    outputs: { "butterfly:brown": 8 },
+    label: "\uAC08\uC0C9 \uB098\uBE44 8\uB9C8\uB9AC"
   }
 ];
 

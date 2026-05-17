@@ -82,6 +82,7 @@ function isAlchemyCraftOverlayVisible() {
 function reconcileAlchemyCraftOpenState() {
   if (!craftOpen) return;
   if (!isAlchemyCraftOverlayVisible()) {
+    returnAlchemyRequirementSlotsToInventory();
     craftOpen = false;
     selectedRecipeId = null;
     requirementsVisible = false;
@@ -277,6 +278,64 @@ export function handleBagSlotClickWhileAlchemyCraftOpen(slotEl) {
   return true;
 }
 
+function addOneInventoryItemToAlchemySlots(itemKey) {
+  if (!requirementsVisible) return false;
+  const index = requirementSlotDefs.findIndex(function (def, i) {
+    const filled = Math.max(0, Math.floor(Number(requirementSlotFills[i]) || 0));
+    return def.key === itemKey && filled < def.required;
+  });
+  if (index < 0) return false;
+  if (!host.removeOneBagItem(itemKey)) return false;
+  requirementSlotFills[index] =
+    Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0)) + 1;
+  renderAlchemyRequirementSlots();
+  updateAlchemyCraftConfirmButton();
+  host.updateBagInventorySlots();
+  return true;
+}
+
+/** @param {string} itemKey @param {number} [preferredSlotIndex] */
+export function addInventoryItemsToAlchemySlots(itemKey, preferredSlotIndex) {
+  if (!host || !craftOpen || !requirementsVisible || !itemKey) return false;
+  if (!ALCHEMY_CRAFT_INPUT_KEYS.has(itemKey)) return false;
+  let addedAny = false;
+  if (Number.isFinite(preferredSlotIndex) && preferredSlotIndex >= 0) {
+    addedAny = addInventoryItemsToOneAlchemySlot(preferredSlotIndex, itemKey) > 0;
+  } else {
+    for (let i = 0; i < requirementSlotDefs.length; i++) {
+      if (requirementSlotDefs[i].key !== itemKey) continue;
+      if (addInventoryItemsToOneAlchemySlot(i, itemKey) > 0) addedAny = true;
+    }
+  }
+  if (addedAny) {
+    renderAlchemyRequirementSlots();
+    updateAlchemyCraftConfirmButton();
+    host.updateBagInventorySlots();
+  }
+  return addedAny;
+}
+
+/** @param {Element | null | undefined} targetEl */
+export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
+  if (!itemKey || !(targetEl instanceof Element) || !host) return false;
+  const slotsRoot = host.alchemyCraftRequirementSlots;
+  if (!slotsRoot) return false;
+  const slotEl = targetEl.closest(".alchemy-craft-req-slot");
+  if (slotEl && slotsRoot.contains(slotEl)) {
+    const index = Number(slotEl.dataset.slotIndex);
+    if (Number.isFinite(index) && index >= 0) {
+      return addInventoryItemsToAlchemySlots(itemKey, index);
+    }
+  }
+  if (!slotsRoot.contains(targetEl) && targetEl !== slotsRoot) return false;
+  return addInventoryItemsToAlchemySlots(itemKey);
+}
+
+export function canDragBagItemToAlchemyCraft(itemKey) {
+  if (!craftOpen || !requirementsVisible || !itemKey) return false;
+  return ALCHEMY_CRAFT_INPUT_KEYS.has(itemKey);
+}
+
 export function updateAlchemyCraftEffects(now) {
   if (!craftSmokeEffect || !host || !host.ground) return;
   const elapsed = now - craftSmokeEffect.startMs;
@@ -438,10 +497,12 @@ export function closeAlchemyCraftPanel(options) {
 }
 
 function returnAlchemyRequirementSlotsToInventory() {
+  if (!host) return;
   requirementSlotDefs.forEach(function (def, index) {
     const n = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
     if (n > 0) host.addBagItems(def.key, n);
   });
+  if (host.updateBagInventorySlots) host.updateBagInventorySlots();
 }
 
 function showAlchemyRequirements() {
@@ -457,18 +518,26 @@ function showAlchemyRequirements() {
   updateAlchemyCraftConfirmButton();
 }
 
-function addOneInventoryItemToAlchemySlots(itemKey) {
-  if (!requirementsVisible) return false;
-  const index = requirementSlotDefs.findIndex(function (def, i) {
-    const filled = Math.max(0, Math.floor(Number(requirementSlotFills[i]) || 0));
-    return def.key === itemKey && filled < def.required;
-  });
-  if (index < 0) return false;
-  if (!host.removeOneBagItem(itemKey)) return false;
-  requirementSlotFills[index] = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0)) + 1;
-  renderAlchemyRequirementSlots();
-  updateAlchemyCraftConfirmButton();
-  return true;
+function addInventoryItemsToOneAlchemySlot(index, itemKey) {
+  const def = requirementSlotDefs[index];
+  if (!def || def.key !== itemKey) return 0;
+  const filled = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
+  const remaining = def.required - filled;
+  if (remaining <= 0) return 0;
+  const available = host.getBagItemCount
+    ? Math.max(0, Math.floor(Number(host.getBagItemCount(itemKey)) || 0))
+    : 0;
+  const toAdd = Math.min(remaining, available);
+  if (toAdd <= 0) return 0;
+  if (host.removeBagItems) {
+    if (!host.removeBagItems(itemKey, toAdd)) return 0;
+  } else {
+    for (let i = 0; i < toAdd; i++) {
+      if (!host.removeOneBagItem(itemKey)) return 0;
+    }
+  }
+  requirementSlotFills[index] = filled + toAdd;
+  return toAdd;
 }
 
 function returnOneAlchemyRequirementSlot(index) {

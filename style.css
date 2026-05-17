@@ -424,11 +424,11 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  width: 36px;
-  height: 36px;
+  width: 7px;
+  height: 7px;
   pointer-events: none;
   user-select: none;
-  transform: rotate(-14deg);
+  transform: rotate(20deg);
   transform-origin: center center;
   filter: drop-shadow(0 0 0.4px #000) drop-shadow(0 0 0.4px #000);
 }
@@ -444,37 +444,37 @@ body::-webkit-scrollbar {
 }
 
 .world-bag-drop__icon {
-  width: 30px;
-  height: 30px;
+  width: 6px;
+  height: 6px;
   object-fit: contain;
   display: block;
   border: 1px solid #000;
-  border-radius: 4px;
+  border-radius: 1px;
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.08);
 }
 
 .world-bag-drop__icon.bag-drop-icon {
-  width: 30px;
-  height: 30px;
+  width: 6px;
+  height: 6px;
   border: 1px solid #000;
-  border-radius: 4px;
+  border-radius: 1px;
   box-sizing: border-box;
 }
 
 .world-bag-drop__count {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
+  right: -1px;
+  bottom: -1px;
+  min-width: 8px;
+  padding: 0 2px;
+  border-radius: 4px;
   background: rgba(8, 12, 18, 0.88);
   border: 1px solid #000;
   color: #fff;
-  font-size: 11px;
+  font-size: 6px;
   font-weight: 800;
-  line-height: 14px;
+  line-height: 8px;
   text-align: center;
   pointer-events: none;
 }

@@ -74,6 +74,7 @@ function isTradeExchangeOverlayVisible() {
 function reconcileTradeExchangeOpenState() {
   if (!exchangeOpen) return;
   if (!isTradeExchangeOverlayVisible()) {
+    returnCounterItemsToInventory();
     exchangeOpen = false;
     selectedRecipeId = null;
     counterByKey = {};
@@ -313,7 +314,7 @@ export function handleBagSlotClickWhileTradeOpen(slotEl) {
     if (host && host.showPlayerAlert) {
       host.showPlayerAlert({
         message:
-          "\uB098\uBE44\uB294 \uC5F0\uAE08\uC220\uC758 \uB2EC\uC778\uC5D0\uC11C \uC81C\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+          "\uB098\uBE44\uB294 \uAC70\uB798\uC758 \uB2EC\uC778\uC5D0\uC11C \uB9C8\uBC95\uC758 \uAC00\uB8E8\uC73C\uB85C \uAD50\uD658\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
         durationMs: 2600
       });
     }
@@ -322,6 +323,65 @@ export function handleBagSlotClickWhileTradeOpen(slotEl) {
   if (!TRADEABLE_KEYS.has(key)) return true;
   addOneInventoryItemToTradeCounter(key);
   return true;
+}
+
+function addOneInventoryItemToTradeCounter(itemKey) {
+  if (!host.removeOneBagItem(itemKey)) return false;
+  counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + 1;
+  renderTradeCounter();
+  renderTradeOffers();
+  if (
+    selectedRecipeId &&
+    !recipeMatchesCounter(counterByKey, getTradeRecipeById(selectedRecipeId))
+  ) {
+    selectedRecipeId = null;
+  }
+  updateTradeConfirmButton();
+  return true;
+}
+
+/** @param {string} itemKey */
+export function addFullInventoryStackToTradeCounter(itemKey) {
+  if (!host || !exchangeOpen || !itemKey) return false;
+  if (!TRADEABLE_KEYS.has(itemKey)) return false;
+  const available = host.getBagItemCount
+    ? Math.max(0, Math.floor(Number(host.getBagItemCount(itemKey)) || 0))
+    : 0;
+  if (available <= 0) return false;
+  if (host.removeBagItems) {
+    if (!host.removeBagItems(itemKey, available)) return false;
+  } else {
+    for (let i = 0; i < available; i++) {
+      if (!host.removeOneBagItem(itemKey)) return false;
+    }
+  }
+  counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + available;
+  renderTradeCounter();
+  renderTradeOffers();
+  if (
+    selectedRecipeId &&
+    !recipeMatchesCounter(counterByKey, getTradeRecipeById(selectedRecipeId))
+  ) {
+    selectedRecipeId = null;
+  }
+  updateTradeConfirmButton();
+  host.updateBagInventorySlots();
+  return true;
+}
+
+/** @param {Element | null | undefined} targetEl */
+export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
+  if (!itemKey || !exchangeOpen || !host || !host.tradeCounterSlot) return false;
+  if (!(targetEl instanceof Element)) return false;
+  if (!host.tradeCounterSlot.contains(targetEl) && targetEl !== host.tradeCounterSlot) {
+    return false;
+  }
+  return addFullInventoryStackToTradeCounter(itemKey);
+}
+
+export function canDragBagItemToTradeCounter(itemKey) {
+  if (!exchangeOpen || !itemKey) return false;
+  return TRADEABLE_KEYS.has(itemKey);
 }
 
 function bagSlotToItemKey(slotEl) {
@@ -458,20 +518,6 @@ function returnCounterItemsToInventory() {
   if (host.saveAppleState) host.saveAppleState();
 }
 
-function addOneInventoryItemToTradeCounter(itemKey) {
-  if (!host.removeOneBagItem(itemKey)) return false;
-  counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + 1;
-  renderTradeCounter();
-  renderTradeOffers();
-  if (
-    selectedRecipeId &&
-    !recipeMatchesCounter(counterByKey, getTradeRecipeById(selectedRecipeId))
-  ) {
-    selectedRecipeId = null;
-  }
-  updateTradeConfirmButton();
-  return true;
-}
 
 function returnOneTradeCounterItemToInventory(itemKey) {
   if (!itemKey) return;
@@ -565,6 +611,18 @@ function confirmSelectedTrade() {
     return;
   }
   counterByKey = subtractRecipeInputsFromCounter(counterByKey, recipe);
+  Object.keys(recipe.outputs).forEach(function (key) {
+    host.addBagItems(key, Number(recipe.outputs[key] || 0));
+  });
+  selectedRecipeId = null;
+  renderTradeCounter();
+  renderTradeOffers();
+  updateTradeConfirmButton();
+  host.updateBagInventorySlots();
+  host.saveAppleState();
+  host.markWorldDirty();
+}
+Key, recipe);
   Object.keys(recipe.outputs).forEach(function (key) {
     host.addBagItems(key, Number(recipe.outputs[key] || 0));
   });
