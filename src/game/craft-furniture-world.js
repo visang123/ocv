@@ -16,7 +16,10 @@ const CRAFT_FURNITURE_WORLD = {
   craftChair: {
     src: "\uC774\uBBF8\uC9C0/craft-chair-world.png?v=20260516g",
     width: 34,
-    height: 36
+    height: 36,
+    /** Seat surface and foot anchor from chair top (world units). */
+    sitSeatOffsetY: 21,
+    sitFootOffsetY: 33
   },
   craftHouse: {
     src: "\uC774\uBBF8\uC9C0/craft-house-world.png?v=20260516g",
@@ -31,6 +34,26 @@ export function isCraftFurnitureKind(kind) {
 
 export function getCraftFurnitureWorldSpec(kind) {
   return CRAFT_FURNITURE_WORLD[kind] || null;
+}
+
+export function getCraftChairSitAnchorOffsets(chair) {
+  const spec = getCraftFurnitureWorldSpec("craftChair");
+  const entry = chair || {};
+  const seatY = Number(entry.sitSeatOffsetY);
+  const footY = Number(entry.sitFootOffsetY);
+  return {
+    seatOffsetY: Number.isFinite(seatY) ? seatY : spec.sitSeatOffsetY,
+    footOffsetY: Number.isFinite(footY) ? footY : spec.sitFootOffsetY
+  };
+}
+
+export function getCraftChairSeatWorldPoint(chair) {
+  if (!chair) return null;
+  const offsets = getCraftChairSitAnchorOffsets(chair);
+  return {
+    x: Number(chair.x) + Number(chair.width) / 2,
+    y: Number(chair.y) + offsets.seatOffsetY
+  };
 }
 
 export function sanitizePlacedCraftFurniture(list) {

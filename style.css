@@ -1907,24 +1907,77 @@ body::-webkit-scrollbar {
   filter: drop-shadow(0 0 0.8px #000);
 }
 
-.remote-player-health {
+.remote-player-health-root {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 10px);
   transform: translateX(-50%);
   display: none;
-  min-width: 28px;
-  padding: 1px 3px;
-  border-radius: 3px;
-  background: rgba(153, 27, 27, 0.88);
-  color: #fff;
-  font-size: 4.8px;
-  font-weight: 800;
-  line-height: 1.2;
-  text-align: center;
-  white-space: nowrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  z-index: 26;
   pointer-events: none;
-  z-index: 25;
+}
+
+.player-health-gauge {
+  display: block;
+  width: 34px;
+  padding: 1px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.52);
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+}
+
+.player-health-gauge[hidden] {
+  display: none !important;
+}
+
+.player-health-gauge-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(40, 10, 10, 0.85);
+  overflow: hidden;
+}
+
+.player-health-gauge-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  transition: width 120ms linear;
+}
+
+.player-health-heart-toggle {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(153, 27, 27, 0.92);
+  color: #fecaca;
+  font-size: 7px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+}
+
+.player-health-heart-toggle.is-active {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 0 3px rgba(248, 113, 113, 0.85);
+}
+
+.remote-player.is-health-recharging .remote-player-body,
+#player.remote-player-body.is-health-recharging {
+  filter: grayscale(0.35) brightness(0.88);
 }
 
 #player.remote-player-body.is-sitting {

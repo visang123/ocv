@@ -1,7 +1,16 @@
-/** Player health drain rules and helpers. */
+/** Player health drain, recharge, and placement helpers. */
+
+import {
+  getCraftChairSeatWorldPoint,
+  getCraftChairSitAnchorOffsets
+} from "./craft-furniture-world.js";
 
 export const PLAYER_MAX_HEALTH = 100;
 export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 5000;
+export const PLAYER_HEALTH_RECHARGE_MS = 1000;
+export const PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC = 1;
+export const PLAYER_HEALTH_RECHARGE_CHAIR_PER_SEC = 2;
+export const PLAYER_HEALTH_RECHARGE_HOME_PER_SEC = 4;
 export const PLAYER_CHAIR_INTERACT_DISTANCE = 42;
 const POSITION_IDLE_EPSILON = 0.05;
 
@@ -11,6 +20,16 @@ export function clampPlayerHealth(value) {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n)) return PLAYER_MAX_HEALTH;
   return Math.max(0, Math.min(PLAYER_MAX_HEALTH, n));
+}
+
+/** 체력 0 — 충전 모드, 이동·행동 불가 */
+export function isPlayerHealthDepleted(health) {
+  return clampPlayerHealth(health) <= 0;
+}
+
+/** 체력 1 이상이면 이동·행동 가능 */
+export function canPlayerMoveByHealth(health) {
+  return clampPlayerHealth(health) >= 1;
 }
 
 export function isPlayerMovementKeyActive(keys) {
@@ -30,9 +49,6 @@ export function isPlayerPoseUnchanged(prev, next, epsilon) {
   );
 }
 
-/**
- * Standing still with no movement input and no active pose change.
- */
 export function isPlayerIdleForHealth(opts) {
   if (!opts || !opts.hasSpawnedCharacter || opts.isCharacterSelecting) return false;
   if (opts.isSittingOnChair) return false;
@@ -97,44 +113,97 @@ export function getCraftChairSitPose(chair, playerWidth) {
   };
 }
 
+export function getPlayerHealthRechargePerSecond(opts) {
+  if (!opts) return PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC;
+  if (isPlayerInsideCraftHouse(opts.footCenterX, opts.footY, opts.placedCraftFurniture)) {
+    return PLAYER_HEALTH_RECHARGE_HOME_PER_SEC;
+  }
+  if (opts.isSittingOnChair) return PLAYER_HEALTH_RECHARGE_CHAIR_PER_SEC;
+  return PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC;
+}
+
 export function shouldDrainPlayerHealth(opts) {
   if (!opts || !opts.hasSpawnedCharacter || opts.isCharacterSelecting) return false;
   if (opts.isTabSessionSuperseded) return false;
+  if (isPlayerHealthDepleted(opts.health)) return false;
   if (isPlayerIdleForHealth(opts)) return false;
   if (opts.isSittingOnChair) return false;
-  if (
-    isPlayerInsideCraftHouse(opts.footCenterX, opts.footY, opts.placedCraftFurniture)
-  ) {
+  if (isPlayerInsideCraftHouse(opts.footCenterX, opts.footY, opts.placedCraftFurniture)) {
     return false;
   }
   return true;
 }
 
 /**
- * @returns {{ health: number, lastDrainAt: number, drained: boolean }}
+ * @returns {{
+ *   health: number,
+ *   lastTickAt: number,
+ *   changed: boolean,
+ *   depleted: boolean,
+ *   resetTickOnDeplete?: boolean
+ * }}
  */
-export function tickPlayerHealthDrain(state, nowMs) {
+export function tickPlayerHealthState(state, nowMs) {
   const health = clampPlayerHealth(state.health);
-  const lastDrainAt = Number(state.lastDrainAt) || 0;
   const now = Number(nowMs) || Date.now();
+  let lastTickAt = Number(state.lastTickAt) || 0;
+  const rechargeCtx = state.rechargeContext || {};
+
+  if (isPlayerHealthDepleted(health)) {
+    const rate = getPlayerHealthRechargePerSecond(rechargeCtx);
+    if (!lastTickAt) {
+      return { health: 0, lastTickAt: now, changed: false, depleted: true };
+    }
+    const elapsed = now - lastTickAt;
+    if (elapsed < PLAYER_HEALTH_RECHARGE_MS) {
+      return { health: health, lastTickAt: lastTickAt, changed: false, depleted: true };
+    }
+    const ticks = Math.floor(elapsed / PLAYER_HEALTH_RECHARGE_MS);
+    const nextHealth = clampPlayerHealth(health + ticks * rate);
+    return {
+      health: nextHealth,
+      lastTickAt: lastTickAt + ticks * PLAYER_HEALTH_RECHARGE_MS,
+      changed: nextHealth !== health,
+      depleted: isPlayerHealthDepleted(nextHealth)
+    };
+  }
+
   if (!state.shouldDrain) {
-    return { health: health, lastDrainAt: lastDrainAt, drained: false };
+    return { health: health, lastTickAt: lastTickAt, changed: false, depleted: false };
   }
-  if (health <= 0) {
-    return { health: 0, lastDrainAt: lastDrainAt, drained: false };
+  if (!lastTickAt) {
+    return { health: health, lastTickAt: now, changed: false, depleted: false };
   }
-  if (!lastDrainAt) {
-    return { health: health, lastDrainAt: now, drained: false };
-  }
-  const elapsed = now - lastDrainAt;
+  const elapsed = now - lastTickAt;
   if (elapsed < PLAYER_HEALTH_DRAIN_INTERVAL_MS) {
-    return { health: health, lastDrainAt: lastDrainAt, drained: false };
+    return { health: health, lastTickAt: lastTickAt, changed: false, depleted: false };
   }
   const ticks = Math.floor(elapsed / PLAYER_HEALTH_DRAIN_INTERVAL_MS);
   const nextHealth = clampPlayerHealth(health - ticks);
+  const becameDepleted = isPlayerHealthDepleted(nextHealth) && !isPlayerHealthDepleted(health);
   return {
     health: nextHealth,
-    lastDrainAt: lastDrainAt + ticks * PLAYER_HEALTH_DRAIN_INTERVAL_MS,
-    drained: nextHealth < health
+    lastTickAt: becameDepleted ? now : lastTickAt + ticks * PLAYER_HEALTH_DRAIN_INTERVAL_MS,
+    changed: nextHealth !== health,
+    depleted: isPlayerHealthDepleted(nextHealth),
+    resetTickOnDeplete: becameDepleted
+  };
+}
+
+/** @deprecated use tickPlayerHealthState */
+export function tickPlayerHealthDrain(state, nowMs) {
+  const r = tickPlayerHealthState(
+    {
+      health: state.health,
+      lastTickAt: state.lastDrainAt,
+      shouldDrain: state.shouldDrain,
+      rechargeContext: {}
+    },
+    nowMs
+  );
+  return {
+    health: r.health,
+    lastDrainAt: r.lastTickAt,
+    drained: r.changed && r.health < clampPlayerHealth(state.health)
   };
 }

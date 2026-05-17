@@ -69,6 +69,10 @@ export const PLANT_FOG_SKY_OPEN_MIN_STAGE = 5;
 
 export const PLAYER_WIDTH = 25;
 export const PLAYER_HEIGHT = 50;
+/** Seated pose — shorter silhouette aligned to craft chair seat. */
+export const PLAYER_SIT_WIDTH = 26;
+export const PLAYER_SIT_HEIGHT = 33;
+export const PLAYER_SIT_IMAGE_SRC = "\uC774\uBBF8\uC9C0/player-sit-white.svg?v=20260517a";
 export const SEED_SIZE = 10;
 export const BUCKET_SIZE = 16;
 export const WELL_SIZE = 38;
