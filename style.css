@@ -3805,7 +3805,7 @@ body #world-bag-inventory {
 
 .bag-inventory-close {
   position: absolute;
-  top: 6px;
+  top: calc(-32px - 6px);
   right: 10px;
   z-index: 2;
   width: 32px;

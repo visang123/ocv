@@ -391,7 +391,8 @@ import {
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import {
   showAppLoadingScreen,
-  hideAppLoadingScreen
+  hideAppLoadingScreen,
+  dismissAppLoadingScreenAfterDevReset
 } from "./src/app/loading-screen.js";
 import {
   setOverlayOpen as setSettingsOverlayOpen,
@@ -504,6 +505,7 @@ import {
   findNearestCraftHouse,
   getCraftChairSitPose,
   shouldDrainPlayerHealth,
+  isPlayerMovementKeyActive,
   isPlayerPoseUnchanged,
   tickPlayerHealthState
 } from "./src/game/player-health.js";
@@ -2919,6 +2921,7 @@ bindAlchemyMaster({
 });
 
 signBoard.addEventListener("click", function () {
+  if (isWorldFloorBagAwaitingPickup()) return;
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
     return;
@@ -3898,6 +3901,13 @@ function isNearSignBoard() {
     return false;
   }
   return getCenterDistance(signX, signY, SIGN_WIDTH, SIGN_HEIGHT) < guideInteractDistance;
+}
+
+/** ?? ?? ??? ?? ??? ?? ? ?? ?? ?? ???? ?? */
+function isWorldFloorBagAwaitingPickup() {
+  return Boolean(
+    worldBag && !isWorldFloorBagHiddenForCurrentView() && worldBag.style.display !== "none"
+  );
 }
 
 function isNearWorldBagPickup() {
@@ -5197,77 +5207,61 @@ function loadGuideBookState(skipMaybeResetTutorial) {
   loadOnboardingFlowState();
 }
 
+let isDevWorldResetInProgress = false;
+
 function resetGameForTesting() {
-  if (isReloadingForWorldReset) return;
+  if (isDevWorldResetInProgress || isReloadingForWorldReset) return;
   if (!isWorldDocumentEntry()) return;
 
-  showAppLoadingScreen("\uCD08\uAE30\uD654 \uC911...", { force: true });
-  isReloadingForWorldReset = true;
-  isWorldDirty = false;
-  isWorldPolling = false;
-  isApplyingWorldState = false;
-  bagInventoryItemOrder = [];
-  purgeLocalStorageKeysForLogicalKey(bagInventoryOrderKey);
-  purgeLocalStorageKeysForLogicalKey(worldBagFloorPickedAccountKey);
-  clearStoredKeys(appStorageKeys);
-  clearMainSeedPickedForCurrentRoom();
-  clearTutorialSessionWorldFloorPickupFlags();
-  clearWorldFloorBagClaim(removeStoredValue);
-  removeRoomKeyedPickupForAllSlugs("mainSeedPickedRoomV1:");
-  removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
-  removeRoomKeyedPickupForAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
-  removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
-  ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
-  pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-  lastAppliedWorldResetToken = pendingWorldResetToken;
-  lastWorldResetAt = Date.now();
-  persistOvcLastAppliedWorldResetToken(lastAppliedWorldResetToken);
+  isDevWorldResetInProgress = true;
+  try {
+    isWorldDirty = false;
+    isApplyingWorldState = false;
+    bagInventoryItemOrder = [];
+    purgeLocalStorageKeysForLogicalKey(bagInventoryOrderKey);
+    purgeLocalStorageKeysForLogicalKey(worldBagFloorPickedAccountKey);
+    clearStoredKeys(appStorageKeys);
+    clearMainSeedPickedForCurrentRoom();
+    clearTutorialSessionWorldFloorPickupFlags();
+    clearWorldFloorBagClaim(removeStoredValue);
+    removeRoomKeyedPickupForAllSlugs("mainSeedPickedRoomV1:");
+    removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
+    removeRoomKeyedPickupForAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
+    removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
+    ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
+    pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    lastAppliedWorldResetToken = pendingWorldResetToken;
+    lastWorldResetAt = Date.now();
+    persistOvcLastAppliedWorldResetToken(lastAppliedWorldResetToken);
 
-  applyDefaultState();
-  hydrateTradeMasterDialogueComplete(false);
-  hydrateAlchemyMasterDialogueComplete(false);
-  setStoredFlag(tradeMasterDialogueCompleteKey, false);
-  setStoredFlag(alchemyMasterDialogueCompleteKey, false);
-  setStoredFlag(guideBookClickPromptDismissedKey, false);
-  persistDefaultStateAfterReset();
-  restartPlayerPositionOnly();
+    applyDefaultState();
+    hydrateTradeMasterDialogueComplete(false);
+    hydrateAlchemyMasterDialogueComplete(false);
+    setStoredFlag(tradeMasterDialogueCompleteKey, false);
+    setStoredFlag(alchemyMasterDialogueCompleteKey, false);
+    setStoredFlag(guideBookClickPromptDismissedKey, false);
+    persistDefaultStateAfterReset();
+    restartPlayerPositionOnly();
 
-  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
-  updatePlayerColorBodyPosition();
-  updateCamera();
-  updatePlantState();
-  loadOnboardingFlowState();
-  updateOnboardingFlowUI();
-  updateNpcPosition();
-  updateGuidePages();
-  updateGuideCard();
-  syncWorldPlantFogVisuals();
-  hasHydratedSharedWorldFromServer = true;
+    setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+    updatePlayerColorBodyPosition();
+    updateCamera();
+    updatePlantState();
+    loadOnboardingFlowState();
+    updateOnboardingFlowUI();
+    updateNpcPosition();
+    updateGuidePages();
+    updateGuideCard();
+    syncWorldPlantFogVisuals();
+    hasHydratedSharedWorldFromServer = true;
 
-  syncWorldState(true);
-
-  isReloadingForWorldReset = false;
-  hideAppLoadingScreen();
-  ovcTryDismissLoadingScreen(true);
-
-  if (window.OVCOnline && typeof window.OVCOnline.saveWorldState === "function") {
-    isWorldSyncing = true;
-    window.OVCOnline.saveWorldState(
-      window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
-      getSharedWorldSnapshot()
-    )
-      .then(function (row) {
-        applyServerWorldRowTimestamps(row);
-      })
-      .catch(function (error) {
-        addNetworkDebugLog(
-          "world reset save error: " +
-            (error && error.message ? error.message : "\uC628\uB77C\uC778 \uC11C\uBC84 \uD655\uC778 \uD544\uC694")
-        );
-      })
-      .finally(function () {
-        isWorldSyncing = false;
-      });
+    syncWorldState(true, { skipPrefetch: true });
+  } catch (devResetError) {
+    console.error("[OVC] dev world reset failed:", devResetError);
+  } finally {
+    isDevWorldResetInProgress = false;
+    dismissAppLoadingScreenAfterDevReset();
+    ovcTryDismissLoadingScreen(true);
   }
 }
 
@@ -8333,12 +8327,11 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   }
   const snapshotResetToken = String(snapshot.resetToken || "");
   const isResetGuardWindow = syncedNow - lastWorldResetAt < 20000;
-  // Guard only during the short reset window. After that, allow sync to recover
-  // even if some clients still publish snapshots without a reset token.
+  // Local dev reset just pushed a new token; server may still return the pre-reset snapshot.
   if (
     isResetGuardWindow &&
     lastAppliedWorldResetToken &&
-    !snapshotResetToken
+    snapshotResetToken !== lastAppliedWorldResetToken
   ) {
     return;
   }
@@ -9059,20 +9052,26 @@ function pollWorldState(forcePoll) {
       hasHydratedSharedWorldFromServer = true;
     }
     if (!row || !row.state) return;
-    const plantBonusChanged = ingestSharedPlantIndexBonus(row.state);
-    if (!row.updated_at || row.updated_at === lastWorldUpdatedAt) {
-      if (plantBonusChanged) updatePlantProgressGauge();
-      return;
+    try {
+      const plantBonusChanged = ingestSharedPlantIndexBonus(row.state);
+      if (!row.updated_at || row.updated_at === lastWorldUpdatedAt) {
+        if (plantBonusChanged) updatePlantProgressGauge();
+        return;
+      }
+      lastWorldUpdatedAt = row.updated_at;
+      applySharedWorldSnapshot(row.state, row.updated_at);
+    } catch (applyError) {
+      addNetworkDebugLog(
+        "world apply error: " +
+          (applyError && applyError.message ? applyError.message : String(applyError))
+      );
     }
-    lastWorldUpdatedAt = row.updated_at;
-    applySharedWorldSnapshot(row.state, row.updated_at);
   }).catch(function (error) {
     addNetworkDebugLog(
-      "world poll error: " + (error && error.message ? error.message : "??? ?? ?? ??")
+      "world poll error: " + (error && error.message ? error.message : "unknown")
     );
-    showThrottledWorldSyncToast(
-      "\uC6D4\uB4DC \uBD88\uB7EC\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
-    );
+    // Poll failure still allows local play (finally marks hydrated). Background
+    // polls and non-network errors must not show a misleading network toast.
   }).finally(function () {
     isWorldPolling = false;
     if (isWorldServerSyncAvailable()) {
@@ -11563,6 +11562,10 @@ function updatePlayerPosition() {
     velocityY = 0;
     isOnGround = true;
     isTreeFalling = false;
+  } else {
+    jumpY = 0;
+    velocityY = 0;
+    isOnGround = true;
   }
 
   if (isPlayerInWellWaterArea()) {
@@ -11611,7 +11614,10 @@ function updatePlayerPosition() {
   }
 
   const poseNow = { x: playerX, depth: playerDepth, jumpY: jumpY };
-  if (isPlayerPoseUnchanged(healthPosePrev, poseNow)) {
+  if (
+    !isPlayerMovementKeyActive(keys) ||
+    isPlayerPoseUnchanged(healthPosePrev, poseNow)
+  ) {
     playerHealthPosePrev = poseNow;
   } else {
     playerHealthPosePrev = healthPosePrev;
@@ -13701,6 +13707,23 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
     return false;
   }
 
+  if (isWorldFloorBagAwaitingPickup()) {
+    const bagPxy = groundClientToWorldXY(clientX, clientY);
+    if (!bagPxy) return false;
+    const bagTarget = pickWorldInteractTargetAtWorldPoint(bagPxy.x, bagPxy.y);
+    if (
+      !bagTarget ||
+      bagTarget.kind !== "world-bag-floor" ||
+      !isPlayerNearWorldInteractTarget(bagTarget)
+    ) {
+      return false;
+    }
+    const bagNow = Date.now();
+    if (bagNow - lastPickupToggleAt < 180) return false;
+    lastPickupToggleAt = bagNow;
+    return pickUpWorldBag();
+  }
+
   if (heldItem === HELD_ITEM_BUCKET && isPointerOnHeldBucket(clientX, clientY)) {
     const now = Date.now();
     if (now - lastPickupToggleAt < 180) return false;
@@ -13732,6 +13755,7 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
 }
 
 function tryWaterPlantByPointerClick(clientX, clientY) {
+  if (isWorldFloorBagAwaitingPickup()) return false;
   if (heldItem !== HELD_ITEM_BUCKET || !isBucketFull) return false;
   if (isPlayerHealthGameplayBlocked()) return false;
   if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {

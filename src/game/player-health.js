@@ -68,7 +68,10 @@ export function isPlayerIdleForHealth(opts) {
   if (opts.isGameplayBlockedByNpcDialogue) return false;
   if (isPlayerMovementKeyActive(opts.keys)) return false;
   if (!isPlayerPoseUnchanged(opts.previousPose, opts.currentPose)) return false;
-  if (Math.abs(Number(opts.velocityY) || 0) > POSITION_IDLE_EPSILON) return false;
+  const jumpY = Number(opts.currentPose && opts.currentPose.jumpY) || 0;
+  if (Math.abs(jumpY) > POSITION_IDLE_EPSILON) {
+    if (Math.abs(Number(opts.velocityY) || 0) > POSITION_IDLE_EPSILON) return false;
+  }
   return true;
 }
 
