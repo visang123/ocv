@@ -9,7 +9,9 @@ import {
   getRecipeTradeBatchCount,
   recipeMatchesCounter,
   scaleTradeItemCounts,
-  subtractRecipeInputsFromCounter
+  subtractRecipeInputsFromCounter,
+  TRADE_BUTTERFLY_ITEM_KEYS,
+  TRADE_INPUT_ANY_BUTTERFLY
 } from "./trade-exchange.js";
 
 const TRADEABLE_ITEM_KEYS = [
@@ -218,8 +220,26 @@ export function isNearTradeMaster() {
   );
 }
 
+function isBagInventoryGameplayBlocked() {
+  return Boolean(
+    host && host.canUseBagInventoryGameplay && !host.canUseBagInventoryGameplay()
+  );
+}
+
+function showBagInventoryGameplayRequiredAlert() {
+  if (!host || !host.showPlayerAlert) return;
+  host.showPlayerAlert({
+    message: "\uBA3C\uC800 \uAC00\uBC29\uC744 \uC8FC\uC6CC\uC57C \uD574\uC694.",
+    durationMs: 2200
+  });
+}
+
 export function tryTalkToTradeMaster() {
   if (!host || !isNearTradeMaster()) return false;
+  if (isBagInventoryGameplayBlocked()) {
+    showBagInventoryGameplayRequiredAlert();
+    return true;
+  }
   reconcileTradeExchangeOpenState();
   if (running) return true;
   if (!complete) {
@@ -483,6 +503,10 @@ function startTradeMasterDialogue() {
 
 export function openTradeExchangePanel() {
   if (!host || !complete) return;
+  if (isBagInventoryGameplayBlocked()) {
+    showBagInventoryGameplayRequiredAlert();
+    return;
+  }
   reconcileTradeExchangeOpenState();
   if (exchangeOpen) return;
   if (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen()) {
@@ -565,13 +589,20 @@ export function returnTradeCounterStackToInventory(itemKey) {
   return true;
 }
 
-function buildTradeRecipeSideIconsHtml(side) {
-  const keys = Object.keys(side || {});
+/** @param {Record<string, number>} side @param {{ expandButterflyAny?: boolean }} [options] */
+function buildTradeRecipeSideIconsHtml(side, options) {
+  const expandButterflyAny = Boolean(options && options.expandButterflyAny);
+  const displaySide = expandButterflyAny ? expandTradeItemCounts(side || {}) : side || {};
+  const keys = sortTradeRecipeDisplayKeys(Object.keys(displaySide));
   if (!keys.length) return "";
   return keys
     .map(function (itemKey) {
-      const count = Math.max(0, Math.floor(Number(side[itemKey]) || 0));
-      const pseudoLabel = formatTradeRecipePseudoLabel(itemKey, count);
+      const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
+      if (count <= 0) return "";
+      const pseudoLabel =
+        itemKey === TRADE_INPUT_ANY_BUTTERFLY
+          ? formatTradeRecipePseudoLabel(itemKey, count)
+          : null;
       if (pseudoLabel) {
         return (
           '<span class="trade-recipe-io trade-recipe-io--any" title="' +
@@ -597,6 +628,18 @@ function buildTradeRecipeSideIconsHtml(side) {
     .join("");
 }
 
+/** @param {string[]} keys */
+function sortTradeRecipeDisplayKeys(keys) {
+  return keys.slice().sort(function (a, b) {
+    const aBf = TRADE_BUTTERFLY_ITEM_KEYS.indexOf(a);
+    const bBf = TRADE_BUTTERFLY_ITEM_KEYS.indexOf(b);
+    if (aBf >= 0 && bBf >= 0) return aBf - bBf;
+    if (aBf >= 0) return 1;
+    if (bBf >= 0) return -1;
+    return a.localeCompare(b);
+  });
+}
+
 function buildTradeButterflyAnyIconsHtml(total) {
   const n = Math.max(0, Math.floor(Number(total) || 0));
   if (n <= 0) return "";
@@ -616,11 +659,11 @@ function buildTradeButterflyAnyIconsHtml(total) {
 function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol) {
   return (
     '<span class="trade-recipe-flow">' +
-    buildTradeRecipeSideIconsHtml(inputs) +
+    buildTradeRecipeSideIconsHtml(inputs, { expandButterflyAny: false }) +
     '<span class="trade-recipe-arrow" aria-hidden="true">' +
     arrowSymbol +
     "</span>" +
-    buildTradeRecipeSideIconsHtml(outputs) +
+    buildTradeRecipeSideIconsHtml(outputs, { expandButterflyAny: true }) +
     "</span>"
   );
 }

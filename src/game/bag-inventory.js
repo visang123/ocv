@@ -94,9 +94,14 @@ export function normalizeBagInventoryOrderByCounts(order, previousCounts, counts
     BAG_SLOT_ITEM_KEYS.forEach(function (key) {
       if (Number(counts[key] || 0) <= 0) return;
       if (nextOrder.includes(key)) return;
+      if (nextOrder.length >= BAG_INVENTORY_SLOT_COUNT) return;
       nextOrder.push(key);
       changed = true;
     });
+    if (nextOrder.length > BAG_INVENTORY_SLOT_COUNT) {
+      nextOrder = nextOrder.slice(0, BAG_INVENTORY_SLOT_COUNT);
+      changed = true;
+    }
     return {
       order: nextOrder,
       previousCounts: Object.assign({}, counts),
@@ -112,6 +117,19 @@ export function normalizeBagInventoryOrderByCounts(order, previousCounts, counts
       changed = true;
     }
   });
+
+  BAG_SLOT_ITEM_KEYS.forEach(function (key) {
+    if (Number(counts[key] || 0) <= 0) return;
+    if (nextOrder.includes(key)) return;
+    if (nextOrder.length >= BAG_INVENTORY_SLOT_COUNT) return;
+    nextOrder.push(key);
+    changed = true;
+  });
+
+  if (nextOrder.length > BAG_INVENTORY_SLOT_COUNT) {
+    nextOrder = nextOrder.slice(0, BAG_INVENTORY_SLOT_COUNT);
+    changed = true;
+  }
 
   return {
     order: nextOrder,

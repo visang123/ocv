@@ -215,7 +215,15 @@ export function tickPlayerHealthState(state, nowMs) {
   let idleRechargeHealTicks = Number(state.idleRechargeHealTicks) || 0;
   const rechargeCtx = state.rechargeContext || {};
   const shouldDrain = Boolean(state.shouldDrain);
+  const wasDraining = Boolean(state.wasDraining);
   const clearIdleRecharge = { idleRechargeSince: 0, idleRechargeHealTicks: 0 };
+
+  // 정지(소모 없음) ↔ 이동(소모) 전환 시 경과 시간을 이월하지 않음 — 멈춘 뒤 움직일 때 체력이 한꺼번에 빠지는 버그 방지
+  if (shouldDrain !== wasDraining) {
+    lastTickAt = now;
+    idleRechargeSince = 0;
+    idleRechargeHealTicks = 0;
+  }
 
   if (shouldRechargePlayerHealth(health, shouldDrain)) {
     const rate = getPlayerHealthRechargePerSecond(rechargeCtx);

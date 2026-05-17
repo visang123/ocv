@@ -102,6 +102,26 @@ function findOpenUiRootForElement(el, openRoots) {
   return null;
 }
 
+function findOpenTradeExchangeRoot(openRoots) {
+  for (let i = 0; i < openRoots.length; i += 1) {
+    if (openRoots[i].id === "trade-exchange-overlay") return openRoots[i];
+  }
+  return null;
+}
+
+function getTradeExchangeScrollable(tradeRoot) {
+  const list = tradeRoot.querySelector(".trade-tradeable-list");
+  if (list) return list;
+  return tradeRoot.querySelector(".trade-exchange-panel");
+}
+
+function isTradeExchangeBagWheelPassthrough(el) {
+  if (!(el instanceof Element)) return false;
+  return Boolean(
+    el.closest("#bag-inventory-panel") || el.closest("#world-bag-inventory")
+  );
+}
+
 function applyWheelScroll(el, event) {
   const maxScroll = el.scrollHeight - el.clientHeight;
   const next = el.scrollTop + event.deltaY;
@@ -118,14 +138,31 @@ function applyWheelScroll(el, event) {
 
 function resolveScrollTarget(event, openRoots) {
   const hit = document.elementsFromPoint(event.clientX, event.clientY);
+  const tradeRoot = findOpenTradeExchangeRoot(openRoots);
+
   for (let i = 0; i < hit.length; i += 1) {
     const root = findOpenUiRootForElement(hit[i], openRoots);
     if (!root) continue;
+
+    if (root.id === "trade-exchange-overlay") {
+      return (
+        findScrollableAncestor(hit[i], root) || getTradeExchangeScrollable(root)
+      );
+    }
+
+    if (tradeRoot && isTradeExchangeBagWheelPassthrough(hit[i])) {
+      continue;
+    }
+
     return (
-      findScrollableAncestor(hit[i], root) ||
-      findBestScrollableInRoot(root)
+      findScrollableAncestor(hit[i], root) || findBestScrollableInRoot(root)
     );
   }
+
+  if (tradeRoot) {
+    return getTradeExchangeScrollable(tradeRoot);
+  }
+
   const topRoot = openRoots[0];
   return topRoot ? findBestScrollableInRoot(topRoot) : null;
 }

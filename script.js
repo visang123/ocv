@@ -491,7 +491,10 @@ import {
   parsePlacedCraftFurnitureFromSnapshot,
   assignCraftFurnitureIdentity,
   refreshCraftFurnitureIdentityOrdinals,
-  getCraftFurnitureWorldLabel
+  getCraftFurnitureWorldLabel,
+  getCraftFurnitureInstallDurationMs,
+  getCraftFurnitureInstallPresenceAction,
+  getCraftFurnitureInstallStatusText
 } from "./src/game/craft-furniture-world.js";
 import {
   PLAYER_MAX_HEALTH,
@@ -1074,6 +1077,17 @@ function shouldShowWorldBagInventoryUi() {
   );
 }
 
+function canUseBagInventoryGameplay() {
+  return shouldShowWorldBagInventoryUi();
+}
+
+function showBagRequiredForGameplayMessage() {
+  showPlayerAlert({
+    message: "\uBA3C\uC800 \uAC00\uBC29\uC744 \uC8FC\uC6CC\uC57C \uD574\uC694.",
+    durationMs: 2200
+  });
+}
+
 function syncWorldGuideBookGroundVisibility() {
   if (!guideBook) return;
   guideBook.style.display = isWorldFloorGuideBookHiddenForCurrentView() ? "none" : "block";
@@ -1444,7 +1458,9 @@ function syncWorldBagGroundVisibility() {
       setWorldBagGroundPickedForCurrentRoom();
       setGuideBookPickedForCurrentRoom();
     }
-    worldBag.style.display = isWorldFloorBagHiddenForCurrentView() ? "none" : "block";
+    const hidden = isWorldFloorBagHiddenForCurrentView();
+    worldBag.style.display = hidden ? "none" : "block";
+    worldBag.classList.toggle("is-awaiting-pickup", !hidden);
   }
 }
 
@@ -1636,6 +1652,27 @@ let craftFurnitureCounts = {
 };
 /** @type {Array<{ id: string, kind: string, x: number, y: number, width: number, height: number, _el?: HTMLElement }>} */
 let placedCraftFurniture = [];
+let craftFurnitureInstallingKind = null;
+let craftFurnitureInstallTimeoutId = 0;
+/** @type {{ x: number, y: number, width: number, height: number } | null} */
+let craftFurniturePendingPlacement = null;
+
+function isCraftFurnitureInstalling() {
+  return craftFurnitureInstallingKind != null;
+}
+
+function clearCraftFurnitureInstalling() {
+  craftFurnitureInstallingKind = null;
+  craftFurniturePendingPlacement = null;
+  if (craftFurnitureInstallTimeoutId) {
+    window.clearTimeout(craftFurnitureInstallTimeoutId);
+    craftFurnitureInstallTimeoutId = 0;
+  }
+}
+
+function isPlayerTimedActionBusy() {
+  return plantRuntime.isPlanting || appleState.isEating || isCraftFurnitureInstalling();
+}
 /** @type {{ yellow: number, white: number, brown: number, mixed: number }} */
 let coloredMagicPowderCounts = { yellow: 0, white: 0, brown: 0, mixed: 0 };
 /** ?????? ????: ????????????????? ??????????? ??? ????(????) */
@@ -2366,7 +2403,8 @@ document.addEventListener("keydown", function (event) {
       !playerSittingChairId &&
       !isPlayerInsideEnteredCraftHouse() &&
       !isPlayerGameplayBlockedByNpcDialogue() &&
-      !isPlayerHealthGameplayBlocked()
+      !isPlayerHealthGameplayBlocked() &&
+      !isPlayerTimedActionBusy()
     ) {
       keys[key] = true;
     }
@@ -2376,7 +2414,7 @@ document.addEventListener("keydown", function (event) {
     event.preventDefault();
     if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
-    if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
+    if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) return;
     if (isPlayerInTreeSpace()) {
       return;
     }
@@ -2390,12 +2428,13 @@ document.addEventListener("keydown", function (event) {
     isInteractKeyLatched = true;
     if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
-    if (isPlayerGameplayBlockedByNpcDialogue()) return;
+    if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) return;
     performInteractAction();
   }
 
   if (key === "q" && !event.repeat) {
     event.preventDefault();
+    if (isPlayerTimedActionBusy()) return;
     if (tryToggleChairSit()) return;
     if (playerSittingChairId) return;
     if (tryToggleCraftHouseEnter()) return;
@@ -2864,6 +2903,7 @@ bindTradeMaster({
   markWorldDirty: markWorldDirty,
   syncWorldState: syncWorldState,
   showPlayerAlert: showPlayerAlert,
+  canUseBagInventoryGameplay: canUseBagInventoryGameplay,
   consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
@@ -2919,6 +2959,7 @@ bindAlchemyMaster({
   saveButterflyCaughtCounts: saveButterflyCaughtCounts,
   markWorldDirty: markWorldDirty,
   showPlayerAlert: showPlayerAlert,
+  canUseBagInventoryGameplay: canUseBagInventoryGameplay,
   consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
@@ -3120,40 +3161,45 @@ networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
 networkDebugButton.setAttribute("aria-label", "???");
 document.body.appendChild(networkDebugButton);
-function appendAdminDevGrantButton(id, ariaLabel) {
+function appendAdminDevGrantButton(id) {
   const button = document.createElement("button");
   button.id = id;
   button.type = "button";
   button.textContent = "";
   button.setAttribute("aria-hidden", "true");
-  button.setAttribute("aria-label", ariaLabel);
-  button.setAttribute("title", ariaLabel);
   document.body.appendChild(button);
   return button;
 }
-const adminDevButterfliesButton = appendAdminDevGrantButton(
-  "admin-dev-butterflies-button",
-  "????? ?????? +10 (??????)"
-);
-const adminDevRocksButton = appendAdminDevGrantButton(
-  "admin-dev-rocks-button",
-  "?? +10 (??????)"
-);
-const adminDevSeedsButton = appendAdminDevGrantButton(
-  "admin-dev-seeds-button",
-  "?????? +10 (??????)"
-);
-const adminDevApplesButton = appendAdminDevGrantButton(
-  "admin-dev-apples-button",
-  "???? +10 (??????)"
-);
+/** Admin dev grants need the floor bag picked up or inventory UI stays hidden. */
+function ensureAdminDevBagUnlocked() {
+  if (!shouldShowWorldBagInventoryUi()) {
+    hasGuideBook = true;
+    setStoredFlag(hasGuideBookKey, true);
+    setGuideBookPickedForCurrentRoom();
+    setWorldBagGroundPickedForCurrentRoom();
+    if (isTutorialDocumentEntry()) {
+      writeTutorialSessionFloorBagPicked();
+      setTutorialSessionWorldGuideBookOffGroundPicked();
+    }
+    if (isWorldDocumentEntry()) {
+      setWorldGuideBookOffGroundPickedForCurrentRoom();
+    }
+    syncWorldBagGroundVisibility();
+    syncGuideInventoryBar();
+  } else if (!hasGuideBook) {
+    hasGuideBook = true;
+    syncGuideInventoryBar();
+  }
+}
+const adminDevButterfliesButton = appendAdminDevGrantButton("admin-dev-butterflies-button");
+const adminDevRocksButton = appendAdminDevGrantButton("admin-dev-rocks-button");
+const adminDevSeedsButton = appendAdminDevGrantButton("admin-dev-seeds-button");
+const adminDevApplesButton = appendAdminDevGrantButton("admin-dev-apples-button");
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
-adminDevPlantIndexPlusButton.setAttribute("aria-label", "????????? +100 (??????)");
-adminDevPlantIndexPlusButton.setAttribute("title", "????????? +100 (??????)");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -3167,24 +3213,29 @@ magicPowderInventory.addEventListener("click", function () {
   tryUseMagicPowder();
 });
 adminDevButterfliesButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
   butterflyColors.forEach(function (color) {
     addBagItemsForTrade("butterfly:" + color, 10);
   });
 });
 adminDevRocksButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
   addBagItemsForTrade("rock", 10);
 });
 adminDevSeedsButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
   addBagItemsForTrade("seed", 10);
   markWorldDirty();
   syncWorldState(true);
 });
 adminDevApplesButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
   addBagItemsForTrade("apple", 10);
   markWorldDirty();
   syncWorldState(true);
 });
 adminDevPlantIndexPlusButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
   adminDebugPlantIndexBonus = Math.max(0, Math.floor(adminDebugPlantIndexBonus)) + 100;
   updatePlantProgressGauge();
   markWorldDirty();
@@ -5403,6 +5454,7 @@ function applyDefaultState(options) {
   }
   plantRuntime.isSeedPlanted = false;
   plantRuntime.isPlanting = false;
+  clearCraftFurnitureInstalling();
   heldItem = null;
   heldBucketId = "";
   heldExtraBucketMainX = 0;
@@ -5656,7 +5708,39 @@ function tryTalkToPlantMaster() {
   return true;
 }
 
+function clearPlantMasterDialogueTimeouts() {
+  plantMasterDialogueTimeoutIds.forEach(function (timeoutId) {
+    window.clearTimeout(timeoutId);
+  });
+  plantMasterDialogueTimeoutIds = [];
+}
+
+function schedulePlantMasterDialogueTask(fn, delayMs) {
+  const generation = plantMasterDialogueGeneration;
+  const timeoutId = window.setTimeout(function () {
+    if (generation !== plantMasterDialogueGeneration) return;
+    fn();
+  }, Math.max(0, Number(delayMs) || 0));
+  plantMasterDialogueTimeoutIds.push(timeoutId);
+  return timeoutId;
+}
+
+function abortPlantMasterDialogue() {
+  clearPlantMasterDialogueTimeouts();
+  plantMasterDialogueGeneration += 1;
+  isNpcDialogueRunning = false;
+  if (npcBubble) {
+    npcBubble.style.display = "none";
+    npcBubble.dataset.promptShown = "false";
+  }
+  if (playerBubble) {
+    playerBubble.style.display = "none";
+  }
+  window.clearTimeout(npcPromptHideTimeout);
+}
+
 function startPlantMasterDialogue() {
+  abortPlantMasterDialogue();
   const isFirstTalk = !isNpcDialogueComplete;
   const lines = isFirstTalk
     ? [
@@ -5684,13 +5768,14 @@ function startPlantMasterDialogue() {
 
   let timelineMs = 0;
   lines.forEach(function (lineInfo) {
-    window.setTimeout(function () {
+    const lineDelayMs = timelineMs;
+    schedulePlantMasterDialogueTask(function () {
       showDialogueLine(lineInfo);
-    }, timelineMs);
+    }, lineDelayMs);
     timelineMs += Math.max(0, Number(lineInfo.delayAfterMs) || 650);
   });
 
-  window.setTimeout(function () {
+  schedulePlantMasterDialogueTask(function () {
     npcBubble.style.display = "none";
     playerBubble.style.display = "none";
     isNpcDialogueRunning = false;
@@ -5854,28 +5939,9 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     nearestRock &&
     rockDist < extraDist &&
     rockDist <= pickupDistance &&
-    rockDist <= bucketDistance
+    rockDist <= bucketDistance &&
+    tryPickupWorldRock(nearestRock.rock)
   ) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
-      flashOnboardingOrderHint("");
-      return;
-    }
-    if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
-      appleState.worldRockPickedIds.push(nearestRock.rock.id);
-    }
-    rockInventoryCount += 1;
-    lastLocalWorldRockPickupAt = Date.now();
-    flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
-    plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
-    saveRockInventoryCount();
-    saveAppleState();
-    holdLocalAppleStateAgainstStaleSnapshot(1200);
-    updateWorldRocks();
-    updateBagInventorySlots();
-    markWorldDirty();
-    broadcastWorldRockPickup(nearestRock.rock.id);
-    syncWorldState(true);
-    sendMultiplayerPresence(true);
     return;
   }
 
@@ -5959,31 +6025,9 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     nearestRock &&
     rockDist < extraDist &&
     rockDist <= pickupDistance &&
-    rockDist <= bucketDistance
+    rockDist <= bucketDistance &&
+    tryPickupWorldRock(nearestRock.rock)
   ) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_ROCK) {
-      flashOnboardingOrderHint("");
-      return;
-    }
-    if (!appleState.worldRockPickedIds.includes(nearestRock.rock.id)) {
-      appleState.worldRockPickedIds.push(nearestRock.rock.id);
-    }
-    rockInventoryCount += 1;
-    lastLocalWorldRockPickupAt = Date.now();
-    flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
-    plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
-    saveRockInventoryCount();
-    saveAppleState();
-    holdLocalAppleStateAgainstStaleSnapshot(1200);
-    updateWorldRocks();
-    updateBagInventorySlots();
-    if (isWorldDocumentEntry()) {
-      broadcastWorldRockPickup(nearestRock.rock.id);
-      markWorldDirty();
-      syncWorldState(true);
-      sendMultiplayerPresence(true);
-    }
-    onboardingHookTutorialRockPicked();
     return;
   }
 
@@ -6090,6 +6134,63 @@ function getNearestPickableExtraSeed() {
   });
 
   return nearest;
+}
+
+function canPickupWorldRockPerOnboarding() {
+  if (!isOnboardingLinearGateActive()) return true;
+  if (usesWorldLooseSeedMode()) {
+    return onboardingFlowStep >= ONBOARDING_STEP_EXTRA_SEED;
+  }
+  return onboardingFlowStep === ONBOARDING_STEP_ROCK;
+}
+
+/** @returns {boolean} ?? ?? */
+function tryPickupWorldRock(rock) {
+  if (!rock || rock.id == null || rock.id === "") return false;
+  if (appleState.worldRockPickedIds.includes(rock.id)) return false;
+  if (!canPickupWorldRockPerOnboarding()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
+  const counts = getBagInventoryCountsByKey();
+  if (
+    !canBagInventoryFitItems(
+      bagInventoryItemOrder,
+      counts,
+      { rock: 1 },
+      BAG_INVENTORY_SLOT_COUNT
+    )
+  ) {
+    showBagInventoryFullFailMessage();
+    return false;
+  }
+  appleState.worldRockPickedIds.push(rock.id);
+  rockInventoryCount += 1;
+  lastLocalWorldRockPickupAt = Date.now();
+  flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
+  plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
+  saveRockInventoryCount();
+  saveAppleState();
+  holdLocalAppleStateAgainstStaleSnapshot(1200);
+  updateWorldRocks();
+  updateBagInventorySlots();
+  markWorldDirty();
+  if (isWorldDocumentEntry()) {
+    broadcastWorldRockPickup(rock.id);
+    syncWorldState(true);
+    sendMultiplayerPresence(true);
+  }
+  onboardingHookTutorialRockPicked();
+  return true;
+}
+
+function tryPickupNearestWorldRock(bucketDistance) {
+  const nearestRock = getNearestPickableWorldRock();
+  if (!nearestRock) return false;
+  const rockDist = nearestRock.distance;
+  const bucketDist = Number.isFinite(Number(bucketDistance)) ? Number(bucketDistance) : Infinity;
+  if (rockDist > pickupDistance || rockDist > bucketDist) return false;
+  return tryPickupWorldRock(nearestRock.rock);
 }
 
 function getNearestPickableWorldRock() {
@@ -6208,37 +6309,8 @@ function updatePlacedCraftFurnitureDom() {
   });
 }
 
-function useCraftFurnitureFromBag(kind) {
-  if (!isCraftFurnitureKind(kind)) return;
-  if ((Number(craftFurnitureCounts[kind]) || 0) <= 0) return;
-  if (isPlayerHealthGameplayBlocked()) return;
-
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
-    flashOnboardingOrderHint("");
-    return;
-  }
-
-  if (
-    plantRuntime.isPlanting ||
-    appleState.isEating ||
-    isPlayerGameplayBlockedByNpcDialogue() ||
-    !isOnGround
-  ) {
-    return;
-  }
-
-  const placement = computeCraftFurniturePlacement(
-    kind,
-    getPlayerCenterX(),
-    getPlayerFootY()
-  );
-  if (!placement) return;
-  const craftBlockMsg = getCraftFurniturePlacementBlockMessage(placement);
-  if (craftBlockMsg) {
-    flashPlantProximityWarning(craftBlockMsg);
-    return;
-  }
-  if (!removeOneBagItemForTrade(kind)) return;
+function commitPlacedCraftFurnitureEntry(kind, placement) {
+  if (!isCraftFurnitureKind(kind) || !placement) return;
 
   const entry = {
     id: "cf-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
@@ -6279,6 +6351,75 @@ function useCraftFurnitureFromBag(kind) {
   saveAppleState();
   markWorldDirty();
   syncWorldState(true);
+}
+
+function finishCraftFurnitureInstall() {
+  const kind = craftFurnitureInstallingKind;
+  const placement = craftFurniturePendingPlacement;
+  clearCraftFurnitureInstalling();
+  playerStatus.textContent = "";
+  updatePlayerStatus();
+  sendMultiplayerPresence(true);
+  if (!kind || !placement) return;
+  commitPlacedCraftFurnitureEntry(kind, placement);
+}
+
+function useCraftFurnitureFromBag(kind) {
+  if (!isCraftFurnitureKind(kind)) return;
+  if (!canUseBagInventoryGameplay()) {
+    showBagRequiredForGameplayMessage();
+    return;
+  }
+  if ((Number(craftFurnitureCounts[kind]) || 0) <= 0) return;
+  if (isPlayerHealthGameplayBlocked()) return;
+
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+
+  if (
+    isPlayerTimedActionBusy() ||
+    isPlayerGameplayBlockedByNpcDialogue() ||
+    !isOnGround
+  ) {
+    return;
+  }
+
+  const placement = computeCraftFurniturePlacement(
+    kind,
+    getPlayerCenterX(),
+    getPlayerFootY()
+  );
+  if (!placement) return;
+  const craftBlockMsg = getCraftFurniturePlacementBlockMessage(placement);
+  if (craftBlockMsg) {
+    flashPlantProximityWarning(craftBlockMsg);
+    return;
+  }
+  if (!removeOneBagItemForTrade(kind)) return;
+
+  const installMs = getCraftFurnitureInstallDurationMs(kind);
+  if (installMs <= 0) {
+    commitPlacedCraftFurnitureEntry(kind, placement);
+    return;
+  }
+
+  craftFurnitureInstallingKind = kind;
+  craftFurniturePendingPlacement = {
+    x: placement.x,
+    y: placement.y,
+    width: placement.width,
+    height: placement.height
+  };
+  resetInputKeys(keys);
+  playerStatus.textContent = getCraftFurnitureInstallStatusText(kind);
+  updatePlayerStatus();
+  sendMultiplayerPresence(true);
+  craftFurnitureInstallTimeoutId = window.setTimeout(function () {
+    craftFurnitureInstallTimeoutId = 0;
+    finishCraftFurnitureInstall();
+  }, installMs);
 }
 
 function pickApple() {
@@ -6352,8 +6493,7 @@ function updateApples() {
 function eatApple() {
   if (
     appleState.count <= 0 ||
-    appleState.isEating ||
-    plantRuntime.isPlanting ||
+    isPlayerTimedActionBusy() ||
     isPlayerGameplayBlockedByNpcDialogue()
   ) {
     return;
@@ -7054,6 +7194,7 @@ function discardBagItemsToGround(itemKey, amount, options) {
 }
 
 function tryPickWorldBagDrop(bucketDistance) {
+  if (!canUseBagInventoryGameplay()) return false;
   ensureWorldBagDropsArray();
   if (!appleState.worldBagDrops.length) return false;
   const info = findNearestWorldBagDropPickup(
@@ -11471,7 +11612,7 @@ function updatePlayerPosition() {
     return;
   }
 
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
@@ -11768,7 +11909,7 @@ function sitOnCraftChair(chair) {
 
 function tryToggleChairSit() {
   if (!hasSpawnedCharacter || isCharacterSelecting) return false;
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return false;
   }
   if (heldItem) return false;
@@ -11845,7 +11986,7 @@ function tryToggleCraftHouseEnter() {
     return true;
   }
 
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return false;
   }
   if (heldItem || playerSittingChairId) return false;
@@ -13251,6 +13392,9 @@ function performInteractActionCore() {
   }
   if (pickUpWorldBag()) return;
   if (!hasGuideBook) {
+    const bucketPick = getNearestGroundBucketPickInfo();
+    const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
+    if (tryPickupNearestWorldRock(bucketDistance)) return;
     return;
   }
   if (tryCatchButterfly()) return;
@@ -13262,7 +13406,7 @@ function performInteractActionCore() {
 function performInteractAction() {
   if (isPlayerInsideEnteredCraftHouse()) return;
   if (isPlayerHealthGameplayBlocked()) return;
-  if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) return;
   const now = Date.now();
   if (now - lastPickupToggleAt < 180) return;
   lastPickupToggleAt = now;
@@ -13282,7 +13426,7 @@ function isPointerBlockedForWorldInteract(event) {
   const target = event && event.target;
   if (!target || !(target instanceof Element)) return true;
   if (isTabSessionSuperseded || isCharacterSelecting || !hasSpawnedCharacter) return true;
-  if (plantRuntime.isPlanting || isWorldChatBlockingGameInput()) return true;
+  if (isPlayerTimedActionBusy() || isWorldChatBlockingGameInput()) return true;
   if (isPlayerGameplayBlockedByNpcDialogue()) return true;
   if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return true;
   if (
@@ -13382,6 +13526,7 @@ function tryCatchButterflyAtWorldPoint(wx, wy) {
 }
 
 function tryPickWorldBagDropAtWorldPoint(wx, wy) {
+  if (!canUseBagInventoryGameplay()) return false;
   ensureWorldBagDropsArray();
   if (!appleState.worldBagDrops.length) return false;
   let hit = null;
@@ -13706,37 +13851,11 @@ function tryPerformTargetedWorldInteract(target, wx, wy) {
       if (!rock) return false;
       const sz = Number(rock.size) || WORLD_ROCK_SIZE;
       if (getCenterDistance(rock.x, rock.y, sz, sz) > pickupDistance) return false;
-      if (isOnboardingLinearGateActive()) {
-        if (usesWorldLooseSeedMode()) {
-          if (onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
-            flashOnboardingOrderHint("");
-            return true;
-          }
-        } else if (onboardingFlowStep !== ONBOARDING_STEP_ROCK) {
-          flashOnboardingOrderHint("");
-          return true;
-        }
+      if (!canPickupWorldRockPerOnboarding()) {
+        flashOnboardingOrderHint("");
+        return true;
       }
-      if (!appleState.worldRockPickedIds.includes(rock.id)) {
-        appleState.worldRockPickedIds.push(rock.id);
-      }
-      rockInventoryCount += 1;
-      lastLocalWorldRockPickupAt = Date.now();
-      flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
-      plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
-      saveRockInventoryCount();
-      saveAppleState();
-      holdLocalAppleStateAgainstStaleSnapshot(1200);
-      updateWorldRocks();
-      updateBagInventorySlots();
-      if (isWorldDocumentEntry()) {
-        broadcastWorldRockPickup(rock.id);
-        markWorldDirty();
-        syncWorldState(true);
-        sendMultiplayerPresence(true);
-      }
-      onboardingHookTutorialRockPicked();
-      return true;
+      return tryPickupWorldRock(rock);
     }
     default:
       return false;
@@ -13745,7 +13864,7 @@ function tryPerformTargetedWorldInteract(target, wx, wy) {
 
 function tryWorldInteractByPointerClick(clientX, clientY) {
   if (isPlayerHealthGameplayBlocked()) return false;
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return false;
   }
 
@@ -13800,7 +13919,7 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
   if (isWorldFloorBagAwaitingPickup()) return false;
   if (heldItem !== HELD_ITEM_BUCKET || !isBucketFull) return false;
   if (isPlayerHealthGameplayBlocked()) return false;
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return false;
   }
   if (isTradeExchangeOpen()) return false;
@@ -14447,7 +14566,7 @@ function isExtraSeedDry(extraSeed, now) {
 
 function useHeldItem() {
   if (isPlayerInsideEnteredCraftHouse()) return;
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return;
   }
 
@@ -14474,7 +14593,7 @@ function useHeldItem() {
 }
 
 function useBucket() {
-  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
     return;
   }
 
@@ -15890,7 +16009,7 @@ function updatePlayerStatus() {
   );
   const yWorld = toScreenY(playerBox.top + 26);
 
-  if (plantRuntime.isPlanting || appleState.isEating) {
+  if (isPlayerTimedActionBusy()) {
     playerStatus.style.display = "block";
     playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
@@ -17310,13 +17429,15 @@ function sendMultiplayerPresence(forceSend) {
     name: nameForIngameUiDisplay(accountDisplayNameForUi()),
     action: plantRuntime.isPlanting
       ? "planting"
-      : appleState.isEating
-        ? "eating"
-        : shouldShowWorldRockPickupAction
-          ? "rock_pickup"
-          : shouldShowButterflyCatchAction
-            ? "butterfly_catch"
-            : "state",
+      : craftFurnitureInstallingKind
+        ? getCraftFurnitureInstallPresenceAction(craftFurnitureInstallingKind) || "state"
+        : appleState.isEating
+          ? "eating"
+          : shouldShowWorldRockPickupAction
+            ? "rock_pickup"
+            : shouldShowButterflyCatchAction
+              ? "butterfly_catch"
+              : "state",
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: selectedPlayerColor,
     x: playerX,

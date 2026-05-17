@@ -1,3 +1,8 @@
+import {
+  getCraftFurnitureInstallStatusText,
+  parseCraftFurnitureInstallPresenceAction
+} from "../game/craft-furniture-world.js";
+
 export function shouldApplyIncomingRemoteState(current, incoming) {
   const currentVersion = Math.max(0, Number(current && current.version) || 0);
   const currentRank = Math.max(0, Number(current && current.rank) || 0);
@@ -16,5 +21,11 @@ export function getRemoteStatusText(action) {
   if (action === "eating") return "사과먹는중...";
   if (action === "butterfly_catch") return "나비 catch";
   if (action === "rock_pickup") return "돌 수집";
+  const installKind = parseCraftFurnitureInstallPresenceAction(action);
+  if (installKind) {
+    const installText = getCraftFurnitureInstallStatusText(installKind);
+    if (installText) return installText;
+  }
+  if (action === "craft_install") return "\uAC00\uAD6C \uC124\uCE58\uC911...";
   return "";
 }

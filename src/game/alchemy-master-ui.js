@@ -211,8 +211,26 @@ export function isNearAlchemyMaster() {
   );
 }
 
+function isBagInventoryGameplayBlocked() {
+  return Boolean(
+    host && host.canUseBagInventoryGameplay && !host.canUseBagInventoryGameplay()
+  );
+}
+
+function showBagInventoryGameplayRequiredAlert() {
+  if (!host || !host.showPlayerAlert) return;
+  host.showPlayerAlert({
+    message: "\uBA3C\uC800 \uAC00\uBC29\uC744 \uC8FC\uC6CC\uC57C \uD574\uC694.",
+    durationMs: 2200
+  });
+}
+
 export function tryTalkToAlchemyMaster() {
   if (!host || !isNearAlchemyMaster()) return false;
+  if (isBagInventoryGameplayBlocked()) {
+    showBagInventoryGameplayRequiredAlert();
+    return true;
+  }
   reconcileAlchemyCraftOpenState();
   if (running) return true;
   if (!complete) {
@@ -461,6 +479,10 @@ function startAlchemyMasterDialogue() {
 
 export function openAlchemyCraftPanel() {
   if (!host || !complete) return;
+  if (isBagInventoryGameplayBlocked()) {
+    showBagInventoryGameplayRequiredAlert();
+    return;
+  }
   reconcileAlchemyCraftOpenState();
   if (craftOpen) return;
   if (host.isTradeExchangeOpen && host.isTradeExchangeOpen()) {

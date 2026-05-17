@@ -2,6 +2,18 @@
 
 export const CRAFT_FURNITURE_KINDS = ["craftDesk", "craftFence", "craftChair", "craftHouse"];
 
+/** Bag-use install duration before furniture appears (ms). */
+export const CRAFT_FURNITURE_INSTALL_MS = {
+  craftChair: 3000,
+  craftDesk: 5000,
+  craftHouse: 15000
+};
+
+export function getCraftFurnitureInstallDurationMs(kind) {
+  const ms = CRAFT_FURNITURE_INSTALL_MS[kind];
+  return Number.isFinite(ms) && ms > 0 ? ms : 0;
+}
+
 const CRAFT_FURNITURE_WORLD = {
   craftDesk: {
     src: "\uC774\uBBF8\uC9C0/craft-desk-world.png?v=20260516g",
@@ -62,6 +74,26 @@ export function getCraftFurnitureKindShortLabel(kind) {
   if (kind === "craftHouse") return "\uC9D1";
   if (kind === "craftFence") return "\uC6B8\uD0C0\uB9AC";
   return "\uAC00\uAD6C";
+}
+
+export function getCraftFurnitureInstallPresenceAction(kind) {
+  if (kind === "craftChair") return "craft_install_chair";
+  if (kind === "craftDesk") return "craft_install_desk";
+  if (kind === "craftHouse") return "craft_install_house";
+  return "";
+}
+
+export function parseCraftFurnitureInstallPresenceAction(action) {
+  if (action === "craft_install_chair") return "craftChair";
+  if (action === "craft_install_desk") return "craftDesk";
+  if (action === "craft_install_house") return "craftHouse";
+  return "";
+}
+
+export function getCraftFurnitureInstallStatusText(kind) {
+  const label = getCraftFurnitureKindShortLabel(kind);
+  if (!label || label === "\uAC00\uAD6C") return "";
+  return label + " \uC124\uCE58\uC911...";
 }
 
 function craftFurnitureIdentityGroupKey(entry) {
