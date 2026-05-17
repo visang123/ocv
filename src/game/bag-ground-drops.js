@@ -102,6 +102,13 @@ export function getBagDropGroundVisual(itemKey) {
   return DROP_VISUALS[itemKey] || null;
 }
 
+/** 월드 바닥 스택 개수 라벨 — 배지가 아이콘을 가리지 않도록 짧게 */
+export function formatWorldBagDropCountLabel(count) {
+  const n = Math.max(1, Math.floor(Number(count) || 0));
+  if (n > 99) return "99+";
+  return String(n);
+}
+
 export function createWorldBagDropId() {
   return (
     "bag-drop-" +

@@ -479,17 +479,24 @@ body::-webkit-scrollbar {
   right: -2px;
   bottom: -2px;
   min-width: 0;
+  max-width: 12px;
   padding: 0 1px;
-  border-radius: 2px;
-  background: rgba(8, 12, 18, 0.88);
+  border-radius: 1px;
+  background: rgba(8, 12, 18, 0.92);
   border: 0.5px solid #000;
   color: #fff;
-  font-size: 4px;
+  /* 브라우저 최소 글자 크기(≈10px) 우회 — scale로 아이콘(8px)보다 작게 */
+  font-size: 10px;
   font-weight: 800;
-  line-height: 5px;
+  line-height: 10px;
+  letter-spacing: -0.3px;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
   pointer-events: none;
   z-index: 2;
+  transform: scale(0.38);
+  transform-origin: 100% 100%;
 }
 
 .bag-drop-icon--apple {
@@ -2702,6 +2709,8 @@ body::-webkit-scrollbar {
   border-radius: 999px;
   user-select: none;
   pointer-events: none;
+  /* JS depth sync 전 fallback — 식물 스프라이트(#sprout z-index:3)보다 위 */
+  z-index: 5;
 }
 
 .plant-growth-meter-fill {

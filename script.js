@@ -355,7 +355,9 @@ import {
 import { createSyncDebugHelpers } from "./src/multiplayer/syncDebug.js";
 import {
   shouldApplyIncomingRemoteState,
-  getRemoteStatusText
+  getRemoteStatusText,
+  getRemotePlayerIdentityKey,
+  pruneDuplicateRemotePlayerSessions
 } from "./src/multiplayer/presence.js";
 import {
   countActiveRemotePlayers,
@@ -435,6 +437,7 @@ import {
   canDiscardBagItemKey,
   createWorldBagDropId,
   findNearestWorldBagDropPickup,
+  formatWorldBagDropCountLabel,
   getBagDropGroundVisual,
   getBagDropStackKey,
   getWorldBagDropZIndex,
@@ -579,6 +582,8 @@ const TUTORIAL_ONBOARDING_ROCK_ID = "tutorial-onboarding-rock-v1";
 /** tutorial.html: ???? ????????? ??????????????????? ???????(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
 let tutorialMainSeedRespawnTimerId = null;
+/** setTimeout ??: ?? ????? due ??? ?? ?? ? ?? ??? */
+let tutorialMainSeedRespawnDueAt = 0;
 /** ???????????????????? ????????? ??????????????? ?????(?????????). */
 let tutorialMainSeedRegenCompleted = false;
 let onboardingStep26OpenedSettingsWithEsc = false;
@@ -590,6 +595,10 @@ let heldBucketId = "";
 let heldExtraBucketMainX = 0;
 let heldExtraBucketMainY = 0;
 let heldExtraBucketMainIsFull = false;
+/** ?? ???? ?? ?? ? ?? ?? ?? ?? ??? ??(? ??? ??) */
+let mainBucketParkedX = 0;
+let mainBucketParkedY = 0;
+let mainBucketParkedIsFull = false;
 const plantRuntime = createPlantState();
 let lastPlantProximityBlockMessage = "";
 let plantProximityWarnUntil = 0;
@@ -764,6 +773,8 @@ function ovcApplyForceWorldHubBypassLoggedIn() {
 const guideBookClickPromptDismissedKey =
   guideBookClickPromptDismissedKeyBase + (currentUserId || "guest");
 let currentSessionId = "";
+/** Previous tab session id; broadcast leave after multiplayer reconnects. */
+let pendingPreviousSessionLeaveId = "";
 const currentUserScopedColorKey = currentUserId
   ? "ovcUserColorV1:" + currentUserId
   : "";
@@ -1884,15 +1895,24 @@ function ensureWorldLooseSeedShape() {
   normalizeWorldLooseSeedRecord(appleState.worldLooseSeed);
 }
 
-function isWorldLooseSeedVisibleAt(now) {
-  if (!usesWorldLooseSeedMode()) return false;
-  ensureWorldLooseSeedShape();
-  return isWorldLooseSpawnReady(now, appleState.worldLooseSeed.nextSpawnAt);
+/** ? ?? ?????????? ?? ??(?? ???) ?? */
+function getWorldLooseSeedClockNow() {
+  return getSynchronizedNow();
 }
 
-function syncWorldLoosePickupLock(now) {
+function isWorldLooseSeedVisibleAt() {
+  if (!usesWorldLooseSeedMode()) return false;
+  ensureWorldLooseSeedShape();
+  return isWorldLooseSpawnReady(
+    getWorldLooseSeedClockNow(),
+    appleState.worldLooseSeed.nextSpawnAt
+  );
+}
+
+function syncWorldLoosePickupLock() {
   if (!usesWorldLooseSeedMode()) return;
   ensureWorldLooseSeedShape();
+  const now = getWorldLooseSeedClockNow();
   worldLoosePickupLockUntil = reconcileWorldLoosePickupLock(
     appleState.worldLooseSeed,
     worldLoosePickupLockUntil,
@@ -2071,16 +2091,36 @@ function claimAccountSessionTabOwnership() {
   currentSessionId = newSessionId;
   sessionStorage.setItem(currentSessionKey, currentSessionId);
 
-  if (
-    previousSessionId &&
-    previousSessionId !== currentSessionId &&
-    window.OVCOnline &&
-    typeof window.OVCOnline.removePresence === "function"
-  ) {
-    Promise.resolve(window.OVCOnline.removePresence(previousSessionId)).catch(function () {
-      // Best effort cleanup for hard refreshes.
-    });
+  if (previousSessionId && previousSessionId !== currentSessionId) {
+    pendingPreviousSessionLeaveId = previousSessionId;
+    if (
+      window.OVCOnline &&
+      typeof window.OVCOnline.removePresence === "function"
+    ) {
+      Promise.resolve(window.OVCOnline.removePresence(previousSessionId)).catch(function () {
+        // Best effort cleanup for hard refreshes.
+      });
+    }
   }
+}
+
+function sendPendingPreviousSessionLeaveBroadcast() {
+  const previousSessionId = pendingPreviousSessionLeaveId;
+  if (!previousSessionId || !multiplayerChannel) return;
+  pendingPreviousSessionLeaveId = "";
+  Promise.resolve(multiplayerChannel.send({
+    type: "broadcast",
+    event: "player_state",
+    payload: {
+      id: previousSessionId,
+      userId: currentUserId,
+      name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+      action: "leave",
+      updatedAt: Date.now()
+    }
+  })).catch(function () {
+    // Best effort; DB row was already removed on tab claim.
+  });
 }
 
 function onAccountSessionLeaderStorageEvent(event) {
@@ -3686,17 +3726,32 @@ function clearTutorialMainSeedRespawnTimer() {
     window.clearTimeout(tutorialMainSeedRespawnTimerId);
     tutorialMainSeedRespawnTimerId = null;
   }
+  tutorialMainSeedRespawnDueAt = 0;
 }
 
 function scheduleTutorialMainSeedRespawnFromGround() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   clearTutorialMainSeedRespawnTimer();
+  tutorialMainSeedRespawnDueAt = Date.now() + TUTORIAL_MAIN_SEED_RESPAWN_MS;
   tutorialMainSeedRespawnTimerId = window.setTimeout(function () {
     tutorialMainSeedRespawnTimerId = null;
+    tutorialMainSeedRespawnDueAt = 0;
     if (getStoredFlag(onboardingFlowDoneKey)) return;
     if (plantRuntime.isSeedPlanted) return;
     tutorialRespawnMainSeedOnGround();
   }, TUTORIAL_MAIN_SEED_RESPAWN_MS);
+}
+
+function tickTutorialMainSeedRespawnDue() {
+  if (!tutorialMainSeedRespawnDueAt || getStoredFlag(onboardingFlowDoneKey)) {
+    tutorialMainSeedRespawnDueAt = 0;
+    return;
+  }
+  if (Date.now() < tutorialMainSeedRespawnDueAt) return;
+  tutorialMainSeedRespawnDueAt = 0;
+  clearTutorialMainSeedRespawnTimer();
+  if (plantRuntime.isSeedPlanted) return;
+  tutorialRespawnMainSeedOnGround();
 }
 
 function hasTutorialStarterSeedInPlay() {
@@ -3841,6 +3896,18 @@ function getMainBucketGroundState() {
       isFull: Boolean(heldExtraBucketMainIsFull)
     };
   }
+  if (isHoldingMainBucket()) {
+    const bucketSize = getBucketSize();
+    return {
+      x: Number.isFinite(mainBucketParkedX)
+        ? mainBucketParkedX
+        : wellX - bucketSize.width - 8,
+      y: Number.isFinite(mainBucketParkedY)
+        ? mainBucketParkedY
+        : wellY + WELL_SIZE - bucketSize.height,
+      isFull: Boolean(mainBucketParkedIsFull)
+    };
+  }
   return {
     x: bucketX,
     y: bucketY,
@@ -3860,7 +3927,13 @@ function getNearestGroundBucketPickInfo() {
   let best = null;
   let bestDist = Infinity;
   if (isMainBucketOnGroundForPickup()) {
-    const mainDist = getCenterDistance(bucketX, bucketY, bucketSize.width, bucketSize.height);
+    const mainGround = getMainBucketGroundState();
+    const mainDist = getCenterDistance(
+      mainGround.x,
+      mainGround.y,
+      bucketSize.width,
+      bucketSize.height
+    );
     if (mainDist < bestDist) {
       bestDist = mainDist;
       best = { type: "main", distance: mainDist };
@@ -4304,6 +4377,7 @@ function onboardingClearEscHintTimer() {
 
 function onboardingClearAllOnboardingTimers() {
   onboardingClearEscHintTimer();
+  clearTutorialMainSeedRespawnTimer();
   if (onboardingCongratsTimerId) {
     window.clearTimeout(onboardingCongratsTimerId);
     onboardingCongratsTimerId = null;
@@ -5470,6 +5544,9 @@ function applyDefaultState(options) {
   heldExtraBucketMainX = 0;
   heldExtraBucketMainY = 0;
   heldExtraBucketMainIsFull = false;
+  mainBucketParkedX = 0;
+  mainBucketParkedY = 0;
+  mainBucketParkedIsFull = false;
   plantingInventorySeedId = null;
 
   plantRuntime.spotX = 0;
@@ -5609,6 +5686,9 @@ function applyDefaultState(options) {
   heldExtraBucketMainX = 0;
   heldExtraBucketMainY = 0;
   heldExtraBucketMainIsFull = false;
+  mainBucketParkedX = 0;
+  mainBucketParkedY = 0;
+  mainBucketParkedIsFull = false;
   bucketX = wellX - BUCKET_SIZE - 8;
   bucketY = wellY + WELL_SIZE - BUCKET_SIZE;
 
@@ -5901,8 +5981,14 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
         extra._el.remove();
         extra._el = null;
       }
+      mainBucketParkedX = 0;
+      mainBucketParkedY = 0;
+      mainBucketParkedIsFull = false;
     }
   } else {
+    mainBucketParkedX = bucketX;
+    mainBucketParkedY = bucketY;
+    mainBucketParkedIsFull = Boolean(isBucketFull);
     heldExtraBucketMainX = 0;
     heldExtraBucketMainY = 0;
     heldExtraBucketMainIsFull = false;
@@ -6967,11 +7053,30 @@ function getGroundBucketZIndex(worldY) {
   return Math.min(18, Math.max(4, 4 + Math.floor(y / 28)));
 }
 
+/** ?? ??? ???? ?? ???? ?? ??? ?? ???? ?? ??? ?? ?? */
+function isWorldExtraBucketOverlappingSharedMain(entry) {
+  if (!entry || isMainBucketHeldByRemotePlayer() || isHoldingMainBucket()) return false;
+  if (isHoldingExtraBucket() && String(entry.id) === String(heldBucketId || "")) return false;
+  const main = getMainBucketGroundState();
+  const bucketSz = getBucketSize();
+  const ex = Number(entry.x) || 0;
+  const ey = Number(entry.y) || 0;
+  const mx = Number(main.x) || 0;
+  const my = Number(main.y) || 0;
+  return (
+    Math.abs(ex - mx) < bucketSz.width * 0.75 &&
+    Math.abs(ey - my) < bucketSz.height * 0.75
+  );
+}
+
 function updateWorldExtraBuckets() {
   if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldExtraBuckets)) return;
   const bucketSz = getBucketSize();
   appleState.worldExtraBuckets.forEach(function (entry) {
     if (!entry || !entry._el) return;
+    const overlapsMain = isWorldExtraBucketOverlappingSharedMain(entry);
+    entry._el.style.display = overlapsMain ? "none" : "block";
+    if (overlapsMain) return;
     setWorldSize(entry._el, bucketSz.width, bucketSz.height);
     setWorldPosition(entry._el, entry.x, entry.y);
     entry._el.style.zIndex = String(getGroundBucketZIndex(entry.y));
@@ -7049,7 +7154,7 @@ function buildWorldBagDropElement(drop, stackIndex) {
   if (count > 1) {
     const countEl = document.createElement("span");
     countEl.className = "world-bag-drop__count";
-    countEl.textContent = String(count);
+    countEl.textContent = formatWorldBagDropCountLabel(count);
     stack.appendChild(countEl);
   }
 
@@ -7088,7 +7193,7 @@ function updateWorldBagDropDom(forceRebuild) {
       const count = Math.max(1, Math.floor(Number(drop.count) || 0));
       if (count > 1) {
         if (countEl) {
-          countEl.textContent = String(count);
+          countEl.textContent = formatWorldBagDropCountLabel(count);
         } else {
           const inner = drop._el.querySelector(".world-bag-drop__inner");
           const mount =
@@ -7096,7 +7201,7 @@ function updateWorldBagDropDom(forceRebuild) {
           if (mount) {
             const next = document.createElement("span");
             next.className = "world-bag-drop__count";
-            next.textContent = String(count);
+            next.textContent = formatWorldBagDropCountLabel(count);
             mount.appendChild(next);
           }
         }
@@ -7835,9 +7940,13 @@ function applyWorldExtraBucketsFromSharedSnapshot(raw) {
       }
     }
   );
-  appleState.worldExtraBuckets = Object.keys(mergedById).map(function (id) {
-    return mergedById[id];
-  });
+  appleState.worldExtraBuckets = Object.keys(mergedById)
+    .map(function (id) {
+      return mergedById[id];
+    })
+    .filter(function (entry) {
+      return !isWorldExtraBucketOverlappingSharedMain(entry);
+    });
 }
 
 /** ???? ????: ?? ????????? ????????? ???????? ????? ????? */
@@ -8089,6 +8198,9 @@ function loadBucketState() {
     heldExtraBucketMainX = 0;
     heldExtraBucketMainY = 0;
     heldExtraBucketMainIsFull = false;
+    mainBucketParkedX = 0;
+    mainBucketParkedY = 0;
+    mainBucketParkedIsFull = false;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
   } catch (error) {
     removeStoredValue(bucketStateKey);
@@ -9419,6 +9531,9 @@ function dropBucket() {
     heldExtraBucketMainY = 0;
     isBucketFull = Boolean(heldExtraBucketMainIsFull);
     heldExtraBucketMainIsFull = false;
+    mainBucketParkedX = 0;
+    mainBucketParkedY = 0;
+    mainBucketParkedIsFull = false;
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     broadcastBucketState(true);
     rebuildWorldExtraBucketDom();
@@ -9438,6 +9553,9 @@ function dropBucket() {
   heldExtraBucketMainX = 0;
   heldExtraBucketMainY = 0;
   heldExtraBucketMainIsFull = false;
+  mainBucketParkedX = 0;
+  mainBucketParkedY = 0;
+  mainBucketParkedIsFull = false;
   window.OVC_SHARED_BUCKET_HELD_BY = "";
   broadcastBucketState(true);
   saveBucketState();
@@ -9454,6 +9572,7 @@ function onboardingShouldKeepWorldMainSeedVisible() {
 }
 
 function updateSeedPosition() {
+  tickTutorialMainSeedRespawnDue();
   updateSeedDryState();
   recoverWorldMainSeedIfOnboardingStuck();
   if (!plantRuntime.isSeedPlanted && !plantRuntime.isPlanting) {
@@ -9567,7 +9686,7 @@ function updateExtraSeedsAndPlants() {
 
   if (usesWorldLooseSeedMode()) {
     ensureWorldLooseSeedShape();
-    syncWorldLoosePickupLock(now);
+    syncWorldLoosePickupLock();
     if (!worldLooseSeedElement) {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
@@ -9576,7 +9695,7 @@ function updateExtraSeedsAndPlants() {
       setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
       ground.appendChild(worldLooseSeedElement);
     }
-    const vis = isWorldLooseSeedVisibleAt(now);
+    const vis = isWorldLooseSeedVisibleAt();
     if (vis) {
       if (worldLooseSeedElement.style.display !== "block") {
         worldLooseSeedElement.style.display = "block";
@@ -10195,11 +10314,7 @@ function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl, growthMeterEl)
   if (spotEl) spotEl.style.zIndex = String(z);
   if (sproutEl) sproutEl.style.zIndex = String(z + 1);
   if (growthMeterEl) {
-    if (isCactusMaturePlant(plant)) {
-      growthMeterEl.style.zIndex = String(z + 2);
-    } else {
-      growthMeterEl.style.zIndex = "";
-    }
+    growthMeterEl.style.zIndex = String(z + 2);
   }
 }
 
@@ -11275,7 +11390,7 @@ function updateBagInventorySlots() {
   updateBookStorageSlot();
   const counts = getBagInventoryCountsByKey();
   const seedCount = Number(counts.seed || 0);
-  const looseVisible = usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt(Date.now());
+  const looseVisible = usesWorldLooseSeedMode() && isWorldLooseSeedVisibleAt();
   if (usesWorldLooseSeedMode() && seedCount <= 0 && !looseVisible) {
     hasShownFirstSeedFocus = false;
   }
@@ -11539,10 +11654,10 @@ function updateBucketPosition() {
     remotePlayer.element.classList.remove("is-carrying-bucket", "is-carrying-bucket-full");
     const holdsMain = String(window.OVC_SHARED_BUCKET_HELD_BY || "") === remoteId;
     const extraHold = remotePlayerHeldBucketById[remoteId];
-    if (holdsMain || extraHold) {
+    // ?? ???? ?? #bucket ??? ? ??? ??? ? ::after ?? ?? ??
+    if (extraHold && !holdsMain) {
       remotePlayer.element.classList.add("is-carrying-bucket");
-      const carryFull = holdsMain ? Boolean(isBucketFull) : Boolean(extraHold.isFull);
-      if (carryFull) {
+      if (Boolean(extraHold.isFull)) {
         remotePlayer.element.classList.add("is-carrying-bucket-full");
       }
     }
@@ -11554,22 +11669,23 @@ function updateBucketPosition() {
 
     bucketX = handPosition.x;
     bucketY = handPosition.y;
-    if (isHoldingMainBucket() || isHoldingExtraBucket()) {
+    if (isHoldingMainBucket()) {
       markWorldDirty();
       broadcastBucketState(false);
       bucket.style.display = "none";
+    } else if (isHoldingExtraBucket()) {
+      const mainGround = getMainBucketGroundState();
+      bucket.src = mainGround.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
+      bucket.style.display = "block";
+      setWorldPosition(bucket, mainGround.x, mainGround.y);
+      bucket.style.zIndex = String(getGroundBucketZIndex(mainGround.y));
+      markWorldDirty();
+      broadcastBucketState(false);
     } else if (isBucketHeldByRemotePlayer) {
       syncMainBucketToRemoteHolderHand();
       bucket.src = isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
       bucket.style.display = "block";
       setWorldPosition(bucket, bucketX, bucketY);
-    } else {
-      const mainX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : wellX - bucketSize.width - 8;
-      const mainY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : wellY + WELL_SIZE - bucketSize.height;
-      const mainGround = getMainBucketGroundState();
-      bucket.src = mainGround.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
-      bucket.style.display = "block";
-      setWorldPosition(bucket, mainX, mainY);
     }
     playerBucketOverlay.style.display = "block";
   } else if (isBucketHeldByRemotePlayer) {
@@ -11602,8 +11718,10 @@ function updateBucketPosition() {
   }
 
   if (bucket.style.display === "block" && !isHoldingExtraBucket()) {
-    setWorldPosition(bucket, bucketX, bucketY);
-    bucket.style.zIndex = String(getGroundBucketZIndex(bucketY));
+    const mainGround = getMainBucketGroundState();
+    bucket.src = mainGround.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
+    setWorldPosition(bucket, mainGround.x, mainGround.y);
+    bucket.style.zIndex = String(getGroundBucketZIndex(mainGround.y));
     if (BUCKET_DEBUG_TRACE) {
       const mode =
         heldItem === HELD_ITEM_BUCKET
@@ -14313,10 +14431,9 @@ function getPlantProximityBlockMessage(plantX, plantY) {
   }
 
   let blockedByLooseSeed = false;
-  const nowLoose = Date.now();
   if (
     usesWorldLooseSeedMode() &&
-    isWorldLooseSeedVisibleAt(nowLoose) &&
+    isWorldLooseSeedVisibleAt() &&
     plantSpotOverlapsExpandedRect(
       plantX,
       plantY,
@@ -14515,10 +14632,9 @@ function getCraftFurniturePlacementBlockMessage(placement) {
   }
 
   let blockedByGroundSeed = false;
-  const nowLoose = Date.now();
   if (
     usesWorldLooseSeedMode() &&
-    isWorldLooseSeedVisibleAt(nowLoose) &&
+    isWorldLooseSeedVisibleAt() &&
     craftPlacementOverlapsExpandedRect(
       placement,
       appleState.worldLooseSeed.x,
@@ -17557,9 +17673,11 @@ function setupMultiplayer() {
         isMultiplayerSubscribed = true;
         clearMultiplayerReconnectTimeout();
         updateMultiplayerStatus("\uC5F0\uACB0\uB428");
+        sendPendingPreviousSessionLeaveBroadcast();
         setTimeout(function () {
           if (channel !== multiplayerChannel) return;
           sendMultiplayerPresence(true);
+          pruneDuplicateRemotePlayerSessions(remotePlayers, removeRemotePlayer);
         }, 600);
         return;
       }
@@ -17834,6 +17952,7 @@ function pollPresenceDatabase() {
   ).then(function (players) {
     const idsInDb = Object.create(null);
     const now = Date.now();
+    const freshestPresenceByIdentity = Object.create(null);
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
       // DB ??? ???(now)?????????presence.updatedAt??????? ???? ???????
@@ -17847,6 +17966,19 @@ function pollPresenceDatabase() {
         maybeApplyRemoteWaterSplashFromBroadcast(String(state.id), state);
         return;
       }
+      const identityKey = getRemotePlayerIdentityKey(state);
+      const prev = freshestPresenceByIdentity[identityKey];
+      if (!prev || presenceSeenAt >= prev.presenceSeenAt) {
+        freshestPresenceByIdentity[identityKey] = {
+          state: state,
+          presenceSeenAt: presenceSeenAt
+        };
+      }
+    });
+    Object.keys(freshestPresenceByIdentity).forEach(function (identityKey) {
+      const entry = freshestPresenceByIdentity[identityKey];
+      const state = entry && entry.state;
+      if (!state || !state.id) return;
       idsInDb[String(state.id)] = true;
       renderRemotePlayerState(state, "poll");
     });
@@ -18075,6 +18207,7 @@ function renderRemotePlayerState(state, source) {
     }
   }
   remotePlayer.lastSeenAt = Date.now();
+  pruneDuplicateRemotePlayerSessions(remotePlayers, removeRemotePlayer);
 }
 
 function getRemotePlayerBaseWorldY(remotePlayer) {
@@ -18288,11 +18421,16 @@ function pruneStaleRemotePlayers() {
 }
 
 function updateRemotePlayerCount() {
+  pruneDuplicateRemotePlayerSessions(remotePlayers, removeRemotePlayer);
   const seenUsers = Object.create(null);
   remotePlayerCount = Object.keys(remotePlayers).reduce(function (count, remoteId) {
     const remotePlayer = remotePlayers[remoteId];
     if (!remotePlayer) return count;
-    const userKey = remotePlayer.userId || ("name:" + (remotePlayer.name || remoteId));
+    const userKey = getRemotePlayerIdentityKey({
+      userId: remotePlayer.userId,
+      name: remotePlayer.name,
+      id: remoteId
+    });
     if (seenUsers[userKey]) return count;
     seenUsers[userKey] = true;
     return count + 1;

@@ -9,7 +9,8 @@ import {
 
 export const PLAYER_MAX_HEALTH = 100;
 export const PLAYER_APPLE_HEAL_AMOUNT = 15;
-export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 5000;
+export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 10000;
+export const PLAYER_HEALTH_DRAIN_AMOUNT = 5;
 export const PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS = 5000;
 export const PLAYER_HEALTH_RECHARGE_MS = 1000;
 export const PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC = 1;
@@ -377,7 +378,7 @@ export function tickPlayerHealthState(state, nowMs) {
     };
   }
   const ticks = Math.floor(elapsed / PLAYER_HEALTH_DRAIN_INTERVAL_MS);
-  const nextHealth = clampPlayerHealth(health - ticks);
+  const nextHealth = clampPlayerHealth(health - ticks * PLAYER_HEALTH_DRAIN_AMOUNT);
   const becameDepleted = isPlayerHealthDepleted(nextHealth) && !isPlayerHealthDepleted(health);
   return {
     health: nextHealth,
