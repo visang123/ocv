@@ -18,8 +18,8 @@ export const BAG_SLOT_ITEM_KEYS = [
 
 export const bagInventoryOrderKey = "ovcBagInventoryOrderV1";
 
-/** 가방 UI 슬롯 수(5×2, 책 제외) */
-export const BAG_INVENTORY_SLOT_COUNT = 10;
+/** 가방 UI 슬롯 수(책 보관 칸 제외) */
+export const BAG_INVENTORY_SLOT_COUNT = 9;
 
 /** 책 전용 보관 슬롯 수(가방 칸과 별도) */
 export const BAG_BOOK_STORAGE_SLOT_COUNT = 1;

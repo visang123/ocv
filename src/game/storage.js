@@ -709,7 +709,12 @@ export function saveAppleStateToStorage(config) {
               id: entry && entry.id != null ? String(entry.id) : "",
               kind: entry && entry.kind != null ? String(entry.kind) : "",
               x: Number(entry && entry.x) || 0,
-              y: Number(entry && entry.y) || 0
+              y: Number(entry && entry.y) || 0,
+              ownerUserId: entry && entry.ownerUserId != null ? String(entry.ownerUserId) : "",
+              ownerDisplayName:
+                entry && entry.ownerDisplayName != null ? String(entry.ownerDisplayName) : "",
+              furnitureOrdinal: Math.max(0, Math.floor(Number(entry && entry.furnitureOrdinal) || 0)),
+              placedAt: Number(entry && entry.placedAt) || 0
             };
           })
         : []

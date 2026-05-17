@@ -56,6 +56,65 @@ export function getCraftChairSeatWorldPoint(chair) {
   };
 }
 
+export function getCraftFurnitureKindShortLabel(kind) {
+  if (kind === "craftDesk") return "\uCC45\uC0C1";
+  if (kind === "craftChair") return "\uC758\uC790";
+  if (kind === "craftHouse") return "\uC9D1";
+  if (kind === "craftFence") return "\uC6B8\uD0C0\uB9AC";
+  return "\uAC00\uAD6C";
+}
+
+function craftFurnitureIdentityGroupKey(entry) {
+  const oid = String(entry.ownerUserId || "").trim();
+  const oname = String(entry.ownerDisplayName || "").trim();
+  return oid + "\0" + oname + "\0" + String(entry.kind || "");
+}
+
+function craftFurnitureOrdinalSortTime(entry) {
+  const placedAt = Number(entry.placedAt);
+  if (Number.isFinite(placedAt) && placedAt > 0) return placedAt;
+  const idMatch = String(entry.id || "").match(/(\d+)/);
+  return idMatch ? Number(idMatch[1]) : 0;
+}
+
+export function assignCraftFurnitureIdentity(entry, ownerUserId, ownerDisplayName) {
+  if (!entry) return;
+  entry.ownerUserId = String(ownerUserId || "").trim();
+  entry.ownerDisplayName = String(ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
+  entry.placedAt = Date.now();
+  entry.furnitureOrdinal = 0;
+}
+
+export function refreshCraftFurnitureIdentityOrdinals(list) {
+  if (!Array.isArray(list)) return;
+  list.forEach(function (entry) {
+    if (entry) entry.furnitureOrdinal = 0;
+  });
+  const groups = Object.create(null);
+  list.forEach(function (entry) {
+    if (!entry || !isCraftFurnitureKind(entry.kind)) return;
+    const k = craftFurnitureIdentityGroupKey(entry);
+    if (!groups[k]) groups[k] = [];
+    groups[k].push({ entry: entry, t: craftFurnitureOrdinalSortTime(entry) });
+  });
+  Object.keys(groups).forEach(function (k) {
+    groups[k].sort(function (a, b) {
+      return a.t - b.t;
+    });
+    groups[k].forEach(function (item, index) {
+      item.entry.furnitureOrdinal = index + 1;
+    });
+  });
+}
+
+export function getCraftFurnitureWorldLabel(entry) {
+  if (!entry || !isCraftFurnitureKind(entry.kind)) return "";
+  const name = String(entry.ownerDisplayName || "").trim() || "\uD50C\uB808\uC774\uC5B4";
+  const kindLabel = getCraftFurnitureKindShortLabel(entry.kind);
+  const ord = Math.max(0, Number(entry.furnitureOrdinal) || 0);
+  return name + "\uC758 " + kindLabel + (ord > 0 ? ord : "");
+}
+
 export function sanitizePlacedCraftFurniture(list) {
   if (!Array.isArray(list)) return [];
   return list
@@ -70,7 +129,11 @@ export function sanitizePlacedCraftFurniture(list) {
         x: Number(entry.x) || 0,
         y: Number(entry.y) || 0,
         width: spec.width,
-        height: spec.height
+        height: spec.height,
+        ownerUserId: entry.ownerUserId != null ? String(entry.ownerUserId) : "",
+        ownerDisplayName: entry.ownerDisplayName != null ? String(entry.ownerDisplayName) : "",
+        furnitureOrdinal: Math.max(0, Math.floor(Number(entry.furnitureOrdinal) || 0)),
+        placedAt: Number(entry.placedAt) || 0
       };
     })
     .filter(function (entry) {
@@ -84,23 +147,33 @@ export function serializePlacedCraftFurnitureForSnapshot(list) {
       id: entry.id,
       kind: entry.kind,
       x: entry.x,
-      y: entry.y
+      y: entry.y,
+      ownerUserId: entry.ownerUserId || "",
+      ownerDisplayName: entry.ownerDisplayName || "",
+      furnitureOrdinal: entry.furnitureOrdinal || 0,
+      placedAt: entry.placedAt || 0
     };
   });
 }
 
 export function parsePlacedCraftFurnitureFromSnapshot(raw) {
   if (!Array.isArray(raw)) return [];
-  return sanitizePlacedCraftFurniture(
+  const parsed = sanitizePlacedCraftFurniture(
     raw.map(function (entry) {
       return {
         id: entry && entry.id,
         kind: entry && entry.kind,
         x: entry && entry.x,
-        y: entry && entry.y
+        y: entry && entry.y,
+        ownerUserId: entry && entry.ownerUserId,
+        ownerDisplayName: entry && entry.ownerDisplayName,
+        furnitureOrdinal: entry && entry.furnitureOrdinal,
+        placedAt: entry && entry.placedAt
       };
     })
   );
+  refreshCraftFurnitureIdentityOrdinals(parsed);
+  return parsed;
 }
 
 export function computeCraftFurniturePlacement(kind, centerX, footY) {

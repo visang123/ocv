@@ -72,7 +72,22 @@ export const PLAYER_HEIGHT = 50;
 /** Seated pose — shorter silhouette aligned to craft chair seat. */
 export const PLAYER_SIT_WIDTH = 26;
 export const PLAYER_SIT_HEIGHT = 33;
-export const PLAYER_SIT_IMAGE_SRC = "\uC774\uBBF8\uC9C0/player-sit-white.svg?v=20260517a";
+const IMAGE_DIR = "\uC774\uBBF8\uC9C0";
+
+export const PLAYER_BASE_IMAGE_SRC = IMAGE_DIR + "/player-white.png";
+export const PLAYER_SIT_IMAGE_SRC = IMAGE_DIR + "/player-sit-white.svg?v=20260517a";
+export const IMG_BUCKET_EMPTY = IMAGE_DIR + "/bucket-empty.png";
+export const IMG_BUCKET_FULL = IMAGE_DIR + "/bucket-full.png";
+export const IMG_SEED = IMAGE_DIR + "/seed.png";
+export const IMG_SEED_DRY = IMAGE_DIR + "/seed-dry.png";
+export const IMG_SOIL_ROTTEN = IMAGE_DIR + "/soil-rotten.png";
+export const IMG_SOIL_WET = IMAGE_DIR + "/soil-wet.png";
+export const IMG_SOIL_DRY = IMAGE_DIR + "/soil-dry.png";
+export const IMG_TILLED_SOIL = IMAGE_DIR + "/tilled-soil.png";
+export const IMG_SPROUT = IMAGE_DIR + "/sprout.png";
+export const IMG_WATER_NEEDED = IMAGE_DIR + "/water-needed.png";
+export const IMG_WELL = IMAGE_DIR + "/well.png";
+export const IMG_WELL_EMPTY = IMAGE_DIR + "/well-empty.png";
 export const SEED_SIZE = 10;
 export const BUCKET_SIZE = 16;
 export const WELL_SIZE = 38;

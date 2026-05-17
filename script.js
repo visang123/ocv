@@ -50,7 +50,20 @@ import {
   PLAYER_HEIGHT,
   PLAYER_SIT_WIDTH,
   PLAYER_SIT_HEIGHT,
+  PLAYER_BASE_IMAGE_SRC,
   PLAYER_SIT_IMAGE_SRC,
+  IMG_BUCKET_EMPTY,
+  IMG_BUCKET_FULL,
+  IMG_SEED,
+  IMG_SEED_DRY,
+  IMG_SOIL_ROTTEN,
+  IMG_SOIL_WET,
+  IMG_SOIL_DRY,
+  IMG_TILLED_SOIL,
+  IMG_SPROUT,
+  IMG_WATER_NEEDED,
+  IMG_WELL,
+  IMG_WELL_EMPTY,
   SEED_SIZE,
   BUCKET_SIZE,
   WELL_SIZE,
@@ -403,7 +416,7 @@ import {
   getBagItemDescriptor as getBagItemDescriptorCore,
   canBagInventoryFitItems,
   BAG_INVENTORY_SLOT_COUNT
-} from "./src/game/bag-inventory.js?v=20260517b";
+} from "./src/game/bag-inventory.js?v=20260517c";
 import {
   BAG_DROP_WORLD_SIZE,
   BAG_DROP_FOOT_OFFSET_Y,
@@ -462,7 +475,10 @@ import {
   getCraftFurnitureWorldSpec,
   computeCraftFurniturePlacement,
   serializePlacedCraftFurnitureForSnapshot,
-  parsePlacedCraftFurnitureFromSnapshot
+  parsePlacedCraftFurnitureFromSnapshot,
+  assignCraftFurnitureIdentity,
+  refreshCraftFurnitureIdentityOrdinals,
+  getCraftFurnitureWorldLabel
 } from "./src/game/craft-furniture-world.js";
 import {
   PLAYER_MAX_HEALTH,
@@ -978,6 +994,10 @@ if (bagInventoryItemOrder.some(function (key) { return key === "book"; })) {
   bagInventoryItemOrder = bagInventoryItemOrder.filter(function (key) {
     return key !== "book";
   });
+  saveBagInventoryOrder();
+}
+if (bagInventoryItemOrder.length > BAG_INVENTORY_SLOT_COUNT) {
+  bagInventoryItemOrder = bagInventoryItemOrder.slice(0, BAG_INVENTORY_SLOT_COUNT);
   saveBagInventoryOrder();
 }
 
@@ -1755,7 +1775,7 @@ playerSitBaseImage.addEventListener("load", function () {
     syncLocalPlayerPoseVisual();
   }
 });
-playerBaseImage.src = "??????/player-white.png";
+playerBaseImage.src = PLAYER_BASE_IMAGE_SRC;
 playerSitBaseImage.src = PLAYER_SIT_IMAGE_SRC;
 if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
   playerBaseImageReady = true;
@@ -3061,13 +3081,16 @@ const playerHealthGaugeFill = document.createElement("div");
 playerHealthGaugeFill.className = "player-health-gauge-fill";
 playerHealthGaugeTrack.appendChild(playerHealthGaugeFill);
 playerHealthGaugeEl.appendChild(playerHealthGaugeTrack);
+const playerHealthCluster = document.createElement("div");
+playerHealthCluster.className = "player-health-cluster";
 const playerHealthHeartBtn = document.createElement("button");
 playerHealthHeartBtn.type = "button";
 playerHealthHeartBtn.className = "player-health-heart-toggle";
 playerHealthHeartBtn.setAttribute("aria-label", "\uCCB4\uB825 \uAC8C\uC774\uC9C0 \uD45C\uC2DC");
 playerHealthHeartBtn.textContent = "\u2665";
-playerHealthRoot.appendChild(playerHealthGaugeEl);
-playerHealthRoot.appendChild(playerHealthHeartBtn);
+playerHealthCluster.appendChild(playerHealthGaugeEl);
+playerHealthCluster.appendChild(playerHealthHeartBtn);
+playerHealthRoot.appendChild(playerHealthCluster);
 playerHealthHeartBtn.addEventListener("click", function (event) {
   event.preventDefault();
   event.stopPropagation();
@@ -3168,17 +3191,17 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong></div>' +
+  '<div class="controls-header"><strong>??????</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / ↑</span><p>위로 이동</p></div>' +
-  '<div><span>A / ←</span><p>왼쪽으로 이동</p></div>' +
-  '<div><span>S / ↓</span><p>아래로 이동</p></div>' +
-  '<div><span>D / →</span><p>오른쪽으로 이동</p></div>' +
-  '<div><span>Space</span><p>점프</p></div>' +
-  '<div><span>E</span><p>줄기 / 내려놓기</p></div>' +
-  '<div><span>Q</span><p>사용 / 대화</p></div>' +
-  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
-  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
+  '<div><span>W / ???</span><p>????? ???</p></div>' +
+  '<div><span>A / ???</span><p>????????? ???</p></div>' +
+  '<div><span>S / ???</span><p>???????? ???</p></div>' +
+  '<div><span>D / ???</span><p>?????????? ???</p></div>' +
+  '<div><span>Space</span><p>????</p></div>' +
+  '<div><span>E</span><p>??? / ????????</p></div>' +
+  '<div><span>Q</span><p>?????? / ??????</p></div>' +
+  '<div><span>???????? ???</span><p>?????? / ?????</p></div>' +
+  '<div><span>Esc</span><p>????? ???? / ????</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -6136,7 +6159,9 @@ function useCraftFurnitureFromBag(kind) {
     width: placement.width,
     height: placement.height
   };
+  assignCraftFurnitureIdentity(entry, getPlanterOwnerId(), getPlanterDisplayName());
   placedCraftFurniture.push(entry);
+  refreshCraftFurnitureIdentityOrdinals(placedCraftFurniture);
 
   if (isWorldDocumentEntry() && ground) {
     const spec = getCraftFurnitureWorldSpec(kind);
@@ -6683,7 +6708,7 @@ function rebuildWorldExtraBucketDom() {
     const el = document.createElement("img");
     el.className = "world-extra-bucket";
     el.dataset.bucketId = entry.id;
-    el.src = entry.isFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+    el.src = entry.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
     el.alt = "";
     el.setAttribute("aria-hidden", "true");
     el.draggable = false;
@@ -6711,7 +6736,7 @@ function updateWorldExtraBuckets() {
     setWorldSize(entry._el, bucketSz.width, bucketSz.height);
     setWorldPosition(entry._el, entry.x, entry.y);
     entry._el.style.zIndex = String(getGroundBucketZIndex(entry.y));
-    entry._el.src = entry.isFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+    entry._el.src = entry.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
   });
 }
 
@@ -7532,7 +7557,7 @@ function spawnWorldBucketBelowTradeMaster() {
   const el = document.createElement("img");
   el.className = "world-extra-bucket";
   el.dataset.bucketId = entry.id;
-  el.src = "??????/bucket-empty.png";
+  el.src = IMG_BUCKET_EMPTY;
   el.alt = "";
   el.setAttribute("aria-hidden", "true");
   el.draggable = false;
@@ -8713,6 +8738,7 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
           const snapFurniture = snapApples.placedCraftFurniture;
           if (Array.isArray(snapFurniture)) {
             placedCraftFurniture = parsePlacedCraftFurnitureFromSnapshot(snapFurniture);
+            rebuildPlacedCraftFurnitureDom();
           }
         }
         if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
@@ -9150,7 +9176,7 @@ function updateSeedPosition() {
   if (!showMainSeedSprite) {
     isHoveringMainSeed = false;
   }
-  seed.src = plantRuntime.isSeedDry ? "??????/seed-dry.png" : "??????/seed.png";
+  seed.src = plantRuntime.isSeedDry ? IMG_SEED_DRY : IMG_SEED;
 
   if (heldItem === HELD_ITEM_SEED && plantRuntime.isSeedDry) {
     heldItem = null;
@@ -9207,7 +9233,7 @@ function updateExtraSeedsAndPlants() {
       worldLooseSeedElement = document.createElement("img");
       worldLooseSeedElement.className = "extra-seed world-loose-seed";
       worldLooseSeedElement.alt = "world loose seed";
-      worldLooseSeedElement.src = "??????/seed.png";
+      worldLooseSeedElement.src = IMG_SEED;
       setWorldSize(worldLooseSeedElement, SEED_SIZE, SEED_SIZE);
       ground.appendChild(worldLooseSeedElement);
     }
@@ -9273,7 +9299,7 @@ function updateExtraSeedsAndPlants() {
   appleState.extraSeeds.forEach(function (extraSeed) {
     ensureExtraSeedElement(extraSeed);
     const isDry = isExtraSeedDry(extraSeed, now);
-    extraSeed.element.src = isDry ? "??????/seed-dry.png" : "??????/seed.png";
+    extraSeed.element.src = isDry ? IMG_SEED_DRY : IMG_SEED;
     const hideGroundOverlap = shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed);
     extraSeed.element.style.display =
       extraSeed.planted || extraSeed.inInventory || hideGroundOverlap ? "none" : "block";
@@ -9934,6 +9960,48 @@ function pickPlantForProximityHover() {
   return best;
 }
 
+const CRAFT_FURNITURE_HOVER_KINDS = ["craftChair", "craftDesk", "craftHouse", "craftFence"];
+
+function getCraftFurnitureHoverRectWorld(entry) {
+  const pad = 2;
+  return worldRectFromXYWH(
+    entry.x - pad,
+    entry.y - pad,
+    entry.width + pad * 2,
+    entry.height + pad * 2
+  );
+}
+
+function getCraftFurnitureDepthSortY(entry) {
+  return Number(entry.y) + Number(entry.height);
+}
+
+/** ?????? ?????(??/??/??/????) ????? ?????? ???? */
+function pickCraftFurnitureHoverTarget(clientX, clientY) {
+  if (!isWorldDocumentEntry()) return null;
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  if (!pxy) return null;
+  const matches = [];
+  placedCraftFurniture.forEach(function (entry) {
+    if (!entry || CRAFT_FURNITURE_HOVER_KINDS.indexOf(entry.kind) < 0) return;
+    const rect = getCraftFurnitureHoverRectWorld(entry);
+    if (!isWorldPointInsideRect(pxy.x, pxy.y, rect)) return;
+    const cx = entry.x + entry.width / 2;
+    const cy = entry.y + entry.height / 2;
+    matches.push({
+      entry: entry,
+      depthY: getCraftFurnitureDepthSortY(entry),
+      d: Math.hypot(pxy.x - cx, pxy.y - cy)
+    });
+  });
+  if (!matches.length) return null;
+  matches.sort(function (a, b) {
+    if (a.depthY !== b.depthY) return a.depthY - b.depthY;
+    return a.d - b.d;
+  });
+  return matches[0];
+}
+
 /** ????????? ?????, ?????????? ???? */
 function pickPlantHoverTarget(clientX, clientY) {
   const pointerPlant = pickPlantForHoverFromPointerClient(clientX, clientY);
@@ -10179,6 +10247,20 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
     if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
     showWorldNpcHoverLabel(npcHover.name, npcHover.anchorEl);
     return;
+  }
+
+  const craftFurnitureHover = pickCraftFurnitureHoverTarget(clientX, clientY);
+  if (craftFurnitureHover && craftFurnitureHover.entry) {
+    const craftEntry = craftFurnitureHover.entry;
+    const craftAnchor = craftEntry._el;
+    const craftLabel = getCraftFurnitureWorldLabel(craftEntry);
+    if (craftAnchor && craftAnchor.isConnected && craftLabel) {
+      if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
+      currentPlantHoverTarget = null;
+      clearPlantHoverVisuals();
+      showWorldNpcHoverLabel(craftLabel, craftAnchor);
+      return;
+    }
   }
 
   if (
@@ -10571,10 +10653,10 @@ function updateExtraPlantWaterLevel(plant, now) {
 }
 
 function getPlantSoilSrc(plant) {
-  if (plant.status === "rotten" || plant.isOverwatered) return "??????/soil-rotten.png";
-  if (plant.status === "wet") return "??????/soil-wet.png";
-  if (plant.status === "dry") return "??????/soil-dry.png";
-  return "??????/tilled-soil.png";
+  if (plant.status === "rotten" || plant.isOverwatered) return IMG_SOIL_ROTTEN;
+  if (plant.status === "wet") return IMG_SOIL_WET;
+  if (plant.status === "dry") return IMG_SOIL_DRY;
+  return IMG_TILLED_SOIL;
 }
 
 function getBagInventorySeedCount() {
@@ -10968,7 +11050,7 @@ function ensureExtraSeedElement(extraSeed) {
   const element = document.createElement("img");
   element.className = "extra-seed";
   element.alt = "extra seed";
-  element.src = "??????/seed.png";
+  element.src = IMG_SEED;
   setWorldSize(element, SEED_SIZE);
   ground.appendChild(element);
   extraSeed.element = element;
@@ -11002,21 +11084,21 @@ function ensureExtraPlantElements(plant) {
   const spotElement = document.createElement("img");
   spotElement.className = "extra-plant-spot";
   spotElement.alt = "extra plant spot";
-  spotElement.src = "??????/tilled-soil.png";
+  spotElement.src = IMG_TILLED_SOIL;
   setWorldSize(spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   ground.appendChild(spotElement);
 
   const sproutElement = document.createElement("img");
   sproutElement.className = "extra-sprout";
   sproutElement.alt = "extra sprout";
-  sproutElement.src = "??????/sprout.png";
+  sproutElement.src = IMG_SPROUT;
   setWorldSize(sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
   ground.appendChild(sproutElement);
 
   const waterNeededElement = document.createElement("img");
   waterNeededElement.className = "extra-water-needed";
   waterNeededElement.alt = "water needed";
-  waterNeededElement.src = "??????/water-needed.png";
+  waterNeededElement.src = IMG_WATER_NEEDED;
   setWorldSize(waterNeededElement, WATER_NEEDED_SIZE);
   ground.appendChild(waterNeededElement);
 
@@ -11099,9 +11181,9 @@ function pruneGroundExtraSeedsShadowedByPlants(extraSeeds, extraPlants) {
 }
 
 function updateBucketPosition() {
-  bucket.src = isBucketFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+  bucket.src = isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
   playerBucketOverlay.style.backgroundImage =
-    'url("' + (isBucketFull ? "??????/bucket-full.png" : "??????/bucket-empty.png") + '")';
+    'url("' + (isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY) + '")';
   const isBucketHeldByRemotePlayer = isMainBucketHeldByRemotePlayer();
   if (isBucketHeldByRemotePlayer) {
     const holderId = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
@@ -11139,14 +11221,14 @@ function updateBucketPosition() {
       bucket.style.display = "none";
     } else if (isBucketHeldByRemotePlayer) {
       syncMainBucketToRemoteHolderHand();
-      bucket.src = isBucketFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+      bucket.src = isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
       bucket.style.display = "block";
       setWorldPosition(bucket, bucketX, bucketY);
     } else {
       const mainX = Number.isFinite(heldExtraBucketMainX) ? heldExtraBucketMainX : wellX - bucketSize.width - 8;
       const mainY = Number.isFinite(heldExtraBucketMainY) ? heldExtraBucketMainY : wellY + WELL_SIZE - bucketSize.height;
       const mainGround = getMainBucketGroundState();
-      bucket.src = mainGround.isFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+      bucket.src = mainGround.isFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
       bucket.style.display = "block";
       setWorldPosition(bucket, mainX, mainY);
     }
@@ -11159,7 +11241,7 @@ function updateBucketPosition() {
         bucketY = wellY + WELL_SIZE - bucketSize.height;
       }
     }
-    bucket.src = isBucketFull ? "??????/bucket-full.png" : "??????/bucket-empty.png";
+    bucket.src = isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
     bucket.style.display = "block";
     playerBucketOverlay.style.display = "none";
   } else {
@@ -14832,13 +14914,13 @@ function updatePlantState() {
   const mainSoilRotten = plantRuntime.status === "rotten" || plantRuntime.isOverwatered;
 
   if (mainSoilRotten) {
-    plantSpot.src = "??????/soil-rotten.png";
+    plantSpot.src = IMG_SOIL_ROTTEN;
   } else if (plantRuntime.status === "wet") {
-    plantSpot.src = "??????/soil-wet.png";
+    plantSpot.src = IMG_SOIL_WET;
   } else if (plantRuntime.status === "dry") {
-    plantSpot.src = "??????/soil-dry.png";
+    plantSpot.src = IMG_SOIL_DRY;
   } else {
-    plantSpot.src = "??????/tilled-soil.png";
+    plantSpot.src = IMG_TILLED_SOIL;
   }
 
   if (mainSoilRotten) {
@@ -15283,13 +15365,13 @@ function refillWellIfNeeded() {
 }
 
 function updateWellImage() {
-  well.src = wellState.water > 0 ? "??????/well.png" : "??????/well-empty.png";
+  well.src = wellState.water > 0 ? IMG_WELL : IMG_WELL_EMPTY;
 }
 
 function updateWellCard() {
   const isVisible = isNearWellForCard();
   const waterRatio = wellState.water / maxWellWater;
-  const wellImage = wellState.water > 0 ? "??????/well.png" : "??????/well-empty.png";
+  const wellImage = wellState.water > 0 ? IMG_WELL : IMG_WELL_EMPTY;
 
   wellCard.style.display = isVisible ? "flex" : "none";
   wellCardImage.src = wellImage;
@@ -15968,7 +16050,7 @@ function syncLocalPlayerVisibility() {
     player.classList.remove("is-hidden-before-spawn");
     player.style.display = "block";
     if (!player.getAttribute("src")) {
-      player.src = "??????/player-white.png";
+      player.src = PLAYER_BASE_IMAGE_SRC;
     }
     return;
   }
