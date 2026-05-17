@@ -8525,9 +8525,6 @@ function pollWorldState(forcePoll) {
     );
   }).finally(function () {
     isWorldPolling = false;
-    if (isWorldServerSyncAvailable()) {
-      hasHydratedSharedWorldFromServer = true;
-    }
     ovcTryDismissLoadingScreen(false);
   });
 }
@@ -18452,3 +18449,4 @@ window.addEventListener("load", function () {
   ovcTryDismissLoadingScreen(false);
 });
 gameLoop();
+

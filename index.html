@@ -490,7 +490,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260517f"></script>
+  <script type="module" src="src/main.js?v=20260517l"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {
@@ -502,15 +502,15 @@
       }
       if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () {
-          window.setTimeout(ovcDismissLoadingFailsafe, 10000);
+          window.setTimeout(ovcDismissLoadingFailsafe, 4000);
         });
       } else {
-        window.setTimeout(ovcDismissLoadingFailsafe, 10000);
+        window.setTimeout(ovcDismissLoadingFailsafe, 4000);
       }
-      window.setTimeout(ovcDismissLoadingFailsafe, 15000);
-      window.setTimeout(ovcDismissLoadingFailsafe, 20000);
+      window.setTimeout(ovcDismissLoadingFailsafe, 8000);
+      window.setTimeout(ovcDismissLoadingFailsafe, 12000);
       window.addEventListener("load", function () {
-        window.setTimeout(ovcDismissLoadingFailsafe, 12000);
+        window.setTimeout(ovcDismissLoadingFailsafe, 5000);
       });
     })();
   </script>

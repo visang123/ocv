@@ -631,15 +631,3 @@ function confirmSelectedTrade() {
   host.saveAppleState();
   host.markWorldDirty();
 }
-Key, recipe);
-  Object.keys(recipe.outputs).forEach(function (key) {
-    host.addBagItems(key, Number(recipe.outputs[key] || 0));
-  });
-  selectedRecipeId = null;
-  renderTradeCounter();
-  renderTradeOffers();
-  updateTradeConfirmButton();
-  host.updateBagInventorySlots();
-  host.saveAppleState();
-  host.markWorldDirty();
-}
