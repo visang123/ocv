@@ -465,7 +465,30 @@ let onboardingPostAppleSeedIntroPhase = 0;
 let onboardingFruitIntroTimerId = null;
 /** 16단계: 0 = 축하 문구, 1 = 이어서 안내(저장 스텝은 계속 16) */
 let onboardingPostWaterCongratsPhase = 0;
-const ONBOARDING_MAX_STEP = 27;
+/** 17단계: 0 = 식물지수 설명 1, 1 = 안개 설명 2 */
+let onboardingPlantIndexIntroPhase = 0;
+let onboardingPlantIndexIntroTimerId = null;
+let onboardingTutorialRockMounted = false;
+const ONBOARDING_MAX_STEP = 34;
+const ONBOARDING_STEP_PLANT_INDEX = 17;
+const ONBOARDING_STEP_DROP_BUCKET = 18;
+const ONBOARDING_STEP_CHAT = 19;
+const ONBOARDING_STEP_HEART = 20;
+const ONBOARDING_STEP_SAD = 21;
+const ONBOARDING_STEP_ROCK = 22;
+const ONBOARDING_STEP_BUTTERFLY = 23;
+const ONBOARDING_STEP_TRADE_MASTER = 24;
+const ONBOARDING_STEP_ALCHEMY_MASTER = 25;
+const ONBOARDING_STEP_ZOOM_INTRO = 26;
+const ONBOARDING_STEP_ZOOM_MIN = 27;
+const ONBOARDING_STEP_TREE_APPROACH = 28;
+const ONBOARDING_STEP_TREE_CLIMB = 29;
+const ONBOARDING_STEP_PICK_APPLE = 30;
+const ONBOARDING_STEP_EAT_APPLE = 31;
+const ONBOARDING_STEP_EXTRA_SEED = 32;
+const ONBOARDING_STEP_SETTINGS_ESC = 33;
+const ONBOARDING_STEP_COMPLETE = 34;
+const TUTORIAL_ONBOARDING_ROCK_ID = "tutorial-onboarding-rock-v1";
 /** tutorial.html: 땅의 튜토리얼 씨앗이 사라진 뒤 다시 놓기까지(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
 let tutorialMainSeedRespawnTimerId = null;
@@ -490,6 +513,8 @@ let isNpcDialogueComplete = false;
 let isGuidePlantPageUnlocked = false;
 let guidePageIndex = 0;
 let npcPromptHideTimeout = null;
+let plantMasterDialogueTimeoutIds = [];
+let plantMasterDialogueGeneration = 0;
 let hasShownFirstSeedFocus = false;
 let hasHandledDryMainSeed = false;
 let isMainSeedAvailable = true;
@@ -1015,6 +1040,12 @@ function isWorldRockPickupUnlocked() {
 }
 
 function isTradeMasterVisible() {
+  if (
+    isMainGameTutorialInProgress() &&
+    onboardingFlowStep === ONBOARDING_STEP_TRADE_MASTER
+  ) {
+    return true;
+  }
   if (!isWorldDocumentEntry()) return false;
   return (
     getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= PLANT_FOG_TRADE_MASTER_MIN_STAGE
@@ -1022,6 +1053,12 @@ function isTradeMasterVisible() {
 }
 
 function isAlchemyMasterVisible() {
+  if (
+    isMainGameTutorialInProgress() &&
+    onboardingFlowStep === ONBOARDING_STEP_ALCHEMY_MASTER
+  ) {
+    return true;
+  }
   if (!isWorldDocumentEntry()) return false;
   return (
     getPlantFogWorldStageFromScore(getTotalPlantIndexScore()) >= PLANT_FOG_ALCHEMY_MASTER_MIN_STAGE
@@ -1039,13 +1076,18 @@ function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) {
 }
 
 function syncWorldPlantFogVisuals() {
-  if (!isWorldDocumentEntry()) {
+  const tutorialPlantIndexFog =
+    isMainGameTutorialInProgress() &&
+    onboardingFlowStep === ONBOARDING_STEP_PLANT_INDEX;
+  if (!isWorldDocumentEntry() && !tutorialPlantIndexFog) {
     if (worldPlantFog) worldPlantFog.style.display = "none";
     if (worldSkyFog) worldSkyFog.style.display = "none";
     if (world) world.style.filter = "";
     return;
   }
-  const stage = getPlantFogWorldStageFromScore(getTotalPlantIndexScore());
+  const stage = tutorialPlantIndexFog
+    ? 2
+    : getPlantFogWorldStageFromScore(getTotalPlantIndexScore());
   if (world) {
     if (stage >= 5) world.style.filter = "";
     else if (stage === 4) world.style.filter = "brightness(0.94)";
@@ -1156,7 +1198,15 @@ function syncWorldPlantFogVisuals() {
   }
 }
 
+function areButterfliesUnlockedForTutorialOnboarding() {
+  return (
+    isMainGameTutorialInProgress() &&
+    onboardingFlowStep === ONBOARDING_STEP_BUTTERFLY
+  );
+}
+
 function areButterfliesUnlockedForPlantFogWorld() {
+  if (areButterfliesUnlockedForTutorialOnboarding()) return true;
   return isWorldDocumentEntry() && getTotalPlantIndexScore() >= PLANT_FOG_BUTTERFLY_MIN_SCORE;
 }
 
@@ -1330,6 +1380,9 @@ const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const REMOTE_PLAYER_SMOOTHING_MS = 130;
 const REMOTE_PLAYER_SNAP_DISTANCE = 42;
 const REMOTE_PLAYER_SNAP_EPSILON = 0.04;
+/** 점프 중 player_state를 더 자주 보내 원격 캐릭터 궤적이 끊기지 않게 함 */
+const REMOTE_PLAYER_JUMP_BROADCAST_MIN_MS = 50;
+const REMOTE_PLAYER_AIRBORNE_JUMP_Y = 0.06;
 const MAX_SNAPSHOT_CLOCK_SKEW_MS = 60000;
 const SYNC_EVENT_DEDUPE_TTL_MS = 120000;
 const SYNC_EVENT_DEDUPE_MAX = 4000;
@@ -2211,10 +2264,18 @@ document.addEventListener("keydown", function (event) {
     }
     // 거래·제작 NPC를 식물의 달인보다 먼저 처리하고, 근처에서 Q는 항상 소비(다른 Q 동작으로 넘어가지 않음).
     if (isTradeMasterVisible() && isNearTradeMaster()) {
+      if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_TRADE_MASTER) {
+        flashOnboardingOrderHint("");
+        return;
+      }
       tryTalkToTradeMaster();
       return;
     }
     if (isAlchemyMasterVisible() && isNearAlchemyMaster()) {
+      if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_ALCHEMY_MASTER) {
+        flashOnboardingOrderHint("");
+        return;
+      }
       tryTalkToAlchemyMaster();
       return;
     }
@@ -2274,7 +2335,7 @@ document.addEventListener("keydown", function (event) {
     }
     if (hasSpawnedCharacter && !isCharacterSelecting) {
       event.preventDefault();
-      if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 26) {
+      if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_SETTINGS_ESC) {
         onboardingStep26OpenedSettingsWithEsc = true;
       }
       openSettingsOverlay();
@@ -2336,7 +2397,7 @@ window.addEventListener(
   function (event) {
     event.preventDefault();
 
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 19) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_ZOOM_INTRO) {
       return;
     }
 
@@ -2348,15 +2409,15 @@ window.addEventListener(
     zoomLevel = clampZoom(zoomLevel + direction * zoomStep);
     updateCamera();
     if (!getStoredFlag(onboardingFlowDoneKey)) {
-      if (onboardingFlowStep === 19) {
-        onboardingFlowStep = 20;
+      if (onboardingFlowStep === ONBOARDING_STEP_ZOOM_INTRO) {
+        onboardingFlowStep = ONBOARDING_STEP_ZOOM_MIN;
         persistOnboardingStep();
         updateOnboardingFlowUI();
       } else if (
-        onboardingFlowStep === 20 &&
+        onboardingFlowStep === ONBOARDING_STEP_ZOOM_MIN &&
         zoomLevel <= getFitZoom() + 0.06
       ) {
-        onboardingFlowStep = 21;
+        onboardingFlowStep = ONBOARDING_STEP_TREE_APPROACH;
         persistOnboardingStep();
         updateOnboardingFlowUI();
       }
@@ -2588,7 +2649,8 @@ bindTradeMaster({
   },
   isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning,
   isAlchemyCraftOpen: isAlchemyCraftOpen,
-  closeAlchemyCraftPanel: closeAlchemyCraftPanel
+  closeAlchemyCraftPanel: closeAlchemyCraftPanel,
+  onFirstDialogueComplete: advanceOnboardingAfterTradeMasterDialogue
 });
 
 bindAlchemyMaster({
@@ -2638,7 +2700,8 @@ bindAlchemyMaster({
   },
   isTradeMasterDialogueRunning: isTradeMasterDialogueRunning,
   isTradeExchangeOpen: isTradeExchangeOpen,
-  closeTradeExchangePanel: closeTradeExchangePanel
+  closeTradeExchangePanel: closeTradeExchangePanel,
+  onFirstDialogueComplete: advanceOnboardingAfterTradeMasterDialogue
 });
 
 signBoard.addEventListener("click", function () {
@@ -2907,8 +2970,12 @@ function closeSettingsOverlayFromEscape() {
   const hadEscOpenCycle = onboardingStep26OpenedSettingsWithEsc;
   setSettingsOverlayOpen(settingsOverlay, false);
   updateSettingsTutorialButtons();
-  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 26 && hadEscOpenCycle) {
-    onboardingFlowStep = 27;
+  if (
+    !getStoredFlag(onboardingFlowDoneKey) &&
+    onboardingFlowStep === ONBOARDING_STEP_SETTINGS_ESC &&
+    hadEscOpenCycle
+  ) {
+    onboardingFlowStep = ONBOARDING_STEP_COMPLETE;
     onboardingStep26OpenedSettingsWithEsc = false;
     persistOnboardingStep();
     updateOnboardingFlowUI();
@@ -2923,6 +2990,7 @@ function skipTutorialFromSettings() {
     return;
   }
   clearTutorialMainSeedRespawnTimer();
+  abortPlantMasterDialogue();
   try {
     sessionStorage.removeItem(ovcTutorialReplaySessionKey);
   } catch (eReplay) {}
@@ -3372,7 +3440,7 @@ function syncMainBucketToRemoteHolderHand() {
   const bucketSize = getBucketSize();
   const hand = getHandPositionFromPlayerPose(
     Number(remotePlayer.renderX ?? remotePlayer.targetX ?? remotePlayer.worldX ?? 0),
-    Number(remotePlayer.renderY ?? remotePlayer.targetY ?? remotePlayer.worldY ?? 0),
+    getRemotePlayerWorldY(remotePlayer),
     bucketSize.width,
     bucketSize.height
   );
@@ -3571,6 +3639,8 @@ function clearOnboardingHighlights() {
     guideCard,
     seed,
     plantMaster,
+    tradeMaster,
+    alchemyMaster,
     player,
     well,
     bucket,
@@ -3579,6 +3649,11 @@ function clearOnboardingHighlights() {
   ].forEach(function (el) {
     if (el) el.classList.remove("onboarding-highlight");
   });
+  const plantGauge = document.getElementById("plant-progress-gauge");
+  if (plantGauge) plantGauge.classList.remove("onboarding-highlight");
+  if (worldChatToggleBtn) worldChatToggleBtn.classList.remove("onboarding-highlight");
+  if (worldHeartBtn) worldHeartBtn.classList.remove("onboarding-highlight");
+  if (worldSadBtn) worldSadBtn.classList.remove("onboarding-highlight");
   treeAppleElements.forEach(function (el) {
     el.classList.remove("onboarding-highlight");
   });
@@ -3660,7 +3735,7 @@ function requestAccountTutorialDoneSync(options) {
  * 튜토리얼을 한 번이라도 끝낸 계정은 로컬에 완료 상태가 남아야 한다(리로드·탭 종료·로그아웃/로그인 후에도 월드).
  * done 플래그만 유실된 경우 저장 스텝으로 복구한다.
  * - "0": 정상 완료/건너뛰기 등의 값
- * - 27(ONBOARDING_MAX_STEP): 축하 단계 직후·7초 타이머가 done을 쓰기 전에 리로드된 경우
+ * - 34(ONBOARDING_MAX_STEP): 축하 단계 직후·7초 타이머가 done을 쓰기 전에 리로드된 경우
  */
 function repairOnboardingCompletionFromStoredStep() {
   if (!currentUserId) return;
@@ -3708,6 +3783,7 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
 
 function resetTutorialProgressInStorage() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
+  abortPlantMasterDialogue();
   clearTutorialMainSeedRespawnTimer();
   setOnboardingFlowDoneStored(false);
   setStoredValue(onboardingFlowStepKey, "1");
@@ -3717,8 +3793,14 @@ function resetTutorialProgressInStorage() {
   removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
   setStoredFlag(npcDialogueCompleteKey, false);
+  setStoredFlag(tradeMasterDialogueCompleteKey, false);
+  setStoredFlag(alchemyMasterDialogueCompleteKey, false);
+  hydrateTradeMasterDialogueComplete(false);
+  hydrateAlchemyMasterDialogueComplete(false);
   setStoredFlag(guidePlantPageUnlockedKey, false);
   setStoredFlag(guideBookClickPromptDismissedKey, false);
+  isNpcDialogueComplete = false;
+  isGuidePlantPageUnlocked = false;
   clearMainSeedPickedForCurrentRoom();
   tutorialWorldNeedsFullReset = true;
 }
@@ -3845,6 +3927,207 @@ function onboardingClearAllOnboardingTimers() {
     window.clearTimeout(onboardingFruitIntroTimerId);
     onboardingFruitIntroTimerId = null;
   }
+  if (onboardingPlantIndexIntroTimerId) {
+    window.clearTimeout(onboardingPlantIndexIntroTimerId);
+    onboardingPlantIndexIntroTimerId = null;
+  }
+}
+
+/** v1(최대 27단계) → v2(34단계) 저장 스텝 이전 */
+function migrateLegacyOnboardingFlowStep(raw) {
+  const n = Math.floor(Number(raw) || 0);
+  if (n <= 16) return n;
+  if (n >= 17 && n <= 27) {
+    const map = {
+      17: ONBOARDING_STEP_DROP_BUCKET,
+      18: ONBOARDING_STEP_BUTTERFLY,
+      19: ONBOARDING_STEP_ZOOM_INTRO,
+      20: ONBOARDING_STEP_ZOOM_MIN,
+      21: ONBOARDING_STEP_TREE_APPROACH,
+      22: ONBOARDING_STEP_TREE_CLIMB,
+      23: ONBOARDING_STEP_PICK_APPLE,
+      24: ONBOARDING_STEP_EAT_APPLE,
+      25: ONBOARDING_STEP_EXTRA_SEED,
+      26: ONBOARDING_STEP_SETTINGS_ESC,
+      27: ONBOARDING_STEP_COMPLETE
+    };
+    return map[n] || n;
+  }
+  return n;
+}
+
+function isOnboardingSocialTutorialStep() {
+  return (
+    isOnboardingLinearGateActive() &&
+    onboardingFlowStep >= ONBOARDING_STEP_CHAT &&
+    onboardingFlowStep <= ONBOARDING_STEP_SAD
+  );
+}
+
+function isOnboardingSocialDemoReady() {
+  return isOnboardingSocialTutorialStep() || isWorldSocialRealtimeReady();
+}
+
+function onboardingClearPlantIndexIntroTimer() {
+  if (onboardingPlantIndexIntroTimerId) {
+    window.clearTimeout(onboardingPlantIndexIntroTimerId);
+    onboardingPlantIndexIntroTimerId = null;
+  }
+}
+
+function startOnboardingPlantIndexIntro() {
+  onboardingClearPlantIndexIntroTimer();
+  onboardingPlantIndexIntroPhase = 0;
+  const gauge = document.getElementById("plant-progress-gauge");
+  if (gauge) {
+    gauge.classList.remove("is-collapsed");
+    const toggle = document.getElementById("plant-progress-sprout-toggle");
+    if (toggle) toggle.setAttribute("aria-expanded", "true");
+  }
+  syncWorldPlantFogVisuals();
+  updatePlantProgressGauge();
+  updateOnboardingFlowUI();
+  onboardingPlantIndexIntroTimerId = window.setTimeout(function () {
+    onboardingPlantIndexIntroTimerId = null;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+      return;
+    }
+    onboardingPlantIndexIntroPhase = 1;
+    updateOnboardingFlowUI();
+    onboardingPlantIndexIntroTimerId = window.setTimeout(function () {
+      onboardingPlantIndexIntroTimerId = null;
+      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+        return;
+      }
+      onboardingPlantIndexIntroPhase = 0;
+      onboardingFlowStep = ONBOARDING_STEP_DROP_BUCKET;
+      persistOnboardingStep();
+      if (worldPlantFog) worldPlantFog.style.display = "none";
+      if (world) world.style.filter = "";
+      updateOnboardingFlowUI();
+    }, 4500);
+  }, 4500);
+}
+
+function showOnboardingSocialDemoChatBubble(text) {
+  const body = sanitizeWorldChatText(text);
+  if (!body) return;
+  localChatBubbleText = body;
+  localChatBubbleHideAt = Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS;
+  if (localChatBubbleTimer) {
+    window.clearTimeout(localChatBubbleTimer);
+  }
+  localChatBubbleTimer = window.setTimeout(function () {
+    localChatBubbleTimer = null;
+    localChatBubbleText = "";
+    localChatBubbleHideAt = 0;
+    updatePlayerChatBubbleOverlay();
+  }, WORLD_CHAT_HEAD_BUBBLE_MS);
+  updatePlayerChatBubbleOverlay();
+}
+
+function advanceOnboardingAfterSocialChatSent() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_CHAT) return;
+  onboardingFlowStep = ONBOARDING_STEP_HEART;
+  persistOnboardingStep();
+  setWorldChatPanelOpen(false);
+  updateOnboardingFlowUI();
+}
+
+function advanceOnboardingAfterSocialHeart() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_HEART) return;
+  onboardingFlowStep = ONBOARDING_STEP_SAD;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function advanceOnboardingAfterSocialSad() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_SAD) return;
+  onboardingFlowStep = ONBOARDING_STEP_ROCK;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function advanceOnboardingAfterTradeMasterDialogue() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_TRADE_MASTER) {
+    return;
+  }
+  setStoredFlag(alchemyMasterDialogueCompleteKey, false);
+  hydrateAlchemyMasterDialogueComplete(false);
+  onboardingFlowStep = ONBOARDING_STEP_ALCHEMY_MASTER;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function advanceOnboardingAfterAlchemyMasterDialogue() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_ALCHEMY_MASTER) {
+    return;
+  }
+  onboardingFlowStep = ONBOARDING_STEP_ZOOM_INTRO;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function ensureTutorialOnboardingRock() {
+  if (!Array.isArray(appleState.worldRocks)) appleState.worldRocks = [];
+  if (!Array.isArray(appleState.worldRockPickedIds)) appleState.worldRockPickedIds = [];
+  const shouldShow =
+    isOnboardingLinearGateActive() && onboardingFlowStep === ONBOARDING_STEP_ROCK;
+  if (!shouldShow) {
+    if (onboardingTutorialRockMounted && ground) {
+      ground.querySelectorAll(".world-ground-rock[data-tutorial-rock='1']").forEach(function (node) {
+        node.remove();
+      });
+    }
+    onboardingTutorialRockMounted = false;
+    return;
+  }
+  let rock = appleState.worldRocks.find(function (r) {
+    return r && String(r.id) === TUTORIAL_ONBOARDING_ROCK_ID;
+  });
+  if (!rock) {
+    rock = {
+      id: TUTORIAL_ONBOARDING_ROCK_ID,
+      x: WELL_START_X + 52,
+      y: WELL_START_Y + 18,
+      size: WORLD_ROCK_SIZE
+    };
+    appleState.worldRocks.push(rock);
+  }
+  if (appleState.worldRockPickedIds.includes(TUTORIAL_ONBOARDING_ROCK_ID)) {
+    const idx = appleState.worldRockPickedIds.indexOf(TUTORIAL_ONBOARDING_ROCK_ID);
+    if (idx >= 0) appleState.worldRockPickedIds.splice(idx, 1);
+  }
+  if (!rock._el && ground) {
+    const insertBeforeEl =
+      localPlayerRoot && localPlayerRoot.parentNode === ground
+        ? localPlayerRoot
+        : player && player.parentNode === ground
+          ? player
+          : null;
+    const el = document.createElement("div");
+    el.className = "world-ground-rock";
+    el.dataset.rockId = rock.id;
+    el.dataset.tutorialRock = "1";
+    el.setAttribute("aria-hidden", "true");
+    if (insertBeforeEl) {
+      ground.insertBefore(el, insertBeforeEl);
+    } else {
+      ground.appendChild(el);
+    }
+    rock._el = el;
+    onboardingTutorialRockMounted = true;
+  }
+  updateWorldRocks();
+}
+
+function ensureTutorialOnboardingButterflies() {
+  if (!areButterfliesUnlockedForTutorialOnboarding()) return;
+  if (!hasSpawnedCharacter || !isButterflyAuthority()) return;
+  if (butterflyState.list.length > 0) return;
+  authorityFillToCapInstantly(Date.now());
+  hasSeededInitialButterflies = true;
+  lastButterflyStateChangeAt = Date.now();
 }
 
 function scheduleOnboardingGuideEscHintLine(expectedStep, applyFlag) {
@@ -4010,6 +4293,7 @@ function loadOnboardingFlowState() {
   onboardingNpcGuideEscHintShown = false;
   onboardingPostAppleSeedIntroPhase = 0;
   onboardingPostWaterCongratsPhase = 0;
+  onboardingPlantIndexIntroPhase = 0;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
   onboardingClearAllOnboardingTimers();
@@ -4031,11 +4315,17 @@ function loadOnboardingFlowState() {
     requestAccountTutorialDoneSync({ force: true });
     return;
   }
+  const normalizedRaw = migrateLegacyOnboardingFlowStep(raw);
   onboardingFlowStep =
-    Number.isFinite(raw) && raw >= 1 && raw <= ONBOARDING_MAX_STEP ? raw : 1;
+    Number.isFinite(normalizedRaw) && normalizedRaw >= 1 && normalizedRaw <= ONBOARDING_MAX_STEP
+      ? normalizedRaw
+      : 1;
   syncOnboardingFlowProgressFromWorld();
-  if (onboardingFlowStep === 25) {
+  if (onboardingFlowStep === ONBOARDING_STEP_EXTRA_SEED) {
     onboardingPostAppleSeedIntroPhase = 1;
+  }
+  if (onboardingFlowStep === ONBOARDING_STEP_PLANT_INDEX && !onboardingPlantIndexIntroTimerId) {
+    startOnboardingPlantIndexIntro();
   }
   if (
     onboardingFlowStep === 10 &&
@@ -4064,10 +4354,10 @@ function onboardingAutoAdvanceSteps() {
     persistOnboardingStep();
   }
   if (
-    onboardingFlowStep === 20 &&
+    onboardingFlowStep === ONBOARDING_STEP_ZOOM_MIN &&
     zoomLevel <= getFitZoom() + 0.06
   ) {
-    onboardingFlowStep = 21;
+    onboardingFlowStep = ONBOARDING_STEP_TREE_APPROACH;
     persistOnboardingStep();
   }
   if (onboardingFlowStep === 8 && isNearPlantMaster()) {
@@ -4078,31 +4368,35 @@ function onboardingAutoAdvanceSteps() {
     onboardingFlowStep = 12;
     persistOnboardingStep();
   }
-  if (onboardingFlowStep === 21 && isPlayerNearTutorialTreeArea()) {
-    onboardingFlowStep = 22;
+  if (onboardingFlowStep === ONBOARDING_STEP_TREE_APPROACH && isPlayerNearTutorialTreeArea()) {
+    onboardingFlowStep = ONBOARDING_STEP_TREE_CLIMB;
     persistOnboardingStep();
   }
-  if (onboardingFlowStep === 22 && isPlayerInTreeSpace()) {
+  if (onboardingFlowStep === ONBOARDING_STEP_TREE_CLIMB && isPlayerInTreeSpace()) {
     onboardingTutorialEnteredTree = true;
   }
   if (
-    onboardingFlowStep === 22 &&
+    onboardingFlowStep === ONBOARDING_STEP_TREE_CLIMB &&
     isPlayerInTreeSpace() &&
     isNearAnyUnpickedAppleTutorial()
   ) {
-    onboardingFlowStep = 23;
+    onboardingFlowStep = ONBOARDING_STEP_PICK_APPLE;
     persistOnboardingStep();
   }
   if (
-    onboardingFlowStep === 25 &&
+    onboardingFlowStep === ONBOARDING_STEP_EXTRA_SEED &&
     onboardingTutorialEnteredTree &&
     onboardingSeedTutorialSecondLine &&
     !isPlayerInTreeSpace()
   ) {
-    onboardingFlowStep = 26;
+    onboardingFlowStep = ONBOARDING_STEP_SETTINGS_ESC;
     onboardingStep26OpenedSettingsWithEsc = false;
     persistOnboardingStep();
   }
+
+  ensureTutorialOnboardingRock();
+  ensureTutorialOnboardingButterflies();
+  updateNpcPosition();
 }
 
 function updateOnboardingFlowUI() {
@@ -4272,16 +4566,68 @@ function updateOnboardingFlowUI() {
       );
       break;
     }
-    case 17: {
+    case ONBOARDING_STEP_PLANT_INDEX: {
+      const plantGauge = document.getElementById("plant-progress-gauge");
+      if (plantGauge) {
+        plantGauge.classList.remove("is-collapsed");
+        plantGauge.classList.add("onboarding-highlight");
+      }
+      setOnboardingCalloutVisible(
+        true,
+        onboardingPlantIndexIntroPhase === 0
+          ? "식물지수는 식물을 심으면 올라갑니다."
+          : "맵의 안개가 해제되니 잘 올려보세요!"
+      );
+      break;
+    }
+    case ONBOARDING_STEP_DROP_BUCKET: {
       setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
-    case 18: {
+    case ONBOARDING_STEP_CHAT: {
       setOnboardingCalloutVisible(
         true,
-        "날아다니는 나비에 근접하여 e,q로 잡으세요"
+        "💬 버튼을 눌러 채팅을 열고, 메시지를 입력한 뒤 전송해 보세요."
+      );
+      if (worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
+      if (worldChatPanelOpen && worldChatSendBtn) {
+        worldChatSendBtn.classList.add("onboarding-highlight");
+      }
+      break;
+    }
+    case ONBOARDING_STEP_HEART: {
+      setOnboardingCalloutVisible(
+        true,
+        "❤️ 버튼을 눌러 하트를 보내 보세요. 다른 플레이어에게 반응을 전할 수 있어요."
+      );
+      if (worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_SAD: {
+      setOnboardingCalloutVisible(
+        true,
+        "😢 버튼을 눌러 슬퍼요를 보내 보세요."
+      );
+      if (worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_ROCK: {
+      setOnboardingCalloutVisible(true, "땅의 돌에 가까이 가서 E키로 줍아 보세요.");
+      if (Array.isArray(appleState.worldRocks)) {
+        appleState.worldRocks.forEach(function (rock) {
+          if (rock && rock._el && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID) {
+            rock._el.classList.add("onboarding-highlight");
+          }
+        });
+      }
+      break;
+    }
+    case ONBOARDING_STEP_BUTTERFLY: {
+      setOnboardingCalloutVisible(
+        true,
+        "날아다니는 나비에 근접하여 E 또는 Q로 잡아 보세요."
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -4291,20 +4637,30 @@ function updateOnboardingFlowUI() {
       });
       break;
     }
-    case 19: {
+    case ONBOARDING_STEP_TRADE_MASTER: {
+      setOnboardingCalloutVisible(true, "거래의 달인에게 가서 Q키로 대화해 보세요.");
+      if (tradeMaster) tradeMaster.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_ALCHEMY_MASTER: {
+      setOnboardingCalloutVisible(true, "연금술의 달인에게 가서 Q키로 대화해 보세요.");
+      if (alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_ZOOM_INTRO: {
       setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
       break;
     }
-    case 20: {
+    case ONBOARDING_STEP_ZOOM_MIN: {
       setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
       break;
     }
-    case 21: {
+    case ONBOARDING_STEP_TREE_APPROACH: {
       setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
-    case 22: {
+    case ONBOARDING_STEP_TREE_CLIMB: {
       setOnboardingCalloutVisible(
         true,
         "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
@@ -4313,12 +4669,12 @@ function updateOnboardingFlowUI() {
       highlightUnpickedApplesForTutorial();
       break;
     }
-    case 23: {
+    case ONBOARDING_STEP_PICK_APPLE: {
       setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
       highlightUnpickedApplesForTutorial();
       break;
     }
-    case 24: {
+    case ONBOARDING_STEP_EAT_APPLE: {
       setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
@@ -4327,7 +4683,7 @@ function updateOnboardingFlowUI() {
       }
       break;
     }
-    case 25: {
+    case ONBOARDING_STEP_EXTRA_SEED: {
       const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
       const lineB = "나무밖으로 이동하세요.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
@@ -4344,14 +4700,14 @@ function updateOnboardingFlowUI() {
       }
       break;
     }
-    case 26: {
+    case ONBOARDING_STEP_SETTINGS_ESC: {
       setOnboardingCalloutVisible(
         true,
         "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
       );
       break;
     }
-    case 27: {
+    case ONBOARDING_STEP_COMPLETE: {
       setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
@@ -4391,9 +4747,9 @@ function onboardingHookWateredMainPlantFromTutorial() {
       onboardingCongratsTimerId = null;
       if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
       onboardingPostWaterCongratsPhase = 0;
-      onboardingFlowStep = 17;
+      onboardingFlowStep = ONBOARDING_STEP_PLANT_INDEX;
       persistOnboardingStep();
-      updateOnboardingFlowUI();
+      startOnboardingPlantIndexIntro();
     }, 2000);
   }, 1500);
   updateOnboardingFlowUI();
@@ -4407,8 +4763,17 @@ function onboardingHookFilledBucketAtWell() {
 }
 
 function onboardingHookDroppedBucketForTutorial() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 17) return;
-  onboardingFlowStep = 18;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_DROP_BUCKET) {
+    return;
+  }
+  onboardingFlowStep = ONBOARDING_STEP_CHAT;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function onboardingHookTutorialRockPicked() {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_ROCK) return;
+  onboardingFlowStep = ONBOARDING_STEP_BUTTERFLY;
   onboardingButterflyCountBaseline = getTotalCaughtButterflies();
   persistOnboardingStep();
   updateOnboardingFlowUI();
@@ -4581,6 +4946,7 @@ function applyDefaultState(options) {
   tutorialMainSeedRegenCompleted = false;
   const sharedWorldResetOnly =
     Boolean(options && options.sharedWorldResetOnly);
+  abortPlantMasterDialogue();
   if (sharedWorldResetOnly) {
     try {
       sessionStorage.removeItem("ovcTutorialWorldResetPending");
@@ -4685,6 +5051,8 @@ function applyDefaultState(options) {
     isNpcDialogueRunning = false;
     isNpcDialogueComplete = false;
     isGuidePlantPageUnlocked = false;
+    setStoredFlag(npcDialogueCompleteKey, false);
+    setStoredFlag(guidePlantPageUnlockedKey, false);
     guidePageIndex = 0;
   } else {
     hasGuideBook = false;
@@ -4934,6 +5302,12 @@ function startPlantMasterDialogue() {
   }, timelineMs + 250);
 }
 
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) {
+    abortPlantMasterDialogue();
+  }
+});
+
 function showDialogueLine(lineInfo) {
   npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
   playerBubble.style.display = lineInfo.speaker === "player" ? "block" : "none";
@@ -5051,7 +5425,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
     rockDist <= pickupDistance &&
     rockDist <= bucketDistance
   ) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -5103,7 +5477,7 @@ function pickUpNearestItemWorldHub(bucketDistance) {
       triggerFirstSeedFocus();
       return;
     }
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -5154,7 +5528,7 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     rockDist <= pickupDistance &&
     rockDist <= bucketDistance
   ) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_ROCK) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -5170,15 +5544,18 @@ function pickUpNearestItemTutorialFlow(seedSize, bucketDistance) {
     holdLocalAppleStateAgainstStaleSnapshot(1200);
     updateWorldRocks();
     updateBagInventorySlots();
-    broadcastWorldRockPickup(nearestRock.rock.id);
-    markWorldDirty();
-    syncWorldState(true);
-    sendMultiplayerPresence(true);
+    if (isWorldDocumentEntry()) {
+      broadcastWorldRockPickup(nearestRock.rock.id);
+      markWorldDirty();
+      syncWorldState(true);
+      sendMultiplayerPresence(true);
+    }
+    onboardingHookTutorialRockPicked();
     return;
   }
 
   if (nearest && extraDist <= pickupDistance && extraDist <= bucketDistance) {
-    if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+    if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -5283,8 +5660,10 @@ function getNearestPickableExtraSeed() {
 }
 
 function getNearestPickableWorldRock() {
-  if (!isWorldDocumentEntry()) return null;
-  if (!isWorldRockPickupUnlocked()) return null;
+  const tutorialRockStep =
+    isOnboardingLinearGateActive() && onboardingFlowStep === ONBOARDING_STEP_ROCK;
+  if (!isWorldDocumentEntry() && !tutorialRockStep) return null;
+  if (isWorldDocumentEntry() && !isWorldRockPickupUnlocked()) return null;
   if (!Array.isArray(appleState.worldRocks) || !Array.isArray(appleState.worldRockPickedIds)) {
     return null;
   }
@@ -5330,7 +5709,13 @@ function rebuildWorldRockDom() {
 }
 
 function updateWorldRocks() {
-  if (!isWorldDocumentEntry() || !Array.isArray(appleState.worldRocks)) return;
+  const tutorialRockDom =
+    isMainGameTutorialInProgress() &&
+    Array.isArray(appleState.worldRocks) &&
+    appleState.worldRocks.some(function (rock) {
+      return rock && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID && rock._el;
+    });
+  if ((!isWorldDocumentEntry() && !tutorialRockDom) || !Array.isArray(appleState.worldRocks)) return;
   appleState.worldRocks.forEach(function (rock) {
     if (!rock._el) return;
     const picked = appleState.worldRockPickedIds.includes(rock.id);
@@ -5394,7 +5779,7 @@ function useCraftFurnitureFromBag(kind) {
   if (!isCraftFurnitureKind(kind)) return;
   if ((Number(craftFurnitureCounts[kind]) || 0) <= 0) return;
 
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
     flashOnboardingOrderHint("");
     return;
   }
@@ -5461,7 +5846,7 @@ function useCraftFurnitureFromBag(kind) {
 }
 
 function pickApple() {
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 23) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_PICK_APPLE) {
     return false;
   }
   respawnApplesIfNeeded();
@@ -5482,8 +5867,8 @@ function pickApple() {
   appleState.count += 1;
   saveAppleState();
   updateApples();
-  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 23) {
-    onboardingFlowStep = 24;
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_PICK_APPLE) {
+    onboardingFlowStep = ONBOARDING_STEP_EAT_APPLE;
     persistOnboardingStep();
     updateOnboardingFlowUI();
   }
@@ -5530,7 +5915,7 @@ function updateApples() {
 
 function eatApple() {
   if (appleState.count <= 0 || appleState.isEating || plantRuntime.isPlanting || isNpcDialogueRunning) return;
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 24) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EAT_APPLE) {
     flashOnboardingOrderHint("");
     return;
   }
@@ -5547,8 +5932,8 @@ function eatApple() {
     sendMultiplayerPresence(true);
     playerStatus.textContent = "";
     createSeedFromApple();
-    if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 24) {
-      onboardingFlowStep = 25;
+    if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_EAT_APPLE) {
+      onboardingFlowStep = ONBOARDING_STEP_EXTRA_SEED;
       onboardingSeedTutorialSecondLine = false;
       onboardingPostAppleSeedIntroPhase = 0;
       persistOnboardingStep();
@@ -5557,7 +5942,9 @@ function eatApple() {
       }
       onboardingFruitIntroTimerId = window.setTimeout(function () {
         onboardingFruitIntroTimerId = null;
-        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 25) return;
+        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_EXTRA_SEED) {
+          return;
+        }
         onboardingPostAppleSeedIntroPhase = 1;
         updateOnboardingFlowUI();
       }, 2000);
@@ -5566,7 +5953,9 @@ function eatApple() {
       }
       onboardingTreeLeaveHintTimerId = window.setTimeout(function () {
         onboardingTreeLeaveHintTimerId = null;
-        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 25) return;
+        if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_EXTRA_SEED) {
+          return;
+        }
         onboardingSeedTutorialSecondLine = true;
         updateOnboardingFlowUI();
       }, 5000);
@@ -7462,7 +7851,7 @@ function pollWorldState(forcePoll) {
 
 function dropHeldItem() {
   if (isOnboardingLinearGateActive()) {
-    if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== 17) {
+    if (heldItem === HELD_ITEM_BUCKET && onboardingFlowStep !== ONBOARDING_STEP_DROP_BUCKET) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -7470,7 +7859,7 @@ function dropHeldItem() {
       flashOnboardingOrderHint("");
       return;
     }
-    if (isHeldExtraSeed(heldItem) && onboardingFlowStep < 25) {
+    if (isHeldExtraSeed(heldItem) && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -9965,7 +10354,7 @@ function startPlanting() {
 }
 
 function startPlantingExtraSeed() {
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
     flashOnboardingOrderHint("");
     return;
   }
@@ -10013,7 +10402,7 @@ function plantWorldSeedCount() {
     return;
   }
 
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
     flashOnboardingOrderHint("");
     updateSeedInventory();
     return;
@@ -10121,7 +10510,7 @@ function plantWorldOvergrowthSeedCount() {
     return;
   }
 
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 25) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
     flashOnboardingOrderHint("");
     updateSeedInventory();
     return;
@@ -10237,7 +10626,7 @@ function plantInventorySeed(seedId) {
       updateSeedInventory();
       return;
     }
-    if (!isStarter && onboardingFlowStep < 25) {
+    if (!isStarter && onboardingFlowStep < ONBOARDING_STEP_EXTRA_SEED) {
       flashOnboardingOrderHint("");
       updateSeedInventory();
       return;
@@ -10762,7 +11151,20 @@ function getPlayerDistanceToPlant(plant) {
 }
 
 function isPlayerNearPlantWorld(plant) {
-  return getPlayerDistanceToPlant(plant) <= plantWaterDistance;
+  return getPlayerDistanceToPlant(plant) < plantWaterDistance;
+}
+
+/** 급수 가능하지만 물주기 거리 밖인 가장 가까운 식물까지 거리(없으면 Infinity) */
+function getClosestWaterablePlantDistance() {
+  let best = Infinity;
+  function tryPlant(plant) {
+    if (!canWaterPlantByClick(plant)) return;
+    const distance = getPlayerDistanceToPlant(plant);
+    if (distance < best) best = distance;
+  }
+  if (plantRuntime.isSeedPlanted) tryPlant(plantRuntime);
+  appleState.extraPlants.forEach(tryPlant);
+  return best;
 }
 
 function tryConsumePlantWaterPourCooldown() {
@@ -11658,6 +12060,11 @@ function useBucket() {
 
 
   if (wateringTarget) {
+    if (!isPlayerNearPlantWorld(wateringTarget.plant)) {
+      flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+      updatePlayerStatus();
+      return;
+    }
     if (!tryConsumePlantWaterPourCooldown()) return;
     if (
       !getStoredFlag(onboardingFlowDoneKey) &&
@@ -11689,6 +12096,12 @@ function useBucket() {
     );
     updatePlayerStatus();
     return;
+  }
+
+  const closestWaterableDist = getClosestWaterablePlantDistance();
+  if (Number.isFinite(closestWaterableDist) && closestWaterableDist >= plantWaterDistance) {
+    flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+    updatePlayerStatus();
   }
 }
 
@@ -13369,6 +13782,10 @@ function setWorldChatPanelOpen(nextOpen) {
 }
 
 function toggleWorldChatPanel() {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_CHAT) {
+    flashOnboardingOrderHint("");
+    return;
+  }
   setWorldChatPanelOpen(!worldChatPanelOpen);
 }
 
@@ -13753,10 +14170,9 @@ function handleWorldHeartBroadcast(payload) {
   const depth = Number(payload.depth);
   const jy = Number(payload.jumpY);
   if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
-    const wy = -depth + jy;
-    setRemotePlayerVisualPosition(rp, px, wy);
+    setRemotePlayerVisualPosition(rp, px, -depth, jy);
     rp.worldX = px;
-    rp.worldY = wy;
+    rp.worldY = -depth + jy;
     rp.depth = depth;
     rp.jumpY = jy;
   }
@@ -13777,10 +14193,9 @@ function handleWorldSadBroadcast(payload) {
   const depth = Number(payload.depth);
   const jy = Number(payload.jumpY);
   if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
-    const wy = -depth + jy;
-    setRemotePlayerVisualPosition(rp, px, wy);
+    setRemotePlayerVisualPosition(rp, px, -depth, jy);
     rp.worldX = px;
-    rp.worldY = wy;
+    rp.worldY = -depth + jy;
     rp.depth = depth;
     rp.jumpY = jy;
   }
@@ -13839,14 +14254,17 @@ function spawnWorldSadFxNearBodyRect(rect) {
   const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
   const n = 9;
   const facesVariety = ["\uD83D\uDE2D", "\uD83D\uDE15", "\uD83E\uDD72", "\u2639\uFE0F"];
+  let sadLeadBit = null;
   for (let i = 0; i < n; i++) {
     const bit = document.createElement("span");
     bit.className = "ovc-heart-fx-bit";
     if (i === 0) {
       bit.classList.add("ovc-heart-fx-bit--sad-lead");
       bit.appendChild(createOvcSadFaceElement());
+      sadLeadBit = bit;
     } else {
       bit.textContent = facesVariety[(i - 1) % facesVariety.length];
+      root.appendChild(bit);
     }
     bit.style.fontSize = fontPx + "px";
     const dx = (Math.random() - 0.35) * spreadX;
@@ -13854,8 +14272,8 @@ function spawnWorldSadFxNearBodyRect(rect) {
     bit.style.setProperty("--ovc-hx", dx + "px");
     bit.style.setProperty("--ovc-hy", dy + "px");
     bit.style.animationDelay = i * 0.05 + "s";
-    root.appendChild(bit);
   }
+  if (sadLeadBit) root.appendChild(sadLeadBit);
   document.body.appendChild(root);
   window.setTimeout(function () {
     if (root.parentNode) root.parentNode.removeChild(root);
@@ -13883,15 +14301,17 @@ function pulseWorldSadButton() {
 }
 
 function updateWorldSocialChatUiEnabled() {
-  const ok = isWorldSocialRealtimeReady();
+  const ok = isOnboardingSocialDemoReady();
   if (worldChatInputEl) {
     worldChatInputEl.disabled = !ok;
     worldChatInputEl.placeholder = ok
-      ? "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADD3\uB9D0..."
+      ? isOnboardingSocialTutorialStep()
+        ? "\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD55C \uB4A4 \uC804\uC1A1"
+        : "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADD3\uB9D0..."
       : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
   }
   if (worldChatSendBtn) worldChatSendBtn.disabled = !ok;
-  if (worldChatUsersBtn) worldChatUsersBtn.disabled = !ok;
+  if (worldChatUsersBtn) worldChatUsersBtn.disabled = !isWorldSocialRealtimeReady();
   if (worldHeartBtn) worldHeartBtn.disabled = !ok;
   if (worldSadBtn) worldSadBtn.disabled = !ok;
 }
@@ -14010,6 +14430,11 @@ function sendWorldChatFromUi() {
   if (!parsed) return;
   const body = sanitizeWorldChatText(parsed.body);
   if (!body) return;
+  if (isOnboardingSocialTutorialStep() && onboardingFlowStep === ONBOARDING_STEP_CHAT) {
+    showOnboardingSocialDemoChatBubble(body);
+    advanceOnboardingAfterSocialChatSent();
+    return;
+  }
   if (!isWorldSocialRealtimeReady()) return;
   const senderName = nameForIngameUiDisplay(accountDisplayNameForUi());
   const basePayload = {
@@ -14045,21 +14470,35 @@ function sendWorldChatFromUi() {
 }
 
 function onWorldHeartClick() {
-  if (!isWorldSocialRealtimeReady()) return;
-  broadcastWorldHeart();
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_HEART) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+  if (!isOnboardingSocialDemoReady()) return;
+  if (isWorldSocialRealtimeReady()) {
+    broadcastWorldHeart();
+  }
   pulseWorldHeartButton();
   if (!player) return;
   const rect = player.getBoundingClientRect();
   spawnWorldHeartFxNearBodyRect(rect);
+  advanceOnboardingAfterSocialHeart();
 }
 
 function onWorldSadClick() {
-  if (!isWorldSocialRealtimeReady()) return;
-  broadcastWorldSad();
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_SAD) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+  if (!isOnboardingSocialDemoReady()) return;
+  if (isWorldSocialRealtimeReady()) {
+    broadcastWorldSad();
+  }
   pulseWorldSadButton();
   if (!player) return;
   const rect = player.getBoundingClientRect();
   spawnWorldSadFxNearBodyRect(rect);
+  advanceOnboardingAfterSocialSad();
 }
 
 function ensureWorldSocialUi() {
@@ -14391,6 +14830,10 @@ function sendMultiplayerPresence(forceSend) {
     Math.round(state.waterSplashAt || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
+  const broadcastMinMs =
+    jumpY < -REMOTE_PLAYER_AIRBORNE_JUMP_Y || !isOnGround
+      ? REMOTE_PLAYER_JUMP_BROADCAST_MIN_MS
+      : getMultiplayerBroadcastMinMs();
 
   // Broadcast is the primary multiplayer sync path. Keep a heartbeat so idle
   // players stay visible even when they are not moving.
@@ -14398,7 +14841,7 @@ function sendMultiplayerPresence(forceSend) {
     multiplayerChannel &&
     (
       forceSend ||
-      (hasChanged && now - lastBroadcastAt >= getMultiplayerBroadcastMinMs()) ||
+      (hasChanged && now - lastBroadcastAt >= broadcastMinMs) ||
       now - lastHeartbeatBroadcastAt >= getMultiplayerHeartbeatMs()
     )
   ) {
@@ -14694,8 +15137,14 @@ function renderRemotePlayerState(state, source) {
   }
   const remoteColor = state.color || "#7dd3fc";
   const nextX = Number(state.x) || 0;
-  const nextY = -(Number(state.depth) || 0) + (Number(state.jumpY) || 0);
-  const nextPositionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
+  const nextBaseY = -(Number(state.depth) || 0);
+  const nextJumpY = Number(state.jumpY) || 0;
+  const nextPositionKey =
+    Math.round(nextX * 10) +
+    "|" +
+    Math.round(nextBaseY * 10) +
+    "|" +
+    Math.round(nextJumpY * 10);
   const statusAction =
     typeof state.action === "string" &&
     state.action !== "" &&
@@ -14730,11 +15179,12 @@ function renderRemotePlayerState(state, source) {
   }
   remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
-  setRemotePlayerMoveTarget(remotePlayer, nextX, nextY, nextPositionKey);
+  setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey);
   remotePlayer.worldX = nextX;
-  remotePlayer.worldY = nextY;
+  remotePlayer.worldY = nextBaseY + nextJumpY;
   remotePlayer.depth = Number(state.depth) || 0;
-  remotePlayer.jumpY = Number(state.jumpY) || 0;
+  remotePlayer.jumpY = nextJumpY;
+  applyRemotePlayerWorldPosition(remotePlayer);
   remotePlayer.userId = state.userId != null ? String(state.userId) : "";
   remotePlayer.name = state.name || "OVC";
   if (incomingVersion > 0) {
@@ -14761,6 +15211,30 @@ function renderRemotePlayerState(state, source) {
     }
   }
   remotePlayer.lastSeenAt = Date.now();
+}
+
+function getRemotePlayerBaseWorldY(remotePlayer) {
+  if (!remotePlayer) return 0;
+  const renderBaseY = Number(remotePlayer.renderBaseY);
+  if (Number.isFinite(renderBaseY)) return renderBaseY;
+  const targetBaseY = Number(remotePlayer.targetBaseY);
+  if (Number.isFinite(targetBaseY)) return targetBaseY;
+  return -(Number(remotePlayer.depth) || 0);
+}
+
+function getRemotePlayerWorldY(remotePlayer) {
+  return getRemotePlayerBaseWorldY(remotePlayer) + (Number(remotePlayer.jumpY) || 0);
+}
+
+function applyRemotePlayerWorldPosition(remotePlayer) {
+  if (!remotePlayer || !remotePlayer.element) return;
+  const x = Number(remotePlayer.renderX ?? remotePlayer.targetX) || 0;
+  const y = getRemotePlayerWorldY(remotePlayer);
+  remotePlayer.element.classList.toggle(
+    "is-airborne",
+    (Number(remotePlayer.jumpY) || 0) < -REMOTE_PLAYER_AIRBORNE_JUMP_Y
+  );
+  setWorldPosition(remotePlayer.element, x, y);
 }
 
 function createRemotePlayer(remoteId) {
@@ -14790,9 +15264,9 @@ function createRemotePlayer(remoteId) {
     statusElement,
     positionKey: "",
     renderX: 0,
-    renderY: 0,
+    renderBaseY: 0,
     targetX: 0,
-    targetY: 0,
+    targetBaseY: 0,
     hasRenderPosition: false,
     lastSmoothAt: 0,
     worldX: 0,
@@ -14809,33 +15283,42 @@ function createRemotePlayer(remoteId) {
   return remotePlayers[remoteId];
 }
 
-function setRemotePlayerMoveTarget(remotePlayer, x, y, positionKey) {
+function setRemotePlayerMoveTarget(remotePlayer, x, baseY, positionKey) {
   const nextX = Number(x) || 0;
-  const nextY = Number(y) || 0;
+  const nextBaseY = Number(baseY) || 0;
   remotePlayer.targetX = nextX;
-  remotePlayer.targetY = nextY;
-  remotePlayer.positionKey = positionKey || (Math.round(nextX * 10) + "|" + Math.round(nextY * 10));
+  remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.positionKey =
+    positionKey ||
+    Math.round(nextX * 10) + "|" + Math.round(nextBaseY * 10) + "|" + Math.round((Number(remotePlayer.jumpY) || 0) * 10);
 
   if (!remotePlayer.hasRenderPosition) {
     remotePlayer.renderX = nextX;
-    remotePlayer.renderY = nextY;
+    remotePlayer.renderBaseY = nextBaseY;
     remotePlayer.hasRenderPosition = true;
     remotePlayer.lastSmoothAt = performance.now();
-    setWorldPosition(remotePlayer.element, nextX, nextY);
+    applyRemotePlayerWorldPosition(remotePlayer);
   }
 }
 
-function setRemotePlayerVisualPosition(remotePlayer, x, y) {
+function setRemotePlayerVisualPosition(remotePlayer, x, baseY, jumpOffsetY) {
   const nextX = Number(x) || 0;
-  const nextY = Number(y) || 0;
+  const nextBaseY = Number(baseY) || 0;
+  const nextJumpY = Number(jumpOffsetY) || 0;
   remotePlayer.renderX = nextX;
-  remotePlayer.renderY = nextY;
+  remotePlayer.renderBaseY = nextBaseY;
   remotePlayer.targetX = nextX;
-  remotePlayer.targetY = nextY;
+  remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.jumpY = nextJumpY;
   remotePlayer.hasRenderPosition = true;
   remotePlayer.lastSmoothAt = performance.now();
-  remotePlayer.positionKey = Math.round(nextX * 10) + "|" + Math.round(nextY * 10);
-  setWorldPosition(remotePlayer.element, nextX, nextY);
+  remotePlayer.positionKey =
+    Math.round(nextX * 10) +
+    "|" +
+    Math.round(nextBaseY * 10) +
+    "|" +
+    Math.round(nextJumpY * 10);
+  applyRemotePlayerWorldPosition(remotePlayer);
 }
 
 function updateRemotePlayerSmoothing() {
@@ -14845,18 +15328,20 @@ function updateRemotePlayerSmoothing() {
     if (!remotePlayer || !remotePlayer.element || !remotePlayer.hasRenderPosition) return;
 
     const targetX = Number(remotePlayer.targetX) || 0;
-    const targetY = Number(remotePlayer.targetY) || 0;
+    const targetBaseY = Number(remotePlayer.targetBaseY) || 0;
     const currentX = Number(remotePlayer.renderX) || 0;
-    const currentY = Number(remotePlayer.renderY) || 0;
+    const currentBaseY = Number(remotePlayer.renderBaseY) || 0;
     const dx = targetX - currentX;
-    const dy = targetY - currentY;
+    const dy = targetBaseY - currentBaseY;
     const distance = Math.hypot(dx, dy);
 
     if (distance <= REMOTE_PLAYER_SNAP_EPSILON) {
-      if (currentX !== targetX || currentY !== targetY) {
+      if (currentX !== targetX || currentBaseY !== targetBaseY) {
         remotePlayer.renderX = targetX;
-        remotePlayer.renderY = targetY;
-        setWorldPosition(remotePlayer.element, targetX, targetY);
+        remotePlayer.renderBaseY = targetBaseY;
+        applyRemotePlayerWorldPosition(remotePlayer);
+      } else {
+        applyRemotePlayerWorldPosition(remotePlayer);
       }
       remotePlayer.lastSmoothAt = now;
       return;
@@ -14864,21 +15349,19 @@ function updateRemotePlayerSmoothing() {
 
     if (distance >= REMOTE_PLAYER_SNAP_DISTANCE) {
       remotePlayer.renderX = targetX;
-      remotePlayer.renderY = targetY;
+      remotePlayer.renderBaseY = targetBaseY;
       remotePlayer.lastSmoothAt = now;
-      setWorldPosition(remotePlayer.element, targetX, targetY);
+      applyRemotePlayerWorldPosition(remotePlayer);
       return;
     }
 
     const lastSmoothAt = Number(remotePlayer.lastSmoothAt || now);
     const dt = Math.min(50, Math.max(0, now - lastSmoothAt));
     const alpha = 1 - Math.exp(-dt / REMOTE_PLAYER_SMOOTHING_MS);
-    const nextX = currentX + dx * alpha;
-    const nextY = currentY + dy * alpha;
-    remotePlayer.renderX = nextX;
-    remotePlayer.renderY = nextY;
+    remotePlayer.renderX = currentX + dx * alpha;
+    remotePlayer.renderBaseY = currentBaseY + dy * alpha;
     remotePlayer.lastSmoothAt = now;
-    setWorldPosition(remotePlayer.element, nextX, nextY);
+    applyRemotePlayerWorldPosition(remotePlayer);
   });
 }
 
@@ -15940,7 +16423,7 @@ function handleRemoteButterflyCatchBroadcast(payload) {
 }
 
 function tryCatchButterfly() {
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 18) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_BUTTERFLY) {
     return false;
   }
   const now = Date.now();
@@ -15967,8 +16450,10 @@ function tryCatchButterfly() {
   });
   sendMultiplayerPresence(true);
   updateBagInventorySlots();
-  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 18) {
-    onboardingFlowStep = 19;
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_BUTTERFLY) {
+    setStoredFlag(tradeMasterDialogueCompleteKey, false);
+    hydrateTradeMasterDialogueComplete(false);
+    onboardingFlowStep = ONBOARDING_STEP_TRADE_MASTER;
     persistOnboardingStep();
     updateOnboardingFlowUI();
   }

@@ -1159,6 +1159,36 @@ body::-webkit-scrollbar {
   animation: onboarding-target-glow 1.1s ease-in-out infinite;
 }
 
+#plant-progress-gauge.onboarding-highlight,
+#plant-progress-gauge.onboarding-highlight .plant-progress-sprout-toggle {
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.95),
+    0 0 22px rgba(250, 204, 21, 0.55);
+  animation: onboarding-pulse 1.2s ease-in-out infinite;
+}
+
+.world-chat-toggle.onboarding-highlight,
+.world-heart-button.onboarding-highlight,
+.world-sad-button.onboarding-highlight {
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.95),
+    0 0 18px rgba(250, 204, 21, 0.5);
+  animation: onboarding-pulse 1.2s ease-in-out infinite;
+}
+
+.world-ground-rock.onboarding-highlight {
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.95),
+    0 0 16px rgba(250, 204, 21, 0.45);
+  animation: onboarding-pulse 1.2s ease-in-out infinite;
+}
+
+#trade-master.onboarding-highlight,
+#alchemy-master.onboarding-highlight {
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.85));
+  animation: onboarding-pulse 1.2s ease-in-out infinite;
+}
+
 .butterfly.onboarding-highlight {
   z-index: 6;
   outline: 3px solid #f59e0b;
@@ -1640,6 +1670,12 @@ body::-webkit-scrollbar {
   height: auto;
   user-select: none;
   pointer-events: none;
+  transform-origin: bottom center;
+  transition: transform 70ms ease-out;
+}
+
+.remote-player.is-airborne .remote-player-body {
+  transform: scale(1.05, 0.94);
 }
 
 .remote-player.needs-outline .remote-player-body {
@@ -1718,6 +1754,7 @@ body::-webkit-scrollbar {
 .ovc-sad-face__head {
   position: absolute;
   inset: 0;
+  z-index: 0;
   border-radius: 50%;
   background: linear-gradient(165deg, #fff59d 0%, #ffca28 55%, #ffb300 100%);
   box-shadow:
@@ -1727,25 +1764,30 @@ body::-webkit-scrollbar {
 
 .ovc-sad-face__brow {
   position: absolute;
-  top: 0.24em;
-  width: 0.24em;
-  height: 0.07em;
+  z-index: 1;
+  top: 0.2em;
+  width: 0.3em;
+  height: 0.06em;
   background: #5d4037;
-  border-radius: 50%;
+  border-radius: 1em;
 }
 
+/* 안쪽은 높고 바깥(관자놀이)쪽으로 내려가는 슬픈 눈썹 */
 .ovc-sad-face__brow--l {
-  left: 0.17em;
-  transform: rotate(32deg);
+  left: 0.12em;
+  transform-origin: 90% 45%;
+  transform: rotate(-38deg);
 }
 
 .ovc-sad-face__brow--r {
-  right: 0.17em;
-  transform: rotate(-32deg);
+  right: 0.12em;
+  transform-origin: 10% 45%;
+  transform: rotate(38deg);
 }
 
 .ovc-sad-face__eye {
   position: absolute;
+  z-index: 1;
   top: 0.4em;
   width: 0.15em;
   height: 0.09em;
@@ -1765,6 +1807,7 @@ body::-webkit-scrollbar {
 
 .ovc-sad-face__mouth {
   position: absolute;
+  z-index: 1;
   left: 50%;
   top: 0.56em;
   width: 0.4em;
@@ -1779,6 +1822,7 @@ body::-webkit-scrollbar {
 
 .ovc-sad-face__tear {
   position: absolute;
+  z-index: 2;
   top: 0.47em;
   width: 0.11em;
   height: 0.26em;
@@ -1806,6 +1850,10 @@ body::-webkit-scrollbar {
 
 .ovc-heart-fx-bit--sad-lead .ovc-sad-face__tear--r {
   animation-delay: 0.4s;
+}
+
+.ovc-heart-fx-bit--sad-lead {
+  z-index: 3;
 }
 
 @keyframes ovc-sad-tear-drip {

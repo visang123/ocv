@@ -372,6 +372,9 @@ function startTradeMasterDialogue() {
     host.tradeMasterBubble.dataset.promptShown = "false";
     host.setStoredFlag(host.tradeMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
+    if (typeof host.onFirstDialogueComplete === "function") {
+      host.onFirstDialogueComplete();
+    }
   }, timelineMs + 200);
   scheduleTradeDialogueTimeout(function () {
     if (!running) return;
@@ -382,6 +385,9 @@ function startTradeMasterDialogue() {
     host.tradeMasterBubble.dataset.promptShown = "false";
     host.setStoredFlag(host.tradeMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
+    if (typeof host.onFirstDialogueComplete === "function") {
+      host.onFirstDialogueComplete();
+    }
   }, timelineMs + 8000);
 }
 

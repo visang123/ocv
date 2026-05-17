@@ -356,6 +356,9 @@ function startAlchemyMasterDialogue() {
     host.playerBubble.style.display = "none";
     host.setStoredFlag(host.alchemyMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
+    if (typeof host.onFirstDialogueComplete === "function") {
+      host.onFirstDialogueComplete();
+    }
   }, timelineMs + 200);
   scheduleAlchemyDialogueTimeout(function () {
     if (!running) return;
@@ -367,6 +370,9 @@ function startAlchemyMasterDialogue() {
     host.playerBubble.style.display = "none";
     host.setStoredFlag(host.alchemyMasterDialogueCompleteKey, true);
     host.updateNpcPosition();
+    if (typeof host.onFirstDialogueComplete === "function") {
+      host.onFirstDialogueComplete();
+    }
   }, timelineMs + 12000);
 }
 

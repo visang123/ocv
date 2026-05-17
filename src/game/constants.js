@@ -120,6 +120,8 @@ export const GUIDE_BOOK_HEIGHT = 15;
 const WORLD_GROUND_BOOK_SEED_NPC_SHIFT_LEFT = 40;
 /** 가방은 위 이동에 더해 책 대비 조금 더 왼쪽으로(World px) */
 const WORLD_BAG_EXTRA_SHIFT_LEFT = 14;
+/** 씨앗만 추가로 왼쪽(World px) */
+const SEED_EXTRA_SHIFT_LEFT = 12;
 /** 책 가로 위치용 기준 너비(스프라이트만 2/3로 줄여도 허브 가로 배치 유지) */
 const GUIDE_BOOK_LAYOUT_REF_WIDTH = 34;
 /** 책·씨앗 간격 계산용 기준 X(책 스프라이트 위치와 무관하게 씨앗·NPC 허브 유지) */
@@ -144,10 +146,11 @@ export const WORLD_BAG_START_Y = GUIDE_BOOK_START_Y + GUIDE_BOOK_HEIGHT + 4;
 /** 책 오른쪽–씨앗 왼쪽 최소 간격(가까이 배치) */
 export const GUIDE_BOOK_SEED_MIN_GAP = GUIDE_BOOK_WIDTH + 8;
 /** 씨앗 — 안내판 오른쪽과, 책·간격 중 더 오른쪽(겹침 방지). 책 X 이동과 무관하게 기준 X 사용 */
-export const SEED_START_X = Math.max(
-  SIGN_START_X + SIGN_WIDTH + 48,
-  GUIDE_BOOK_BASE_START_X + GUIDE_BOOK_WIDTH + GUIDE_BOOK_SEED_MIN_GAP
-);
+export const SEED_START_X =
+  Math.max(
+    SIGN_START_X + SIGN_WIDTH + 48,
+    GUIDE_BOOK_BASE_START_X + GUIDE_BOOK_WIDTH + GUIDE_BOOK_SEED_MIN_GAP
+  ) - SEED_EXTRA_SHIFT_LEFT;
 export const SEED_START_Y = SIGN_START_Y + SIGN_HEIGHT - SEED_SIZE;
 /** 식물의 달인 — 씨앗 바로 오른쪽(가로로 붙임) */
 export const NPC_START_X = SEED_START_X + SEED_SIZE + 12;
@@ -320,7 +323,8 @@ export const wellUseDistance = 17;
 export const wellPourDistance = wellUseDistance;
 /** 우물 물량 카드(#well-card) 표시 거리 — 상호작용보다 넓게 */
 export const wellCardDistance = 45;
-export const plantWaterDistance = 40;
+/** Q·클릭 물주기 — 씨앗/아이템 줍기와 같은 근접 거리 */
+export const plantWaterDistance = pickupDistance;
 /** 포인터 기준 식물 호버: 월드 식물 중심과 이 거리 안이면 후보 */
 export const plantHoverPickRadiusWorld = 24;
 export const maxWellWater = 3;
