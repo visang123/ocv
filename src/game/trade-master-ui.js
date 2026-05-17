@@ -642,7 +642,14 @@ function refreshTradeExchangeUi() {
 
 function renderTradeTradeableList() {
   if (!host.tradeTradeableList) return;
-  const catalog = getTradeCatalogEntries();
+  const catalog = getTradeCatalogEntries().slice().sort(function (a, b) {
+    const aAvailable =
+      getMatchingRecipesForCatalogEntry(a, counterByKey).length > 0;
+    const bAvailable =
+      getMatchingRecipesForCatalogEntry(b, counterByKey).length > 0;
+    if (aAvailable === bAvailable) return 0;
+    return aAvailable ? -1 : 1;
+  });
   host.tradeTradeableList.innerHTML = catalog
     .map(function (entry) {
       const entryMatches = getMatchingRecipesForCatalogEntry(entry, counterByKey);

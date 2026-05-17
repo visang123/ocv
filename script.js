@@ -296,6 +296,7 @@ import {
   resetKeys as resetInputKeys,
   getControlKey
 } from "./src/systems/input.js";
+import { tryConsumeWheelForOpenUi } from "./src/systems/wheel-ui-scroll.js";
 import {
   clearStoredKeys,
   purgeLocalStorageKeysForLogicalKey,
@@ -410,7 +411,9 @@ import {
 } from "./src/app/ovc-world-hub.js";
 import {
   isWorldMapDevResetShortcut,
-  wireDevWorldResetApi
+  bootDevWorldReset,
+  finishDevWorldResetBoot,
+  markPendingDevWorldReset
 } from "./src/app/dev-world-reset.js";
 import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
 import {
@@ -1815,6 +1818,8 @@ let lastMovementTickMs = 0;
 let playerHealth = PLAYER_MAX_HEALTH;
 let playerLastHealthTickAt = 0;
 let playerWasDrainingHealth = false;
+let playerIdleRechargeSince = 0;
+let playerIdleRechargeHealTicks = 0;
 let playerHealthGaugeVisible = false;
 let playerSittingChairId = "";
 let playerInsideCraftHouseId = "";
@@ -2558,6 +2563,10 @@ document.addEventListener("visibilitychange", function () {
 window.addEventListener(
   "wheel",
   function (event) {
+    if (tryConsumeWheelForOpenUi(event)) {
+      return;
+    }
+
     event.preventDefault();
 
     if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_ZOOM_INTRO) {
@@ -5212,11 +5221,16 @@ let lastDevWorldResetAt = 0;
 
 function resetGameForTesting() {
   const now = Date.now();
-  if (now - lastDevWorldResetAt < 400) return;
-  if (isDevWorldResetInProgress || isReloadingForWorldReset) return;
+  if (now - lastDevWorldResetAt < 350) return;
+  if (isDevWorldResetInProgress) return;
   if (!isWorldDocumentEntry()) return;
+  if (!ovcBootstrapFinished) {
+    markPendingDevWorldReset();
+    return;
+  }
   lastDevWorldResetAt = now;
 
+  isReloadingForWorldReset = false;
   isDevWorldResetInProgress = true;
   try {
     isWorldDirty = false;
@@ -5260,14 +5274,21 @@ function resetGameForTesting() {
     hasHydratedSharedWorldFromServer = true;
 
     syncWorldState(true, { skipPrefetch: true });
+    showThrottledWorldSyncToast("\uC6D4\uB4DC\uAC00 \uCD08\uAE30\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
   } catch (devResetError) {
     console.error("[OVC] dev world reset failed:", devResetError);
+    showThrottledWorldSyncToast(
+      "\uCD08\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uCF5C\uC194\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694."
+    );
   } finally {
     isDevWorldResetInProgress = false;
+    isReloadingForWorldReset = false;
     dismissAppLoadingScreenAfterDevReset();
     ovcTryDismissLoadingScreen(true);
   }
 }
+
+bootDevWorldReset(resetGameForTesting, isWorldDocumentEntry);
 
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
@@ -5332,6 +5353,8 @@ function applyDefaultState(options) {
   playerHealth = PLAYER_MAX_HEALTH;
   playerLastHealthTickAt = 0;
   playerWasDrainingHealth = false;
+  playerIdleRechargeSince = 0;
+  playerIdleRechargeHealTicks = 0;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
@@ -11847,6 +11870,8 @@ function loadPlayerHealth() {
     playerHealth = PLAYER_MAX_HEALTH;
     playerLastHealthTickAt = 0;
     playerWasDrainingHealth = false;
+    playerIdleRechargeSince = 0;
+    playerIdleRechargeHealTicks = 0;
     playerHealthGaugeVisible = false;
     return;
   }
@@ -11872,6 +11897,8 @@ function loadPlayerHealth() {
   playerHealth = legacy;
   playerLastHealthTickAt = 0;
   playerWasDrainingHealth = false;
+  playerIdleRechargeSince = 0;
+  playerIdleRechargeHealTicks = 0;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
@@ -11925,6 +11952,8 @@ function tickPlayerHealth(nowMs) {
     {
       health: playerHealth,
       lastTickAt: playerLastHealthTickAt,
+      idleRechargeSince: playerIdleRechargeSince,
+      idleRechargeHealTicks: playerIdleRechargeHealTicks,
       shouldDrain: shouldDrain,
       wasDraining: playerWasDrainingHealth,
       rechargeContext: {
@@ -11940,6 +11969,12 @@ function tickPlayerHealth(nowMs) {
   playerWasDrainingHealth = shouldDrain;
   playerHealth = result.health;
   playerLastHealthTickAt = result.lastTickAt;
+  if (result.idleRechargeSince != null) {
+    playerIdleRechargeSince = Number(result.idleRechargeSince) || 0;
+  }
+  if (result.idleRechargeHealTicks != null) {
+    playerIdleRechargeHealTicks = Number(result.idleRechargeHealTicks) || 0;
+  }
   if (result.changed) {
     savePlayerHealthState();
   }
@@ -19693,14 +19728,15 @@ try {
     }
   }
   ovcBootstrapFinished = true;
+  finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
   ovcTryDismissLoadingScreen(false);
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;
+  finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
   ovcTryDismissLoadingScreen(true);
 }
 })();
-wireDevWorldResetApi(resetGameForTesting);
 setTimeout(function () {
   if (!isTabSessionSuperseded) {
     if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {

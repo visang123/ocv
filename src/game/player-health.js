@@ -200,6 +200,8 @@ export function shouldRechargePlayerHealth(health, shouldDrain) {
  * @returns {{
  *   health: number,
  *   lastTickAt: number,
+ *   idleRechargeSince?: number,
+ *   idleRechargeHealTicks?: number,
  *   changed: boolean,
  *   depleted: boolean,
  *   resetTickOnDeplete?: boolean
@@ -209,56 +211,81 @@ export function tickPlayerHealthState(state, nowMs) {
   const health = clampPlayerHealth(state.health);
   const now = Number(nowMs) || Date.now();
   let lastTickAt = Number(state.lastTickAt) || 0;
+  let idleRechargeSince = Number(state.idleRechargeSince) || 0;
+  let idleRechargeHealTicks = Number(state.idleRechargeHealTicks) || 0;
   const rechargeCtx = state.rechargeContext || {};
   const shouldDrain = Boolean(state.shouldDrain);
+  const clearIdleRecharge = { idleRechargeSince: 0, idleRechargeHealTicks: 0 };
 
   if (shouldRechargePlayerHealth(health, shouldDrain)) {
     const rate = getPlayerHealthRechargePerSecond(rechargeCtx);
     const useWarmup = needsIdleRechargeWarmup(health, rechargeCtx);
-    if (useWarmup && Boolean(state.wasDraining)) {
-      lastTickAt = 0;
-    }
-    if (!lastTickAt) {
-      return {
-        health: health,
-        lastTickAt: now,
-        changed: false,
-        depleted: isPlayerHealthDepleted(health)
-      };
-    }
-    const elapsed = now - lastTickAt;
     if (useWarmup) {
+      if (Boolean(state.wasDraining)) {
+        idleRechargeSince = 0;
+        idleRechargeHealTicks = 0;
+      }
+      if (!idleRechargeSince) {
+        return {
+          health: health,
+          lastTickAt: now,
+          idleRechargeSince: now,
+          idleRechargeHealTicks: 0,
+          changed: false,
+          depleted: isPlayerHealthDepleted(health)
+        };
+      }
+      const elapsed = now - idleRechargeSince;
       if (elapsed < PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS) {
         return {
           health: health,
           lastTickAt: lastTickAt,
+          idleRechargeSince: idleRechargeSince,
+          idleRechargeHealTicks: idleRechargeHealTicks,
           changed: false,
           depleted: isPlayerHealthDepleted(health)
         };
       }
       const healElapsed = elapsed - PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS;
-      const ticks = Math.floor(healElapsed / PLAYER_HEALTH_RECHARGE_MS);
-      if (ticks < 1) {
+      const totalHealTicks = Math.floor(healElapsed / PLAYER_HEALTH_RECHARGE_MS);
+      const deltaTicks = totalHealTicks - idleRechargeHealTicks;
+      if (deltaTicks < 1) {
         return {
           health: health,
           lastTickAt: lastTickAt,
+          idleRechargeSince: idleRechargeSince,
+          idleRechargeHealTicks: idleRechargeHealTicks,
           changed: false,
           depleted: isPlayerHealthDepleted(health)
         };
       }
-      const nextHealth = clampPlayerHealth(health + ticks * rate);
+      const nextHealth = clampPlayerHealth(health + deltaTicks * rate);
       return {
         health: nextHealth,
-        lastTickAt:
-          lastTickAt + PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS + ticks * PLAYER_HEALTH_RECHARGE_MS,
+        lastTickAt: lastTickAt,
+        idleRechargeSince: idleRechargeSince,
+        idleRechargeHealTicks: totalHealTicks,
         changed: nextHealth !== health,
         depleted: isPlayerHealthDepleted(nextHealth)
       };
     }
+    idleRechargeSince = 0;
+    idleRechargeHealTicks = 0;
+    if (!lastTickAt) {
+      return {
+        health: health,
+        lastTickAt: now,
+        ...clearIdleRecharge,
+        changed: false,
+        depleted: isPlayerHealthDepleted(health)
+      };
+    }
+    const elapsed = now - lastTickAt;
     if (elapsed < PLAYER_HEALTH_RECHARGE_MS) {
       return {
         health: health,
         lastTickAt: lastTickAt,
+        ...clearIdleRecharge,
         changed: false,
         depleted: isPlayerHealthDepleted(health)
       };
@@ -268,20 +295,41 @@ export function tickPlayerHealthState(state, nowMs) {
     return {
       health: nextHealth,
       lastTickAt: lastTickAt + ticks * PLAYER_HEALTH_RECHARGE_MS,
+      ...clearIdleRecharge,
       changed: nextHealth !== health,
       depleted: isPlayerHealthDepleted(nextHealth)
     };
   }
 
   if (!shouldDrain) {
-    return { health: health, lastTickAt: lastTickAt, changed: false, depleted: false };
+    return {
+      health: health,
+      lastTickAt: lastTickAt,
+      ...clearIdleRecharge,
+      changed: false,
+      depleted: false
+    };
   }
+  idleRechargeSince = 0;
+  idleRechargeHealTicks = 0;
   if (!lastTickAt) {
-    return { health: health, lastTickAt: now, changed: false, depleted: false };
+    return {
+      health: health,
+      lastTickAt: now,
+      ...clearIdleRecharge,
+      changed: false,
+      depleted: false
+    };
   }
   const elapsed = now - lastTickAt;
   if (elapsed < PLAYER_HEALTH_DRAIN_INTERVAL_MS) {
-    return { health: health, lastTickAt: lastTickAt, changed: false, depleted: false };
+    return {
+      health: health,
+      lastTickAt: lastTickAt,
+      ...clearIdleRecharge,
+      changed: false,
+      depleted: false
+    };
   }
   const ticks = Math.floor(elapsed / PLAYER_HEALTH_DRAIN_INTERVAL_MS);
   const nextHealth = clampPlayerHealth(health - ticks);
@@ -289,6 +337,7 @@ export function tickPlayerHealthState(state, nowMs) {
   return {
     health: nextHealth,
     lastTickAt: becameDepleted ? now : lastTickAt + ticks * PLAYER_HEALTH_DRAIN_INTERVAL_MS,
+    ...clearIdleRecharge,
     changed: nextHealth !== health,
     depleted: isPlayerHealthDepleted(nextHealth),
     resetTickOnDeplete: becameDepleted

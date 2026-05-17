@@ -1,6 +1,5 @@
 /**
- * index.html <head>에서 먼저 로드 — Ctrl+Shift+R / Ctrl+Alt+R (월드 전용)
- * 모듈 로드 전에도 단축키를 잡고, 로드 후 resetGameForTesting에 연결한다.
+ * index.html <head> — Ctrl+Alt+R / Ctrl+Shift+R / F9 (월드 전용)
  */
 (function (global) {
   function hasAltModifier(e) {
@@ -9,37 +8,76 @@
     return e.getModifierState("Alt") || e.getModifierState("AltGraph");
   }
 
-  function isWorldMapDevResetShortcut(e) {
-    if (e.repeat) return false;
-    if (!(e.ctrlKey || e.metaKey)) return false;
-    var isR =
+  function isRKey(e) {
+    var key = e.keyCode || e.which;
+    return (
       e.code === "KeyR" ||
       e.key === "r" ||
       e.key === "R" ||
-      e.keyCode === 82;
-    if (!isR) return false;
-    if (e.shiftKey) return true;
-    if (hasAltModifier(e)) return true;
+      key === 82
+    );
+  }
+
+  function isWorldMapDevResetShortcut(e) {
+    if (e.repeat) return false;
+    if (e.code === "F9") return true;
+    if (!isRKey(e)) return false;
+    var ctrlOrMeta = e.ctrlKey || e.metaKey;
+    var shift = e.shiftKey;
+    var altMod = hasAltModifier(e);
+    if (ctrlOrMeta && shift) return true;
+    if (ctrlOrMeta && altMod) return true;
     return false;
+  }
+
+  function isWorldHubPage() {
+    if (global.OVC_ENTRY === "tutorial") return false;
+    try {
+      var path = (global.location.pathname || "").toLowerCase();
+      if (path.indexOf("tutorial") !== -1) return false;
+    } catch (pathErr) {}
+    return true;
+  }
+
+  function triggerDevWorldReset(e) {
+    if (!isWorldMapDevResetShortcut(e)) return false;
+    if (!isWorldHubPage()) return false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (typeof global.__ovcResetGameForTesting === "function") {
+      global.__ovcResetGameForTesting();
+    } else {
+      try {
+        global.sessionStorage.setItem("ovcPendingDevWorldResetV1", "1");
+      } catch (storeErr) {}
+    }
+    return true;
   }
 
   global.__ovcIsWorldMapDevResetShortcut = isWorldMapDevResetShortcut;
 
-  global.addEventListener(
-    "keydown",
-    function (e) {
-      if (!isWorldMapDevResetShortcut(e)) return;
-      if (global.OVC_ENTRY === "tutorial") return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (typeof global.__ovcResetGameForTesting === "function") {
-        global.__ovcResetGameForTesting();
-        return;
-      }
-      try {
-        global.sessionStorage.setItem("ovcPendingDevWorldResetV1", "1");
-      } catch (err) {}
-    },
-    true
-  );
+  function onKeyDown(e) {
+    triggerDevWorldReset(e);
+  }
+
+  global.addEventListener("keydown", onKeyDown, true);
+  if (global.document) {
+    global.document.addEventListener("keydown", onKeyDown, true);
+  }
+
+  var pollCount = 0;
+  var pollId = global.setInterval(function () {
+    pollCount += 1;
+    if (pollCount > 200) {
+      global.clearInterval(pollId);
+      return;
+    }
+    try {
+      if (global.sessionStorage.getItem("ovcPendingDevWorldResetV1") !== "1") return;
+      if (typeof global.__ovcResetGameForTesting !== "function") return;
+      if (!isWorldHubPage()) return;
+      global.sessionStorage.removeItem("ovcPendingDevWorldResetV1");
+      global.__ovcResetGameForTesting();
+    } catch (pollErr) {}
+  }, 250);
 })(window);

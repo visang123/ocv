@@ -6,7 +6,17 @@ function hasAltModifier(event) {
   return event.getModifierState("Alt") || event.getModifierState("AltGraph");
 }
 
-/** 월드(index) 전용: Ctrl+Shift+R 또는 Ctrl+Alt+R */
+function isRKey(event) {
+  const key = event.keyCode || event.which;
+  return (
+    event.code === "KeyR" ||
+    event.key === "r" ||
+    event.key === "R" ||
+    key === 82
+  );
+}
+
+/** 월드(index): Ctrl+Shift+R, Ctrl+Alt+R, F9 */
 export function isWorldMapDevResetShortcut(event) {
   if (
     typeof window !== "undefined" &&
@@ -15,15 +25,11 @@ export function isWorldMapDevResetShortcut(event) {
     return window.__ovcIsWorldMapDevResetShortcut(event);
   }
   if (event.repeat) return false;
-  if (!(event.ctrlKey || event.metaKey)) return false;
-  const isRKey =
-    event.code === "KeyR" ||
-    event.key === "r" ||
-    event.key === "R" ||
-    event.keyCode === 82;
-  if (!isRKey) return false;
-  if (event.shiftKey) return true;
-  if (hasAltModifier(event)) return true;
+  if (event.code === "F9") return true;
+  if (!isRKey(event)) return false;
+  const ctrlOrMeta = event.ctrlKey || event.metaKey;
+  if (ctrlOrMeta && event.shiftKey) return true;
+  if (ctrlOrMeta && hasAltModifier(event)) return true;
   return false;
 }
 
@@ -33,7 +39,7 @@ export function markPendingDevWorldReset() {
   } catch (e) {}
 }
 
-export function consumePendingDevWorldReset(resetFn) {
+export function consumePendingDevWorldReset(resetFn, isWorldEntry) {
   try {
     if (sessionStorage.getItem(OVC_PENDING_DEV_WORLD_RESET_KEY) !== "1") {
       return false;
@@ -42,11 +48,44 @@ export function consumePendingDevWorldReset(resetFn) {
   } catch (e) {
     return false;
   }
-  if (typeof resetFn === "function") resetFn();
-  return true;
+  if (typeof isWorldEntry === "function" && !isWorldEntry()) {
+    return false;
+  }
+  if (typeof resetFn === "function") {
+    resetFn();
+    return true;
+  }
+  return false;
 }
 
-export function wireDevWorldResetApi(resetFn) {
-  window.__ovcResetGameForTesting = resetFn;
-  consumePendingDevWorldReset(resetFn);
+function onDevResetKeydown(resetFn, isWorldEntry, event) {
+  if (!isWorldMapDevResetShortcut(event)) return;
+  if (typeof isWorldEntry === "function" && !isWorldEntry()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (typeof resetFn === "function") {
+    resetFn();
+  } else {
+    markPendingDevWorldReset();
+  }
+}
+
+/** resetGameForTesting 정의 직후 + 부트스트랩 완료 시 호출 */
+export function bootDevWorldReset(resetFn, isWorldEntry) {
+  if (typeof window !== "undefined") {
+    window.__ovcResetGameForTesting = resetFn;
+  }
+  if (typeof window !== "undefined" && !window.__ovcDevResetModuleListenerInstalled) {
+    window.__ovcDevResetModuleListenerInstalled = true;
+    const handler = function (event) {
+      onDevResetKeydown(resetFn, isWorldEntry, event);
+    };
+    window.addEventListener("keydown", handler, true);
+    document.addEventListener("keydown", handler, true);
+  }
+}
+
+export function finishDevWorldResetBoot(resetFn, isWorldEntry) {
+  bootDevWorldReset(resetFn, isWorldEntry);
+  consumePendingDevWorldReset(resetFn, isWorldEntry);
 }
