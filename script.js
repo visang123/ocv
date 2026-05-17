@@ -407,6 +407,11 @@ import {
   ovcHardNavigateToWorldIndex,
   ovcForceWorldHubIsRequested
 } from "./src/app/ovc-world-hub.js";
+import {
+  installWorldMapDevResetShortcut,
+  isWorldMapDevResetShortcut,
+  wireDevWorldResetApi
+} from "./src/app/dev-world-reset.js";
 import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
 import {
   storageKeyMainSeedPickedForRoom,
@@ -499,6 +504,7 @@ import {
   findNearestCraftHouse,
   getCraftChairSitPose,
   shouldDrainPlayerHealth,
+  isPlayerPoseUnchanged,
   tickPlayerHealthState
 } from "./src/game/player-health.js";
 
@@ -1680,6 +1686,8 @@ const movementTutorial = createMovementTutorial({
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
 let isWorldPolling = false;
+/** Force-save requested while a world poll is in flight (e.g. admin plant-index +). */
+let pendingForceWorldSaveAfterPoll = false;
 let isWorldDirty = false;
 let lastWorldSaveAt = 0;
 let lastWorldPollAt = 0;
@@ -2244,42 +2252,6 @@ function layoutNpcSpeechBubble() {
     bubbleWorldY
   );
 }
-
-/** ??(index) ??: ?? ?? ???. ????tutorial.html ?? ??. */
-function isDevResetAltModifierHeld(event) {
-  if (event.altKey) return true;
-  if (typeof event.getModifierState !== "function") return false;
-  if (event.getModifierState("AltGraph")) return true;
-  return (
-    event.getModifierState("Control") && event.getModifierState("Alt")
-  );
-}
-
-function isWorldMapDevResetShortcut(event) {
-  if (event.repeat) return false;
-  const isRKey =
-    event.code === "KeyR" || event.key === "r" || event.key === "R";
-  if (!isRKey) return false;
-  if (!(event.ctrlKey || event.metaKey)) return false;
-  // Ctrl+Shift+R ? Shift? ?? (IME? altKey? ??? ??)
-  if (event.shiftKey) return !event.altKey;
-  // Ctrl+Alt+R ? AltGr?Control+Alt ?? ?? (Shift ??? ??)
-  return isDevResetAltModifierHeld(event);
-}
-
-window.addEventListener(
-  "keydown",
-  function (event) {
-    if (!isWorldMapDevResetShortcut(event)) return;
-    if (!isWorldDocumentEntry()) {
-      return;
-    }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    resetGameForTesting();
-  },
-  true
-);
 
 document.addEventListener("keydown", function (event) {
   if (isWorldMapDevResetShortcut(event)) return;
@@ -3134,7 +3106,7 @@ if (localPlayerRoot) {
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
-networkDebugButton.setAttribute("aria-label", "로그");
+networkDebugButton.setAttribute("aria-label", "???");
 document.body.appendChild(networkDebugButton);
 function appendAdminDevGrantButton(id, ariaLabel) {
   const button = document.createElement("button");
@@ -3149,27 +3121,27 @@ function appendAdminDevGrantButton(id, ariaLabel) {
 }
 const adminDevButterfliesButton = appendAdminDevGrantButton(
   "admin-dev-butterflies-button",
-  "나비 종류별 +10 (관리자)"
+  "????? ?????? +10 (??????)"
 );
 const adminDevRocksButton = appendAdminDevGrantButton(
   "admin-dev-rocks-button",
-  "돌 +10 (관리자)"
+  "?? +10 (??????)"
 );
 const adminDevSeedsButton = appendAdminDevGrantButton(
   "admin-dev-seeds-button",
-  "씨앗 +10 (관리자)"
+  "?????? +10 (??????)"
 );
 const adminDevApplesButton = appendAdminDevGrantButton(
   "admin-dev-apples-button",
-  "사과 +10 (관리자)"
+  "???? +10 (??????)"
 );
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
-adminDevPlantIndexPlusButton.setAttribute("aria-label", "식물지수 +100 (관리자)");
-adminDevPlantIndexPlusButton.setAttribute("title", "식물지수 +100 (관리자)");
+adminDevPlantIndexPlusButton.setAttribute("aria-label", "????????? +100 (??????)");
+adminDevPlantIndexPlusButton.setAttribute("title", "????????? +100 (??????)");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -3216,17 +3188,17 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>조작법</strong></div>' +
+  '<div class="controls-header"><strong>??????</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / \u2191</span><p>위로 이동</p></div>' +
-  '<div><span>A / \u2190</span><p>왼쪽으로 이동</p></div>' +
-  '<div><span>S / \u2193</span><p>아래로 이동</p></div>' +
-  '<div><span>D / \u2192</span><p>오른쪽으로 이동</p></div>' +
-  '<div><span>Space</span><p>점프</p></div>' +
-  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
-  '<div><span>Q</span><p>사용 / 대화</p></div>' +
-  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
-  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
+  '<div><span>W / \u2191</span><p>????? ???</p></div>' +
+  '<div><span>A / \u2190</span><p>????????? ???</p></div>' +
+  '<div><span>S / \u2193</span><p>???????? ???</p></div>' +
+  '<div><span>D / \u2192</span><p>?????????? ???</p></div>' +
+  '<div><span>Space</span><p>????</p></div>' +
+  '<div><span>E</span><p>?? / ????????</p></div>' +
+  '<div><span>Q</span><p>?????? / ??????</p></div>' +
+  '<div><span>???????? ???</span><p>?????? / ?????</p></div>' +
+  '<div><span>Esc</span><p>????? ???? / ????</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -4781,7 +4753,7 @@ function updateOnboardingFlowUI() {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
         movementTutorial.hideOverlay();
-        setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
+        setOnboardingCalloutVisible(true, "E???? ?????? ????? ??????????????.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -4798,7 +4770,7 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
+        setOnboardingCalloutVisible(true, "??????(????????)?? ??????????.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
         if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
           bagBookStorageSlot.classList.add("onboarding-highlight");
@@ -4811,18 +4783,18 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "space바를 누르면 점프를 합니다. 해보세요!"
+        "space??? ????? ????? ?????????. ??????????!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
-      setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
+      setOnboardingCalloutVisible(true, "??????????? ????????????.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
-      setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
+      setOnboardingCalloutVisible(true, "e???? ?????? ???????? ??????????????.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
@@ -4839,7 +4811,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 8: {
-      setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
+      setOnboardingCalloutVisible(true, "?????? ?????? ????????????.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
@@ -4849,14 +4821,14 @@ function updateOnboardingFlowUI() {
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
+      setOnboardingCalloutVisible(true, "q? ?????? ?????? ????? ???????????????.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case 10: {
       if (guideOpen) {
-        const line1 = "설명을 참고하세요.";
-        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
+        const line1 = "??????? ???????????.";
+        const line2 = "esc ?????? ????????? ????? ???????? ????????????.";
         setOnboardingCalloutVisible(
           true,
           onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
@@ -4871,7 +4843,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 11: {
-      setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
+      setOnboardingCalloutVisible(true, "?????????? ???????? ????????????.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4879,7 +4851,7 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
+        "?????? ????? ????? E???? ?????? ??????? ?????? ???????."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4887,19 +4859,19 @@ function updateOnboardingFlowUI() {
     case 13: {
       setOnboardingCalloutVisible(
         true,
-        "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
+        "?????? ?????? ??? Q???? ?????? ??? ???? ???????."
       );
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
+      setOnboardingCalloutVisible(true, "?????? ????? ????? ??????????? ????????.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
+      setOnboardingCalloutVisible(true, "Q???? ?????? ??? ?????????.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
@@ -4907,8 +4879,8 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPostWaterCongratsPhase === 0
-          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
-          : "아직 남았습니다 끝까지 진행해주세요."
+          ? "??????????????! ???? ????????? ???? ????????????????."
+          : "???? ??????????????? ????? ???????????????."
       );
       break;
     }
@@ -4921,13 +4893,13 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPlantIndexIntroPhase === 0
-          ? "식물지수는 식물을 심으면 올라갑니다."
-          : "맵의 안개가 해제되니 잘 올려보세요!"
+          ? "???????????? ?????? ??????? ????????????."
+          : "??? ??????? ?????????? ??? ???????????!"
       );
       break;
     }
     case ONBOARDING_STEP_DROP_BUCKET: {
-      setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
+      setOnboardingCalloutVisible(true, "E???? ?????? ??????? ????????????????.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
@@ -4935,7 +4907,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_CHAT: {
       setOnboardingCalloutVisible(
         true,
-        "💬 버튼을 눌러 채팅을 열고, 메시지를 입력한 뒤 전송해 보세요."
+        "???? ??????? ?????? ??????? ????, ???????? ??????? ??? ???????? ???????."
       );
       if (worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
       if (worldChatPanelOpen && worldChatSendBtn) {
@@ -4946,7 +4918,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_HEART: {
       setOnboardingCalloutVisible(
         true,
-        "❤️ 버튼을 눌러 하트를 보내 보세요. 다른 플레이어에게 반응을 전할 수 있어요."
+        "?? ??????? ?????? ??????? ???? ???????. ???? ?????????????? ?????? ????? ??? ?????????."
       );
       if (worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
       break;
@@ -4954,13 +4926,13 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SAD: {
       setOnboardingCalloutVisible(
         true,
-        "😢 버튼을 눌러 슬퍼요를 보내 보세요."
+        "???? ??????? ?????? ???????? ???? ???????."
       );
       if (worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ROCK: {
-      setOnboardingCalloutVisible(true, "땅의 돌에 가까이 가서 E키로 줍아 보세요.");
+      setOnboardingCalloutVisible(true, "????? ????? ????? ????? E????? ???? ???????.");
       if (Array.isArray(appleState.worldRocks)) {
         appleState.worldRocks.forEach(function (rock) {
           if (rock && rock._el && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID) {
@@ -4973,7 +4945,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_BUTTERFLY: {
       setOnboardingCalloutVisible(
         true,
-        "날아다니는 나비에 근접하여 E 또는 Q로 잡아 보세요."
+        "??????????????? ???????? ????????? E ?????? Q?? ?????? ???????."
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -4984,44 +4956,44 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_TRADE_MASTER: {
-      setOnboardingCalloutVisible(true, "거래의 달인에게 가서 Q키로 대화해 보세요.");
+      setOnboardingCalloutVisible(true, "?????? ????????? ????? Q????? ????????? ???????.");
       if (tradeMaster) tradeMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ALCHEMY_MASTER: {
-      setOnboardingCalloutVisible(true, "연금술의 달인에게 가서 Q키로 대화해 보세요.");
+      setOnboardingCalloutVisible(true, "?????????? ????????? ????? Q????? ????????? ???????.");
       if (alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ZOOM_INTRO: {
-      setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
+      setOnboardingCalloutVisible(true, "???????? ??? ?????,?????? ??????????.");
       break;
     }
     case ONBOARDING_STEP_ZOOM_MIN: {
-      setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
+      setOnboardingCalloutVisible(true, "????? ????? ????? ??????????.");
       break;
     }
     case ONBOARDING_STEP_TREE_APPROACH: {
-      setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
+      setOnboardingCalloutVisible(true, "??????? ??? ?????? ????????????.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_TREE_CLIMB: {
       setOnboardingCalloutVisible(
         true,
-        "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
+        "????? ????????? ???????? ??????? ????? ????????????."
       );
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_PICK_APPLE: {
-      setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
+      setOnboardingCalloutVisible(true, "e???? ?????? ????? ?????????.");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_EAT_APPLE: {
-      setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
+      setOnboardingCalloutVisible(true, "????? ??? ??? ???? ??? ?????? ??????????.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
@@ -5030,10 +5002,10 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_EXTRA_SEED: {
-      const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
-      const lineB = "나무밖으로 이동하세요.";
+      const lineSeed = "??????? ?????????? ????????? ???? ????? ???????????????.";
+      const lineB = "??????????? ????????????.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "씨앗을 얻었습니다.");
+        setOnboardingCalloutVisible(true, "???????? ???????????????.");
       } else {
         setOnboardingCalloutVisible(
           true,
@@ -5049,12 +5021,12 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SETTINGS_ESC: {
       setOnboardingCalloutVisible(
         true,
-        "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
+        "Esc? ?????? ??????? ??? ???, ?????? Esc?? ?????? ???????."
       );
       break;
     }
     case ONBOARDING_STEP_COMPLETE: {
-      setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
+      setOnboardingCalloutVisible(true, "??????????????! ??????????? ?????????????!!");
       break;
     }
     default:
@@ -5226,24 +5198,81 @@ function loadGuideBookState(skipMaybeResetTutorial) {
 }
 
 function resetGameForTesting() {
-  showAppLoadingScreen("Resetting...");
+  if (isReloadingForWorldReset) return;
+  if (!isWorldDocumentEntry()) return;
+
+  showAppLoadingScreen("\uCD08\uAE30\uD654 \uC911...", { force: true });
   isReloadingForWorldReset = true;
   isWorldDirty = false;
   isWorldPolling = false;
+  isApplyingWorldState = false;
   bagInventoryItemOrder = [];
   purgeLocalStorageKeysForLogicalKey(bagInventoryOrderKey);
-  clearStoredKeys(appStorageKeysSharedWorldReset);
+  purgeLocalStorageKeysForLogicalKey(worldBagFloorPickedAccountKey);
+  clearStoredKeys(appStorageKeys);
   clearMainSeedPickedForCurrentRoom();
+  clearTutorialSessionWorldFloorPickupFlags();
+  clearWorldFloorBagClaim(removeStoredValue);
+  removeRoomKeyedPickupForAllSlugs("mainSeedPickedRoomV1:");
+  removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
+  removeRoomKeyedPickupForAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
+  removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
   ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
   pendingWorldResetToken = "reset-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   lastAppliedWorldResetToken = pendingWorldResetToken;
   lastWorldResetAt = Date.now();
   persistOvcLastAppliedWorldResetToken(lastAppliedWorldResetToken);
-  applyDefaultState({ sharedWorldResetOnly: true });
+
+  applyDefaultState();
+  hydrateTradeMasterDialogueComplete(false);
+  hydrateAlchemyMasterDialogueComplete(false);
+  setStoredFlag(tradeMasterDialogueCompleteKey, false);
+  setStoredFlag(alchemyMasterDialogueCompleteKey, false);
+  setStoredFlag(guideBookClickPromptDismissedKey, false);
   persistDefaultStateAfterReset();
   restartPlayerPositionOnly();
-  saveSharedWorldAndReload({ reloadUrl: ovcWorldIndexUrl() });
+
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
+  updateCamera();
+  updatePlantState();
+  loadOnboardingFlowState();
+  updateOnboardingFlowUI();
+  updateNpcPosition();
+  updateGuidePages();
+  updateGuideCard();
+  syncWorldPlantFogVisuals();
+  hasHydratedSharedWorldFromServer = true;
+
+  syncWorldState(true);
+
+  isReloadingForWorldReset = false;
+  hideAppLoadingScreen();
+  ovcTryDismissLoadingScreen(true);
+
+  if (window.OVCOnline && typeof window.OVCOnline.saveWorldState === "function") {
+    isWorldSyncing = true;
+    window.OVCOnline.saveWorldState(
+      window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
+      getSharedWorldSnapshot()
+    )
+      .then(function (row) {
+        applyServerWorldRowTimestamps(row);
+      })
+      .catch(function (error) {
+        addNetworkDebugLog(
+          "world reset save error: " +
+            (error && error.message ? error.message : "\uC628\uB77C\uC778 \uC11C\uBC84 \uD655\uC778 \uD544\uC694")
+        );
+      })
+      .finally(function () {
+        isWorldSyncing = false;
+      });
+  }
 }
+
+installWorldMapDevResetShortcut(isWorldDocumentEntry, resetGameForTesting);
+wireDevWorldResetApi(resetGameForTesting);
 
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
@@ -8260,6 +8289,17 @@ function getSynchronizedNow() {
   return getSynchronizedNowCore(serverClockOffsetMs);
 }
 
+/** Monotonic merge of shared admin plant-index bonus (never decreases). */
+function ingestSharedPlantIndexBonus(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  if (!Object.prototype.hasOwnProperty.call(snapshot, "plantIndexBonus")) return false;
+  const incoming = Math.max(0, Math.floor(Number(snapshot.plantIndexBonus) || 0));
+  const prev = Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0));
+  if (incoming <= prev) return false;
+  adminDebugPlantIndexBonus = incoming;
+  return true;
+}
+
 function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
   const next = syncServerClockOffsetCore(
     serverClockOffsetMs,
@@ -8275,7 +8315,11 @@ function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) {
 function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   if (isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
-  if (snapshot.savedBy === currentSessionId) return;
+  const plantBonusChanged = ingestSharedPlantIndexBonus(snapshot);
+  if (snapshot.savedBy === currentSessionId) {
+    if (plantBonusChanged) updatePlantProgressGauge();
+    return;
+  }
   syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt);
   const snapshotSavedAt = resolveSnapshotSavedAt(snapshot, serverRowUpdatedAt);
   const syncedNow = getSynchronizedNow();
@@ -8323,17 +8367,6 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
   const shouldDeferRemoteAppleApply = Date.now() < localAppleActionLockUntil;
 
   try {
-    if (Object.prototype.hasOwnProperty.call(snapshot, "plantIndexBonus")) {
-      const incomingPlantIndexBonus = Math.max(
-        0,
-        Math.floor(Number(snapshot.plantIndexBonus) || 0)
-      );
-      adminDebugPlantIndexBonus = Math.max(
-        Math.max(0, Math.floor(Number(adminDebugPlantIndexBonus) || 0)),
-        incomingPlantIndexBonus
-      );
-    }
-
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
     // Apply snapshot bucket fallback only when realtime channel is not subscribed.
     if (snapshot.bucket && !isMultiplayerSubscribed) {
@@ -8886,7 +8919,9 @@ function getSharedPlantSimulationNow() {
   return isSharedWorldMergeActive() ? getSynchronizedNow() : Date.now();
 }
 
-function syncWorldState(forceSave) {
+function syncWorldState(forceSave, options) {
+  options = options || {};
+  const skipPrefetch = Boolean(options.skipPrefetch);
   const now = Date.now();
   if (isTabSessionSuperseded || isReloadingForWorldReset) return;
   if (isSharedWorldSyncPausedForTutorial()) return;
@@ -8898,10 +8933,26 @@ function syncWorldState(forceSave) {
   ) {
     return;
   }
+  if (isWorldPolling) {
+    isWorldDirty = true;
+    if (forceSave) pendingForceWorldSaveAfterPoll = true;
+    return;
+  }
   if (!forceSave && !isWorldDirty) return;
   if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
     isWorldDirty = true;
     pollWorldState(true);
+    return;
+  }
+  if (
+    forceSave &&
+    !skipPrefetch &&
+    isWorldServerSyncAvailable() &&
+    hasHydratedSharedWorldFromServer
+  ) {
+    isWorldDirty = true;
+    pollWorldState(true);
+    pendingForceWorldSaveAfterPoll = true;
     return;
   }
   isWorldSyncing = true;
@@ -9007,7 +9058,12 @@ function pollWorldState(forcePoll) {
     if (isWorldServerSyncAvailable()) {
       hasHydratedSharedWorldFromServer = true;
     }
-    if (!row || !row.state || !row.updated_at || row.updated_at === lastWorldUpdatedAt) return;
+    if (!row || !row.state) return;
+    const plantBonusChanged = ingestSharedPlantIndexBonus(row.state);
+    if (!row.updated_at || row.updated_at === lastWorldUpdatedAt) {
+      if (plantBonusChanged) updatePlantProgressGauge();
+      return;
+    }
     lastWorldUpdatedAt = row.updated_at;
     applySharedWorldSnapshot(row.state, row.updated_at);
   }).catch(function (error) {
@@ -9021,6 +9077,10 @@ function pollWorldState(forcePoll) {
     isWorldPolling = false;
     if (isWorldServerSyncAvailable()) {
       hasHydratedSharedWorldFromServer = true;
+    }
+    if (pendingForceWorldSaveAfterPoll) {
+      pendingForceWorldSaveAfterPoll = false;
+      syncWorldState(true, { skipPrefetch: true });
     }
     ovcTryDismissLoadingScreen(false);
   });
@@ -10097,7 +10157,7 @@ function bagHasPlantableSeedsForHoverHint() {
   });
 }
 
-/** ??? UI(?????????????????????? ????????? title ????#plant-hover-label ???????? ??????????? */
+/** \uACE0\uC815 UI(\uC124\uC815\u00B7\uCC44\uD305\u00B7\uD558\uD2B8\u00B7\uC2AC\uD37C\uC694) \u2014 \uBE0C\uB77C\uC6B0\uC800 title \uB300\uC2E0 #plant-hover-label \uC2A4\uD0C0\uC77C\uB85C \uB2E8\uCD95\uD0A4 \uD45C\uC2DC */
 function pickUiShortcutHoverTarget(clientX, clientY) {
   const pad = 4;
   function over(el) {
@@ -10112,17 +10172,17 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
     );
   }
   if (settingsButton && over(settingsButton)) {
-    return { anchorEl: settingsButton, text: "?????: Esc" };
+    return { anchorEl: settingsButton, text: "\uC124\uC815: Esc" };
   }
   if (!worldSocialUiReady) return null;
   if (worldChatToggleBtn && over(worldChatToggleBtn)) {
-    return { anchorEl: worldChatToggleBtn, text: "?????: C" };
+    return { anchorEl: worldChatToggleBtn, text: "\uCC44\uD305: C" };
   }
   if (worldHeartBtn && over(worldHeartBtn)) {
-    return { anchorEl: worldHeartBtn, text: "??????: H" };
+    return { anchorEl: worldHeartBtn, text: "\uD558\uD2B8: H" };
   }
   if (worldSadBtn && over(worldSadBtn)) {
-    return { anchorEl: worldSadBtn, text: "???????: Ctrl+S" };
+    return { anchorEl: worldSadBtn, text: "\uC2AC\uD37C\uC694: Ctrl+S" };
   }
   return null;
 }
@@ -11550,7 +11610,12 @@ function updatePlayerPosition() {
     refreshPlantHoverAfterPlayerMove();
   }
 
-  playerHealthPosePrev = healthPosePrev;
+  const poseNow = { x: playerX, depth: playerDepth, jumpY: jumpY };
+  if (isPlayerPoseUnchanged(healthPosePrev, poseNow)) {
+    playerHealthPosePrev = poseNow;
+  } else {
+    playerHealthPosePrev = healthPosePrev;
+  }
   playerHealthPoseInitialized = true;
 }
 

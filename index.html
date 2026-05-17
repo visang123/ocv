@@ -26,6 +26,39 @@
       } catch (e) {}
     })();
   </script>
+  <script>
+    (function () {
+      function isDevResetShortcut(e) {
+        if (e.repeat) return false;
+        var isR = e.code === "KeyR" || e.key === "r" || e.key === "R";
+        if (!isR || !(e.ctrlKey || e.metaKey)) return false;
+        if (e.shiftKey) return true;
+        if (e.altKey) return true;
+        if (typeof e.getModifierState === "function") {
+          if (e.getModifierState("AltGraph")) return true;
+          if (e.getModifierState("Control") && e.getModifierState("Alt")) return true;
+        }
+        return false;
+      }
+      window.addEventListener(
+        "keydown",
+        function (e) {
+          if (!isDevResetShortcut(e)) return;
+          if (window.OVC_ENTRY === "tutorial") return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (typeof window.__ovcResetGameForTesting === "function") {
+            window.__ovcResetGameForTesting();
+            return;
+          }
+          try {
+            sessionStorage.setItem("ovcPendingDevWorldResetV1", "1");
+          } catch (err) {}
+        },
+        true
+      );
+    })();
+  </script>
   <title>온라인 비상 커뮤니티</title>
   <link rel="stylesheet" href="style.css?v=20260517h">
 </head>
@@ -500,7 +533,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260517r"></script>
+  <script type="module" src="src/main.js?v=20260517s"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

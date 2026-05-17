@@ -3,8 +3,13 @@ const appLoadingText = document.getElementById("app-loading-text");
 let appLoadingHideTimer = null;
 let appLoadingDismissed = false;
 
-export function showAppLoadingScreen(message) {
-  if (!appLoadingScreen || appLoadingDismissed) return;
+export function showAppLoadingScreen(message, options) {
+  const force = Boolean(options && options.force);
+  if (!appLoadingScreen) return;
+  if (appLoadingDismissed && !force) return;
+  if (force) {
+    appLoadingDismissed = false;
+  }
   clearTimeout(appLoadingHideTimer);
   if (appLoadingText && message) {
     appLoadingText.textContent = message;
