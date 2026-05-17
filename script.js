@@ -193,6 +193,7 @@ import {
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
+  worldBagFloorPickedAccountKey,
   npcDialogueCompleteKey,
   tradeMasterDialogueCompleteKey,
   alchemyMasterDialogueCompleteKey,
@@ -297,6 +298,8 @@ import {
 } from "./src/systems/input.js";
 import {
   clearStoredKeys,
+  purgeLocalStorageKeysForLogicalKey,
+  purgeRoomKeyedPickupFlags,
   setStoragePrefix,
   migrateUnscopedUserPickupFlagsToUserScope,
   getStoredValue,
@@ -415,7 +418,8 @@ import {
   normalizeBagInventoryOrderByCounts as normalizeBagInventoryOrderByCountsCore,
   getBagItemDescriptor as getBagItemDescriptorCore,
   canBagInventoryFitItems,
-  BAG_INVENTORY_SLOT_COUNT
+  BAG_INVENTORY_SLOT_COUNT,
+  bagInventoryOrderKey
 } from "./src/game/bag-inventory.js?v=20260517c";
 import {
   BAG_DROP_WORLD_SIZE,
@@ -846,9 +850,11 @@ function setRoomKeyedPickupFlagAllSlugs(keyPrefix, enabled) {
 }
 
 function removeRoomKeyedPickupForAllSlugs(keyPrefix) {
-  getWorldFloorPickupStorageSlugs().forEach(function (slug) {
+  const slugs = getWorldFloorPickupStorageSlugs();
+  slugs.forEach(function (slug) {
     removeStoredValue(keyPrefix + slug);
   });
+  purgeRoomKeyedPickupFlags(keyPrefix, slugs);
 }
 
 const GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX = "guideBookPickedRoomV1:";
@@ -2240,10 +2246,14 @@ function layoutNpcSpeechBubble() {
 
 /** ?????(index) ?????: ???? ??? ????? ????????? ?????tutorial.html ??? ????. */
 function isWorldMapDevResetShortcut(event) {
-  if (event.code !== "KeyR" || event.repeat) return false;
+  if (event.repeat) return false;
+  const isRKey =
+    event.code === "KeyR" || event.key === "r" || event.key === "R";
+  if (!isRKey) return false;
   if (!(event.ctrlKey || event.metaKey)) return false;
-  if (event.shiftKey && !event.altKey) return true;
-  if (event.altKey && !event.shiftKey) return true;
+  const altHeld = event.altKey || event.getModifierState("Alt");
+  if (event.shiftKey && !altHeld) return true;
+  if (altHeld && !event.shiftKey) return true;
   return false;
 }
 
@@ -2251,7 +2261,7 @@ window.addEventListener(
   "keydown",
   function (event) {
     if (!isWorldMapDevResetShortcut(event)) return;
-    if (!isWorldDocumentEntry() || !hasSpawnedCharacter || isCharacterSelecting) {
+    if (!isWorldDocumentEntry()) {
       return;
     }
     event.preventDefault();
@@ -5205,6 +5215,8 @@ function resetGameForTesting() {
   isReloadingForWorldReset = true;
   isWorldDirty = false;
   isWorldPolling = false;
+  bagInventoryItemOrder = [];
+  purgeLocalStorageKeysForLogicalKey(bagInventoryOrderKey);
   clearStoredKeys(appStorageKeysSharedWorldReset);
   clearMainSeedPickedForCurrentRoom();
   ignoreSnapshotInventorySeedsUntil = Date.now() + 15000;
@@ -5312,8 +5324,12 @@ function applyDefaultState(options) {
   lastMainSeedStateChangeAt = Date.now();
   clearMainSeedPickedForCurrentRoom();
   if (sharedWorldResetOnly) {
+    removeRoomKeyedPickupForAllSlugs("mainSeedPickedRoomV1:");
     removeRoomKeyedPickupForAllSlugs(WORLD_BAG_GROUND_PICKED_ROOM_KEY_PREFIX);
     removeRoomKeyedPickupForAllSlugs(WORLD_GUIDE_BOOK_OFF_GROUND_PICKED_ROOM_KEY_PREFIX);
+    purgeLocalStorageKeysForLogicalKey(worldBagFloorPickedAccountKey);
+    purgeLocalStorageKeysForLogicalKey(bagInventoryOrderKey);
+    bagInventoryItemOrder = [];
   }
   if (!sharedWorldResetOnly || isWorldDocumentEntry()) {
     removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
@@ -5442,12 +5458,22 @@ function applyDefaultState(options) {
   hasSeededInitialButterflies = false;
   magicPowderCount = 0;
   rockInventoryCount = 0;
+  craftFurnitureCounts.craftDesk = 0;
+  craftFurnitureCounts.craftFence = 0;
+  craftFurnitureCounts.craftChair = 0;
+  craftFurnitureCounts.craftHouse = 0;
+  coloredMagicPowderCounts.yellow = 0;
+  coloredMagicPowderCounts.white = 0;
+  coloredMagicPowderCounts.brown = 0;
+  coloredMagicPowderCounts.mixed = 0;
   Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
     delete butterflyLocalCatchTombstoneById[id];
   });
   saveButterflyCaughtCounts();
   saveMagicPowderCount();
   saveRockInventoryCount();
+  saveCraftFurnitureCounts();
+  saveColoredMagicPowderCounts();
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
 

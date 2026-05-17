@@ -1975,7 +1975,6 @@ body::-webkit-scrollbar {
   font-size: 5px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.35);
 }
 
 .player-health-heart-toggle.is-active {
@@ -3756,7 +3755,7 @@ body #world-bag-inventory {
 
 :root {
   --ovc-bag-inventory-left: calc(18px + 78px + 10px);
-  --ovc-bag-inventory-width: calc(5 * 60px + 4 * 9px + 30px);
+  --ovc-bag-inventory-width: calc(3 * 60px + 2 * 9px + 30px);
   --ovc-npc-ui-gap: 12px;
   --ovc-npc-side-panel-left: calc(
     var(--ovc-bag-inventory-left) + var(--ovc-bag-inventory-width) + var(--ovc-npc-ui-gap)
@@ -3833,8 +3832,8 @@ body #world-bag-inventory {
 
 .bag-inventory-slots {
   display: grid;
-  grid-template-columns: repeat(5, 60px);
-  grid-template-rows: repeat(2, 60px);
+  grid-template-columns: repeat(3, 60px);
+  grid-template-rows: repeat(3, 60px);
   gap: 9px;
   padding: 12px 15px;
   background: rgba(8, 12, 24, 0.38);

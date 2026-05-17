@@ -490,7 +490,8 @@ export const appStorageKeys = [
   "butterflyCaughtCountsV1",
   "magicPowderCountV1",
   "craftFurnitureCountsV1",
-  "coloredMagicPowderCountsV1"
+  "coloredMagicPowderCountsV1",
+  "ovcBagInventoryOrderV1"
 ];
 
 /**

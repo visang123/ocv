@@ -86,7 +86,53 @@ export function removeStoredValue(key) {
 export function clearStoredKeys(keys) {
   keys.forEach(function (key) {
     localStorage.removeItem(getScopedKey(key));
+    purgeLocalStorageKeysForLogicalKey(key);
   });
+}
+
+/**
+ * logicalKey 및 `ovc-user-*:logicalKey` 등 접두사가 붙은 모든 변형을 제거한다.
+ * 공유 월드 리셋 시 migrate가 예전(접두사 없는) 플래그를 다시 복사하는 것을 막는다.
+ */
+export function purgeLocalStorageKeysForLogicalKey(logicalKey) {
+  const tail = String(logicalKey || "").trim();
+  if (!tail) return;
+  const toRemove = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k === tail || k.endsWith(":" + tail)) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(function (k) {
+      localStorage.removeItem(k);
+    });
+  } catch (e) {}
+}
+
+/** 방별 줍기 플래그(`prefix + slug`)의 scoped·unscoped 키를 모두 제거한다. */
+export function purgeRoomKeyedPickupFlags(keyPrefix, slugs) {
+  const prefix = String(keyPrefix || "");
+  if (!prefix || !Array.isArray(slugs)) return;
+  const toRemove = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      for (let s = 0; s < slugs.length; s++) {
+        const logicalTail = prefix + slugs[s];
+        if (k === logicalTail || k.endsWith(":" + logicalTail)) {
+          toRemove.push(k);
+          break;
+        }
+      }
+    }
+    toRemove.forEach(function (k) {
+      localStorage.removeItem(k);
+    });
+  } catch (e) {}
 }
 
 export function getStoredFlag(key) {
