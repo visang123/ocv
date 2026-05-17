@@ -167,6 +167,9 @@ export function bindAlchemyMaster(h) {
     host.alchemyCraftRequirementSlots.addEventListener("click", function (event) {
       const slotEl = event.target.closest(".alchemy-craft-req-slot");
       if (!slotEl || !craftOpen) return;
+      if (host.consumeCraftTradeDragClickSuppress && host.consumeCraftTradeDragClickSuppress()) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       const index = Number(slotEl.dataset.slotIndex);
@@ -375,17 +378,13 @@ function layoutAlchemySpeechBubble() {
   const headTop = host.getNpcHeadTopWorldY
     ? host.getNpcHeadTopWorldY(host.ALCHEMY_MASTER_START_Y)
     : host.ALCHEMY_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
-  const hoverShift = host.getWorldNpcPromptBubbleExtraShiftWorld
-    ? host.getWorldNpcPromptBubbleExtraShiftWorld(host.alchemyMaster)
-    : 0;
   const bubbleWorldY =
     host.speechBubbleTopWorldYFromHead(
       headTop,
       host.alchemyMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
     ) -
-    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD -
-    hoverShift;
+    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   host.setSpeechBubbleTransform(
     host.alchemyMasterBubble,
     host.ALCHEMY_MASTER_START_X + host.NPC_WIDTH / 2 - bubbleWidth / 2,
@@ -555,9 +554,29 @@ function returnOneAlchemyRequirementSlot(index) {
   if (!def || filled <= 0) return;
   requirementSlotFills[index] = filled - 1;
   host.addBagItems(def.key, 1);
+  afterAlchemyRequirementSlotChanged();
+}
+
+function afterAlchemyRequirementSlotChanged() {
   renderAlchemyRequirementSlots();
   updateAlchemyCraftConfirmButton();
   host.updateBagInventorySlots();
+}
+
+/** @param {number} index */
+export function returnAlchemySlotStackToInventory(index) {
+  if (!host || !craftOpen || !requirementsVisible) return false;
+  const def = requirementSlotDefs[index];
+  const filled = Math.max(0, Math.floor(Number(requirementSlotFills[index]) || 0));
+  if (!def || filled <= 0) return false;
+  if (host.canAddBagItems && !host.canAddBagItems({ [def.key]: filled })) {
+    if (host.showInventoryFullFail) host.showInventoryFullFail();
+    return false;
+  }
+  requirementSlotFills[index] = 0;
+  host.addBagItems(def.key, filled);
+  afterAlchemyRequirementSlotChanged();
+  return true;
 }
 
 function renderAlchemyCraftProducts() {
@@ -616,6 +635,8 @@ function renderAlchemyRequirementSlots() {
         manySegClass +
         '" data-slot-index="' +
         index +
+        '" data-item-key="' +
+        def.key +
         '" aria-label="' +
         desc.label +
         ariaProgress +

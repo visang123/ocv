@@ -1,13 +1,23 @@
 import { getBagItemDescriptor } from "./bag-inventory.js";
 import {
   cloneTradeCounter,
+  formatTradeRecipeInputLabel,
   getMatchingTradeRecipes,
   getTradeRecipeById,
   recipeMatchesCounter,
   subtractRecipeInputsFromCounter
 } from "./trade-exchange.js";
 
-const TRADEABLE_KEYS = new Set(["rock", "seed", "overgrowthSeed", "apple", "magicPowder"]);
+const TRADEABLE_KEYS = new Set([
+  "rock",
+  "seed",
+  "overgrowthSeed",
+  "apple",
+  "magicPowder",
+  "butterfly:brown",
+  "butterfly:yellow",
+  "butterfly:white"
+]);
 
 /** @type {Record<string, any>} */
 let host = null;
@@ -146,6 +156,9 @@ export function bindTradeMaster(h) {
     host.tradeCounterSlot.addEventListener("click", function (event) {
       const chip = event.target.closest(".trade-counter-chip");
       if (!chip || !exchangeOpen) return;
+      if (host.consumeCraftTradeDragClickSuppress && host.consumeCraftTradeDragClickSuppress()) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       returnOneTradeCounterItemToInventory(chip.dataset.itemKey || "");
@@ -310,16 +323,6 @@ export function handleBagSlotClickWhileTradeOpen(slotEl) {
   if (slotEl.classList.contains("is-empty")) return true;
   const key = bagSlotToItemKey(slotEl);
   if (!key) return true;
-  if (key.indexOf("butterfly:") === 0) {
-    if (host && host.showPlayerAlert) {
-      host.showPlayerAlert({
-        message:
-          "\uB098\uBE44\uB294 \uAC70\uB798\uC758 \uB2EC\uC778\uC5D0\uC11C \uB9C8\uBC95\uC758 \uAC00\uB8E8\uC73C\uB85C \uAD50\uD658\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-        durationMs: 2600
-      });
-    }
-    return true;
-  }
   if (!TRADEABLE_KEYS.has(key)) return true;
   addOneInventoryItemToTradeCounter(key);
   return true;
@@ -407,17 +410,13 @@ function layoutTradeSpeechBubble() {
   const headTop = host.getNpcHeadTopWorldY
     ? host.getNpcHeadTopWorldY(host.TRADE_MASTER_START_Y)
     : host.TRADE_MASTER_START_Y + host.NPC_HEAD_TOP_TRIM_WORLD;
-  const hoverShift = host.getWorldNpcPromptBubbleExtraShiftWorld
-    ? host.getWorldNpcPromptBubbleExtraShiftWorld(host.tradeMaster)
-    : 0;
   const bubbleWorldY =
     host.speechBubbleTopWorldYFromHead(
       headTop,
       host.tradeMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
     ) -
-    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD -
-    hoverShift;
+    host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   host.setSpeechBubbleTransform(
     host.tradeMasterBubble,
     host.TRADE_MASTER_START_X + host.NPC_WIDTH / 2 - bubbleWidth / 2,
@@ -535,6 +534,10 @@ function returnOneTradeCounterItemToInventory(itemKey) {
   counterByKey[itemKey] = n - 1;
   if (counterByKey[itemKey] <= 0) delete counterByKey[itemKey];
   host.addBagItems(itemKey, 1);
+  afterTradeCounterInventoryChanged();
+}
+
+function afterTradeCounterInventoryChanged() {
   renderTradeCounter();
   renderTradeOffers();
   if (
@@ -545,6 +548,22 @@ function returnOneTradeCounterItemToInventory(itemKey) {
   }
   updateTradeConfirmButton();
   host.updateBagInventorySlots();
+}
+
+/** @param {string} itemKey */
+export function returnTradeCounterStackToInventory(itemKey) {
+  if (!host || !exchangeOpen || !itemKey) return false;
+  const n = Math.max(0, Math.floor(Number(counterByKey[itemKey]) || 0));
+  if (n <= 0) return false;
+  if (host.canAddBagItems && !host.canAddBagItems({ [itemKey]: n })) {
+    if (host.showInventoryFullFail) host.showInventoryFullFail();
+    return false;
+  }
+  delete counterByKey[itemKey];
+  host.addBagItems(itemKey, n);
+  afterTradeCounterInventoryChanged();
+  if (host.saveAppleState) host.saveAppleState();
+  return true;
 }
 
 function renderTradeCounter() {
@@ -586,6 +605,8 @@ function renderTradeOffers() {
     .map(function (recipe) {
       const inputs = Object.keys(recipe.inputs)
         .map(function (k) {
+          const anyLabel = formatTradeRecipeInputLabel(k, recipe.inputs[k]);
+          if (anyLabel) return anyLabel;
           return getBagItemDescriptor(k).label + " " + recipe.inputs[k];
         })
         .join(" + ");

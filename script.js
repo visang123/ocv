@@ -427,7 +427,8 @@ import {
   updateTradeNpcPrompt,
   relayoutTradeMasterSpeechBubble,
   canDragBagItemToTradeCounter,
-  tryDropBagItemOnTradeCounter
+  tryDropBagItemOnTradeCounter,
+  returnTradeCounterStackToInventory
 } from "./src/game/trade-master-ui.js";
 import {
   bindAlchemyMaster,
@@ -442,7 +443,8 @@ import {
   updateAlchemyNpcPrompt,
   relayoutAlchemyMasterSpeechBubble,
   canDragBagItemToAlchemyCraft,
-  tryDropBagItemOnAlchemyRequirement
+  tryDropBagItemOnAlchemyRequirement,
+  returnAlchemySlotStackToInventory
 } from "./src/game/alchemy-master-ui.js";
 import {
   isCraftFurnitureKind,
@@ -531,6 +533,7 @@ let heldExtraBucketMainIsFull = false;
 const plantRuntime = createPlantState();
 let lastPlantProximityBlockMessage = "";
 let plantProximityWarnUntil = 0;
+const PLANT_WATER_TOO_FAR_MESSAGE = "\uC2DD\uBB3C\uACFC \uAC70\uB9AC\uAC00 \uBA40\uC2B5\uB2C8\uB2E4.";
 let npcX = NPC_START_X;
 let npcY = NPC_START_Y;
 let isNpcDialogueRunning = false;
@@ -1403,7 +1406,9 @@ const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
 const WORLD_ROCK_REMOTE_STATUS_TAIL_MS = 0;
 const REMOTE_WATER_SPLASH_ACCEPT_MS = 60000;
 const REMOTE_PLAYER_SMOOTHING_MS = 130;
+const REMOTE_PLAYER_JUMP_SMOOTHING_MS = 85;
 const REMOTE_PLAYER_SNAP_DISTANCE = 42;
+const REMOTE_PLAYER_JUMP_SNAP_DISTANCE = 3;
 const REMOTE_PLAYER_SNAP_EPSILON = 0.04;
 /** 점프 중 player_state를 더 자주 보내 원격 캐릭터 궤적이 끊기지 않게 함 */
 const REMOTE_PLAYER_JUMP_BROADCAST_MIN_MS = 50;
@@ -1622,6 +1627,13 @@ let pendingLocalExtraBucketDropUntilById = Object.create(null);
 let lastWorldBagDropChangeAt = 0;
 let bagInventoryDragState = null;
 let bagInventoryDragGhostEl = null;
+let craftTradeDragClickSuppress = false;
+
+function consumeCraftTradeDragClickSuppress() {
+  if (!craftTradeDragClickSuppress) return false;
+  craftTradeDragClickSuppress = false;
+  return true;
+}
 let serverClockOffsetMs = 0;
 let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
@@ -1789,9 +1801,7 @@ const NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD = 0;
 const NPC_HEAD_TOP_TRIM_WORLD = 8;
 /** NPC 말풍선: 양수일수록 y를 줄여 머리 쪽(아래)으로 이동 */
 const NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD = 4;
-/** 근접 대화 말풍선 + NPC 이름 호버가 같이 뜰 때 말풍선을 아래로 내리는 화면 px */
-const WORLD_NPC_HOVER_PROMPT_STACK_SCREEN_PX = 14;
-/** 호버 이름 라벨과 말풍선 사이 간격(화면 px) */
+/** 호버 이름 라벨과 대화 유도 말풍선 사이 간격(화면 px) */
 const WORLD_NPC_HOVER_NAME_GAP_ABOVE_BUBBLE_PX = 5;
 /** 플레이어 말풍선만: 닉네임(머리 근처) 위에 확실히 올리기(월드 단위, 클수록 말풍선 더 위) */
 const PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD = 16;
@@ -2153,8 +2163,7 @@ function layoutNpcSpeechBubble() {
   const npcHeadTop = getNpcHeadTopWorldY(npcY);
   const bubbleWorldY =
     speechBubbleTopWorldYFromHead(npcHeadTop, npcBubble, NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) -
-    NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD -
-    getWorldNpcPromptBubbleExtraShiftWorld(plantMaster);
+    NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   setNpcBubbleWorldPosition(
     npcX + NPC_WIDTH / 2 - bubbleWidth / 2,
     bubbleWorldY
@@ -2563,6 +2572,18 @@ if (bagInventoryClose) {
   });
 }
 
+if (tradeCounterSlot) {
+  tradeCounterSlot.addEventListener("pointerdown", onTradeCounterChipPointerDown);
+  tradeCounterSlot.addEventListener("pointermove", onBagInventorySlotPointerMove);
+  tradeCounterSlot.addEventListener("pointerup", onBagInventorySlotPointerUp);
+  tradeCounterSlot.addEventListener("pointercancel", onBagInventorySlotPointerCancel);
+}
+if (alchemyCraftRequirementSlots) {
+  alchemyCraftRequirementSlots.addEventListener("pointerdown", onAlchemyRequirementSlotPointerDown);
+  alchemyCraftRequirementSlots.addEventListener("pointermove", onBagInventorySlotPointerMove);
+  alchemyCraftRequirementSlots.addEventListener("pointerup", onBagInventorySlotPointerUp);
+  alchemyCraftRequirementSlots.addEventListener("pointercancel", onBagInventorySlotPointerCancel);
+}
 if (bagInventoryPanel) {
   bagInventoryPanel.addEventListener("pointerdown", onBagInventorySlotPointerDown);
   bagInventoryPanel.addEventListener("pointermove", onBagInventorySlotPointerMove);
@@ -2692,7 +2713,6 @@ bindTradeMaster({
   NPC_HEAD_TOP_TRIM_WORLD: NPC_HEAD_TOP_TRIM_WORLD,
   NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD: NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
   NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD: NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
-  getWorldNpcPromptBubbleExtraShiftWorld: getWorldNpcPromptBubbleExtraShiftWorld,
   getNpcHeadTopWorldY: getNpcHeadTopWorldY,
   npcInteractDistance: npcInteractDistance,
   tradeMasterDialogueCompleteKey: tradeMasterDialogueCompleteKey,
@@ -2715,6 +2735,7 @@ bindTradeMaster({
   saveAppleState: saveAppleState,
   markWorldDirty: markWorldDirty,
   showPlayerAlert: showPlayerAlert,
+  consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
@@ -2745,7 +2766,6 @@ bindAlchemyMaster({
   NPC_HEAD_TOP_TRIM_WORLD: NPC_HEAD_TOP_TRIM_WORLD,
   NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD: NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
   NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD: NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
-  getWorldNpcPromptBubbleExtraShiftWorld: getWorldNpcPromptBubbleExtraShiftWorld,
   getNpcHeadTopWorldY: getNpcHeadTopWorldY,
   npcInteractDistance: npcInteractDistance,
   alchemyMasterDialogueCompleteKey: alchemyMasterDialogueCompleteKey,
@@ -2770,6 +2790,7 @@ bindAlchemyMaster({
   saveButterflyCaughtCounts: saveButterflyCaughtCounts,
   markWorldDirty: markWorldDirty,
   showPlayerAlert: showPlayerAlert,
+  consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
   isNpcDialogueRunning: function () {
     return isNpcDialogueRunning;
   },
@@ -6550,18 +6571,21 @@ function buildWorldBagDropElement(drop, stackIndex) {
   const inner = document.createElement("div");
   inner.className = "world-bag-drop__inner";
 
+  const stack = document.createElement("div");
+  stack.className = "world-bag-drop__stack";
+
   if (visual.kind === "img") {
     const img = document.createElement("img");
     img.className = "world-bag-drop__icon";
     img.src = visual.src;
     img.alt = visual.alt || "";
     img.draggable = false;
-    inner.appendChild(img);
+    stack.appendChild(img);
   } else {
     const icon = document.createElement("span");
     icon.className = "world-bag-drop__icon " + (visual.className || "bag-drop-icon");
     icon.setAttribute("aria-hidden", "true");
-    inner.appendChild(icon);
+    stack.appendChild(icon);
   }
 
   const count = Math.max(1, Math.floor(Number(drop.count) || 0));
@@ -6569,9 +6593,10 @@ function buildWorldBagDropElement(drop, stackIndex) {
     const countEl = document.createElement("span");
     countEl.className = "world-bag-drop__count";
     countEl.textContent = String(count);
-    inner.appendChild(countEl);
+    stack.appendChild(countEl);
   }
 
+  inner.appendChild(stack);
   root.appendChild(inner);
   return root;
 }
@@ -6609,11 +6634,13 @@ function updateWorldBagDropDom(forceRebuild) {
           countEl.textContent = String(count);
         } else {
           const inner = drop._el.querySelector(".world-bag-drop__inner");
-          if (inner) {
+          const mount =
+            (inner && inner.querySelector(".world-bag-drop__stack")) || inner;
+          if (mount) {
             const next = document.createElement("span");
             next.className = "world-bag-drop__count";
             next.textContent = String(count);
-            inner.appendChild(next);
+            mount.appendChild(next);
           }
         }
       } else if (countEl) {
@@ -6904,17 +6931,6 @@ function onBagInventorySlotPointerDown(event) {
   if (craftTradeOpen) {
     if (!itemKey || slot.classList.contains("is-empty")) return;
     if (!canStartBagPanelCraftTradeDrag(itemKey)) {
-      if (
-        isTradeExchangeOpen() &&
-        itemKey.indexOf("butterfly:") === 0 &&
-        typeof showPlayerAlert === "function"
-      ) {
-        showPlayerAlert({
-          message:
-            "\uB098\uBE44\uB294 \uC5F0\uAE08\uC220\uC758 \uB2EC\uC778\uC5D0\uC11C \uC81C\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-          durationMs: 2600
-        });
-      }
       return;
     }
     event.preventDefault();
@@ -6971,6 +6987,10 @@ function isPointerOutsideBagInventoryPanel(clientX, clientY) {
   );
 }
 
+function isPointerInsideBagInventoryPanel(clientX, clientY) {
+  return !isPointerOutsideBagInventoryPanel(clientX, clientY);
+}
+
 async function finishBagInventoryDrag(event) {
   if (!bagInventoryDragState) return;
   const state = bagInventoryDragState;
@@ -6985,6 +7005,22 @@ async function finishBagInventoryDrag(event) {
   }
   clearBagInventoryDragVisual();
   if (!wasDragging) return;
+  craftTradeDragClickSuppress = true;
+  if (dragMode === "tradeReturn" && isTradeExchangeOpen()) {
+    if (isPointerInsideBagInventoryPanel(event.clientX, event.clientY)) {
+      returnTradeCounterStackToInventory(itemKey);
+    }
+    return;
+  }
+  if (dragMode === "alchemyReturn" && isAlchemyCraftOpen()) {
+    if (isPointerInsideBagInventoryPanel(event.clientX, event.clientY)) {
+      const slotIndex = Number(state.alchemySlotIndex);
+      if (Number.isFinite(slotIndex) && slotIndex >= 0) {
+        returnAlchemySlotStackToInventory(slotIndex);
+      }
+    }
+    return;
+  }
   if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
     tryDropBagItemOnAlchemyRequirement(itemKey, target);
@@ -7014,6 +7050,51 @@ function onBagInventorySlotPointerUp(event) {
 function onBagInventorySlotPointerCancel(event) {
   if (!bagInventoryDragState) return;
   clearBagInventoryDragVisual();
+}
+
+function onTradeCounterChipPointerDown(event) {
+  if (!isTradeExchangeOpen() || !tradeCounterSlot) return;
+  if (event.button !== 0) return;
+  const chip = event.target.closest(".trade-counter-chip");
+  if (!chip || !tradeCounterSlot.contains(chip)) return;
+  const itemKey = chip.dataset.itemKey || "";
+  if (!itemKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  bagInventoryDragState = {
+    itemKey: itemKey,
+    sourceSlot: chip,
+    startX: event.clientX,
+    startY: event.clientY,
+    dragging: false,
+    mode: "tradeReturn"
+  };
+  chip.classList.add("is-bag-drag-source");
+  chip.setPointerCapture(event.pointerId);
+}
+
+function onAlchemyRequirementSlotPointerDown(event) {
+  if (!isAlchemyCraftOpen() || !alchemyCraftRequirementSlots) return;
+  if (event.button !== 0) return;
+  const slotEl = event.target.closest(".alchemy-craft-req-slot");
+  if (!slotEl || !alchemyCraftRequirementSlots.contains(slotEl)) return;
+  if (!slotEl.classList.contains("is-partial") && !slotEl.classList.contains("is-filled")) return;
+  const slotIndex = Number(slotEl.dataset.slotIndex);
+  if (!Number.isFinite(slotIndex) || slotIndex < 0) return;
+  const itemKey = slotEl.dataset.itemKey || "";
+  event.preventDefault();
+  event.stopPropagation();
+  bagInventoryDragState = {
+    itemKey: itemKey,
+    alchemySlotIndex: slotIndex,
+    sourceSlot: slotEl,
+    startX: event.clientX,
+    startY: event.clientY,
+    dragging: false,
+    mode: "alchemyReturn"
+  };
+  slotEl.classList.add("is-bag-drag-source");
+  slotEl.setPointerCapture(event.pointerId);
 }
 
 function serializeWorldExtraBucketsForSnapshot(buckets) {
@@ -9366,6 +9447,9 @@ function getPlantVisibleHoverRectsWorld(plant) {
 const PLANT_DEPTH_Z_MIN = 3;
 const PLANT_DEPTH_Z_MAX = 14;
 let currentPlantHoverTarget = null;
+let lastPlantHoverPointerClientX = 0;
+let lastPlantHoverPointerClientY = 0;
+let hasLastPlantHoverPointer = false;
 /** @type {HTMLElement[]} */
 let plantOccluderFadeElements = [];
 
@@ -9458,14 +9542,47 @@ function refreshPlantOccluderFade() {
   setPlantOccluderFadeElements(nextEls);
 }
 
+function isPlantEligibleForWorldHover(plant) {
+  if (!plant || plant.removed) return false;
+  if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return false;
+  if (plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
+    return false;
+  }
+  return true;
+}
+
+/** 플레이어 근처(물주기 거리) 식물 — 포인터 호버가 없을 때 같은 호버 효과 */
+function pickPlantForProximityHover() {
+  let best = null;
+  let bestDist = Infinity;
+  function consider(plant) {
+    if (!isPlantEligibleForWorldHover(plant)) return;
+    const distance = getPlayerDistanceToPlant(plant);
+    if (distance >= plantWaterDistance || distance >= bestDist) return;
+    bestDist = distance;
+    best = plant;
+  }
+  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
+  for (let i = 0; i < appleState.extraPlants.length; i += 1) {
+    consider(appleState.extraPlants[i]);
+  }
+  return best;
+}
+
+/** 포인터 호버 우선, 없으면 근접 호버 */
+function pickPlantHoverTarget(clientX, clientY) {
+  const pointerPlant = pickPlantForHoverFromPointerClient(clientX, clientY);
+  if (pointerPlant) return pointerPlant;
+  return pickPlantForProximityHover();
+}
+
 /** 포인터 아래 식물 중 가려진(뒤·작은 Y) 식물 우선 — 겹침 시 앞 식물이 아닌 뒤 식물 호버 */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
   const matches = [];
   function consider(plant) {
-    if (!plant) return;
-    if (plant.removed) return;
+    if (!isPlantEligibleForWorldHover(plant)) return;
     const rects = getPlantVisibleHoverRectsWorld(plant);
     for (let i = 0; i < rects.length; i += 1) {
       const rect = rects[i];
@@ -9569,30 +9686,6 @@ function isWorldNpcHoverActiveFor(npcEl) {
   return Boolean(npcEl && worldNpcHoverAnchorEl === npcEl && isWorldNpcHoverLabelVisible());
 }
 
-function getWorldNpcPromptBubbleExtraShiftWorld(npcEl) {
-  if (!isWorldNpcHoverActiveFor(npcEl)) return 0;
-  return groundScreenPxToWorldY(WORLD_NPC_HOVER_PROMPT_STACK_SCREEN_PX);
-}
-
-function relayoutWorldNpcPromptBubbleFor(npcEl) {
-  if (!npcEl) return;
-  if (npcEl === plantMaster) {
-    if (npcBubble && npcBubble.style.display === "block") layoutNpcSpeechBubble();
-    return;
-  }
-  if (npcEl === tradeMaster) {
-    if (tradeMasterBubble && tradeMasterBubble.style.display === "block") {
-      relayoutTradeMasterSpeechBubble();
-    }
-    return;
-  }
-  if (npcEl === alchemyMaster) {
-    if (alchemyMasterBubble && alchemyMasterBubble.style.display === "block") {
-      relayoutAlchemyMasterSpeechBubble();
-    }
-  }
-}
-
 function syncWorldNpcHoverLabelPosition(anchorEl) {
   const anchor = anchorEl || worldNpcHoverAnchorEl;
   if (!plantHoverLabel || !anchor || !anchor.isConnected) return;
@@ -9603,9 +9696,6 @@ function syncWorldNpcHoverLabelPosition(anchorEl) {
     promptBubble &&
     promptBubble.style.display !== "none" &&
     isWorldNpcHoverActiveFor(anchor);
-  if (stackOnPromptBubble) {
-    relayoutWorldNpcPromptBubbleFor(anchor);
-  }
   const rect = anchor.getBoundingClientRect();
   void plantHoverLabel.offsetWidth;
   const w = plantHoverLabel.offsetWidth || 1;
@@ -9652,7 +9742,6 @@ function showWorldNpcHoverLabel(text, anchorEl) {
   plantHoverLabel.style.minWidth = "";
   plantHoverLabel.style.right = "";
   syncWorldNpcHoverLabelPosition(anchorEl);
-  relayoutWorldNpcPromptBubbleFor(anchorEl);
 }
 
 function showUiShortcutHoverLabel(text, anchorEl) {
@@ -9690,8 +9779,28 @@ function showUiShortcutHoverLabel(text, anchorEl) {
   plantHoverLabel.style.top = top + "px";
 }
 
+function refreshPlantHoverAfterPlayerMove() {
+  if (!plantHoverLabel) return;
+  if (hasLastPlantHoverPointer) {
+    syncPlantHoverFromPointerClient(
+      lastPlantHoverPointerClientX,
+      lastPlantHoverPointerClientY
+    );
+    return;
+  }
+  const plant = pickPlantForProximityHover();
+  if (plant) {
+    if (plant !== currentPlantHoverTarget) showPlantHoverSignForPlant(plant);
+  } else if (currentPlantHoverTarget) {
+    hidePlantHoverLabel();
+  }
+}
+
 function syncPlantHoverFromPointerClient(clientX, clientY) {
   if (!plantHoverLabel) return;
+  lastPlantHoverPointerClientX = clientX;
+  lastPlantHoverPointerClientY = clientY;
+  hasLastPlantHoverPointer = true;
 
   const uiShortcut = pickUiShortcutHoverTarget(clientX, clientY);
   if (uiShortcut) {
@@ -9735,7 +9844,7 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
 
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
 
-  const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
+  const plant = pickPlantHoverTarget(clientX, clientY);
   if (plant) {
     if (plant !== currentPlantHoverTarget) showPlantHoverSignForPlant(plant);
   } else hidePlantHoverLabel();
@@ -9800,6 +9909,11 @@ function getSproutSizeForStage(stage, plant) {
         : 1;
   const baseWidth = SPROUT_STAGE_WIDTHS[idx] || SPROUT_WIDTH;
   const baseHeight = SPROUT_STAGE_HEIGHTS[idx] || SPROUT_HEIGHT;
+  if (matureAnchor) {
+    const height = Math.max(1, Math.round(baseHeight * growthScale));
+    const width = Math.max(1, Math.round(height * (matureAnchor.srcW / matureAnchor.srcH)));
+    return { width: width, height: height };
+  }
   return {
     width: Math.max(1, Math.round(baseWidth * growthScale)),
     height: Math.max(1, Math.round(baseHeight * growthScale))
@@ -10846,6 +10960,13 @@ function updatePlayerPosition() {
   setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   wasPlayerInTree = shouldClampToTree || (isTreeFalling && playerDepth > groundMaxDepth);
+  if (
+    playerX !== previousPlayerX ||
+    playerDepth !== previousPlayerDepth ||
+    jumpY !== previousJumpY
+  ) {
+    refreshPlantHoverAfterPlayerMove();
+  }
 }
 
 function isPlayerInWellWaterArea() {
@@ -11813,7 +11934,12 @@ function getPlantHoverRingWorldBounds(plant) {
     plant.status !== "rotten" &&
     plant.status !== "dry" &&
     !plant.isOverwatered;
-  if (sproutVisible && st >= 4 && shouldHideSeparateSoilUnderBigGrass(plant)) {
+  if (
+    sproutVisible &&
+    st >= 4 &&
+    shouldHideSeparateSoilUnderBigGrass(plant) &&
+    !isFlowerMaturePlant(plant)
+  ) {
     const anchor = getPlantHoverAnchorWorld(plant);
     const size = PLANT_HOVER_RING_WORLD_SIZE;
     return {
@@ -12037,6 +12163,10 @@ function hidePlantHoverLabel() {
 
 function showPlantHoverSignForPlant(plant) {
   if (!plantHoverLabel || !plant) return;
+  if (!isPlantEligibleForWorldHover(plant)) {
+    hidePlantHoverLabel();
+    return;
+  }
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
   currentPlantHoverTarget = plant;
@@ -12629,7 +12759,8 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
   const plant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (!plant || !canWaterPlantByClick(plant)) return false;
   if (!isPlayerNearPlantWorld(plant)) {
-    flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+    flashPlantProximityWarning(PLANT_WATER_TOO_FAR_MESSAGE);
+    updatePlayerStatus();
     return false;
   }
   if (!tryConsumePlantWaterPourCooldown()) return false;
@@ -13342,7 +13473,7 @@ function useBucket() {
 
   if (wateringTarget) {
     if (!isPlayerNearPlantWorld(wateringTarget.plant)) {
-      flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+      flashPlantProximityWarning(PLANT_WATER_TOO_FAR_MESSAGE);
       updatePlayerStatus();
       return;
     }
@@ -13381,7 +13512,7 @@ function useBucket() {
 
   const closestWaterableDist = getClosestWaterablePlantDistance();
   if (Number.isFinite(closestWaterableDist) && closestWaterableDist >= plantWaterDistance) {
-    flashPlantProximityWarning(plantProximityPhraseForNoun("\uC2DD\uBB3C"));
+    flashPlantProximityWarning(PLANT_WATER_TOO_FAR_MESSAGE);
     updatePlayerStatus();
   }
 }
@@ -16467,14 +16598,15 @@ function renderRemotePlayerState(state, source) {
       remotePlayer.lastShownAction = "";
     }
   }
-  remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
+  if (remotePlayer.appliedTintColor !== remoteColor) {
+    remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
+    remotePlayer.appliedTintColor = remoteColor;
+  }
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
-  setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey);
+  setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey, nextJumpY);
   remotePlayer.worldX = nextX;
   remotePlayer.worldY = nextBaseY + nextJumpY;
   remotePlayer.depth = Number(state.depth) || 0;
-  remotePlayer.jumpY = nextJumpY;
-  applyRemotePlayerWorldPosition(remotePlayer);
   remotePlayer.userId = state.userId != null ? String(state.userId) : "";
   remotePlayer.name = state.name || "OVC";
   if (incomingVersion > 0) {
@@ -16512,8 +16644,15 @@ function getRemotePlayerBaseWorldY(remotePlayer) {
   return -(Number(remotePlayer.depth) || 0);
 }
 
+function getRemotePlayerRenderJumpY(remotePlayer) {
+  if (!remotePlayer) return 0;
+  const renderJumpY = Number(remotePlayer.renderJumpY);
+  if (Number.isFinite(renderJumpY)) return renderJumpY;
+  return Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
+}
+
 function getRemotePlayerWorldY(remotePlayer) {
-  return getRemotePlayerBaseWorldY(remotePlayer) + (Number(remotePlayer.jumpY) || 0);
+  return getRemotePlayerBaseWorldY(remotePlayer) + getRemotePlayerRenderJumpY(remotePlayer);
 }
 
 function applyRemotePlayerWorldPosition(remotePlayer) {
@@ -16522,7 +16661,7 @@ function applyRemotePlayerWorldPosition(remotePlayer) {
   const y = getRemotePlayerWorldY(remotePlayer);
   remotePlayer.element.classList.toggle(
     "is-airborne",
-    (Number(remotePlayer.jumpY) || 0) < -REMOTE_PLAYER_AIRBORNE_JUMP_Y
+    getRemotePlayerRenderJumpY(remotePlayer) < -REMOTE_PLAYER_AIRBORNE_JUMP_Y
   );
   setWorldPosition(remotePlayer.element, x, y);
 }
@@ -16557,8 +16696,11 @@ function createRemotePlayer(remoteId) {
     renderBaseY: 0,
     targetX: 0,
     targetBaseY: 0,
+    targetJumpY: 0,
+    renderJumpY: 0,
     hasRenderPosition: false,
     lastSmoothAt: 0,
+    appliedTintColor: "",
     worldX: 0,
     worldY: 0,
     depth: 0,
@@ -16573,18 +16715,29 @@ function createRemotePlayer(remoteId) {
   return remotePlayers[remoteId];
 }
 
-function setRemotePlayerMoveTarget(remotePlayer, x, baseY, positionKey) {
+function setRemotePlayerMoveTarget(remotePlayer, x, baseY, positionKey, jumpOffsetY) {
   const nextX = Number(x) || 0;
   const nextBaseY = Number(baseY) || 0;
+  const nextJumpY =
+    jumpOffsetY != null && Number.isFinite(Number(jumpOffsetY))
+      ? Number(jumpOffsetY)
+      : Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
   remotePlayer.targetX = nextX;
   remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.targetJumpY = nextJumpY;
+  remotePlayer.jumpY = nextJumpY;
   remotePlayer.positionKey =
     positionKey ||
-    Math.round(nextX * 10) + "|" + Math.round(nextBaseY * 10) + "|" + Math.round((Number(remotePlayer.jumpY) || 0) * 10);
+    Math.round(nextX * 10) +
+      "|" +
+      Math.round(nextBaseY * 10) +
+      "|" +
+      Math.round(nextJumpY * 10);
 
   if (!remotePlayer.hasRenderPosition) {
     remotePlayer.renderX = nextX;
     remotePlayer.renderBaseY = nextBaseY;
+    remotePlayer.renderJumpY = nextJumpY;
     remotePlayer.hasRenderPosition = true;
     remotePlayer.lastSmoothAt = performance.now();
     applyRemotePlayerWorldPosition(remotePlayer);
@@ -16597,8 +16750,10 @@ function setRemotePlayerVisualPosition(remotePlayer, x, baseY, jumpOffsetY) {
   const nextJumpY = Number(jumpOffsetY) || 0;
   remotePlayer.renderX = nextX;
   remotePlayer.renderBaseY = nextBaseY;
+  remotePlayer.renderJumpY = nextJumpY;
   remotePlayer.targetX = nextX;
   remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.targetJumpY = nextJumpY;
   remotePlayer.jumpY = nextJumpY;
   remotePlayer.hasRenderPosition = true;
   remotePlayer.lastSmoothAt = performance.now();
@@ -16619,39 +16774,57 @@ function updateRemotePlayerSmoothing() {
 
     const targetX = Number(remotePlayer.targetX) || 0;
     const targetBaseY = Number(remotePlayer.targetBaseY) || 0;
+    const targetJumpY = Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
     const currentX = Number(remotePlayer.renderX) || 0;
     const currentBaseY = Number(remotePlayer.renderBaseY) || 0;
+    const currentJumpY = Number(remotePlayer.renderJumpY);
+    const safeCurrentJumpY = Number.isFinite(currentJumpY)
+      ? currentJumpY
+      : targetJumpY;
     const dx = targetX - currentX;
     const dy = targetBaseY - currentBaseY;
+    const jumpDy = targetJumpY - safeCurrentJumpY;
     const distance = Math.hypot(dx, dy);
+    const lastSmoothAt = Number(remotePlayer.lastSmoothAt || now);
+    const dt = Math.min(50, Math.max(0, now - lastSmoothAt));
+    let positionChanged = false;
 
     if (distance <= REMOTE_PLAYER_SNAP_EPSILON) {
       if (currentX !== targetX || currentBaseY !== targetBaseY) {
         remotePlayer.renderX = targetX;
         remotePlayer.renderBaseY = targetBaseY;
-        applyRemotePlayerWorldPosition(remotePlayer);
-      } else {
-        applyRemotePlayerWorldPosition(remotePlayer);
+        positionChanged = true;
       }
-      remotePlayer.lastSmoothAt = now;
-      return;
-    }
-
-    if (distance >= REMOTE_PLAYER_SNAP_DISTANCE) {
+    } else if (distance >= REMOTE_PLAYER_SNAP_DISTANCE) {
       remotePlayer.renderX = targetX;
       remotePlayer.renderBaseY = targetBaseY;
-      remotePlayer.lastSmoothAt = now;
-      applyRemotePlayerWorldPosition(remotePlayer);
-      return;
+      positionChanged = true;
+    } else if (distance > 0) {
+      const alpha = 1 - Math.exp(-dt / REMOTE_PLAYER_SMOOTHING_MS);
+      remotePlayer.renderX = currentX + dx * alpha;
+      remotePlayer.renderBaseY = currentBaseY + dy * alpha;
+      positionChanged = true;
     }
 
-    const lastSmoothAt = Number(remotePlayer.lastSmoothAt || now);
-    const dt = Math.min(50, Math.max(0, now - lastSmoothAt));
-    const alpha = 1 - Math.exp(-dt / REMOTE_PLAYER_SMOOTHING_MS);
-    remotePlayer.renderX = currentX + dx * alpha;
-    remotePlayer.renderBaseY = currentBaseY + dy * alpha;
-    remotePlayer.lastSmoothAt = now;
-    applyRemotePlayerWorldPosition(remotePlayer);
+    let jumpChanged = false;
+    if (Math.abs(jumpDy) <= REMOTE_PLAYER_SNAP_EPSILON) {
+      if (safeCurrentJumpY !== targetJumpY) {
+        remotePlayer.renderJumpY = targetJumpY;
+        jumpChanged = true;
+      }
+    } else if (Math.abs(jumpDy) >= REMOTE_PLAYER_JUMP_SNAP_DISTANCE) {
+      remotePlayer.renderJumpY = targetJumpY;
+      jumpChanged = true;
+    } else {
+      const jumpAlpha = 1 - Math.exp(-dt / REMOTE_PLAYER_JUMP_SMOOTHING_MS);
+      remotePlayer.renderJumpY = safeCurrentJumpY + jumpDy * jumpAlpha;
+      jumpChanged = true;
+    }
+
+    if (positionChanged || jumpChanged) {
+      remotePlayer.lastSmoothAt = now;
+      applyRemotePlayerWorldPosition(remotePlayer);
+    }
   });
 }
 

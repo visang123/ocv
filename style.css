@@ -424,13 +424,12 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   pointer-events: none;
   user-select: none;
-  transform: rotate(20deg);
-  transform-origin: center center;
-  filter: drop-shadow(0 0 0.4px #000) drop-shadow(0 0 0.4px #000);
+  overflow: visible;
+  filter: drop-shadow(0 0 0.3px #000) drop-shadow(0 0 0.3px #000);
 }
 
 .world-bag-drop__inner {
@@ -440,43 +439,54 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
   animation: bag-drop-wiggle 3.6s ease-in-out infinite;
 }
 
+.world-bag-drop__stack {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  transform: rotate(20deg);
+  transform-origin: center center;
+}
+
 .world-bag-drop__icon {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   object-fit: contain;
   display: block;
-  border: 1px solid #000;
+  border: 0.5px solid #000;
   border-radius: 1px;
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.08);
 }
 
 .world-bag-drop__icon.bag-drop-icon {
-  width: 6px;
-  height: 6px;
-  border: 1px solid #000;
+  width: 8px;
+  height: 8px;
+  border: 0.5px solid #000;
   border-radius: 1px;
   box-sizing: border-box;
 }
 
 .world-bag-drop__count {
   position: absolute;
-  right: -1px;
-  bottom: -1px;
-  min-width: 8px;
-  padding: 0 2px;
-  border-radius: 4px;
+  right: -2px;
+  bottom: -2px;
+  min-width: 0;
+  padding: 0 1px;
+  border-radius: 2px;
   background: rgba(8, 12, 18, 0.88);
-  border: 1px solid #000;
+  border: 0.5px solid #000;
   color: #fff;
-  font-size: 6px;
+  font-size: 4px;
   font-weight: 800;
-  line-height: 8px;
+  line-height: 5px;
   text-align: center;
   pointer-events: none;
+  z-index: 2;
 }
 
 .bag-drop-icon--apple {
@@ -4134,6 +4144,11 @@ body #world-bag-inventory {
   background: rgba(245, 158, 11, 0.14);
 }
 
+.trade-counter-chip.is-bag-drag-source,
+.alchemy-craft-req-slot.is-bag-drag-source {
+  opacity: 0.55;
+}
+
 .trade-counter-chip .bag-slot-icon {
   width: 34px;
   height: 34px;
@@ -4472,8 +4487,8 @@ body #world-bag-inventory {
 
 .alchemy-craft-req-badge {
   position: absolute;
+  top: 2px;
   right: 3px;
-  bottom: 2px;
   z-index: 3;
   padding: 1px 3px;
   border-radius: 4px;

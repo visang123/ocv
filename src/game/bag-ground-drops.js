@@ -1,6 +1,6 @@
 /** 월드에 버린 가방 아이템(캐릭터 발밑) — 좌표·스택·비주얼 */
 
-export const BAG_DROP_WORLD_SIZE = 7;
+export const BAG_DROP_WORLD_SIZE = 9;
 export const BAG_DROP_SNAP_GRID = 10;
 export const BAG_DROP_FOOT_OFFSET_Y = 8;
 
