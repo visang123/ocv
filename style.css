@@ -4369,17 +4369,38 @@ button.trade-tradeable-recipe.is-selected {
 .trade-recipe-io {
   position: relative;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
+  gap: 2px;
+  min-width: 40px;
+  max-width: 58px;
   min-height: 32px;
+  padding: 3px 4px 4px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
+}
+
+.trade-recipe-io-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .trade-recipe-io .bag-slot-icon {
   width: 28px;
   height: 28px;
+}
+
+.trade-recipe-io-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 8px/1.15 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
+  color: rgba(248, 250, 252, 0.92);
+  text-align: center;
 }
 
 .trade-recipe-io-count {
