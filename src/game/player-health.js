@@ -8,6 +8,7 @@ import {
 export const PLAYER_MAX_HEALTH = 100;
 export const PLAYER_APPLE_HEAL_AMOUNT = 15;
 export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 5000;
+export const PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS = 5000;
 export const PLAYER_HEALTH_RECHARGE_MS = 1000;
 export const PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC = 1;
 export const PLAYER_HEALTH_RECHARGE_CHAIR_PER_SEC = 2;
@@ -169,6 +170,12 @@ export function getPlayerHealthRechargePerSecond(opts) {
   return PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC;
 }
 
+/** 가만히 서서 초당 +1 회복일 때만 5초 준비 시간 */
+export function needsIdleRechargeWarmup(health, rechargeCtx) {
+  if (isPlayerHealthDepleted(health)) return false;
+  return getPlayerHealthRechargePerSecond(rechargeCtx) === PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC;
+}
+
 export function shouldDrainPlayerHealth(opts) {
   if (!opts || !opts.hasSpawnedCharacter || opts.isCharacterSelecting) return false;
   if (opts.isTabSessionSuperseded) return false;
@@ -207,6 +214,10 @@ export function tickPlayerHealthState(state, nowMs) {
 
   if (shouldRechargePlayerHealth(health, shouldDrain)) {
     const rate = getPlayerHealthRechargePerSecond(rechargeCtx);
+    const useWarmup = needsIdleRechargeWarmup(health, rechargeCtx);
+    if (useWarmup && Boolean(state.wasDraining)) {
+      lastTickAt = 0;
+    }
     if (!lastTickAt) {
       return {
         health: health,
@@ -216,6 +227,34 @@ export function tickPlayerHealthState(state, nowMs) {
       };
     }
     const elapsed = now - lastTickAt;
+    if (useWarmup) {
+      if (elapsed < PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS) {
+        return {
+          health: health,
+          lastTickAt: lastTickAt,
+          changed: false,
+          depleted: isPlayerHealthDepleted(health)
+        };
+      }
+      const healElapsed = elapsed - PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS;
+      const ticks = Math.floor(healElapsed / PLAYER_HEALTH_RECHARGE_MS);
+      if (ticks < 1) {
+        return {
+          health: health,
+          lastTickAt: lastTickAt,
+          changed: false,
+          depleted: isPlayerHealthDepleted(health)
+        };
+      }
+      const nextHealth = clampPlayerHealth(health + ticks * rate);
+      return {
+        health: nextHealth,
+        lastTickAt:
+          lastTickAt + PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS + ticks * PLAYER_HEALTH_RECHARGE_MS,
+        changed: nextHealth !== health,
+        depleted: isPlayerHealthDepleted(nextHealth)
+      };
+    }
     if (elapsed < PLAYER_HEALTH_RECHARGE_MS) {
       return {
         health: health,

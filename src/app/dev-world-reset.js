@@ -1,22 +1,30 @@
 export const OVC_PENDING_DEV_WORLD_RESET_KEY = "ovcPendingDevWorldResetV1";
 
-function isDevResetAltModifierHeld(event) {
+function hasAltModifier(event) {
   if (event.altKey) return true;
   if (typeof event.getModifierState !== "function") return false;
-  if (event.getModifierState("AltGraph")) return true;
-  return event.getModifierState("Control") && event.getModifierState("Alt");
+  return event.getModifierState("Alt") || event.getModifierState("AltGraph");
 }
 
 /** 월드(index) 전용: Ctrl+Shift+R 또는 Ctrl+Alt+R */
 export function isWorldMapDevResetShortcut(event) {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.__ovcIsWorldMapDevResetShortcut === "function"
+  ) {
+    return window.__ovcIsWorldMapDevResetShortcut(event);
+  }
   if (event.repeat) return false;
-  const isRKey =
-    event.code === "KeyR" || event.key === "r" || event.key === "R";
-  if (!isRKey) return false;
   if (!(event.ctrlKey || event.metaKey)) return false;
-  // Ctrl+Shift+R — shift만 본다 (한국어 IME가 altKey를 잘못 켜는 경우 무시)
+  const isRKey =
+    event.code === "KeyR" ||
+    event.key === "r" ||
+    event.key === "R" ||
+    event.keyCode === 82;
+  if (!isRKey) return false;
   if (event.shiftKey) return true;
-  return isDevResetAltModifierHeld(event);
+  if (hasAltModifier(event)) return true;
+  return false;
 }
 
 export function markPendingDevWorldReset() {
@@ -36,24 +44,6 @@ export function consumePendingDevWorldReset(resetFn) {
   }
   if (typeof resetFn === "function") resetFn();
   return true;
-}
-
-export function installWorldMapDevResetShortcut(isWorldEntry, resetFn) {
-  window.addEventListener(
-    "keydown",
-    function (event) {
-      if (!isWorldMapDevResetShortcut(event)) return;
-      if (typeof isWorldEntry === "function" && !isWorldEntry()) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (typeof resetFn === "function") {
-        resetFn();
-        return;
-      }
-      markPendingDevWorldReset();
-    },
-    true
-  );
 }
 
 export function wireDevWorldResetApi(resetFn) {

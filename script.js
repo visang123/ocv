@@ -409,7 +409,6 @@ import {
   ovcForceWorldHubIsRequested
 } from "./src/app/ovc-world-hub.js";
 import {
-  installWorldMapDevResetShortcut,
   isWorldMapDevResetShortcut,
   wireDevWorldResetApi
 } from "./src/app/dev-world-reset.js";
@@ -1815,6 +1814,7 @@ const MOVEMENT_DT_CAP_SEC = 0.05;
 let lastMovementTickMs = 0;
 let playerHealth = PLAYER_MAX_HEALTH;
 let playerLastHealthTickAt = 0;
+let playerWasDrainingHealth = false;
 let playerHealthGaugeVisible = false;
 let playerSittingChairId = "";
 let playerInsideCraftHouseId = "";
@@ -5208,10 +5208,14 @@ function loadGuideBookState(skipMaybeResetTutorial) {
 }
 
 let isDevWorldResetInProgress = false;
+let lastDevWorldResetAt = 0;
 
 function resetGameForTesting() {
+  const now = Date.now();
+  if (now - lastDevWorldResetAt < 400) return;
   if (isDevWorldResetInProgress || isReloadingForWorldReset) return;
   if (!isWorldDocumentEntry()) return;
+  lastDevWorldResetAt = now;
 
   isDevWorldResetInProgress = true;
   try {
@@ -5264,9 +5268,6 @@ function resetGameForTesting() {
     ovcTryDismissLoadingScreen(true);
   }
 }
-
-installWorldMapDevResetShortcut(isWorldDocumentEntry, resetGameForTesting);
-wireDevWorldResetApi(resetGameForTesting);
 
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
@@ -5330,6 +5331,7 @@ function applyDefaultState(options) {
 
   playerHealth = PLAYER_MAX_HEALTH;
   playerLastHealthTickAt = 0;
+  playerWasDrainingHealth = false;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
@@ -11844,6 +11846,7 @@ function loadPlayerHealth() {
   if (raw == null || raw === "") {
     playerHealth = PLAYER_MAX_HEALTH;
     playerLastHealthTickAt = 0;
+    playerWasDrainingHealth = false;
     playerHealthGaugeVisible = false;
     return;
   }
@@ -11868,6 +11871,7 @@ function loadPlayerHealth() {
   const legacy = clampPlayerHealth(raw);
   playerHealth = legacy;
   playerLastHealthTickAt = 0;
+  playerWasDrainingHealth = false;
   playerHealthGaugeVisible = false;
   playerSittingChairId = "";
   playerInsideCraftHouseId = "";
@@ -11916,11 +11920,13 @@ function tickPlayerHealth(nowMs) {
     ? playerHealthPosePrev
     : { x: playerX, depth: playerDepth, jumpY: jumpY };
   const ctx = getPlayerHealthTickContext(healthPosePrev);
+  const shouldDrain = shouldDrainPlayerHealth(ctx);
   const result = tickPlayerHealthState(
     {
       health: playerHealth,
       lastTickAt: playerLastHealthTickAt,
-      shouldDrain: shouldDrainPlayerHealth(ctx),
+      shouldDrain: shouldDrain,
+      wasDraining: playerWasDrainingHealth,
       rechargeContext: {
         footCenterX: ctx.footCenterX,
         footY: ctx.footY,
@@ -11931,6 +11937,7 @@ function tickPlayerHealth(nowMs) {
     },
     nowMs
   );
+  playerWasDrainingHealth = shouldDrain;
   playerHealth = result.health;
   playerLastHealthTickAt = result.lastTickAt;
   if (result.changed) {
@@ -19693,6 +19700,7 @@ try {
   ovcTryDismissLoadingScreen(true);
 }
 })();
+wireDevWorldResetApi(resetGameForTesting);
 setTimeout(function () {
   if (!isTabSessionSuperseded) {
     if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
