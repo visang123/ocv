@@ -163,6 +163,15 @@ export function getBagItemDescriptor(itemKey) {
         '<img class="bag-slot-icon bag-slot-icon--rock" src="이미지/rock-icon.svg?v=20260512a" alt="" width="42" height="42" draggable="false">'
     };
   }
+  if (itemKey === "worldBucket") {
+    return {
+      bagType: "worldBucket",
+      butterflyColor: "",
+      label: "\uC591\uB3D9\uC774",
+      iconHtml:
+        '<img class="bag-slot-icon" src="이미지/bucket-empty.png" alt="" width="42" height="42" draggable="false">'
+    };
+  }
   if (itemKey === "magicPowder") {
     return {
       bagType: "magicPowder",

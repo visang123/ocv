@@ -6570,6 +6570,17 @@ function buildWorldBagDropElement(drop, stackIndex) {
 
   const inner = document.createElement("div");
   inner.className = "world-bag-drop__inner";
+  const dropAgeMs = Date.now() - (Number(drop.droppedAt) || 0);
+  if (dropAgeMs >= 0 && dropAgeMs < 600) {
+    inner.classList.add("is-settling");
+    inner.addEventListener(
+      "animationend",
+      function () {
+        inner.classList.remove("is-settling");
+      },
+      { once: true }
+    );
+  }
 
   const stack = document.createElement("div");
   stack.className = "world-bag-drop__stack";
@@ -9197,7 +9208,7 @@ function normalizeExtraPlantState(plant) {
   migrateLegacyPowderTier5ToAutoGrass(plant, now);
   ensureGrassOrdinalIfNeeded(plant);
   clampPlantGrowthTimingToCurrentConstants(plant);
-  if (isOvergrowthSeedPlant(plant) && !plant.isSproutSelfSustaining) {
+  if (shouldFinalizeOvergrowthGroundToStage3(plant, now)) {
     makePlantStableStage3FromOvergrowthSeed(plant, now);
   }
 }
@@ -11559,7 +11570,6 @@ function plantWorldOvergrowthSeedCount() {
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
       plantRuntime.drySoilAt = null;
-      makePlantStableStage3FromOvergrowthSeed(plantRuntime, plantedAt);
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -11573,7 +11583,6 @@ function plantWorldOvergrowthSeedCount() {
       invPlant.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(invPlant);
       ensureGrassOrdinalIfNeeded(invPlant);
-      makePlantStableStage3FromOvergrowthSeed(invPlant, invPlant.plantedAt);
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
@@ -11780,6 +11789,15 @@ function isExtraSeedOwnedByLocalPlayer(seed) {
 
 function isOvergrowthSeedPlant(plant) {
   return String(plant && plant.seedKind || "") === "overgrowth";
+}
+
+/** 과성장: 빈 땅(티어0·새싹 없음) 구간은 일반 씨앗과 동일하게 유지, 이후에만 3단계로 확정 */
+function shouldFinalizeOvergrowthGroundToStage3(plant, now) {
+  if (!isOvergrowthSeedPlant(plant) || plant.isSproutSelfSustaining) return false;
+  if (plant.isSproutGrown) return true;
+  const started = plant.growthStartedAt;
+  if (started == null || !Number.isFinite(Number(started))) return false;
+  return now - Number(started) >= getPlantFirstGrowthDurationMs(plant);
 }
 
 function makePlantStableStage3FromOvergrowthSeed(plant, now) {
@@ -14790,8 +14808,9 @@ function applyLoadedPlantState(loadedPlant) {
   } else if (Object.prototype.hasOwnProperty.call(loadedPlant, "seedKind")) {
     plantRuntime.seedKind = String(loadedPlant.seedKind || "");
   }
-  if (isOvergrowthSeedPlant(plantRuntime) && !plantRuntime.isSproutSelfSustaining) {
-    makePlantStableStage3FromOvergrowthSeed(plantRuntime, Date.now());
+  const plantLoadNow = Date.now();
+  if (shouldFinalizeOvergrowthGroundToStage3(plantRuntime, plantLoadNow)) {
+    makePlantStableStage3FromOvergrowthSeed(plantRuntime, plantLoadNow);
   }
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;

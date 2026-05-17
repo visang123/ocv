@@ -1,4 +1,5 @@
 /** @typedef {{ id: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string }} TradeRecipe */
+/** @typedef {{ catalogKey?: string, inputs: Record<string, number>, outputs: Record<string, number>, label: string }} TradeCatalogEntry */
 
 export const TRADE_BUTTERFLY_ITEM_KEYS = [
   "butterfly:brown",
@@ -96,6 +97,103 @@ export const TRADE_RECIPES = [
   }
 ];
 
+function recipesEquivalent(a, b) {
+  return (
+    JSON.stringify(a.inputs) === JSON.stringify(b.inputs) &&
+    JSON.stringify(a.outputs) === JSON.stringify(b.outputs)
+  );
+}
+
+/** @param {TradeRecipe} recipe */
+function createReverseTradeRecipe(recipe) {
+  const outputKeys = Object.keys(recipe.outputs || {});
+  const inputKeys = Object.keys(recipe.inputs || {});
+  if (!outputKeys.length || !inputKeys.length) return null;
+  const revInputs = {};
+  outputKeys.forEach(function (key) {
+    revInputs[key] = recipe.outputs[key];
+  });
+  const revOutputs = {};
+  inputKeys.forEach(function (key) {
+    revOutputs[key] = recipe.inputs[key];
+  });
+  const revOutputKeys = Object.keys(revOutputs);
+  let label = recipe.label;
+  if (revOutputKeys.length === 1) {
+    const outKey = revOutputKeys[0];
+    label =
+      formatTradeRecipePseudoLabel(outKey, revOutputs[outKey]) || recipe.label;
+  }
+  return {
+    id: "rev_" + recipe.id,
+    inputs: revInputs,
+    outputs: revOutputs,
+    label: label
+  };
+}
+
+function buildAllTradeRecipes() {
+  /** @type {TradeRecipe[]} */
+  const all = TRADE_RECIPES.slice();
+  TRADE_RECIPES.forEach(function (recipe) {
+    const reverse = createReverseTradeRecipe(recipe);
+    if (!reverse) return;
+    if (all.some(function (existing) { return recipesEquivalent(existing, reverse); })) {
+      return;
+    }
+    all.push(reverse);
+  });
+  return all;
+}
+
+export const ALL_TRADE_RECIPES = buildAllTradeRecipes();
+
+function normalizeTradeSideKey(side) {
+  return Object.keys(side || {})
+    .sort()
+    .map(function (key) {
+      return key + ":" + Math.max(0, Math.floor(Number(side[key]) || 0));
+    })
+    .join(",");
+}
+
+function catalogEntryKey(inputs, outputs) {
+  const left = normalizeTradeSideKey(inputs);
+  const right = normalizeTradeSideKey(outputs);
+  return left < right ? left + "|" + right : right + "|" + left;
+}
+
+/** @returns {TradeCatalogEntry[]} */
+export function getTradeCatalogEntries() {
+  /** @type {TradeCatalogEntry[]} */
+  const entries = [];
+  const seen = new Set();
+  ALL_TRADE_RECIPES.forEach(function (recipe) {
+    const key = catalogEntryKey(recipe.inputs, recipe.outputs);
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({
+      catalogKey: key,
+      inputs: Object.assign({}, recipe.inputs),
+      outputs: Object.assign({}, recipe.outputs),
+      label: recipe.label
+    });
+  });
+  return entries;
+}
+
+/** @param {TradeCatalogEntry} entry @param {Record<string, number>} counter */
+export function getMatchingRecipesForCatalogEntry(entry, counter) {
+  const key =
+    entry.catalogKey || catalogEntryKey(entry.inputs, entry.outputs);
+  return ALL_TRADE_RECIPES.filter(function (recipe) {
+    return (
+      catalogEntryKey(recipe.inputs, recipe.outputs) === key &&
+      recipeMatchesCounter(counter, recipe)
+    );
+  });
+}
+
 export function cloneTradeCounter(counter) {
   const next = {};
   Object.keys(counter || {}).forEach(function (key) {
@@ -107,7 +205,7 @@ export function cloneTradeCounter(counter) {
 
 export function getMatchingTradeRecipes(counter) {
   const c = counter || {};
-  return TRADE_RECIPES.filter(function (recipe) {
+  return ALL_TRADE_RECIPES.filter(function (recipe) {
     return Object.keys(recipe.inputs).every(function (key) {
       return tradeInputSatisfied(c, key, recipe.inputs[key]);
     });
@@ -130,24 +228,59 @@ export function subtractRecipeInputsFromCounter(counter, recipe) {
   return next;
 }
 
-export function formatTradeRecipeInputLabel(itemKey, amount) {
+export function formatTradeRecipePseudoLabel(itemKey, amount) {
   if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
     return "\uB098\uBE44 " + Math.max(0, Math.floor(Number(amount) || 0)) + "\uB9C8\uB9AC";
   }
   return null;
 }
 
+/** @deprecated use formatTradeRecipePseudoLabel */
+export function formatTradeRecipeInputLabel(itemKey, amount) {
+  return formatTradeRecipePseudoLabel(itemKey, amount);
+}
+
+/** Expand pseudo-keys (e.g. butterfly:any) for inventory checks and grants. */
+export function expandTradeItemCounts(counts) {
+  const expanded = {};
+  Object.keys(counts || {}).forEach(function (key) {
+    const n = Math.max(0, Math.floor(Number(counts[key]) || 0));
+    if (n <= 0) return;
+    if (key === TRADE_INPUT_ANY_BUTTERFLY) {
+      let remaining = n;
+      TRADE_BUTTERFLY_ITEM_KEYS.forEach(function (bfKey, index) {
+        if (remaining <= 0) return;
+        const isLast = index === TRADE_BUTTERFLY_ITEM_KEYS.length - 1;
+        const give = isLast
+          ? remaining
+          : Math.floor(n / TRADE_BUTTERFLY_ITEM_KEYS.length);
+        if (give <= 0) return;
+        expanded[bfKey] = (Number(expanded[bfKey]) || 0) + give;
+        remaining -= give;
+      });
+      if (remaining > 0) {
+        expanded[TRADE_BUTTERFLY_ITEM_KEYS[0]] =
+          (Number(expanded[TRADE_BUTTERFLY_ITEM_KEYS[0]]) || 0) + remaining;
+      }
+      return;
+    }
+    expanded[key] = (Number(expanded[key]) || 0) + n;
+  });
+  return expanded;
+}
+
 export function mergeOutputsIntoCounter(counter, recipe) {
   const next = cloneTradeCounter(counter);
   if (!recipe) return next;
-  Object.keys(recipe.outputs).forEach(function (key) {
-    next[key] = Number(next[key] || 0) + Number(recipe.outputs[key] || 0);
+  const expanded = expandTradeItemCounts(recipe.outputs);
+  Object.keys(expanded).forEach(function (key) {
+    next[key] = Number(next[key] || 0) + Number(expanded[key] || 0);
   });
   return next;
 }
 
 export function getTradeRecipeById(recipeId) {
-  return TRADE_RECIPES.find(function (r) {
+  return ALL_TRADE_RECIPES.find(function (r) {
     return r.id === recipeId;
   });
 }
