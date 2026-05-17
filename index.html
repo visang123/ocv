@@ -403,7 +403,9 @@
           &#215;
         </button>
       </div>
-      <p class="trade-exchange-hint">가방에서 아이템을 클릭해 교환대에 올리세요.</p>
+      <p class="trade-exchange-hint">가방에서 아이템을 클릭해 교환대에 올리세요. 바깥으로 끌면 버릴 수 있습니다.</p>
+      <p class="trade-tradeable-label">거래 가능</p>
+      <div id="trade-tradeable-list" class="trade-tradeable-list" aria-label="거래 가능 아이템"></div>
       <div id="trade-counter-slot" class="trade-counter-slot" aria-label="교환대"></div>
       <ul id="trade-offer-list" class="trade-offer-list" aria-label="교환 가능 목록"></ul>
       <button type="button" id="trade-exchange-confirm" class="trade-exchange-confirm" disabled>
@@ -490,7 +492,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260517l"></script>
+  <script type="module" src="src/main.js?v=20260517o"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

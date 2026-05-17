@@ -13,6 +13,7 @@ const tradeMasterBubble = document.getElementById("trade-master-bubble");
 const alchemyMasterBubble = document.getElementById("alchemy-master-bubble");
 const tradeExchangeOverlay = document.getElementById("trade-exchange-overlay");
 const tradeCounterSlot = document.getElementById("trade-counter-slot");
+const tradeTradeableList = document.getElementById("trade-tradeable-list");
 const tradeOfferList = document.getElementById("trade-offer-list");
 const tradeExchangeConfirm = document.getElementById("trade-exchange-confirm");
 const tradeExchangeClose = document.getElementById("trade-exchange-close");
@@ -93,6 +94,7 @@ export {
   alchemyMasterBubble,
   tradeExchangeOverlay,
   tradeCounterSlot,
+  tradeTradeableList,
   tradeOfferList,
   tradeExchangeConfirm,
   tradeExchangeClose,

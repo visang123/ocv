@@ -188,8 +188,11 @@ export const flowerStage5Image = "이미지/flower-stage5-front.png?v=20260516f"
 export const treeStage4Image = "이미지/tree-stage4-front.png?v=20260517a";
 export const treeStage5Image = "이미지/tree-stage5-front.png?v=20260517a";
 /** 하얀 마법 가루 4·5단계 선인장 */
-export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260517a";
-export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260517a";
+export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260517b";
+export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260517b";
+/** 4·5단계 선인장 — 풀·나무보다 작게 */
+export const cactusStage4WorldScale = 2.15;
+export const cactusStage5WorldScale = 2.55;
 /** Draw sizes per stage (world pixels). */
 /** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
 export const SPROUT_STAGE_WIDTHS = [7, 10, 15];
@@ -215,12 +218,12 @@ export const MATURE_SPRITE_ANCHORS = {
     5: { srcW: 500, srcH: 601, centerX: 217, footY: 553, scale: grassStage5WorldScale }
   },
   tree: {
-    4: { srcW: 325, srcH: 294, centerX: 162, footY: 255, scale: grassStage4WorldScale },
-    5: { srcW: 325, srcH: 294, centerX: 91.5, footY: 263, scale: grassStage5WorldScale }
+    4: { srcW: 325, srcH: 294, centerX: 83, footY: 255, scale: grassStage4WorldScale },
+    5: { srcW: 325, srcH: 294, centerX: 81.5, footY: 263, scale: grassStage5WorldScale }
   },
   cactus: {
-    4: { srcW: 325, srcH: 294, centerX: 162, footY: 274, scale: grassStage4WorldScale },
-    5: { srcW: 325, srcH: 294, centerX: 101, footY: 293, scale: grassStage5WorldScale }
+    4: { srcW: 325, srcH: 294, centerX: 81.5, footY: 274, scale: cactusStage4WorldScale },
+    5: { srcW: 325, srcH: 294, centerX: 84.5, footY: 293, scale: cactusStage5WorldScale }
   }
 };
 
@@ -323,8 +326,8 @@ export const wellUseDistance = 17;
 export const wellPourDistance = wellUseDistance;
 /** 우물 물량 카드(#well-card) 표시 거리 — 상호작용보다 넓게 */
 export const wellCardDistance = 45;
-/** Q·클릭 물주기 — 씨앗/아이템 줍기와 같은 근접 거리 */
-export const plantWaterDistance = pickupDistance;
+/** Q·클릭 물주기 — 줍기보다 넓게(씨앗·아이템은 pickupDistance 유지) */
+export const plantWaterDistance = 48;
 /** 포인터 기준 식물 호버: 월드 식물 중심과 이 거리 안이면 후보 */
 export const plantHoverPickRadiusWorld = 24;
 export const maxWellWater = 3;

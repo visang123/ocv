@@ -140,6 +140,11 @@ export function parseMainPlantFromSnapshot(mp) {
     plantedFromSnapshot.ownerDisplayName =
       mp.ownerDisplayName != null ? String(mp.ownerDisplayName) : "";
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "plantSeedKind")) {
+    plantedFromSnapshot.plantSeedKind = String(mp.plantSeedKind || "");
+  } else if (Object.prototype.hasOwnProperty.call(mp, "seedKind")) {
+    plantedFromSnapshot.plantSeedKind = String(mp.seedKind || "");
+  }
   if (Object.prototype.hasOwnProperty.call(mp, "sproutOrdinal")) {
     plantedFromSnapshot.sproutOrdinal = Math.max(0, Number(mp.sproutOrdinal) || 0);
   }
@@ -311,6 +316,9 @@ export function parseExtraPlantFromSnapshot(plant) {
       : "",
     ownerDisplayName: Object.prototype.hasOwnProperty.call(plant, "ownerDisplayName")
       ? String(plant.ownerDisplayName || "")
+      : "",
+    seedKind: Object.prototype.hasOwnProperty.call(plant, "seedKind")
+      ? String(plant.seedKind || "")
       : "",
     sproutOrdinal: Object.prototype.hasOwnProperty.call(plant, "sproutOrdinal")
       ? Math.max(0, Number(plant.sproutOrdinal) || 0)

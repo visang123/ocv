@@ -8,16 +8,21 @@ import {
   subtractRecipeInputsFromCounter
 } from "./trade-exchange.js";
 
-const TRADEABLE_KEYS = new Set([
+const TRADEABLE_ITEM_KEYS = [
   "rock",
   "seed",
   "overgrowthSeed",
   "apple",
   "magicPowder",
+  "magicPowderYellow",
+  "magicPowderWhite",
+  "magicPowderBrown",
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"
-]);
+];
+
+const TRADEABLE_KEYS = new Set(TRADEABLE_ITEM_KEYS);
 
 /** @type {Record<string, any>} */
 let host = null;
@@ -493,6 +498,7 @@ export function openTradeExchangePanel() {
   host.updateBagInventorySlots();
   if (host.worldBagInventory) host.worldBagInventory.classList.add("is-trade-exchange-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.add("is-trade-exchange-focus");
+  renderTradeTradeableList();
   renderTradeCounter();
   renderTradeOffers();
   updateTradeConfirmButton();
@@ -512,6 +518,7 @@ export function closeTradeExchangePanel(options) {
   if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-trade-exchange-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
   if (!keepInventory) host.setBagInventoryPanelOpen(false);
+  renderTradeTradeableList();
   renderTradeCounter();
   renderTradeOffers();
 }
@@ -566,6 +573,22 @@ export function returnTradeCounterStackToInventory(itemKey) {
   return true;
 }
 
+function renderTradeTradeableList() {
+  if (!host.tradeTradeableList) return;
+  host.tradeTradeableList.innerHTML = TRADEABLE_ITEM_KEYS.map(function (key) {
+    const desc = getBagItemDescriptor(key);
+    return (
+      '<div class="trade-tradeable-item" title="' +
+      desc.label +
+      '">' +
+      desc.iconHtml +
+      '<span class="trade-tradeable-item-label">' +
+      desc.label +
+      "</span></div>"
+    );
+  }).join("");
+}
+
 function renderTradeCounter() {
   if (!host.tradeCounterSlot) return;
   const keys = Object.keys(counterByKey).filter(function (k) {
@@ -603,13 +626,35 @@ function renderTradeOffers() {
   }
   host.tradeOfferList.innerHTML = matches
     .map(function (recipe) {
-      const inputs = Object.keys(recipe.inputs)
+      const inputIcons = Object.keys(recipe.inputs)
         .map(function (k) {
-          const anyLabel = formatTradeRecipeInputLabel(k, recipe.inputs[k]);
-          if (anyLabel) return anyLabel;
-          return getBagItemDescriptor(k).label + " " + recipe.inputs[k];
+          const count = recipe.inputs[k];
+          const anyLabel = formatTradeRecipeInputLabel(k, count);
+          if (anyLabel) {
+            return (
+              '<span class="trade-offer-io trade-offer-io--any" title="' +
+              anyLabel +
+              '"><span class="trade-offer-io-label">' +
+              anyLabel +
+              "</span></span>"
+            );
+          }
+          const desc = getBagItemDescriptor(k);
+          return (
+            '<span class="trade-offer-io" title="' +
+            desc.label +
+            " x" +
+            count +
+            '">' +
+            desc.iconHtml +
+            (count > 1 ? '<span class="trade-offer-io-count">×' + count + "</span>" : "") +
+            "</span>"
+          );
         })
-        .join(" + ");
+        .join('<span class="trade-offer-plus" aria-hidden="true">+</span>');
+      const outputKey = Object.keys(recipe.outputs)[0];
+      const outputCount = Number(recipe.outputs[outputKey] || 0);
+      const outDesc = outputKey ? getBagItemDescriptor(outputKey) : { iconHtml: "", label: recipe.label };
       const selected = recipe.id === selectedRecipeId ? " is-selected" : "";
       return (
         '<li><button type="button" class="trade-offer-item' +
@@ -617,10 +662,17 @@ function renderTradeOffers() {
         '" data-recipe-id="' +
         recipe.id +
         '">' +
-        inputs +
-        " \u2192 " +
+        '<span class="trade-offer-flow">' +
+        inputIcons +
+        '<span class="trade-offer-arrow" aria-hidden="true">→</span>' +
+        '<span class="trade-offer-io trade-offer-io--out" title="' +
+        outDesc.label +
+        '">' +
+        outDesc.iconHtml +
+        (outputCount > 1 ? '<span class="trade-offer-io-count">×' + outputCount + "</span>" : "") +
+        '<span class="trade-offer-io-label">' +
         recipe.label +
-        "</button></li>"
+        "</span></span></span></button></li>"
       );
     })
     .join("");

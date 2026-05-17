@@ -4100,6 +4100,51 @@ body #world-bag-inventory {
   color: rgba(248, 250, 252, 0.88);
 }
 
+.trade-tradeable-label {
+  margin: 0 0 4px;
+  font: 700 10px/1.2 Arial, sans-serif;
+  color: rgba(251, 191, 36, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.trade-tradeable-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.18);
+  max-height: 108px;
+  overflow-y: auto;
+}
+
+.trade-tradeable-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.trade-tradeable-item .bag-slot-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.trade-tradeable-item-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 7px/1.1 Arial, sans-serif;
+  color: rgba(248, 250, 252, 0.82);
+  text-align: center;
+}
+
 .trade-counter-slot {
   min-height: 72px;
   margin-bottom: 8px;
@@ -4183,7 +4228,7 @@ body #world-bag-inventory {
 .trade-offer-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  width: 100%;
   padding: 6px 8px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.28);
@@ -4191,6 +4236,74 @@ body #world-bag-inventory {
   color: #f8fafc;
   font: 700 10px/1.25 Arial, sans-serif;
   cursor: pointer;
+}
+
+.trade-offer-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.trade-offer-io {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.trade-offer-io .bag-slot-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.trade-offer-io-count {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 12px;
+  padding: 0 2px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 800 8px/11px Arial, sans-serif;
+  text-align: center;
+}
+
+.trade-offer-io--any {
+  padding: 0 6px;
+  min-width: auto;
+}
+
+.trade-offer-io--any .trade-offer-io-label {
+  font: 700 9px/1.2 Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.trade-offer-io--out {
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 4px 3px;
+  min-width: 36px;
+}
+
+.trade-offer-io--out .trade-offer-io-label {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 8px/1.1 Arial, sans-serif;
+}
+
+.trade-offer-plus,
+.trade-offer-arrow {
+  font: 800 11px/1 Arial, sans-serif;
+  color: rgba(248, 250, 252, 0.75);
 }
 
 .trade-offer-item.is-selected {

@@ -210,6 +210,7 @@ import {
   alchemyMasterBubble,
   tradeExchangeOverlay,
   tradeCounterSlot,
+  tradeTradeableList,
   tradeOfferList,
   tradeExchangeConfirm,
   tradeExchangeClose,
@@ -2276,12 +2277,14 @@ document.addEventListener("keydown", function (event) {
 
   if (key in keys) {
     event.preventDefault();
-    keys[key] = true;
+    if (!isPlayerGameplayBlockedByNpcDialogue()) {
+      keys[key] = true;
+    }
   }
 
   if (key === " " && isOnGround) {
     event.preventDefault();
-    if (plantRuntime.isPlanting) return;
+    if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
     if (isPlayerInTreeSpace()) {
       return;
     }
@@ -2291,6 +2294,7 @@ document.addEventListener("keydown", function (event) {
 
   if (key === "e" && !event.repeat) {
     event.preventDefault();
+    if (isPlayerGameplayBlockedByNpcDialogue()) return;
     if (isInteractKeyLatched) return;
     isInteractKeyLatched = true;
     performInteractAction();
@@ -2299,6 +2303,7 @@ document.addEventListener("keydown", function (event) {
   if (key === "q" && !event.repeat) {
     event.preventDefault();
     if (heldItem === HELD_ITEM_BUCKET) {
+      if (isPlayerGameplayBlockedByNpcDialogue()) return;
       useHeldItem();
       return;
     }
@@ -2324,6 +2329,7 @@ document.addEventListener("keydown", function (event) {
       return;
     }
     if (hasGuideBook && tryCatchButterfly()) return;
+    if (isPlayerGameplayBlockedByNpcDialogue()) return;
     useHeldItem();
   }
 
@@ -2593,6 +2599,11 @@ if (bagInventoryPanel) {
       handleBagSlotClickWhileTradeOpen(slot);
       return;
     }
+    if (isPlayerGameplayBlockedByNpcDialogue()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const kind = slot.dataset.bagType;
     if (!kind || kind === "empty") return;
     if (kind === "butterfly") {
@@ -2682,6 +2693,7 @@ bindTradeMaster({
   tradeMasterBubble: tradeMasterBubble,
   tradeExchangeOverlay: tradeExchangeOverlay,
   tradeCounterSlot: tradeCounterSlot,
+  tradeTradeableList: tradeTradeableList,
   tradeOfferList: tradeOfferList,
   tradeExchangeConfirm: tradeExchangeConfirm,
   tradeExchangeClose: tradeExchangeClose,
@@ -5922,7 +5934,7 @@ function useCraftFurnitureFromBag(kind) {
   if (
     plantRuntime.isPlanting ||
     appleState.isEating ||
-    isNpcDialogueRunning ||
+    isPlayerGameplayBlockedByNpcDialogue() ||
     !isOnGround
   ) {
     return;
@@ -6049,7 +6061,14 @@ function updateApples() {
 }
 
 function eatApple() {
-  if (appleState.count <= 0 || appleState.isEating || plantRuntime.isPlanting || isNpcDialogueRunning) return;
+  if (
+    appleState.count <= 0 ||
+    appleState.isEating ||
+    plantRuntime.isPlanting ||
+    isPlayerGameplayBlockedByNpcDialogue()
+  ) {
+    return;
+  }
   if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_EAT_APPLE) {
     flashOnboardingOrderHint("");
     return;
@@ -6637,10 +6656,7 @@ function getLocalBagDropSpawnPosition() {
   return { x: x, y: y };
 }
 
-function canDiscardBagItemNow(itemKey) {
-  if (!canDiscardBagItemKey(itemKey)) return false;
-  if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return false;
-  if (!bagInventoryPanelOpen) return false;
+function bagDiscardInventoryEligible(itemKey) {
   const counts = getBagInventoryCountsByKey();
   if (Number(counts[itemKey] || 0) <= 0) return false;
   if (itemKey === "seed" && !usesWorldLooseSeedMode()) {
@@ -6661,6 +6677,21 @@ function canDiscardBagItemNow(itemKey) {
     }
   }
   return true;
+}
+
+function canDiscardBagItemFromBagPanel(itemKey) {
+  if (!canDiscardBagItemKey(itemKey)) return false;
+  if (isBagDiscardModalOpen()) return false;
+  if (!bagInventoryPanelOpen) return false;
+  if (!isTradeExchangeOpen() && !isAlchemyCraftOpen()) return false;
+  return bagDiscardInventoryEligible(itemKey);
+}
+
+function canDiscardBagItemNow(itemKey) {
+  if (!canDiscardBagItemKey(itemKey)) return false;
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return false;
+  if (!bagInventoryPanelOpen) return false;
+  return bagDiscardInventoryEligible(itemKey);
 }
 
 function removeBagItemsFromInventory(itemKey, amount) {
@@ -6699,10 +6730,14 @@ function spawnWorldBagDropAt(itemKey, amount, x, y) {
   return drop;
 }
 
-function discardBagItemsToGround(itemKey, amount) {
+function discardBagItemsToGround(itemKey, amount, options) {
   itemKey = normalizeBagItemKey(itemKey);
   const max = Math.max(0, Math.floor(Number(amount) || 0));
-  if (max <= 0 || !canDiscardBagItemNow(itemKey)) return false;
+  const allowCraftTrade = Boolean(options && options.allowCraftTrade);
+  const canDiscard = allowCraftTrade
+    ? canDiscardBagItemFromBagPanel(itemKey)
+    : canDiscardBagItemNow(itemKey);
+  if (max <= 0 || !canDiscard) return false;
   const pos = getLocalBagDropSpawnPosition();
   if (!removeBagItemsFromInventory(itemKey, max)) return false;
   spawnWorldBagDropAt(itemKey, max, pos.x, pos.y);
@@ -6909,7 +6944,9 @@ function onBagInventorySlotPointerDown(event) {
   const craftTradeOpen = isTradeExchangeOpen() || isAlchemyCraftOpen();
   if (craftTradeOpen) {
     if (!itemKey || slot.classList.contains("is-empty")) return;
-    if (!canStartBagPanelCraftTradeDrag(itemKey)) {
+    const canPlaceOnTarget = canStartBagPanelCraftTradeDrag(itemKey);
+    const canDiscardWhileOpen = canDiscardBagItemFromBagPanel(itemKey);
+    if (!canPlaceOnTarget && !canDiscardWhileOpen) {
       return;
     }
     event.preventDefault();
@@ -6970,6 +7007,54 @@ function isPointerInsideBagInventoryPanel(clientX, clientY) {
   return !isPointerOutsideBagInventoryPanel(clientX, clientY);
 }
 
+function isPointerInElementRect(clientX, clientY, el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 && rect.height <= 0) return false;
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
+}
+
+function isPointerOverTradeCounterDropZone(clientX, clientY) {
+  return isPointerInElementRect(clientX, clientY, tradeCounterSlot);
+}
+
+function isAlchemyCraftRequirementDropZoneVisible() {
+  if (!isAlchemyCraftOpen() || !alchemyCraftRequirementsBlock) return false;
+  return !alchemyCraftRequirementsBlock.classList.contains("is-hidden");
+}
+
+function isPointerOverAlchemyRequirementDropZone(clientX, clientY) {
+  if (!isAlchemyCraftRequirementDropZoneVisible()) return false;
+  return isPointerInElementRect(clientX, clientY, alchemyCraftRequirementSlots);
+}
+
+function shouldDiscardBagDragAt(clientX, clientY, dragMode) {
+  if (isPointerInsideBagInventoryPanel(clientX, clientY)) return false;
+  if (dragMode === "trade" && isPointerOverTradeCounterDropZone(clientX, clientY)) {
+    return false;
+  }
+  if (dragMode === "alchemy" && isPointerOverAlchemyRequirementDropZone(clientX, clientY)) {
+    return false;
+  }
+  return true;
+}
+
+async function tryDiscardBagItemFromDrag(itemKey) {
+  if (!canDiscardBagItemFromBagPanel(itemKey)) return;
+  const counts = getBagInventoryCountsByKey();
+  const maxCount = Math.max(0, Math.floor(Number(counts[itemKey] || 0)));
+  if (maxCount <= 0) return;
+  const amount = await openBagDiscardQuantityModal(itemKey, maxCount);
+  if (amount > 0) {
+    discardBagItemsToGround(itemKey, amount, { allowCraftTrade: true });
+  }
+}
+
 async function finishBagInventoryDrag(event) {
   if (!bagInventoryDragState) return;
   const state = bagInventoryDragState;
@@ -7002,12 +7087,22 @@ async function finishBagInventoryDrag(event) {
   }
   if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    tryDropBagItemOnAlchemyRequirement(itemKey, target);
+    if (canDragBagItemToAlchemyCraft(itemKey)) {
+      if (tryDropBagItemOnAlchemyRequirement(itemKey, target)) return;
+    }
+    if (shouldDiscardBagDragAt(event.clientX, event.clientY, "alchemy")) {
+      await tryDiscardBagItemFromDrag(itemKey);
+    }
     return;
   }
   if (dragMode === "trade" && isTradeExchangeOpen()) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    tryDropBagItemOnTradeCounter(itemKey, target);
+    if (canDragBagItemToTradeCounter(itemKey)) {
+      if (tryDropBagItemOnTradeCounter(itemKey, target)) return;
+    }
+    if (shouldDiscardBagDragAt(event.clientX, event.clientY, "trade")) {
+      await tryDiscardBagItemFromDrag(itemKey);
+    }
     return;
   }
   if (!isPointerOutsideBagInventoryPanel(event.clientX, event.clientY)) return;
@@ -9098,6 +9193,9 @@ function normalizeExtraPlantState(plant) {
   migrateLegacyPowderTier5ToAutoGrass(plant, now);
   ensureGrassOrdinalIfNeeded(plant);
   clampPlantGrowthTimingToCurrentConstants(plant);
+  if (isOvergrowthSeedPlant(plant) && !plant.isSproutSelfSustaining) {
+    makePlantStableStage3FromOvergrowthSeed(plant, now);
+  }
 }
 
 function updateExtraPlantState(plant, now) {
@@ -9456,19 +9554,36 @@ function getPlantDepthZIndex(sortY) {
   );
 }
 
-function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl) {
+function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl, growthMeterEl) {
   const z = getPlantDepthZIndex(getPlantDepthSortY(plant));
   if (spotEl) spotEl.style.zIndex = String(z);
   if (sproutEl) sproutEl.style.zIndex = String(z + 1);
+  if (growthMeterEl) {
+    if (isCactusMaturePlant(plant)) {
+      growthMeterEl.style.zIndex = String(z + 2);
+    } else {
+      growthMeterEl.style.zIndex = "";
+    }
+  }
 }
 
 function syncAllPlantDepthStacking() {
   if (plantRuntime.isSeedPlanted) {
-    applyPlantDepthZIndexToElements(plantRuntime, plantSpot, sprout);
+    applyPlantDepthZIndexToElements(
+      plantRuntime,
+      plantSpot,
+      sprout,
+      mainPlantGrowthMeter && mainPlantGrowthMeter.element
+    );
   }
   appleState.extraPlants.forEach(function (plant) {
     if (!plant || plant.removed) return;
-    applyPlantDepthZIndexToElements(plant, plant.spotElement, plant.sproutElement);
+    applyPlantDepthZIndexToElements(
+      plant,
+      plant.spotElement,
+      plant.sproutElement,
+      plant.growthMeterElement
+    );
   });
 }
 
@@ -10780,6 +10895,13 @@ function updateBucketPosition() {
   updateWorldExtraBuckets();
 }
 
+/** 식물의 달인·상인·연금술사 대화 중 이동·상호작용 등 게임플레이 불가. 거래·제작 UI는 제외. */
+function isPlayerGameplayBlockedByNpcDialogue() {
+  if (isNpcDialogueRunning) return true;
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen()) return false;
+  return isTradeMasterDialogueRunning() || isAlchemyMasterDialogueRunning();
+}
+
 function updatePlayerPosition() {
   if (isCharacterSelecting || !hasSpawnedCharacter) {
     lastMovementTickMs = performance.now();
@@ -10788,7 +10910,7 @@ function updatePlayerPosition() {
     return;
   }
 
-  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) {
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
     lastMovementTickMs = performance.now();
     setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
     updatePlayerColorBodyPosition();
@@ -11094,6 +11216,8 @@ function startPlanting() {
     return;
   }
 
+  if (isPlayerGameplayBlockedByNpcDialogue()) return;
+
   if (heldItem !== HELD_ITEM_SEED || plantRuntime.isPlanting || !isOnGround || plantRuntime.isSeedDry) return;
 
   const playerBox = getPlayerBox();
@@ -11202,6 +11326,7 @@ function startPlantingExtraSeed() {
     flashOnboardingOrderHint("");
     return;
   }
+  if (isPlayerGameplayBlockedByNpcDialogue()) return;
   const extraSeed = getHeldExtraSeed();
   if (!extraSeed || plantRuntime.isPlanting || !isOnGround) {
     return;
@@ -11255,7 +11380,7 @@ function plantWorldSeedCount() {
   if (
     plantRuntime.isPlanting ||
     appleState.isEating ||
-    isNpcDialogueRunning ||
+    isPlayerGameplayBlockedByNpcDialogue() ||
     !isOnGround
   ) {
     updateSeedInventory();
@@ -11363,7 +11488,7 @@ function plantWorldOvergrowthSeedCount() {
   if (
     plantRuntime.isPlanting ||
     appleState.isEating ||
-    isNpcDialogueRunning ||
+    isPlayerGameplayBlockedByNpcDialogue() ||
     !isOnGround
   ) {
     updateSeedInventory();
@@ -11430,6 +11555,7 @@ function plantWorldOvergrowthSeedCount() {
       ensureGrassOrdinalIfNeeded(plantRuntime);
       plantRuntime.blockSproutRegrowthAfterDry = false;
       plantRuntime.drySoilAt = null;
+      makePlantStableStage3FromOvergrowthSeed(plantRuntime, plantedAt);
       plantSpot.style.display = "block";
       setWorldPosition(plantSpot, plantRuntime.spotX, plantRuntime.spotY);
       updatePlantState();
@@ -11443,6 +11569,7 @@ function plantWorldOvergrowthSeedCount() {
       invPlant.seedKind = "overgrowth";
       assignSproutIdentityToNewPlant(invPlant);
       ensureGrassOrdinalIfNeeded(invPlant);
+      makePlantStableStage3FromOvergrowthSeed(invPlant, invPlant.plantedAt);
       appleState.extraPlants.push(invPlant);
       updateExtraSeedsAndPlants();
       holdLocalPlantStateAgainstStaleSnapshot(3000);
@@ -11483,7 +11610,7 @@ function plantInventorySeed(seedId) {
     inventorySeed.planted ||
     plantRuntime.isPlanting ||
     appleState.isEating ||
-    isNpcDialogueRunning ||
+    isPlayerGameplayBlockedByNpcDialogue() ||
     !isOnGround
   ) {
     updateSeedInventory();
@@ -12213,7 +12340,7 @@ function performInteractActionCore() {
 }
 
 function performInteractAction() {
-  if (plantRuntime.isPlanting) return;
+  if (plantRuntime.isPlanting || isPlayerGameplayBlockedByNpcDialogue()) return;
   const now = Date.now();
   if (now - lastPickupToggleAt < 180) return;
   lastPickupToggleAt = now;
@@ -12234,6 +12361,7 @@ function isPointerBlockedForWorldInteract(event) {
   if (!target || !(target instanceof Element)) return true;
   if (isTabSessionSuperseded || isCharacterSelecting || !hasSpawnedCharacter) return true;
   if (plantRuntime.isPlanting || isWorldChatBlockingGameInput()) return true;
+  if (isPlayerGameplayBlockedByNpcDialogue()) return true;
   if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return true;
   if (
     target.closest(
@@ -12694,7 +12822,9 @@ function tryPerformTargetedWorldInteract(target, wx, wy) {
 }
 
 function tryWorldInteractByPointerClick(clientX, clientY) {
-  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return false;
+  }
 
   if (heldItem === HELD_ITEM_BUCKET && isPointerOnHeldBucket(clientX, clientY)) {
     const now = Date.now();
@@ -12728,7 +12858,9 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
 
 function tryWaterPlantByPointerClick(clientX, clientY) {
   if (heldItem !== HELD_ITEM_BUCKET || !isBucketFull) return false;
-  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return false;
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return false;
+  }
   if (isTradeExchangeOpen()) return false;
   if (isOnboardingLinearGateActive() && !onboardingAllowsBucketQUse()) {
     flashOnboardingOrderHint("");
@@ -13372,7 +13504,9 @@ function isExtraSeedDry(extraSeed, now) {
 }
 
 function useHeldItem() {
-  if (plantRuntime.isPlanting || appleState.isEating) return;
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return;
+  }
 
   if (isOnboardingLinearGateActive()) {
     if (heldItem === HELD_ITEM_BUCKET && !onboardingAllowsBucketQUse()) {
@@ -13397,7 +13531,9 @@ function useHeldItem() {
 }
 
 function useBucket() {
-  if (plantRuntime.isPlanting || appleState.isEating || isNpcDialogueRunning) return;
+  if (plantRuntime.isPlanting || appleState.isEating || isPlayerGameplayBlockedByNpcDialogue()) {
+    return;
+  }
 
   refillWellIfNeeded();
   // 키 입력은 보통 다음 updateBucketPosition보다 먼저 옴 → 통 좌표가 플레이어 한 프레임 늦으면
@@ -13592,6 +13728,7 @@ function isMagicPowderUsableNow() {
 
 function tryUseMagicPowderBagType(bagType) {
   bagType = normalizeMagicPowderBagType(bagType);
+  if (isPlayerGameplayBlockedByNpcDialogue()) return false;
   if (isOnboardingLinearGateActive()) {
     flashOnboardingOrderHint("");
     return false;
@@ -14223,7 +14360,12 @@ function updateSproutPosition() {
     plantRuntime
   );
   setWorldPosition(sprout, sproutPos.x, sproutPos.y);
-  applyPlantDepthZIndexToElements(plantRuntime, plantSpot, sprout);
+  applyPlantDepthZIndexToElements(
+    plantRuntime,
+    plantSpot,
+    sprout,
+    mainPlantGrowthMeter && mainPlantGrowthMeter.element
+  );
   updateNpcPosition();
 }
 
@@ -14639,6 +14781,14 @@ function applyLoadedPlantState(loadedPlant) {
   if (!plantRuntime.isSeedPlanted) {
     plantRuntime.plantedAt = null;
   }
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "plantSeedKind")) {
+    plantRuntime.seedKind = String(loadedPlant.plantSeedKind || "");
+  } else if (Object.prototype.hasOwnProperty.call(loadedPlant, "seedKind")) {
+    plantRuntime.seedKind = String(loadedPlant.seedKind || "");
+  }
+  if (isOvergrowthSeedPlant(plantRuntime) && !plantRuntime.isSproutSelfSustaining) {
+    makePlantStableStage3FromOvergrowthSeed(plantRuntime, Date.now());
+  }
   if (plantRuntime.isSproutSelfSustaining && plantRuntime.growthTier < 3) {
     plantRuntime.growthTier = 3;
   }
@@ -14667,6 +14817,7 @@ function getPlantStateForStorage() {
     plantRottenAt: plantRuntime.rottenAt,
     plantNeedsFirstWater: plantRuntime.needsFirstWater,
     plantGrowthStartedAt: plantRuntime.growthStartedAt,
+    plantSeedKind: plantRuntime.seedKind != null ? String(plantRuntime.seedKind) : "",
     plantPlantedAt: plantRuntime.plantedAt != null ? plantRuntime.plantedAt : null,
     plantedAt: plantRuntime.plantedAt != null ? plantRuntime.plantedAt : null,
     isSproutGrown: plantRuntime.isSproutGrown,
@@ -16398,7 +16549,11 @@ function pollPresenceDatabase() {
     const now = Date.now();
     (players || []).forEach(function (state) {
       if (!state || !state.id || state.id === currentSessionId) return;
-      multiplayerRoomSessionIdsLastSeen[String(state.id)] = now;
+      // DB 폴링 시각(now)이 아니라 presence.updatedAt을 써야 고아 세션이
+      // 나비 권한 선거에 계속 끼어들지 않음(매 폴마다 now로 갱신되면 영원히 "살아 있음").
+      const presenceSeenAt = Number(state.updatedAt) || 0;
+      if (!presenceSeenAt || now - presenceSeenAt > 70000) return;
+      multiplayerRoomSessionIdsLastSeen[String(state.id)] = presenceSeenAt;
       multiplayerRoomSessionButterflyActive[String(state.id)] =
         state.butterflyActive !== false;
       if (isRemotePresenceSameLoggedInAccount(state)) {
@@ -17429,6 +17584,16 @@ function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
   lastRemoteWaterSplashAppliedAtBySession[remoteId] = nextWaterSplashAt;
 }
 
+function hasFreshButterflyAuthorityBroadcast(now) {
+  const freshMs = Math.max(400, butterflyBroadcastMs * 6);
+  let found = false;
+  Object.keys(multiplayerRoomSessionButterflyStateLastSeen).forEach(function (sid) {
+    const at = Number(multiplayerRoomSessionButterflyStateLastSeen[sid]) || 0;
+    if (at && now - at <= freshMs) found = true;
+  });
+  return found;
+}
+
 function isButterflyAuthority() {
   if (!currentSessionId) return false;
   if (document.hidden) return false;
@@ -17449,6 +17614,13 @@ function isButterflyAuthority() {
   });
   ids.sort();
   return ids[0] === currentSessionId;
+}
+
+/** 온라인: 권한 탭만 시뮬. 권한 스냅샷이 끊기면 로컬 폴백(고아 presence·권한 유실 대비). */
+function shouldRunButterflyMotionSimulation(now, onlineAvailable) {
+  if (!onlineAvailable) return true;
+  if (isButterflyAuthority()) return true;
+  return !hasFreshButterflyAuthorityBroadcast(now);
 }
 
 function getNumericButterflyValue(value, fallback) {
@@ -17865,6 +18037,7 @@ function handleRemoteButterflyCatchBroadcast(payload) {
 }
 
 function tryCatchButterfly() {
+  if (isPlayerGameplayBlockedByNpcDialogue()) return false;
   if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_BUTTERFLY) {
     return false;
   }
@@ -17959,7 +18132,7 @@ function updateButterflies() {
   // 나비 위치 시뮬은 권한 클라이언트(가장 낮은 sessionId)만 수행. 비권한 탭이
   // 같이 ?리??냅??좌표? ?워??2창·??에??????상???다.
   if (sharedHydrated && butterflyState.list.length > 0) {
-    const runAuthorityButterflyMotion = !onlineAvailable || isButterflyAuthority();
+    const runAuthorityButterflyMotion = shouldRunButterflyMotionSimulation(now, onlineAvailable);
     if (runAuthorityButterflyMotion) {
       const motionStepCount =
         wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;

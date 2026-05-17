@@ -179,6 +179,7 @@ export function loadSeedStateFromStorage(config) {
     cactusOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null,
+    plantSeedKind: "",
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
   };
@@ -292,6 +293,11 @@ export function loadSeedStateFromStorage(config) {
         planted.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
       } else {
         planted.drySoilAt = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(savedPlantedState, "plantSeedKind")) {
+        planted.plantSeedKind = String(savedPlantedState.plantSeedKind || "");
+      } else if (Object.prototype.hasOwnProperty.call(savedPlantedState, "seedKind")) {
+        planted.plantSeedKind = String(savedPlantedState.seedKind || "");
       }
       planted.npcX = Number(savedPlantedState.npcX) || config.defaultNpcX;
       planted.npcY = Number(savedPlantedState.npcY) || config.defaultNpcY;
