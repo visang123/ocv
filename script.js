@@ -311,6 +311,7 @@ import {
   isFlowerMaturePlant,
   isTreeMaturePlant,
   isCactusMaturePlant,
+  isColoredMaturePlant,
   normalizePlantMatureKind,
   getMatureKindForPowderBagType,
   getColoredPowderCountField,
@@ -1867,26 +1868,6 @@ if (!currentUserName || !currentUserId) {
 
 showAppLoadingScreen("\uBD88\uB7EC\uC624\uB294 \uC911...");
 
-function syncNetworkDebugUiVisibility() {
-  const visible = Boolean(
-    networkDebugPanel && networkDebugPanel.classList.contains("is-visible")
-  );
-  document.body.classList.toggle("ovc-network-debug-visible", visible);
-  if (visible && multiplayerStatus) {
-    const statusLabel =
-      multiplayerStatusText === "연결됨" ||
-      multiplayerStatusText === "연결중" ||
-      multiplayerStatusText === "캐릭터 선택 전" ||
-      multiplayerStatusText === "초기화 중" ||
-      (typeof multiplayerStatusText === "string" &&
-        multiplayerStatusText.indexOf("튜토리얼") !== -1)
-        ? multiplayerStatusText
-        : "연결 안됨";
-    multiplayerStatus.textContent =
-      "멀티 " + statusLabel + " / 로그인 " + getOnlinePlayerCount();
-  }
-}
-
 function ovcTryDismissLoadingScreen(force) {
   if (isTabSessionSuperseded && !force) return;
   if (force || isCharacterSelecting) {
@@ -3250,11 +3231,9 @@ adminOpenButton.addEventListener("dblclick", function () {
 
 networkDebugButton.addEventListener("dblclick", function () {
   networkDebugPanel.classList.toggle("is-visible");
-  syncNetworkDebugUiVisibility();
   networkDebugDomStale = true;
   refreshNetworkDebugPanelDom();
 });
-syncNetworkDebugUiVisibility();
 
 document.addEventListener("selectionchange", function () {
   if (networkDebugDomStale) {
@@ -11938,7 +11917,7 @@ function getPlantHoverRingWorldBounds(plant) {
     sproutVisible &&
     st >= 4 &&
     shouldHideSeparateSoilUnderBigGrass(plant) &&
-    !isFlowerMaturePlant(plant)
+    !isColoredMaturePlant(plant)
   ) {
     const anchor = getPlantHoverAnchorWorld(plant);
     const size = PLANT_HOVER_RING_WORLD_SIZE;

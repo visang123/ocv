@@ -2703,7 +2703,6 @@ body::-webkit-scrollbar {
 }
 
 #multiplayer-status {
-  display: none;
   position: fixed;
   left: 14px;
   bottom: 14px;
@@ -2717,10 +2716,6 @@ body::-webkit-scrollbar {
   font-weight: 800;
   line-height: 1.25;
   pointer-events: none;
-}
-
-body.ovc-network-debug-visible #multiplayer-status {
-  display: block;
 }
 
 #admin-open-button {

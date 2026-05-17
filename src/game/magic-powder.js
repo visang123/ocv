@@ -50,6 +50,12 @@ export function isCactusMaturePlant(plant) {
   return normalizePlantMatureKind(plant && plant.matureKind) === "cactus";
 }
 
+/** 노랑·갈색·하양 가루 4·5단(꽃·나무·선인장) — 풀과 달리 spot 작은 링 대신 스프라이트 기준 호버 */
+export function isColoredMaturePlant(plant) {
+  const k = normalizePlantMatureKind(plant && plant.matureKind);
+  return k === "flower" || k === "tree" || k === "cactus";
+}
+
 /** 풀·나무 — 4·5단 수분·자동 성장 규칙 동일 */
 export function isGrassLikeMaturePlant(plant) {
   const k = normalizePlantMatureKind(plant && plant.matureKind);
