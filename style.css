@@ -1981,8 +1981,9 @@ body::-webkit-scrollbar {
 }
 
 #player.remote-player-body.is-sitting {
-  transform: scale(0.92, 0.88);
+  transform: none;
   transform-origin: bottom center;
+  object-position: center bottom;
 }
 
 .remote-player-name {

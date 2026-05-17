@@ -88,10 +88,10 @@ export function findNearestCraftChair(footCenterX, footY, placedFurniture, maxDi
   for (let i = 0; i < placedFurniture.length; i++) {
     const entry = placedFurniture[i];
     if (!entry || entry.kind !== "craftChair") continue;
-    const centerX = Number(entry.x) + Number(entry.width) / 2;
-    const centerY = Number(entry.y) + Number(entry.height) / 2;
-    const dx = Number(footCenterX) - centerX;
-    const dy = Number(footY) - centerY;
+    const seat = getCraftChairSeatWorldPoint(entry);
+    if (!seat) continue;
+    const dx = Number(footCenterX) - seat.x;
+    const dy = Number(footY) - seat.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < bestDist && dist <= limit) {
       bestDist = dist;
@@ -101,14 +101,20 @@ export function findNearestCraftChair(footCenterX, footY, placedFurniture, maxDi
   return best;
 }
 
-export function getCraftChairSitPose(chair, playerWidth) {
+export function getCraftChairSitPose(chair, playerWidth, playerSitHeight) {
   if (!chair) return null;
   const width = Number(playerWidth) || 25;
-  const footY = Number(chair.y) + Number(chair.height);
+  const sitHeight = Number(playerSitHeight) || 33;
+  const offsets = getCraftChairSitAnchorOffsets(chair);
+  const seat = getCraftChairSeatWorldPoint(chair);
+  if (!seat) return null;
+  const footY = Number(chair.y) + offsets.footOffsetY;
   return {
-    playerX: Number(chair.x) + Number(chair.width) / 2 - width / 2,
+    playerX: seat.x - width / 2,
     playerDepth: null,
     footY: footY,
+    seatY: seat.y,
+    renderHeight: sitHeight,
     chairId: String(chair.id || "")
   };
 }
