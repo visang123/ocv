@@ -448,16 +448,12 @@ function getTradeExchangePanelEl() {
 export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
   if (!itemKey || !exchangeOpen || !host) return false;
   if (!(targetEl instanceof Element)) return false;
-  const counter = host.tradeCounterSlot;
-  if (!counter) return false;
-  const chip = targetEl.closest(".trade-counter-chip");
-  if (chip && counter.contains(chip)) {
-    const slotKey = chip.dataset.itemKey || "";
-    if (slotKey !== itemKey) return false;
+  if (!TRADEABLE_KEYS.has(itemKey)) return false;
+  const panel = getTradeExchangePanelEl();
+  if (panel && panel.contains(targetEl)) {
     return addFullInventoryStackToTradeCounter(itemKey);
   }
-  if (!counter.contains(targetEl) && targetEl !== counter) return false;
-  return addFullInventoryStackToTradeCounter(itemKey);
+  return false;
 }
 
 export function canDragBagItemToTradeCounter(itemKey) {
@@ -769,7 +765,16 @@ function buildTradeRecipeSideIconsHtml(side, options) {
       const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
       if (count <= 0) return "";
       if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
-        return buildTradeButterflyAnyOrOptionsHtml(count);
+        const label = formatTradeRecipePseudoLabel(itemKey, count);
+        const desc = getBagItemDescriptor("butterfly:yellow");
+        return (
+          '<span class="trade-recipe-io" title="' +
+          escapeTradeHtml(label) +
+          '">' +
+          desc.iconHtml +
+          (count > 1 ? '<span class="trade-recipe-io-count">×' + count + "</span>" : "") +
+          "</span>"
+        );
       }
       return buildTradeRecipeIoChipHtml(itemKey, count);
     })
@@ -793,8 +798,20 @@ function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol, counter) {
   const inputText = formatTradeRecipeSideText(inputs, c, false);
   const outputText = formatTradeRecipeSideText(outputs, c, true);
   const formulaText = [inputText, outputText].filter(Boolean).join(" " + arrowSymbol + " ");
+  const displayInputs = resolveTradeRecipeDisplaySide(inputs, c);
   return (
-    '<p class="trade-recipe-formula-text">' + escapeTradeHtml(formulaText) + "</p>"
+    '<div class="trade-recipe-entry">' +
+    '<p class="trade-recipe-formula-text">' +
+    escapeTradeHtml(formulaText) +
+    "</p>" +
+    '<div class="trade-recipe-flow" aria-hidden="true">' +
+    buildTradeRecipeSideIconsHtml(displayInputs, { expandButterflyAny: false }) +
+    '<span class="trade-recipe-arrow">' +
+    arrowSymbol +
+    "</span>" +
+    buildTradeRecipeSideIconsHtml(outputs, { expandButterflyAny: true }) +
+    "</div>" +
+    "</motion>"
   );
 }
 

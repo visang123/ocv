@@ -73,7 +73,7 @@ export const PLAYER_HEIGHT = 50;
 export const PLAYER_SIT_WIDTH = 21;
 export const PLAYER_SIT_HEIGHT = 26;
 /** Shift seated foot anchor up (world Y−) so the body sits on the chair seat. */
-export const PLAYER_SIT_VISUAL_LIFT_Y = 6;
+export const PLAYER_SIT_VISUAL_LIFT_Y = 11;
 const IMAGE_DIR = "\uC774\uBBF8\uC9C0";
 
 export const PLAYER_BASE_IMAGE_SRC = IMAGE_DIR + "/player-white.png";

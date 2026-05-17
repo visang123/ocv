@@ -7555,8 +7555,15 @@ function isPointerInElementRect(clientX, clientY, el) {
   );
 }
 
-function isPointerOverTradeCounterDropZone(clientX, clientY) {
-  return isPointerInElementRect(clientX, clientY, tradeCounterSlot);
+function getTradeExchangePanelElement() {
+  if (!tradeExchangeOverlay || tradeExchangeOverlay.style.display === "none") return null;
+  return tradeExchangeOverlay.querySelector(".trade-exchange-panel");
+}
+
+function isPointerOverTradeExchangeDropZone(clientX, clientY) {
+  const panel = getTradeExchangePanelElement();
+  if (!panel) return false;
+  return isPointerInElementRect(clientX, clientY, panel);
 }
 
 function isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY) {
@@ -7590,7 +7597,7 @@ function resolveBagCraftTradeDropAt(clientX, clientY, itemKey, dragMode) {
     return "discard";
   }
   if (dragMode === "trade" && isTradeExchangeOpen()) {
-    if (isPointerOverTradeCounterDropZone(clientX, clientY)) {
+    if (isPointerOverTradeExchangeDropZone(clientX, clientY)) {
       if (canDragBagItemToTradeCounter(itemKey) && tryDropBagItemOnTradeCounter(itemKey, target)) {
         return "placed";
       }
@@ -7692,7 +7699,7 @@ function onBagInventorySlotPointerCancel(event) {
 function onTradeCounterChipPointerDown(event) {
   if (!isTradeExchangeOpen() || !tradeCounterSlot) return;
   if (event.button !== 0) return;
-  const chip = event.target.closest(".trade-counter-slot-cell");
+  const chip = event.target.closest(".trade-counter-chip");
   if (!chip || !tradeCounterSlot.contains(chip)) return;
   const itemKey = chip.dataset.itemKey || "";
   if (!itemKey) return;
