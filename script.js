@@ -604,7 +604,7 @@ let lastPickupToggleAt = 0;
 let lastWorldRockRespawnAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
-const guidePlaceholderHtml = "<p>?? ??? ????!</p>";
+const guidePlaceholderHtml = "<p>???? ??????? ????????????!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
 let cameraX = 0;
@@ -2245,18 +2245,26 @@ function layoutNpcSpeechBubble() {
   );
 }
 
-/** ?????(index) ?????: ???? ??? ????? ????????? ?????tutorial.html ??? ????. */
+/** ??(index) ??: ?? ?? ???. ????tutorial.html ?? ??. */
+function isDevResetAltModifierHeld(event) {
+  if (event.altKey) return true;
+  if (typeof event.getModifierState !== "function") return false;
+  if (event.getModifierState("AltGraph")) return true;
+  return (
+    event.getModifierState("Control") && event.getModifierState("Alt")
+  );
+}
+
 function isWorldMapDevResetShortcut(event) {
   if (event.repeat) return false;
   const isRKey =
     event.code === "KeyR" || event.key === "r" || event.key === "R";
   if (!isRKey) return false;
   if (!(event.ctrlKey || event.metaKey)) return false;
-  // Ctrl+Shift+R ? Shift? ?? ?(getModifierState Alt? IME?? Shift+R? ??)
+  // Ctrl+Shift+R ? Shift? ?? (IME? altKey? ??? ??)
   if (event.shiftKey) return !event.altKey;
-  // Ctrl+Alt+R ? AltGr ? altKey? ? ??? ??? getModifierState ??
-  if (event.altKey || event.getModifierState("Alt")) return true;
-  return false;
+  // Ctrl+Alt+R ? AltGr?Control+Alt ?? ?? (Shift ??? ??)
+  return isDevResetAltModifierHeld(event);
 }
 
 window.addEventListener(
@@ -3126,7 +3134,7 @@ if (localPlayerRoot) {
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
-networkDebugButton.setAttribute("aria-label", "??");
+networkDebugButton.setAttribute("aria-label", "로그");
 document.body.appendChild(networkDebugButton);
 function appendAdminDevGrantButton(id, ariaLabel) {
   const button = document.createElement("button");
@@ -3141,27 +3149,27 @@ function appendAdminDevGrantButton(id, ariaLabel) {
 }
 const adminDevButterfliesButton = appendAdminDevGrantButton(
   "admin-dev-butterflies-button",
-  "?? ??? +10 (???)"
+  "나비 종류별 +10 (관리자)"
 );
 const adminDevRocksButton = appendAdminDevGrantButton(
   "admin-dev-rocks-button",
-  "? +10 (???)"
+  "돌 +10 (관리자)"
 );
 const adminDevSeedsButton = appendAdminDevGrantButton(
   "admin-dev-seeds-button",
-  "?? +10 (???)"
+  "씨앗 +10 (관리자)"
 );
 const adminDevApplesButton = appendAdminDevGrantButton(
   "admin-dev-apples-button",
-  "?? +10 (???)"
+  "사과 +10 (관리자)"
 );
 const adminDevPlantIndexPlusButton = document.createElement("button");
 adminDevPlantIndexPlusButton.id = "admin-dev-plant-index-plus-button";
 adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
-adminDevPlantIndexPlusButton.setAttribute("aria-label", "???? +100 (???)");
-adminDevPlantIndexPlusButton.setAttribute("title", "???? +100 (???)");
+adminDevPlantIndexPlusButton.setAttribute("aria-label", "식물지수 +100 (관리자)");
+adminDevPlantIndexPlusButton.setAttribute("title", "식물지수 +100 (관리자)");
 document.body.appendChild(adminDevPlantIndexPlusButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
@@ -3208,17 +3216,17 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>???</strong></div>' +
+  '<div class="controls-header"><strong>조작법</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / \u2191</span><p>?? ??</p></div>' +
-  '<div><span>A / \u2190</span><p>???? ??</p></div>' +
-  '<div><span>S / \u2193</span><p>??? ??</p></div>' +
-  '<div><span>D / \u2192</span><p>????? ??</p></div>' +
-  '<div><span>Space</span><p>??</p></div>' +
-  '<div><span>E</span><p>?? / ????</p></div>' +
-  '<div><span>Q</span><p>?? / ??</p></div>' +
-  '<div><span>??? ?</span><p>?? / ??</p></div>' +
-  '<div><span>Esc</span><p>?? ?? / ??</p></div>' +
+  '<div><span>W / \u2191</span><p>위로 이동</p></div>' +
+  '<div><span>A / \u2190</span><p>왼쪽으로 이동</p></div>' +
+  '<div><span>S / \u2193</span><p>아래로 이동</p></div>' +
+  '<div><span>D / \u2192</span><p>오른쪽으로 이동</p></div>' +
+  '<div><span>Space</span><p>점프</p></div>' +
+  '<div><span>E</span><p>줍기 / 내려놓기</p></div>' +
+  '<div><span>Q</span><p>사용 / 대화</p></div>' +
+  '<div><span>마우스 휠</span><p>확대 / 축소</p></div>' +
+  '<div><span>Esc</span><p>설정 열기 / 닫기</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 ensureWorldSocialUi();
@@ -3265,7 +3273,7 @@ function closeSettingsOverlayFromEscape() {
 }
 
 function skipTutorialFromSettings() {
-  if (!window.confirm("????? ???? ???? ???????")) {
+  if (!window.confirm("???????????? ???????? ????????? ???????????????")) {
     return;
   }
   clearTutorialMainSeedRespawnTimer();
@@ -3331,7 +3339,7 @@ function skipTutorialFromSettings() {
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
-      "????? ???? ?? ?????? ???? ???? ?????."
+      "???????????? ????????? ?????? ?????????????? ?????????? ????????? ????????????."
     )
   ) {
     return;
@@ -4773,7 +4781,7 @@ function updateOnboardingFlowUI() {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
         movementTutorial.hideOverlay();
-        setOnboardingCalloutVisible(true, "E?? ?? ??? ?????.");
+        setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -4790,7 +4798,7 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        setOnboardingCalloutVisible(true, "????(???)? ????.");
+        setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
         if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
           bagBookStorageSlot.classList.add("onboarding-highlight");
@@ -4803,18 +4811,18 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "space?? ??? ??? ???. ????!"
+        "space바를 누르면 점프를 합니다. 해보세요!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
-      setOnboardingCalloutVisible(true, "???? ?????.");
+      setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
-      setOnboardingCalloutVisible(true, "e?? ?? ??? ?????.");
+      setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
@@ -4831,7 +4839,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 8: {
-      setOnboardingCalloutVisible(true, "??? ??? ?????.");
+      setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
@@ -4841,14 +4849,14 @@ function updateOnboardingFlowUI() {
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      setOnboardingCalloutVisible(true, "q? ?? ??? ??? ?????.");
+      setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case 10: {
       if (guideOpen) {
-        const line1 = "??? ?????.";
-        const line2 = "esc ?? ????? ??? ???? ????.";
+        const line1 = "설명을 참고하세요.";
+        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
           onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
@@ -4863,7 +4871,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 11: {
-      setOnboardingCalloutVisible(true, "????? ???? ?????.");
+      setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4871,7 +4879,7 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "??? ??? ?? E?? ?? ???? ?? ???."
+        "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -4879,19 +4887,19 @@ function updateOnboardingFlowUI() {
     case 13: {
       setOnboardingCalloutVisible(
         true,
-        "??? ??? ? Q?? ?? ?? ?? ???."
+        "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
       );
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(true, "??? ?? ?? ???? ???.");
+      setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "Q?? ?? ?? ????.");
+      setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
@@ -4899,8 +4907,8 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPostWaterCongratsPhase === 0
-          ? "?????! ?? ??? ?? ??????."
-          : "?? ????? ??? ??????."
+          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
+          : "아직 남았습니다 끝까지 진행해주세요."
       );
       break;
     }
@@ -4913,13 +4921,13 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPlantIndexIntroPhase === 0
-          ? "????? ??? ??? ?????."
-          : "?? ??? ???? ? ?????!"
+          ? "식물지수는 식물을 심으면 올라갑니다."
+          : "맵의 안개가 해제되니 잘 올려보세요!"
       );
       break;
     }
     case ONBOARDING_STEP_DROP_BUCKET: {
-      setOnboardingCalloutVisible(true, "E?? ?? ???? ??????.");
+      setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
@@ -4927,7 +4935,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_CHAT: {
       setOnboardingCalloutVisible(
         true,
-        "?? ??? ?? ??? ??, ???? ??? ? ??? ???."
+        "💬 버튼을 눌러 채팅을 열고, 메시지를 입력한 뒤 전송해 보세요."
       );
       if (worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
       if (worldChatPanelOpen && worldChatSendBtn) {
@@ -4938,7 +4946,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_HEART: {
       setOnboardingCalloutVisible(
         true,
-        "?? ??? ?? ??? ?? ???. ?? ?????? ??? ?? ? ???."
+        "❤️ 버튼을 눌러 하트를 보내 보세요. 다른 플레이어에게 반응을 전할 수 있어요."
       );
       if (worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
       break;
@@ -4946,13 +4954,13 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SAD: {
       setOnboardingCalloutVisible(
         true,
-        "?? ??? ?? ???? ?? ???."
+        "😢 버튼을 눌러 슬퍼요를 보내 보세요."
       );
       if (worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ROCK: {
-      setOnboardingCalloutVisible(true, "?? ?? ??? ?? E?? ?? ???.");
+      setOnboardingCalloutVisible(true, "땅의 돌에 가까이 가서 E키로 줍아 보세요.");
       if (Array.isArray(appleState.worldRocks)) {
         appleState.worldRocks.forEach(function (rock) {
           if (rock && rock._el && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID) {
@@ -4965,7 +4973,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_BUTTERFLY: {
       setOnboardingCalloutVisible(
         true,
-        "????? ??? ???? E ?? Q? ?? ???."
+        "날아다니는 나비에 근접하여 E 또는 Q로 잡아 보세요."
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -4976,44 +4984,44 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_TRADE_MASTER: {
-      setOnboardingCalloutVisible(true, "??? ???? ?? Q?? ??? ???.");
+      setOnboardingCalloutVisible(true, "거래의 달인에게 가서 Q키로 대화해 보세요.");
       if (tradeMaster) tradeMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ALCHEMY_MASTER: {
-      setOnboardingCalloutVisible(true, "???? ???? ?? Q?? ??? ???.");
+      setOnboardingCalloutVisible(true, "연금술의 달인에게 가서 Q키로 대화해 보세요.");
       if (alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ZOOM_INTRO: {
-      setOnboardingCalloutVisible(true, "???? ?? ??,?? ????.");
+      setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
       break;
     }
     case ONBOARDING_STEP_ZOOM_MIN: {
-      setOnboardingCalloutVisible(true, "?? ?? ?? ????.");
+      setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
       break;
     }
     case ONBOARDING_STEP_TREE_APPROACH: {
-      setOnboardingCalloutVisible(true, "??? ? ??? ?????.");
+      setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_TREE_CLIMB: {
       setOnboardingCalloutVisible(
         true,
-        "??? ???? ???? ??? ??? ?????."
+        "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
       );
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_PICK_APPLE: {
-      setOnboardingCalloutVisible(true, "e?? ?? ??? ???.");
+      setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_EAT_APPLE: {
-      setOnboardingCalloutVisible(true, "??? ? ? ?? ?? ?? ????.");
+      setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
@@ -5022,10 +5030,10 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_EXTRA_SEED: {
-      const lineSeed = "??? ???? ??? ?? ??? ?????.";
-      const lineB = "????? ?????.";
+      const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
+      const lineB = "나무밖으로 이동하세요.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "??? ?????.");
+        setOnboardingCalloutVisible(true, "씨앗을 얻었습니다.");
       } else {
         setOnboardingCalloutVisible(
           true,
@@ -5041,17 +5049,16 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SETTINGS_ESC: {
       setOnboardingCalloutVisible(
         true,
-        "Esc? ?? ??? ? ?, ?? Esc? ?? ???."
+        "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
       );
       break;
     }
     case ONBOARDING_STEP_COMPLETE: {
-      setOnboardingCalloutVisible(true, "?????! ????? ?????!!");
+      setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
     default:
       setOnboardingCalloutVisible(false, "");
-  }
   }
   updateSettingsTutorialButtons();
 }
@@ -10105,17 +10112,17 @@ function pickUiShortcutHoverTarget(clientX, clientY) {
     );
   }
   if (settingsButton && over(settingsButton)) {
-    return { anchorEl: settingsButton, text: "??: Esc" };
+    return { anchorEl: settingsButton, text: "?????: Esc" };
   }
   if (!worldSocialUiReady) return null;
   if (worldChatToggleBtn && over(worldChatToggleBtn)) {
-    return { anchorEl: worldChatToggleBtn, text: "??: C" };
+    return { anchorEl: worldChatToggleBtn, text: "?????: C" };
   }
   if (worldHeartBtn && over(worldHeartBtn)) {
-    return { anchorEl: worldHeartBtn, text: "??: H" };
+    return { anchorEl: worldHeartBtn, text: "??????: H" };
   }
   if (worldSadBtn && over(worldSadBtn)) {
-    return { anchorEl: worldSadBtn, text: "???: Ctrl+S" };
+    return { anchorEl: worldSadBtn, text: "???????: Ctrl+S" };
   }
   return null;
 }
