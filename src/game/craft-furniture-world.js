@@ -40,6 +40,30 @@ const CRAFT_FURNITURE_WORLD = {
   }
 };
 
+/** 집 입장 판정: 스프라이트 하단 중앙 문/발판만 (투명 여백 제외) */
+export const CRAFT_HOUSE_TOUCH_INSETS = {
+  left: 32,
+  right: 32,
+  top: 52,
+  bottom: 0
+};
+
+export function getCraftHouseTouchRect(entry) {
+  if (!entry || entry.kind !== "craftHouse") return null;
+  const x = Number(entry.x) || 0;
+  const y = Number(entry.y) || 0;
+  const spec = getCraftFurnitureWorldSpec("craftHouse");
+  const w = Number(entry.width) || (spec && spec.width) || 88;
+  const h = Number(entry.height) || (spec && spec.height) || 72;
+  const ins = CRAFT_HOUSE_TOUCH_INSETS;
+  const left = x + ins.left;
+  const right = x + w - ins.right;
+  const top = y + ins.top;
+  const bottom = y + h - ins.bottom;
+  if (right <= left || bottom <= top) return null;
+  return { left, right, top, bottom };
+}
+
 export function isCraftFurnitureKind(kind) {
   return CRAFT_FURNITURE_KINDS.includes(kind);
 }

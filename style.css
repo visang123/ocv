@@ -2029,10 +2029,13 @@ body::-webkit-scrollbar {
   width: 100%;
   height: auto;
   max-height: 100%;
+  opacity: 1;
   transform: none;
   transform-origin: bottom center;
   object-fit: contain;
   object-position: center bottom;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .remote-player.local-player-avatar.is-inside-craft-house #player,
@@ -4293,9 +4296,10 @@ body #world-bag-inventory {
 .trade-tradeable-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: stretch;
+  gap: 8px;
   flex: 1 1 auto;
-  min-height: 72px;
+  min-height: 0;
   margin-bottom: 8px;
   padding: 8px;
   border-radius: 12px;
@@ -4304,6 +4308,13 @@ body #world-bag-inventory {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.trade-tradeable-list > .trade-tradeable-recipe,
+.trade-tradeable-list > button.trade-tradeable-recipe {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: min-content;
 }
 
 .trade-tradeable-step-hint {
@@ -4322,10 +4333,11 @@ body #world-bag-inventory {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 5px;
+  flex-shrink: 0;
+  gap: 0;
   width: 100%;
   margin: 0;
-  padding: 7px 8px;
+  padding: 8px 9px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -4333,6 +4345,9 @@ body #world-bag-inventory {
   font: inherit;
   text-align: left;
   box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  isolation: isolate;
 }
 
 button.trade-tradeable-recipe {
@@ -4372,24 +4387,39 @@ button.trade-tradeable-recipe.is-selected {
 .trade-recipe-entry {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  flex: none;
   gap: 6px;
   width: 100%;
+  min-height: min-content;
+  pointer-events: none;
 }
 
 .trade-recipe-formula-text {
   margin: 0;
+  padding: 0;
   font: 700 11px/1.45 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
   color: rgba(248, 250, 252, 0.96);
   letter-spacing: -0.02em;
   word-break: keep-all;
+  white-space: normal;
 }
 
 .trade-recipe-flow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  align-content: flex-start;
   gap: 4px;
   width: 100%;
+  min-height: 0;
+  padding: 4px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.trade-tradeable-recipe .trade-recipe-io {
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .trade-recipe-io {

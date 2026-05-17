@@ -804,14 +804,14 @@ function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol, counter) {
     '<p class="trade-recipe-formula-text">' +
     escapeTradeHtml(formulaText) +
     "</p>" +
-    '<div class="trade-recipe-flow" aria-hidden="true">' +
+    '<div class="trade-recipe-flow">' +
     buildTradeRecipeSideIconsHtml(displayInputs, { expandButterflyAny: false }) +
     '<span class="trade-recipe-arrow">' +
     arrowSymbol +
     "</span>" +
     buildTradeRecipeSideIconsHtml(outputs, { expandButterflyAny: true }) +
     "</div>" +
-    "</motion>"
+    "</div>"
   );
 }
 

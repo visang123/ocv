@@ -77,7 +77,7 @@ export const PLAYER_SIT_VISUAL_LIFT_Y = 11;
 const IMAGE_DIR = "\uC774\uBBF8\uC9C0";
 
 export const PLAYER_BASE_IMAGE_SRC = IMAGE_DIR + "/player-white.png";
-export const PLAYER_SIT_IMAGE_SRC = IMAGE_DIR + "/player-sit-white.png?v=20260517d";
+export const PLAYER_SIT_IMAGE_SRC = IMAGE_DIR + "/player-sit-white.png?v=20260517e";
 export const IMG_BUCKET_EMPTY = IMAGE_DIR + "/bucket-empty.png";
 export const IMG_BUCKET_FULL = IMAGE_DIR + "/bucket-full.png";
 export const IMG_SEED = IMAGE_DIR + "/seed.png";
