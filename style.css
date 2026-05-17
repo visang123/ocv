@@ -717,6 +717,8 @@ body::-webkit-scrollbar {
   top: 0;
   width: 10px;
   height: 10px;
+  /* 지형·식물(최대 18) 위, 플레이어·말풍선·이름(20+) 아래 */
+  z-index: 19;
   pointer-events: auto;
   cursor: help;
   user-select: none;
@@ -1411,7 +1413,7 @@ body::-webkit-scrollbar {
 }
 
 .butterfly.onboarding-highlight {
-  z-index: 6;
+  z-index: 25;
   outline: 3px solid #f59e0b;
   outline-offset: 2px;
   border-radius: 2px;
@@ -2022,7 +2024,8 @@ body::-webkit-scrollbar {
   filter: grayscale(0.35) brightness(0.88);
 }
 
-#player.remote-player-body.is-sitting {
+#player.remote-player-body.is-sitting,
+.remote-player-body.is-sitting {
   width: 100%;
   height: 100%;
   transform: none;
@@ -4235,7 +4238,8 @@ body #world-bag-inventory {
   max-height: min(520px, calc(100vh - 36px));
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px 14px 14px;
   border-radius: 16px;
   background: rgba(8, 12, 24, 0.52);
@@ -4311,7 +4315,9 @@ body #world-bag-inventory {
 
 .trade-tradeable-recipe {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
   width: 100%;
   margin: 0;
   padding: 7px 8px;
@@ -4322,6 +4328,12 @@ body #world-bag-inventory {
   font: inherit;
   text-align: left;
   box-sizing: border-box;
+}
+
+.trade-tradeable-recipe-label {
+  font: 700 11px/1.25 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
+  color: rgba(248, 250, 252, 0.96);
+  letter-spacing: -0.02em;
 }
 
 button.trade-tradeable-recipe {
@@ -4394,12 +4406,13 @@ button.trade-tradeable-recipe.is-selected {
 }
 
 .trade-recipe-io-label {
+  display: block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 8px/1.15 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
-  color: rgba(248, 250, 252, 0.92);
+  font: 700 10px/1.2 Arial, "Malgun Gothic", "Noto Sans KR", sans-serif;
+  color: rgba(248, 250, 252, 0.96);
   text-align: center;
 }
 

@@ -466,7 +466,7 @@ import {
   canDragBagItemToTradeCounter,
   tryDropBagItemOnTradeCounter,
   returnTradeCounterStackToInventory
-} from "./src/game/trade-master-ui.js";
+} from "./src/game/trade-master-ui.js?v=20260517x";
 import {
   bindAlchemyMaster,
   closeAlchemyCraftPanel,
@@ -5372,6 +5372,7 @@ function saveGameSnapshot() {
 
 function restartPlayerPositionOnly() {
   resetInputKeys(keys);
+  resetPlayerChairSitState();
   playerX = spawnPlayerX;
   playerDepth = spawnPlayerDepth;
   jumpY = 0;
@@ -5380,6 +5381,8 @@ function restartPlayerPositionOnly() {
   isTreeFalling = false;
   wasPlayerInTree = false;
   plantingInventorySeedId = null;
+  setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
   savePlayerPosition(true);
 }
 
@@ -5416,11 +5419,10 @@ function applyDefaultState(options) {
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
   playerHealthGaugeVisible = true;
-  playerSittingChairId = "";
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;
   playerHealthPoseInitialized = false;
-  standUpFromChair();
+  resetPlayerChairSitState();
   exitCraftHouse();
 
   playerX = spawnPlayerX;
@@ -7528,83 +7530,27 @@ function isPointerInElementRect(clientX, clientY, el) {
   );
 }
 
-function getTradeExchangePanelEl() {
-  return tradeExchangeOverlay
-    ? tradeExchangeOverlay.querySelector(".trade-exchange-panel")
-    : null;
+function isPointerOverTradeCounterDropZone(clientX, clientY) {
+  return isPointerInElementRect(clientX, clientY, tradeCounterSlot);
 }
 
-function getAlchemyCraftPanelEl() {
-  return alchemyCraftOverlay ? alchemyCraftOverlay.querySelector(".alchemy-craft-panel") : null;
-}
-
-function isPointerOverTradeExchangePanel(clientX, clientY) {
-  return isPointerInElementRect(clientX, clientY, getTradeExchangePanelEl());
-}
-
-function isPointerOverAlchemyCraftPanel(clientX, clientY) {
-  if (!isAlchemyCraftOpen()) return false;
-  return isPointerInElementRect(clientX, clientY, getAlchemyCraftPanelEl());
-}
-
-function unionElementBoundingRects(elements) {
-  const rects = (elements || [])
-    .filter(Boolean)
-    .map(function (el) {
-      return el.getBoundingClientRect();
-    })
-    .filter(function (rect) {
-      return rect.width > 0 || rect.height > 0;
-    });
-  if (!rects.length) return null;
-  let left = Infinity;
-  let top = Infinity;
-  let right = -Infinity;
-  let bottom = -Infinity;
-  rects.forEach(function (rect) {
-    left = Math.min(left, rect.left);
-    top = Math.min(top, rect.top);
-    right = Math.max(right, rect.right);
-    bottom = Math.max(bottom, rect.bottom);
-  });
-  return { left: left, top: top, right: right, bottom: bottom };
-}
-
-/** ??????? ?????/?? ?? ?? ???? ??? ??? ?? ??? ?? ?? ?? */
-function getCraftTradeCombinedBoundingRect(dragMode) {
-  const elements = [];
-  if (bagInventoryPanel && bagInventoryPanel.style.display !== "none") {
-    elements.push(bagInventoryPanel);
+function isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY) {
+  if (!isAlchemyCraftOpen() || !alchemyCraftRequirementSlots) return false;
+  if (
+    alchemyCraftRequirementsBlock &&
+    alchemyCraftRequirementsBlock.classList.contains("is-hidden")
+  ) {
+    return false;
   }
-  if (worldBagInventory && worldBagInventory.style.display !== "none") {
-    elements.push(worldBagInventory);
-  }
-  const sidePanel =
-    dragMode === "alchemy" ? getAlchemyCraftPanelEl() : getTradeExchangePanelEl();
-  if (sidePanel) elements.push(sidePanel);
-  return unionElementBoundingRects(elements);
-}
-
-function isPointerOverCraftTradeCombinedZone(clientX, clientY, dragMode) {
-  const rect = getCraftTradeCombinedBoundingRect(dragMode);
-  if (!rect) return false;
-  return (
-    clientX >= rect.left &&
-    clientX <= rect.right &&
-    clientY >= rect.top &&
-    clientY <= rect.bottom
-  );
+  return isPointerInElementRect(clientX, clientY, alchemyCraftRequirementSlots);
 }
 
 function shouldDiscardBagDragAt(clientX, clientY, dragMode) {
   if (isPointerInsideBagInventoryPanel(clientX, clientY)) return false;
-  if (dragMode === "trade" || dragMode === "alchemy") {
-    if (isPointerOverCraftTradeCombinedZone(clientX, clientY, dragMode)) return false;
-  }
-  if (dragMode === "trade" && isPointerOverTradeExchangePanel(clientX, clientY)) {
+  if (dragMode === "trade" && isPointerOverTradeCounterDropZone(clientX, clientY)) {
     return false;
   }
-  if (dragMode === "alchemy" && isPointerOverAlchemyCraftPanel(clientX, clientY)) {
+  if (dragMode === "alchemy" && isPointerOverAlchemyCraftRequirementDropZone(clientX, clientY)) {
     return false;
   }
   return true;
@@ -7653,12 +7599,8 @@ async function finishBagInventoryDrag(event) {
   }
   if (dragMode === "alchemy" && isAlchemyCraftOpen()) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (canDragBagItemToAlchemyCraft(itemKey)) {
-      if (tryDropBagItemOnAlchemyRequirement(itemKey, target)) return;
-      if (isPointerOverCraftTradeCombinedZone(event.clientX, event.clientY, "alchemy")) {
-        const panel = getAlchemyCraftPanelEl();
-        if (panel && tryDropBagItemOnAlchemyRequirement(itemKey, panel)) return;
-      }
+    if (canDragBagItemToAlchemyCraft(itemKey) && tryDropBagItemOnAlchemyRequirement(itemKey, target)) {
+      return;
     }
     if (shouldDiscardBagDragAt(event.clientX, event.clientY, "alchemy")) {
       await tryDiscardBagItemFromDrag(itemKey);
@@ -7667,12 +7609,8 @@ async function finishBagInventoryDrag(event) {
   }
   if (dragMode === "trade" && isTradeExchangeOpen()) {
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (canDragBagItemToTradeCounter(itemKey)) {
-      if (tryDropBagItemOnTradeCounter(itemKey, target)) return;
-      if (isPointerOverCraftTradeCombinedZone(event.clientX, event.clientY, "trade")) {
-        const panel = getTradeExchangePanelEl();
-        if (panel && tryDropBagItemOnTradeCounter(itemKey, panel)) return;
-      }
+    if (canDragBagItemToTradeCounter(itemKey) && tryDropBagItemOnTradeCounter(itemKey, target)) {
+      return;
     }
     if (shouldDiscardBagDragAt(event.clientX, event.clientY, "trade")) {
       await tryDiscardBagItemFromDrag(itemKey);
@@ -11939,10 +11877,75 @@ function getCraftChairById(chairId) {
   return null;
 }
 
-function standUpFromChair() {
-  if (!playerSittingChairId) return;
+function getRemotePlayerOccupyingChair(chairId) {
+  const id = String(chairId || "");
+  if (!id) return null;
+  let found = null;
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    if (found) return;
+    const remotePlayer = remotePlayers[remoteId];
+    if (remotePlayer && String(remotePlayer.sittingChairId || "") === id) {
+      found = remotePlayer;
+    }
+  });
+  return found;
+}
+
+function isCraftChairOccupiedByRemotePlayer(chairId) {
+  return Boolean(getRemotePlayerOccupyingChair(chairId));
+}
+
+function showCraftChairOccupiedAlert(chair) {
+  const occupant = getRemotePlayerOccupyingChair(chair && chair.id);
+  const occupantName =
+    occupant && occupant.name ? nameForIngameUiDisplay(occupant.name) : "";
+  showPlayerAlert({
+    message: occupantName
+      ? occupantName + "\uB2D8\uC774 \uC549\uC544 \uC788\uC5B4\uC694."
+      : "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uAC00 \uC549\uC544 \uC788\uC5B4\uC694.",
+    durationMs: 2200
+  });
+}
+
+function syncRemotePlayerPoseVisual(remotePlayer, color) {
+  if (!remotePlayer || !remotePlayer.bodyElement || !remotePlayer.element) return;
+  const seatedChair = getCraftChairById(remotePlayer.sittingChairId);
+  const sitting = Boolean(seatedChair);
+  if (!seatedChair) {
+    remotePlayer.sittingChairId = "";
+  }
+  remotePlayer.bodyElement.classList.toggle("is-sitting", sitting);
+  setWorldSize(
+    remotePlayer.element,
+    sitting ? PLAYER_SIT_WIDTH : PLAYER_WIDTH,
+    sitting ? PLAYER_SIT_HEIGHT : undefined
+  );
+  const tintColor = color || remotePlayer.appliedTintColor || "#7dd3fc";
+  const sitTintKey = sitting ? "1" : "0";
+  if (
+    remotePlayer.appliedTintColor !== tintColor ||
+    remotePlayer.appliedSitTintKey !== sitTintKey
+  ) {
+    remotePlayer.bodyElement.src = getTintedPlayerSrc(tintColor, sitting);
+    remotePlayer.appliedTintColor = tintColor;
+    remotePlayer.appliedSitTintKey = sitTintKey;
+  }
+}
+
+function resetPlayerChairSitState() {
   playerSittingChairId = "";
   syncLocalPlayerPoseVisual();
+}
+
+function standUpFromChair() {
+  if (
+    !playerSittingChairId &&
+    !(player && player.classList.contains("is-sitting"))
+  ) {
+    return;
+  }
+  resetPlayerChairSitState();
+  sendMultiplayerPresence(true);
 }
 
 function snapPlayerToCraftChair(chair) {
@@ -11982,6 +11985,7 @@ function sitOnCraftChair(chair) {
   playerSittingChairId = String(chair.id || "");
   syncLocalPlayerPoseVisual();
   snapPlayerToCraftChair(chair);
+  sendMultiplayerPresence(true);
   return true;
 }
 
@@ -11999,13 +12003,31 @@ function tryToggleChairSit() {
     return true;
   }
 
+  const chairSearchDistance = PLAYER_CHAIR_INTERACT_DISTANCE + 6;
   const chair = findNearestCraftChair(
     getPlayerCenterX(),
     getPlayerFootY(),
     placedCraftFurniture,
-    PLAYER_CHAIR_INTERACT_DISTANCE + 6
+    chairSearchDistance,
+    {
+      isChairSelectable: function (entry) {
+        return !isCraftChairOccupiedByRemotePlayer(entry && entry.id);
+      }
+    }
   );
-  if (!chair) return false;
+  if (!chair) {
+    const blockedChair = findNearestCraftChair(
+      getPlayerCenterX(),
+      getPlayerFootY(),
+      placedCraftFurniture,
+      chairSearchDistance
+    );
+    if (blockedChair && isCraftChairOccupiedByRemotePlayer(blockedChair.id)) {
+      showCraftChairOccupiedAlert(blockedChair);
+      return true;
+    }
+    return false;
+  }
   sitOnCraftChair(chair);
   savePlayerHealthState();
   return true;
@@ -12105,9 +12127,9 @@ function loadPlayerHealth() {
         playerLastHealthTickAt = 0;
       }
       playerHealthGaugeVisible = parsed.gaugeVisible !== false;
-      playerSittingChairId = "";
       playerInsideCraftHouseId = "";
       playerOutsideCraftHousePose = null;
+      resetPlayerChairSitState();
       syncLocalPlayerInsideCraftHouseVisual();
       return;
     }
@@ -12119,9 +12141,9 @@ function loadPlayerHealth() {
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
   playerHealthGaugeVisible = true;
-  playerSittingChairId = "";
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;
+  resetPlayerChairSitState();
   syncLocalPlayerInsideCraftHouseVisual();
 }
 
@@ -17521,6 +17543,7 @@ function sendMultiplayerPresence(forceSend) {
     x: playerX,
     depth: playerDepth,
     jumpY,
+    sittingChairId: playerSittingChairId ? String(playerSittingChairId) : "",
     waterSplashAt: lastWaterSplashAt,
     waterSplashX: lastWaterSplashX,
     waterSplashY: lastWaterSplashY,
@@ -17533,6 +17556,7 @@ function sendMultiplayerPresence(forceSend) {
     Math.round(state.depth * 10),
     Math.round(state.jumpY * 10),
     state.action,
+    state.sittingChairId || "",
     Math.round(state.waterSplashAt || 0)
   ].join("|");
   const hasChanged = stateKey !== lastPresenceStateKey;
@@ -17884,9 +17908,20 @@ function renderRemotePlayerState(state, source) {
     return;
   }
   const remoteColor = state.color || "#7dd3fc";
-  const nextX = Number(state.x) || 0;
-  const nextBaseY = -(Number(state.depth) || 0);
-  const nextJumpY = Number(state.jumpY) || 0;
+  const nextSittingChairId = String(state.sittingChairId || "");
+  const seatedChair = nextSittingChairId ? getCraftChairById(nextSittingChairId) : null;
+  const isRemoteSittingOnChair = Boolean(seatedChair);
+  let nextX = Number(state.x) || 0;
+  let nextBaseY = -(Number(state.depth) || 0);
+  let nextJumpY = Number(state.jumpY) || 0;
+  if (isRemoteSittingOnChair) {
+    const sitPose = getCraftChairSitPose(seatedChair, PLAYER_SIT_WIDTH, PLAYER_SIT_HEIGHT);
+    if (sitPose) {
+      nextX = sitPose.playerX;
+      nextBaseY = -(GROUND_WORLD_HEIGHT - sitPose.footY);
+      nextJumpY = 0;
+    }
+  }
   const nextPositionKey =
     Math.round(nextX * 10) +
     "|" +
@@ -17925,10 +17960,8 @@ function renderRemotePlayerState(state, source) {
       remotePlayer.lastShownAction = "";
     }
   }
-  if (remotePlayer.appliedTintColor !== remoteColor) {
-    remotePlayer.bodyElement.src = getTintedPlayerSrc(remoteColor);
-    remotePlayer.appliedTintColor = remoteColor;
-  }
+  remotePlayer.sittingChairId = isRemoteSittingOnChair ? nextSittingChairId : "";
+  syncRemotePlayerPoseVisual(remotePlayer, remoteColor);
   remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
   setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey, nextJumpY);
   remotePlayer.worldX = nextX;
@@ -18037,7 +18070,9 @@ function createRemotePlayer(remoteId) {
     lastWaterSplashAt: 0,
     lastActionAt: 0,
     lastShownAction: "",
-    lastSeenAt: Date.now()
+    lastSeenAt: Date.now(),
+    sittingChairId: "",
+    appliedSitTintKey: ""
   };
   return remotePlayers[remoteId];
 }
@@ -19744,7 +19779,7 @@ function setup() {
 
   setWorldSize(localPlayerRoot, getLocalPlayerBodyWidth(), playerSittingChairId ? getLocalPlayerBodyHeight() : undefined);
   setWorldSize(playerColorBody, getLocalPlayerBodyWidth(), getLocalPlayerBodyHeight());
-  if (playerSittingChairId) {
+  if (playerSittingChairId || (player && player.classList.contains("is-sitting"))) {
     syncLocalPlayerPoseVisual();
   }
   Object.keys(remotePlayers).forEach(function (remoteId) {

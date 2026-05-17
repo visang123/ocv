@@ -119,14 +119,17 @@ export function findNearestCraftHouse(footCenterX, footY, placedFurniture, maxDi
   return best;
 }
 
-export function findNearestCraftChair(footCenterX, footY, placedFurniture, maxDistance) {
+export function findNearestCraftChair(footCenterX, footY, placedFurniture, maxDistance, opts) {
   if (!Array.isArray(placedFurniture) || placedFurniture.length === 0) return null;
   const limit = Number.isFinite(Number(maxDistance)) ? Number(maxDistance) : PLAYER_CHAIR_INTERACT_DISTANCE;
+  const isChairSelectable =
+    opts && typeof opts.isChairSelectable === "function" ? opts.isChairSelectable : null;
   let best = null;
   let bestDist = Infinity;
   for (let i = 0; i < placedFurniture.length; i++) {
     const entry = placedFurniture[i];
     if (!entry || entry.kind !== "craftChair") continue;
+    if (isChairSelectable && !isChairSelectable(entry)) continue;
     const seat = getCraftChairSeatWorldPoint(entry);
     if (!seat) continue;
     const dx = Number(footCenterX) - seat.x;

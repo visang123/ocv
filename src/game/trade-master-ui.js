@@ -5,7 +5,6 @@ import {
   expandTradeItemCounts,
   formatTradeRecipePseudoLabel,
   getMatchingRecipesForCatalogEntry,
-  getMatchingTradeRecipes,
   getTradeCatalogEntries,
   getTradeRecipeById,
   getRecipeTradeBatchCount,
@@ -52,6 +51,7 @@ let dialogueStartedAt = 0;
 /** @type {Record<string, number>} */
 let counterByKey = {};
 let selectedRecipeId = null;
+let pendingTradeRecipeReveal = false;
 
 let outsideDismissBound = false;
 
@@ -382,11 +382,9 @@ function addOneInventoryItemToTradeCounter(itemKey) {
   const before = cloneTradeCounter(counterByKey);
   if (!host.removeOneBagItem(itemKey)) return false;
   counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + 1;
+  pendingTradeRecipeReveal = didCounterGainCatalogMatch(before, counterByKey);
   renderTradeCounter();
   refreshTradeExchangeUi();
-  if (didCounterGainRecipeMatch(before, counterByKey)) {
-    revealTradeExchangeAfterRecipeMatched();
-  }
   return true;
 }
 
@@ -407,48 +405,48 @@ export function addFullInventoryStackToTradeCounter(itemKey) {
     }
   }
   counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + available;
+  pendingTradeRecipeReveal = didCounterGainCatalogMatch(before, counterByKey);
   renderTradeCounter();
   refreshTradeExchangeUi();
-  if (didCounterGainRecipeMatch(before, counterByKey)) {
-    revealTradeExchangeAfterRecipeMatched();
-  }
   host.updateBagInventorySlots();
   return true;
 }
 
 /** @param {Record<string, number>} counter */
-function counterMatchingRecipeIds(counter) {
-  const ids = new Set();
-  getMatchingTradeRecipes(counter).forEach(function (recipe) {
-    ids.add(recipe.id);
+function countMatchedCatalogEntries(counter) {
+  let count = 0;
+  getTradeCatalogEntries().forEach(function (entry) {
+    if (getMatchingRecipesForCatalogEntry(entry, counter).length > 0) count += 1;
   });
-  return ids;
+  return count;
 }
 
 /** @param {Record<string, number>} before @param {Record<string, number>} after */
-function didCounterGainRecipeMatch(before, after) {
-  const beforeIds = counterMatchingRecipeIds(before);
-  const afterIds = counterMatchingRecipeIds(after);
-  for (const id of afterIds) {
-    if (!beforeIds.has(id)) return true;
-  }
-  return false;
+function didCounterGainCatalogMatch(before, after) {
+  return countMatchedCatalogEntries(after) > countMatchedCatalogEntries(before);
 }
 
 function revealTradeExchangeAfterRecipeMatched() {
   if (!host) return;
   window.requestAnimationFrame(function () {
-    window.requestAnimationFrame(function () {
-      if (host.tradeTradeableList) {
-        host.tradeTradeableList.scrollTop = 0;
+    const list = host.tradeTradeableList;
+    if (list) {
+      list.scrollTop = 0;
+      const firstAvailable = list.querySelector(".trade-tradeable-recipe.is-available");
+      if (firstAvailable && typeof firstAvailable.scrollIntoView === "function") {
+        firstAvailable.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
-      if (
-        host.tradeCounterSlot &&
-        typeof host.tradeCounterSlot.scrollIntoView === "function"
-      ) {
-        host.tradeCounterSlot.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
-    });
+    }
+    if (
+      host.tradeCounterSlot &&
+      typeof host.tradeCounterSlot.scrollIntoView === "function"
+    ) {
+      host.tradeCounterSlot.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    const panel = getTradeExchangePanelEl();
+    if (panel && panel.scrollHeight > panel.clientHeight + 1) {
+      panel.scrollTop = 0;
+    }
   });
 }
 
@@ -461,8 +459,8 @@ function getTradeExchangePanelEl() {
 export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
   if (!itemKey || !exchangeOpen || !host) return false;
   if (!(targetEl instanceof Element)) return false;
-  const panel = getTradeExchangePanelEl();
-  if (!panel || (!panel.contains(targetEl) && targetEl !== panel)) return false;
+  const counter = host.tradeCounterSlot;
+  if (!counter || (!counter.contains(targetEl) && targetEl !== counter)) return false;
   return addFullInventoryStackToTradeCounter(itemKey);
 }
 
@@ -673,6 +671,14 @@ function resolveTradeRecipeDisplaySide(side, counter) {
   return resolved;
 }
 
+function escapeTradeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /** @param {string} itemKey @param {number} count */
 function getTradeRecipeItemLabel(itemKey, count) {
   const pseudo = formatTradeRecipePseudoLabel(itemKey, count);
@@ -688,13 +694,13 @@ function buildTradeRecipeIoChipHtml(itemKey, count) {
   const label = getTradeRecipeItemLabel(itemKey, n);
   return (
     '<span class="trade-recipe-io" title="' +
-    label +
+    escapeTradeHtml(label) +
     '">' +
     '<span class="trade-recipe-io-icon">' +
     desc.iconHtml +
     "</span>" +
     '<span class="trade-recipe-io-label">' +
-    label +
+    escapeTradeHtml(label) +
     "</span>" +
     (n > 1 ? '<span class="trade-recipe-io-count">×' + n + "</span>" : "") +
     "</span>"
@@ -781,6 +787,10 @@ function refreshTradeExchangeUi() {
   renderTradeTradeableList();
   renderTradeOffers();
   updateTradeConfirmButton();
+  if (pendingTradeRecipeReveal) {
+    pendingTradeRecipeReveal = false;
+    revealTradeExchangeAfterRecipeMatched();
+  }
 }
 
 function renderTradeTradeableList() {
@@ -827,12 +837,25 @@ function renderTradeTradeableList() {
           recipeId +
           '" aria-pressed="' +
           (isSelected ? "true" : "false") +
+          '" aria-label="' +
+          escapeTradeHtml(entry.label) +
           '">' +
+          '<span class="trade-tradeable-recipe-label">' +
+          escapeTradeHtml(entry.label) +
+          "</span>" +
           flow +
           "</button>"
         );
       }
-      return '<div class="' + classNames.join(" ") + '">' + flow + "</div>";
+      return (
+        '<div class="' +
+        classNames.join(" ") +
+        '"><span class="trade-tradeable-recipe-label">' +
+        escapeTradeHtml(entry.label) +
+        "</span>" +
+        flow +
+        "</div>"
+      );
     })
     .join("");
 }
