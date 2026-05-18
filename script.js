@@ -1867,6 +1867,7 @@ let playerLastHealthTickAt = 0;
 let playerWasDrainingHealth = false;
 let playerIdleRechargeSince = 0;
 let playerIdleRechargeHealTicks = 0;
+let playerHealthDrainDebt = 0;
 let playerHealthGaugeVisible = true;
 let playerSittingChairId = "";
 let playerInsideCraftHouseId = "";
@@ -3905,7 +3906,7 @@ function getMainBucketGroundState() {
       y: Number.isFinite(mainBucketParkedY)
         ? mainBucketParkedY
         : wellY + WELL_SIZE - bucketSize.height,
-      isFull: Boolean(mainBucketParkedIsFull)
+      isFull: Boolean(isBucketFull)
     };
   }
   return {
@@ -3913,6 +3914,34 @@ function getMainBucketGroundState() {
     y: bucketY,
     isFull: Boolean(isBucketFull)
   };
+}
+
+/** 멀티: 공유 메인 양동이(땅·주차) 위치·찬/빈 — 손에 든 추가 양동이와 분리 */
+function applyRemoteSharedMainBucketGround(x, y, isFull) {
+  const nextX = Number(x);
+  const nextY = Number(y);
+  const nextFull = Boolean(isFull);
+  if (isHoldingExtraBucket()) {
+    if (Number.isFinite(nextX)) heldExtraBucketMainX = nextX;
+    if (Number.isFinite(nextY)) heldExtraBucketMainY = nextY;
+    heldExtraBucketMainIsFull = nextFull;
+    return;
+  }
+  if (isHoldingMainBucket()) return;
+  if (Number.isFinite(nextX)) bucketX = nextX;
+  if (Number.isFinite(nextY)) bucketY = nextY;
+  isBucketFull = nextFull;
+}
+
+/** 멀티: 원격이 메인 양동이를 들었을 때 손 위치만 반영(로컬이 추가 양동이를 든 경우 isBucketFull 유지) */
+function applyRemoteSharedMainBucketHeldPose(x, y, isFull) {
+  const nextX = Number(x);
+  const nextY = Number(y);
+  if (Number.isFinite(nextX)) bucketX = nextX;
+  if (Number.isFinite(nextY)) bucketY = nextY;
+  if (!isHoldingExtraBucket() && !isHoldingMainBucket()) {
+    isBucketFull = Boolean(isFull);
+  }
 }
 
 function isMainBucketOnGroundForPickup() {
@@ -5491,6 +5520,7 @@ function applyDefaultState(options) {
   playerWasDrainingHealth = false;
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
+  playerHealthDrainDebt = 0;
   playerHealthGaugeVisible = true;
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;
@@ -8720,12 +8750,21 @@ function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) {
         window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
       } else if (isHoldingExtraBucket()) {
         window.OVC_SHARED_BUCKET_HELD_BY = heldBy === currentSessionId ? "" : heldBy;
+        if (!heldBy) {
+          applyRemoteSharedMainBucketGround(
+            nextBucketX,
+            nextBucketY,
+            snapshot.bucket.isFull
+          );
+        }
       } else {
         window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
         if (heldBy !== currentSessionId) {
-          isBucketFull = Boolean(snapshot.bucket.isFull);
-          if (Number.isFinite(nextBucketX)) bucketX = nextBucketX;
-          if (Number.isFinite(nextBucketY)) bucketY = nextBucketY;
+          applyRemoteSharedMainBucketGround(
+            nextBucketX,
+            nextBucketY,
+            snapshot.bucket.isFull
+          );
         }
       }
     }
@@ -10363,28 +10402,43 @@ function setPlantOccluderFadeElements(nextEls) {
   plantOccluderFadeElements = nextEls.slice();
 }
 
+/** 포인터 아래 식물이 다른 식물과 겹치며 앞(큰 depth Y)에 그려지는지 */
+function plantOccludesOverlappingPlant(plant) {
+  if (!plant || plant.removed) return false;
+  if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return false;
+  const plantDepthY = getPlantDepthSortY(plant);
+  const plantRects = getPlantVisibleHoverRectsWorld(plant);
+  let occludes = false;
+  function checkOther(other) {
+    if (occludes || !other || other === plant) return;
+    if (other === plantRuntime && !plantRuntime.isSeedPlanted) return;
+    if (other.removed) return;
+    if (plantDepthY <= getPlantDepthSortY(other)) return;
+    if (!worldRectsOverlap(plantRects, getPlantVisibleHoverRectsWorld(other))) return;
+    occludes = true;
+  }
+  if (plantRuntime.isSeedPlanted) checkOther(plantRuntime);
+  for (let i = 0; i < appleState.extraPlants.length; i += 1) {
+    checkOther(appleState.extraPlants[i]);
+  }
+  return occludes;
+}
+
+/** 겹침 시 커서가 가리는(앞) 식물 위에 있을 때만 그 식물을 투명 처리 */
 function refreshPlantOccluderFade() {
-  const target = currentPlantHoverTarget;
-  if (!target) {
+  if (!hasLastPlantHoverPointer) {
     clearPlantOccluderFade();
     return;
   }
-  const targetDepthY = getPlantDepthSortY(target);
-  const targetRects = getPlantVisibleHoverRectsWorld(target);
-  const nextEls = [];
-  function fadeOccluders(plant) {
-    if (!plant || plant === target) return;
-    if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return;
-    if (plant.removed) return;
-    if (getPlantDepthSortY(plant) <= targetDepthY) return;
-    if (!worldRectsOverlap(targetRects, getPlantVisibleHoverRectsWorld(plant))) return;
-    getPlantHoverDomElements(plant).forEach(function (el) {
-      nextEls.push(el);
-    });
+  const pointerPlant = pickPlantForHoverFromPointerClient(
+    lastPlantHoverPointerClientX,
+    lastPlantHoverPointerClientY
+  );
+  if (!pointerPlant || !plantOccludesOverlappingPlant(pointerPlant)) {
+    clearPlantOccluderFade();
+    return;
   }
-  if (plantRuntime.isSeedPlanted) fadeOccluders(plantRuntime);
-  appleState.extraPlants.forEach(fadeOccluders);
-  setPlantOccluderFadeElements(nextEls);
+  setPlantOccluderFadeElements(getPlantHoverDomElements(pointerPlant));
 }
 
 function isPlantEligibleForWorldHover(plant) {
@@ -10456,14 +10510,14 @@ function pickCraftFurnitureHoverTarget(clientX, clientY) {
   return matches[0];
 }
 
-/** ????????? ?????, ?????????? ???? */
+/** 포인터 아래 식물 우선, 없으면 근접 식물 */
 function pickPlantHoverTarget(clientX, clientY) {
   const pointerPlant = pickPlantForHoverFromPointerClient(clientX, clientY);
   if (pointerPlant) return pointerPlant;
   return pickPlantForProximityHover();
 }
 
-/** ?????????? ??? ????????(???????? Y) ??? ????? ???? ?????????????? ????? ???? */
+/** 포인터 아래 식물 중 앞(큰 depth Y) 우선 — 겹침 시 가리는 식물 선택 */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
@@ -10484,12 +10538,12 @@ function pickPlantForHoverFromPointerClient(clientX, clientY) {
     }
   }
   if (plantRuntime.isSeedPlanted) consider(plantRuntime);
-  for (let i = 0; i < appleState.extraPlants.length; i++) {
+  for (let i = 0; i < appleState.extraPlants.length; i += 1) {
     consider(appleState.extraPlants[i]);
   }
   if (!matches.length) return null;
   matches.sort(function (a, b) {
-    if (a.depthY !== b.depthY) return a.depthY - b.depthY;
+    if (a.depthY !== b.depthY) return b.depthY - a.depthY;
     return a.d - b.d;
   });
   return matches[0].plant;
@@ -12308,6 +12362,7 @@ function loadPlayerHealth() {
     playerWasDrainingHealth = false;
     playerIdleRechargeSince = 0;
     playerIdleRechargeHealTicks = 0;
+    playerHealthDrainDebt = 0;
     playerHealthGaugeVisible = true;
     return;
   }
@@ -12321,6 +12376,7 @@ function loadPlayerHealth() {
       if (Number.isFinite(savedAt) && savedAt > 0 && playerLastHealthTickAt > savedAt + 600000) {
         playerLastHealthTickAt = 0;
       }
+      playerHealthDrainDebt = 0;
       playerHealthGaugeVisible = parsed.gaugeVisible !== false;
       playerInsideCraftHouseId = "";
       playerOutsideCraftHousePose = null;
@@ -12335,6 +12391,7 @@ function loadPlayerHealth() {
   playerWasDrainingHealth = false;
   playerIdleRechargeSince = 0;
   playerIdleRechargeHealTicks = 0;
+  playerHealthDrainDebt = 0;
   playerHealthGaugeVisible = true;
   playerInsideCraftHouseId = "";
   playerOutsideCraftHousePose = null;
@@ -12390,6 +12447,7 @@ function tickPlayerHealth(nowMs) {
       lastTickAt: playerLastHealthTickAt,
       idleRechargeSince: playerIdleRechargeSince,
       idleRechargeHealTicks: playerIdleRechargeHealTicks,
+      healthDrainDebt: playerHealthDrainDebt,
       shouldDrain: shouldDrain,
       wasDraining: playerWasDrainingHealth,
       rechargeContext: {
@@ -12410,6 +12468,9 @@ function tickPlayerHealth(nowMs) {
   }
   if (result.idleRechargeHealTicks != null) {
     playerIdleRechargeHealTicks = Number(result.idleRechargeHealTicks) || 0;
+  }
+  if (result.healthDrainDebt != null) {
+    playerHealthDrainDebt = Number(result.healthDrainDebt) || 0;
   }
   if (result.changed) {
     savePlayerHealthState();
@@ -17826,6 +17887,7 @@ function broadcastBucketState(forceSend) {
     x: mainBucket.x,
     y: mainBucket.y,
     isFull: holdingBucket ? Boolean(isBucketFull) : mainBucket.isFull,
+    mainIsFull: mainBucket.isFull,
     updatedAt: now
   };
   Promise.resolve(multiplayerChannel.send({
@@ -17864,11 +17926,7 @@ function handleRemoteBucketBroadcast(payload) {
   if (held && heldMain) {
     window.OVC_SHARED_BUCKET_HELD_BY = remoteId;
     delete remotePlayerHeldBucketById[remoteId];
-    const nextX = Number(payload.x);
-    const nextY = Number(payload.y);
-    if (Number.isFinite(nextX)) bucketX = nextX;
-    if (Number.isFinite(nextY)) bucketY = nextY;
-    isBucketFull = Boolean(payload.isFull);
+    applyRemoteSharedMainBucketHeldPose(payload.x, payload.y, payload.isFull);
     markWorldDirty();
     addBucketTrace(
       "recv",
@@ -17886,6 +17944,23 @@ function handleRemoteBucketBroadcast(payload) {
       isFull: Boolean(payload.isFull),
       bucketId: String(payload.heldBucketId || "")
     };
+    const mainFull =
+      payload.mainIsFull !== undefined && payload.mainIsFull !== null
+        ? Boolean(payload.mainIsFull)
+        : null;
+    if (isHoldingExtraBucket()) {
+      applyRemoteSharedMainBucketGround(
+        payload.x,
+        payload.y,
+        mainFull !== null ? mainFull : heldExtraBucketMainIsFull
+      );
+    } else if (!isHoldingMainBucket() && !String(window.OVC_SHARED_BUCKET_HELD_BY || "")) {
+      applyRemoteSharedMainBucketGround(
+        payload.x,
+        payload.y,
+        mainFull !== null ? mainFull : false
+      );
+    }
     markWorldDirty();
     addBucketTrace(
       "recv",
@@ -17899,11 +17974,11 @@ function handleRemoteBucketBroadcast(payload) {
   if (window.OVC_SHARED_BUCKET_HELD_BY === remoteId) {
     window.OVC_SHARED_BUCKET_HELD_BY = "";
   }
-  const nextX = Number(payload.x);
-  const nextY = Number(payload.y);
-  if (Number.isFinite(nextX)) bucketX = nextX;
-  if (Number.isFinite(nextY)) bucketY = nextY;
-  isBucketFull = Boolean(payload.isFull);
+  const resolvedMainFull =
+    payload.mainIsFull !== undefined && payload.mainIsFull !== null
+      ? Boolean(payload.mainIsFull)
+      : Boolean(payload.isFull);
+  applyRemoteSharedMainBucketGround(payload.x, payload.y, resolvedMainFull);
   markWorldDirty();
   addBucketTrace(
     "recv",

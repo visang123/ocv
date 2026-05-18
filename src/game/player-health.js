@@ -9,8 +9,8 @@ import {
 
 export const PLAYER_MAX_HEALTH = 100;
 export const PLAYER_APPLE_HEAL_AMOUNT = 15;
-export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 10000;
-export const PLAYER_HEALTH_DRAIN_AMOUNT = 5;
+export const PLAYER_HEALTH_DRAIN_INTERVAL_MS = 2000;
+export const PLAYER_HEALTH_DRAIN_AMOUNT = 1.5;
 export const PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS = 5000;
 export const PLAYER_HEALTH_RECHARGE_MS = 1000;
 export const PLAYER_HEALTH_RECHARGE_DEFAULT_PER_SEC = 1;
@@ -251,19 +251,23 @@ export function tickPlayerHealthState(state, nowMs) {
   let lastTickAt = Number(state.lastTickAt) || 0;
   let idleRechargeSince = Number(state.idleRechargeSince) || 0;
   let idleRechargeHealTicks = Number(state.idleRechargeHealTicks) || 0;
+  let healthDrainDebt = Number(state.healthDrainDebt) || 0;
   const rechargeCtx = state.rechargeContext || {};
   const shouldDrain = Boolean(state.shouldDrain);
   const wasDraining = Boolean(state.wasDraining);
   const clearIdleRecharge = { idleRechargeSince: 0, idleRechargeHealTicks: 0 };
+  const finish = (result) => ({ ...result, healthDrainDebt });
 
   // 정지(소모 없음) ↔ 이동(소모) 전환 시 경과 시간을 이월하지 않음 — 멈춘 뒤 움직일 때 체력이 한꺼번에 빠지는 버그 방지
   if (shouldDrain !== wasDraining) {
     lastTickAt = now;
     idleRechargeSince = 0;
     idleRechargeHealTicks = 0;
+    healthDrainDebt = 0;
   }
 
   if (shouldRechargePlayerHealth(health, shouldDrain)) {
+    healthDrainDebt = 0;
     const rate = getPlayerHealthRechargePerSecond(rechargeCtx);
     const useWarmup = needsIdleRechargeWarmup(health, rechargeCtx);
     if (useWarmup) {
@@ -272,122 +276,126 @@ export function tickPlayerHealthState(state, nowMs) {
         idleRechargeHealTicks = 0;
       }
       if (!idleRechargeSince) {
-        return {
+        return finish({
           health: health,
           lastTickAt: now,
           idleRechargeSince: now,
           idleRechargeHealTicks: 0,
           changed: false,
           depleted: isPlayerHealthDepleted(health)
-        };
+        });
       }
       const elapsed = now - idleRechargeSince;
       if (elapsed < PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS) {
-        return {
+        return finish({
           health: health,
           lastTickAt: lastTickAt,
           idleRechargeSince: idleRechargeSince,
           idleRechargeHealTicks: idleRechargeHealTicks,
           changed: false,
           depleted: isPlayerHealthDepleted(health)
-        };
+        });
       }
       const healElapsed = elapsed - PLAYER_HEALTH_RECHARGE_IDLE_WARMUP_MS;
       const totalHealTicks = Math.floor(healElapsed / PLAYER_HEALTH_RECHARGE_MS);
       const deltaTicks = totalHealTicks - idleRechargeHealTicks;
       if (deltaTicks < 1) {
-        return {
+        return finish({
           health: health,
           lastTickAt: lastTickAt,
           idleRechargeSince: idleRechargeSince,
           idleRechargeHealTicks: idleRechargeHealTicks,
           changed: false,
           depleted: isPlayerHealthDepleted(health)
-        };
+        });
       }
       const nextHealth = clampPlayerHealth(health + deltaTicks * rate);
-      return {
+      return finish({
         health: nextHealth,
         lastTickAt: lastTickAt,
         idleRechargeSince: idleRechargeSince,
         idleRechargeHealTicks: totalHealTicks,
         changed: nextHealth !== health,
         depleted: isPlayerHealthDepleted(nextHealth)
-      };
+      });
     }
     idleRechargeSince = 0;
     idleRechargeHealTicks = 0;
     if (!lastTickAt) {
-      return {
+      return finish({
         health: health,
         lastTickAt: now,
         ...clearIdleRecharge,
         changed: false,
         depleted: isPlayerHealthDepleted(health)
-      };
+      });
     }
     const elapsed = now - lastTickAt;
     if (elapsed < PLAYER_HEALTH_RECHARGE_MS) {
-      return {
+      return finish({
         health: health,
         lastTickAt: lastTickAt,
         ...clearIdleRecharge,
         changed: false,
         depleted: isPlayerHealthDepleted(health)
-      };
+      });
     }
     const ticks = Math.floor(elapsed / PLAYER_HEALTH_RECHARGE_MS);
     const nextHealth = clampPlayerHealth(health + ticks * rate);
-    return {
+    return finish({
       health: nextHealth,
       lastTickAt: lastTickAt + ticks * PLAYER_HEALTH_RECHARGE_MS,
       ...clearIdleRecharge,
       changed: nextHealth !== health,
       depleted: isPlayerHealthDepleted(nextHealth)
-    };
+    });
   }
 
   if (!shouldDrain) {
-    return {
+    healthDrainDebt = 0;
+    return finish({
       health: health,
       lastTickAt: lastTickAt,
       ...clearIdleRecharge,
       changed: false,
       depleted: false
-    };
+    });
   }
   idleRechargeSince = 0;
   idleRechargeHealTicks = 0;
   if (!lastTickAt) {
-    return {
+    return finish({
       health: health,
       lastTickAt: now,
       ...clearIdleRecharge,
       changed: false,
       depleted: false
-    };
+    });
   }
   const elapsed = now - lastTickAt;
   if (elapsed < PLAYER_HEALTH_DRAIN_INTERVAL_MS) {
-    return {
+    return finish({
       health: health,
       lastTickAt: lastTickAt,
       ...clearIdleRecharge,
       changed: false,
       depleted: false
-    };
+    });
   }
   const ticks = Math.floor(elapsed / PLAYER_HEALTH_DRAIN_INTERVAL_MS);
-  const nextHealth = clampPlayerHealth(health - ticks * PLAYER_HEALTH_DRAIN_AMOUNT);
+  healthDrainDebt += ticks * PLAYER_HEALTH_DRAIN_AMOUNT;
+  const loss = Math.floor(healthDrainDebt);
+  healthDrainDebt -= loss;
+  const nextHealth = clampPlayerHealth(health - loss);
   const becameDepleted = isPlayerHealthDepleted(nextHealth) && !isPlayerHealthDepleted(health);
-  return {
+  return finish({
     health: nextHealth,
     lastTickAt: becameDepleted ? now : lastTickAt + ticks * PLAYER_HEALTH_DRAIN_INTERVAL_MS,
     ...clearIdleRecharge,
     changed: nextHealth !== health,
     depleted: isPlayerHealthDepleted(nextHealth),
     resetTickOnDeplete: becameDepleted
-  };
+  });
 }
 
 /** @deprecated use tickPlayerHealthState */
