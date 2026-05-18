@@ -3951,6 +3951,80 @@ function isMainBucketOnGroundForPickup() {
   return true;
 }
 
+function groundBucketsOverlap(ax, ay, bx, by, bucketSz) {
+  return (
+    Math.abs(ax - bx) < bucketSz.width * 0.9 &&
+    Math.abs(ay - by) < bucketSz.height * 0.9
+  );
+}
+
+function listGroundBucketPositionsForDropResolve(options) {
+  const bucketSz = getBucketSize();
+  const out = [];
+  const opts = options || {};
+  if (!opts.skipMain) {
+    if (Number.isFinite(Number(opts.mainX)) && Number.isFinite(Number(opts.mainY))) {
+      out.push({ x: Number(opts.mainX), y: Number(opts.mainY) });
+    } else if (isMainBucketOnGroundForPickup()) {
+      const main = getMainBucketGroundState();
+      out.push({ x: main.x, y: main.y });
+    }
+  }
+  const excludeId = opts.excludeExtraId ? String(opts.excludeExtraId) : "";
+  (Array.isArray(appleState.worldExtraBuckets) ? appleState.worldExtraBuckets : []).forEach(
+    function (entry) {
+      if (!entry) return;
+      if (excludeId && String(entry.id) === excludeId) return;
+      out.push({ x: Number(entry.x) || 0, y: Number(entry.y) || 0 });
+    }
+  );
+  return { bucketSz: bucketSz, positions: out };
+}
+
+/** 바닥에 둘 때 다른 양동이와 겹치지 않도록 인접 칸으로 보정 */
+function resolveGroundBucketDropPosition(preferredX, preferredY, options) {
+  const listed = listGroundBucketPositionsForDropResolve(options);
+  const bucketSz = listed.bucketSz;
+  const positions = listed.positions;
+  const step = Math.max(5, Math.ceil(bucketSz.width * 0.4));
+  const rings = [
+    [0, 0],
+    [step, 0],
+    [-step, 0],
+    [0, step],
+    [0, -step],
+    [step, step],
+    [step, -step],
+    [-step, step],
+    [-step, -step],
+    [2 * step, 0],
+    [-2 * step, 0],
+    [0, 2 * step],
+    [0, -2 * step],
+    [2 * step, step],
+    [-2 * step, step]
+  ];
+  const px = Number(preferredX) || 0;
+  const py = Number(preferredY) || 0;
+
+  function isFree(x, y) {
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      if (groundBucketsOverlap(x, y, p.x, p.y, bucketSz)) return false;
+    }
+    return true;
+  }
+
+  for (let r = 0; r < rings.length; r++) {
+    const ox = px + rings[r][0];
+    const oy = py + rings[r][1];
+    if (isFree(ox, oy)) {
+      return { x: ox, y: oy };
+    }
+  }
+  return { x: px, y: py };
+}
+
 function getNearestGroundBucketPickInfo() {
   const bucketSize = getBucketSize();
   let best = null;
@@ -7088,15 +7162,11 @@ function isWorldExtraBucketOverlappingSharedMain(entry) {
   if (!entry || isMainBucketHeldByRemotePlayer() || isHoldingMainBucket()) return false;
   if (isHoldingExtraBucket() && String(entry.id) === String(heldBucketId || "")) return false;
   const main = getMainBucketGroundState();
-  const bucketSz = getBucketSize();
   const ex = Number(entry.x) || 0;
   const ey = Number(entry.y) || 0;
   const mx = Number(main.x) || 0;
   const my = Number(main.y) || 0;
-  return (
-    Math.abs(ex - mx) < bucketSz.width * 0.75 &&
-    Math.abs(ey - my) < bucketSz.height * 0.75
-  );
+  return Math.abs(ex - mx) < 4 && Math.abs(ey - my) < 4;
 }
 
 function updateWorldExtraBuckets() {
@@ -7970,13 +8040,9 @@ function applyWorldExtraBucketsFromSharedSnapshot(raw) {
       }
     }
   );
-  appleState.worldExtraBuckets = Object.keys(mergedById)
-    .map(function (id) {
-      return mergedById[id];
-    })
-    .filter(function (entry) {
-      return !isWorldExtraBucketOverlappingSharedMain(entry);
-    });
+  appleState.worldExtraBuckets = Object.keys(mergedById).map(function (id) {
+    return mergedById[id];
+  });
 }
 
 /** ???? ????: ?? ????????? ????????? ???????? ????? ????? */
@@ -9555,10 +9621,14 @@ function dropBucket() {
     const extraId = String(heldBucketId || "");
     const droppedExtraId =
       extraId || "world-bucket-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6);
+    const resolvedDrop = resolveGroundBucketDropPosition(dropX, dropY, {
+      mainX: heldExtraBucketMainX,
+      mainY: heldExtraBucketMainY
+    });
     appleState.worldExtraBuckets.push({
       id: droppedExtraId,
-      x: dropX,
-      y: dropY,
+      x: resolvedDrop.x,
+      y: resolvedDrop.y,
       isFull: Boolean(isBucketFull)
     });
     notePendingLocalExtraBucketDrop(droppedExtraId);
@@ -9585,8 +9655,9 @@ function dropBucket() {
     return;
   }
 
-  bucketX = dropX;
-  bucketY = dropY;
+  const resolvedMainDrop = resolveGroundBucketDropPosition(dropX, dropY, { skipMain: true });
+  bucketX = resolvedMainDrop.x;
+  bucketY = resolvedMainDrop.y;
   heldItem = null;
   heldBucketId = "";
   heldExtraBucketMainX = 0;
@@ -13830,27 +13901,44 @@ function isPointerOnHeldBucket(clientX, clientY) {
 
 function getGroundBucketPickInfoAtWorldPoint(wx, wy) {
   const bucketSize = getBucketSize();
-  function hitBucketAt(x, y) {
-    return isWorldPointInsideRect(wx, wy, worldRectFromXYWH(x, y, bucketSize.width, bucketSize.height));
+  let best = null;
+  let bestClickDist = Infinity;
+
+  function consider(x, y, info) {
+    if (
+      !isWorldPointInsideRect(
+        wx,
+        wy,
+        worldRectFromXYWH(x, y, bucketSize.width, bucketSize.height)
+      )
+    ) {
+      return;
+    }
+    const cx = x + bucketSize.width / 2;
+    const cy = y + bucketSize.height / 2;
+    const clickDist = Math.hypot(wx - cx, wy - cy);
+    if (clickDist >= bestClickDist) return;
+    bestClickDist = clickDist;
+    best = info;
   }
-  if (isMainBucketOnGroundForPickup() && hitBucketAt(bucketX, bucketY)) {
-    return {
+
+  if (isMainBucketOnGroundForPickup()) {
+    const main = getMainBucketGroundState();
+    consider(main.x, main.y, {
       type: "main",
-      distance: getCenterDistance(bucketX, bucketY, bucketSize.width, bucketSize.height)
-    };
+      distance: getCenterDistance(main.x, main.y, bucketSize.width, bucketSize.height)
+    });
   }
   const extras = Array.isArray(appleState.worldExtraBuckets) ? appleState.worldExtraBuckets : [];
-  for (let i = 0; i < extras.length; i++) {
-    const entry = extras[i];
-    if (!entry) continue;
-    if (!hitBucketAt(entry.x, entry.y)) continue;
-    return {
+  extras.forEach(function (entry) {
+    if (!entry) return;
+    consider(entry.x, entry.y, {
       type: "extra",
       id: String(entry.id),
       distance: getCenterDistance(entry.x, entry.y, bucketSize.width, bucketSize.height)
-    };
-  }
-  return null;
+    });
+  });
+  return best;
 }
 
 function tryCatchButterflyAtWorldPoint(wx, wy) {
