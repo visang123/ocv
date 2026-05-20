@@ -54,7 +54,7 @@ body {
   max-width: min(96vw, 56rem);
   margin: 0 auto;
   padding: 0;
-  font-size: clamp(1.2rem, 4.5vmin, 2rem);
+  font-size: clamp(3rem, 11.25vmin, 5rem);
   font-weight: 500;
   line-height: 1.35;
   letter-spacing: -0.02em;
