@@ -3,7 +3,7 @@ const appLoadingText = document.getElementById("app-loading-text");
 let appLoadingHideTimer = null;
 let appLoadingDismissed = false;
 
-/** index/tutorial 인라인 failsafe·script.js 공용 */
+/** 로딩을 닫을 때 반드시 게임 레이어 표시 */
 export function forceDismissLoadingOverlay() {
   appLoadingDismissed = true;
   clearTimeout(appLoadingHideTimer);
@@ -35,7 +35,10 @@ export function showAppLoadingScreen(message, options) {
 
 export function hideAppLoadingScreen(options) {
   const force = Boolean(options && options.force);
-  if (appLoadingDismissed && !force) return;
+  if (appLoadingDismissed && !force) {
+    document.body.classList.add("is-game-ready");
+    return;
+  }
   forceDismissLoadingOverlay();
 }
 

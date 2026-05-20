@@ -48,17 +48,6 @@ body::-webkit-scrollbar {
   pointer-events: none !important;
 }
 
-/* 부트 완료 전: 로딩 뒤에서 게임이 움직이거나 겹쳐 보이지 않게 */
-body:not(.is-game-ready) .viewport {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-body:not(.is-game-ready) #character-select-overlay.is-open {
-  visibility: visible;
-  pointer-events: auto;
-}
-
 .app-loading-inner {
   width: min(72vw, 520px);
   display: grid;
