@@ -1454,22 +1454,14 @@ body::-webkit-scrollbar {
 .story-intro-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10001;
+  z-index: 10050;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 0 clamp(16px, 4vw, 40px) clamp(12vh, 18vh, 22vh);
   background: #000;
   color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 280ms ease, visibility 280ms ease;
-}
-
-.story-intro-overlay.is-visible {
-  opacity: 1;
-  visibility: visible;
+  pointer-events: auto;
 }
 
 .story-intro-overlay[hidden] {
@@ -1484,7 +1476,7 @@ body::-webkit-scrollbar {
   line-height: 1.55;
   letter-spacing: -0.01em;
   text-align: center;
-  color: #000;
+  color: #fff;
   transition: color 1.4s ease;
 }
 
@@ -1507,7 +1499,7 @@ body::-webkit-scrollbar {
   color: rgba(255, 255, 255, 0.72);
   pointer-events: none;
   user-select: none;
-  z-index: 10002;
+  z-index: 10051;
 }
 
 .story-intro-hint.is-blink {

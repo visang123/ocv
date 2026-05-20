@@ -1,4 +1,4 @@
-/** 첫 로그인 세계관 인트로 — Enter로 한 줄씩 넘김 */
+/** 첫 로그인 세계관 인트로 — Enter로 한 줄씩 넘김 (로딩 화면과 분리) */
 export const STORY_INTRO_LINES = [
   "지구온난화는 너무나 심해져서 지구는 생존하기 부적합해졌다.",
   "사람들은 다른행성으로 눈을 돌렸다.",
@@ -12,6 +12,10 @@ export const STORY_INTRO_LINES = [
 const FADE_MS = 1400;
 const HINT_BLINK_DELAY_MS = 2000;
 
+function isEnterKey(event) {
+  return event.key === "Enter" || event.code === "NumpadEnter";
+}
+
 export function createStoryIntro(options) {
   const {
     storyIntroCompleteKey,
@@ -19,8 +23,7 @@ export function createStoryIntro(options) {
     setStoredFlag,
     overlay,
     lineEl,
-    hintEl,
-    onDismissLoading
+    hintEl
   } = options;
 
   let active = false;
@@ -75,7 +78,6 @@ export function createStoryIntro(options) {
     hintEl.classList.remove("is-blink");
   }
 
-  /** 줄이 밝아진 뒤 — 안내 문구 표시, 2초 후 노란 깜빡임 */
   function showHintForCurrentLine() {
     if (!hintEl) {
       canAdvance = true;
@@ -94,13 +96,20 @@ export function createStoryIntro(options) {
     isTransitioning = false;
   }
 
+  function showOverlay() {
+    if (!overlay) return;
+    overlay.removeAttribute("hidden");
+    overlay.classList.add("is-visible");
+    document.body.classList.add("story-intro-active");
+  }
+
   function hideOverlay() {
     active = false;
     canAdvance = false;
     isTransitioning = false;
     clearTimers();
-    overlay.hidden = true;
     overlay.classList.remove("is-visible");
+    overlay.setAttribute("hidden", "");
     document.body.classList.remove("story-intro-active");
     lineEl.classList.remove("is-bright", "is-dim");
     lineEl.textContent = "";
@@ -132,8 +141,10 @@ export function createStoryIntro(options) {
     lineEl.textContent = STORY_INTRO_LINES[idx];
     setLineDim();
     requestAnimationFrame(function () {
-      setLineBright();
-      showHintForCurrentLine();
+      requestAnimationFrame(function () {
+        setLineBright();
+        showHintForCurrentLine();
+      });
     });
   }
 
@@ -159,14 +170,18 @@ export function createStoryIntro(options) {
   }
 
   function bindInput() {
-    if (!overlay || overlay.dataset.storyIntroBound === "1") return;
+    if (overlay.dataset.storyIntroBound === "1") return;
     overlay.dataset.storyIntroBound = "1";
-    window.addEventListener("keydown", function (e) {
-      if (!active) return;
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      advanceOnEnter();
-    });
+    window.addEventListener(
+      "keydown",
+      function (e) {
+        if (!active || !isEnterKey(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        advanceOnEnter();
+      },
+      true
+    );
   }
 
   /**
@@ -183,15 +198,10 @@ export function createStoryIntro(options) {
     lineIndex = 0;
     canAdvance = false;
     isTransitioning = false;
-    overlay.hidden = false;
-    overlay.classList.add("is-visible");
-    document.body.classList.add("story-intro-active");
-    if (typeof onDismissLoading === "function") {
-      onDismissLoading();
-    }
     lineEl.textContent = "";
     lineEl.classList.remove("is-bright", "is-dim");
     hideHint();
+    showOverlay();
     requestAnimationFrame(function () {
       showLine(0);
     });

@@ -1748,10 +1748,7 @@ const storyIntro = createStoryIntro({
   setStoredFlag,
   overlay: storyIntroOverlay,
   lineEl: storyIntroLine,
-  hintEl: storyIntroHint,
-  onDismissLoading: function () {
-    hideAppLoadingScreen({ force: true });
-  }
+  hintEl: storyIntroHint
 });
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
@@ -2055,7 +2052,6 @@ showAppLoadingScreen("\uBD88\uB7EC\uC624\uB294 \uC911...");
 
 function ovcTryDismissLoadingScreen(force) {
   if (isTabSessionSuperseded && !force) return;
-  if (storyIntro.isActive() && !force) return;
   if (force || isCharacterSelecting) {
     hideAppLoadingScreen();
     return;
@@ -20337,20 +20333,6 @@ try {
       ", color=" +
       selectedPlayerColor
     );
-    function ovcContinueBootAfterStoryIntro() {
-      openCharacterSelectIfNeeded();
-      if (
-        isWorldServerSyncAvailable() &&
-        !isSharedWorldSyncPausedForTutorial() &&
-        !hasHydratedSharedWorldFromServer
-      ) {
-        showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
-      }
-      ovcTryDismissLoadingScreen(false);
-    }
-    if (!storyIntro.tryShow(ovcContinueBootAfterStoryIntro)) {
-      ovcContinueBootAfterStoryIntro();
-    }
     try {
       if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
         sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
@@ -20366,9 +20348,7 @@ try {
       }
     } catch (postTutorialReconnect) {}
     if (isWorldServerSyncAvailable() && !isSharedWorldSyncPausedForTutorial()) {
-      if (!storyIntro.isActive()) {
-        showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...");
-      }
+      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...");
       pollWorldState(true);
     } else {
       hasHydratedSharedWorldFromServer = true;
@@ -20377,7 +20357,26 @@ try {
   }
   ovcBootstrapFinished = true;
   finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
-  ovcTryDismissLoadingScreen(false);
+
+  function ovcRunPostBootstrapUi() {
+    openCharacterSelectIfNeeded();
+    if (
+      isWorldServerSyncAvailable() &&
+      !isSharedWorldSyncPausedForTutorial() &&
+      !hasHydratedSharedWorldFromServer
+    ) {
+      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
+    }
+    ovcTryDismissLoadingScreen(false);
+  }
+
+  if (!ovcAbortedPageInit) {
+    if (!storyIntro.tryShow(ovcRunPostBootstrapUi)) {
+      ovcRunPostBootstrapUi();
+    }
+  } else {
+    ovcTryDismissLoadingScreen(false);
+  }
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;
