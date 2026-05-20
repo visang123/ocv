@@ -787,12 +787,15 @@ const currentUserScopedHasChosenColorKey = currentUserId
 const savedUserScopedColor = normalizeHexColor(
   currentUserScopedColorKey ? localStorage.getItem(currentUserScopedColorKey) : ""
 );
-const hasChosenPlayerColor = currentUserId
-  ? (
-      localStorage.getItem(currentUserScopedHasChosenColorKey) === "true" ||
-      localStorage.getItem(currentUserHasChosenColorKey) === currentUserId
-    )
-  : false;
+function readHasChosenPlayerColorFromStorage() {
+  if (!currentUserId) return false;
+  return (
+    localStorage.getItem(currentUserScopedHasChosenColorKey) === "true" ||
+    localStorage.getItem(currentUserHasChosenColorKey) === currentUserId
+  );
+}
+
+let hasChosenPlayerColor = readHasChosenPlayerColorFromStorage();
 const savedGlobalLoginColor = normalizeHexColor(localStorage.getItem(currentUserColorKey));
 let selectedPlayerColor =
   savedUserScopedColor || savedGlobalLoginColor || "#ffffff";
@@ -1833,6 +1836,9 @@ let playerSitBaseImageReady = false;
 playerBaseImage.addEventListener("load", function () {
   playerBaseImageReady = true;
   playerTintCache.clear();
+  if (characterSelectOverlay && characterSelectOverlay.classList.contains("is-open")) {
+    syncCharacterPreviewVisual(selectedPlayerColor);
+  }
   if (hasChosenPlayerColor && selectedPlayerColor && !playerSittingChairId) {
     applyPlayerColor(selectedPlayerColor);
   }
@@ -12269,6 +12275,36 @@ function snapPlayerToCraftChair(chair) {
   updatePlayerColorBodyPosition();
 }
 
+function shouldApplyLocalPlayerTint() {
+  return Boolean(
+    selectedPlayerColor &&
+      (hasChosenPlayerColor || isCharacterSelecting)
+  );
+}
+
+function syncCharacterPreviewVisual(color) {
+  if (!characterPreview) return;
+  const normalized = normalizeHexColor(color) || "#ffffff";
+  let img = characterPreview.querySelector("img");
+  if (!img) {
+    img = document.createElement("img");
+    img.alt = "";
+    img.draggable = false;
+    characterPreview.replaceChildren(img);
+    characterPreview.classList.add("has-tinted-preview");
+  }
+  const applySrc = function () {
+    img.src = getTintedPlayerSrc(normalized, false);
+    img.classList.toggle("needs-outline", needsDarkOutline(normalized));
+  };
+  if (playerBaseImageReady) {
+    applySrc();
+  } else {
+    img.src = PLAYER_BASE_IMAGE_SRC;
+    playerBaseImage.addEventListener("load", applySrc, { once: true });
+  }
+}
+
 function syncLocalPlayerPoseVisual() {
   if (!player || !localPlayerRoot) return;
   const sitting = Boolean(playerSittingChairId);
@@ -12277,7 +12313,7 @@ function syncLocalPlayerPoseVisual() {
   player.classList.toggle("is-sitting", sitting);
   setWorldSize(localPlayerRoot, bodyW, sitting ? bodyH : undefined);
   setWorldSize(playerColorBody, bodyW, bodyH);
-  if (hasChosenPlayerColor && selectedPlayerColor) {
+  if (shouldApplyLocalPlayerTint()) {
     player.src = getTintedPlayerSrc(selectedPlayerColor, sitting);
     player.classList.toggle("needs-outline", needsDarkOutline(selectedPlayerColor));
     player.classList.add("is-colorized");
@@ -16535,6 +16571,7 @@ function applyPlayerColor(color) {
   }
   player.style.setProperty("--player-color", normalizedColor);
   playerColorBody.style.display = "none";
+  syncCharacterPreviewVisual(normalizedColor);
   syncLocalPlayerPoseVisual();
   addNetworkDebugLog("apply color: " + normalizedColor);
   syncPlayerColorToServer();
@@ -16693,6 +16730,7 @@ function openCharacterSelectIfNeeded() {
   player.classList.add("is-hidden-before-spawn");
   buildCharacterColorGrid();
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
+  syncCharacterPreviewVisual(selectedPlayerColor);
   characterSelectOverlay.classList.add("is-open");
 }
 
@@ -16702,6 +16740,7 @@ function openCharacterColorChange() {
   isCharacterSelecting = true;
   buildCharacterColorGrid();
   document.documentElement.style.setProperty("--preview-player-color", selectedPlayerColor);
+  syncCharacterPreviewVisual(selectedPlayerColor);
   characterSelectOverlay.classList.add("is-open");
 }
 
@@ -16713,6 +16752,7 @@ function finishCharacterSelect() {
   if (currentUserScopedHasChosenColorKey) {
     localStorage.setItem(currentUserScopedHasChosenColorKey, "true");
   }
+  hasChosenPlayerColor = readHasChosenPlayerColorFromStorage();
   characterSelectOverlay.classList.remove("is-open");
   syncLocalPlayerVisibility();
   applyPlayerColor(selectedPlayerColor);

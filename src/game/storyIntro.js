@@ -50,7 +50,8 @@ export function createStoryIntro(options) {
     overlay,
     lineEl,
     hintEl,
-    wormholeEl
+    wormholeEl,
+    wormholeStageEl
   } = options;
 
   let active = false;
@@ -60,6 +61,7 @@ export function createStoryIntro(options) {
   let fadeTimerId = null;
   let hintBlinkTimerId = null;
   let wormholeTimerId = null;
+  let skipWormholeFrameFn = null;
   let onCompleteCallback = null;
 
   function clearFadeTimer() {
@@ -139,11 +141,13 @@ export function createStoryIntro(options) {
   }
 
   function hideWormholeView() {
-    if (!wormholeEl) return;
-    wormholeEl.classList.remove("is-visible");
-    wormholeEl.hidden = true;
-    wormholeEl.removeAttribute("src");
+    if (wormholeEl) {
+      wormholeEl.classList.remove("is-visible");
+      wormholeEl.removeAttribute("src");
+    }
+    if (wormholeStageEl) wormholeStageEl.hidden = true;
     if (overlay) overlay.classList.remove("is-wormhole");
+    if (lineEl) lineEl.removeAttribute("aria-hidden");
   }
 
   function hideOverlay() {
@@ -158,6 +162,7 @@ export function createStoryIntro(options) {
     lineEl.textContent = "";
     hideHint();
     hideWormholeView();
+    skipWormholeFrameFn = null;
   }
 
   function playWormholeSequence(onDone) {
@@ -166,13 +171,22 @@ export function createStoryIntro(options) {
       return;
     }
     lineEl.hidden = true;
+    lineEl.textContent = "";
+    lineEl.setAttribute("aria-hidden", "true");
     hideHint();
     canAdvance = false;
     isTransitioning = true;
     overlay.classList.add("is-wormhole");
-    wormholeEl.hidden = false;
+    if (wormholeStageEl) wormholeStageEl.hidden = false;
 
     let frameIndex = 0;
+
+    function finishWormholeSequence() {
+      clearWormholeTimer();
+      skipWormholeFrameFn = null;
+      isTransitioning = false;
+      onDone();
+    }
 
     function showFrame() {
       wormholeEl.classList.remove("is-visible");
@@ -186,13 +200,22 @@ export function createStoryIntro(options) {
       if (frameIndex >= STORY_WORMHOLE_FRAMES.length) {
         wormholeTimerId = setTimeout(function () {
           wormholeTimerId = null;
-          isTransitioning = false;
-          onDone();
+          finishWormholeSequence();
         }, WORMHOLE_FRAME_MS);
       } else {
         wormholeTimerId = setTimeout(showFrame, WORMHOLE_FRAME_MS);
       }
     }
+
+    skipWormholeFrameFn = function () {
+      if (!active || !overlay.classList.contains("is-wormhole")) return;
+      clearWormholeTimer();
+      if (frameIndex >= STORY_WORMHOLE_FRAMES.length) {
+        finishWormholeSequence();
+        return;
+      }
+      showFrame();
+    };
 
     showFrame();
   }
@@ -244,7 +267,7 @@ export function createStoryIntro(options) {
     revealLine(idx);
   }
 
-  function advanceOnEnter() {
+  function advanceStoryLine() {
     if (!active || !canAdvance || isTransitioning) return;
     canAdvance = false;
     const next = lineIndex + 1;
@@ -257,16 +280,28 @@ export function createStoryIntro(options) {
     });
   }
 
+  function advanceIntro() {
+    if (!active) return;
+    if (typeof skipWormholeFrameFn === "function") {
+      skipWormholeFrameFn();
+      return;
+    }
+    advanceStoryLine();
+  }
+
   function bindInput() {
     if (overlay.dataset.storyIntroBound === "1") return;
     overlay.dataset.storyIntroBound = "1";
+    overlay.addEventListener("click", function () {
+      advanceIntro();
+    });
     window.addEventListener(
       "keydown",
       function (e) {
         if (!active || !isEnterKey(e)) return;
         e.preventDefault();
         e.stopPropagation();
-        advanceOnEnter();
+        advanceIntro();
       },
       true
     );
