@@ -2044,11 +2044,11 @@ function ovcTryDismissLoadingScreen(force) {
     return;
   }
   if (!ovcBootstrapFinished) return;
-  const worldReady =
-    !isWorldServerSyncAvailable() ||
-    isSharedWorldSyncPausedForTutorial() ||
-    hasHydratedSharedWorldFromServer;
-  if (!worldReady) return;
+  if (isSharedWorldSyncPausedForTutorial() || !isWorldServerSyncAvailable()) {
+    hideAppLoadingScreen();
+    return;
+  }
+  if (!hasHydratedSharedWorldFromServer) return;
   hideAppLoadingScreen();
 }
 
@@ -20335,7 +20335,7 @@ try {
       }
     } catch (postTutorialReconnect) {}
     if (isWorldServerSyncAvailable() && !isSharedWorldSyncPausedForTutorial()) {
-      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...");
+      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
       pollWorldState(true);
     } else {
       hasHydratedSharedWorldFromServer = true;
@@ -20363,14 +20363,6 @@ setTimeout(function () {
   }
   ovcTryDismissLoadingScreen(false);
 }, 40);
-setTimeout(function () {
-  if (!isTabSessionSuperseded) {
-    if (!hasHydratedSharedWorldFromServer && isWorldServerSyncAvailable()) {
-      hasHydratedSharedWorldFromServer = true;
-    }
-  }
-  ovcTryDismissLoadingScreen(false);
-}, 8000);
 setTimeout(function () {
   ovcTryDismissLoadingScreen(true);
 }, 12000);
