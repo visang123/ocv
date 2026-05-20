@@ -205,7 +205,6 @@ import {
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
   movementTutorialCompleteKey,
-  storyIntroCompleteKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
@@ -290,10 +289,7 @@ import {
   movementTutorialOverlay,
   movementTutorialLineMove,
   movementTutorialLineBook,
-  movementTutorialKeys,
-  storyIntroOverlay,
-  storyIntroLine,
-  storyIntroHint
+  movementTutorialKeys
 } from "./src/world/dom.js";
 import {
   createInputState,
@@ -399,7 +395,6 @@ import {
   isWorldDocumentEntry
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
-import { createStoryIntro } from "./src/game/storyIntro.js";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1741,14 +1736,6 @@ const movementTutorial = createMovementTutorial({
       jumpY: jumpY
     };
   }
-});
-const storyIntro = createStoryIntro({
-  storyIntroCompleteKey,
-  getStoredFlag,
-  setStoredFlag,
-  overlay: storyIntroOverlay,
-  lineEl: storyIntroLine,
-  hintEl: storyIntroHint
 });
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
@@ -20353,30 +20340,12 @@ try {
     } else {
       hasHydratedSharedWorldFromServer = true;
     }
+    openCharacterSelectIfNeeded();
     }
   }
   ovcBootstrapFinished = true;
   finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
-
-  function ovcRunPostBootstrapUi() {
-    openCharacterSelectIfNeeded();
-    if (
-      isWorldServerSyncAvailable() &&
-      !isSharedWorldSyncPausedForTutorial() &&
-      !hasHydratedSharedWorldFromServer
-    ) {
-      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
-    }
-    ovcTryDismissLoadingScreen(false);
-  }
-
-  if (!ovcAbortedPageInit) {
-    if (!storyIntro.tryShow(ovcRunPostBootstrapUi)) {
-      ovcRunPostBootstrapUi();
-    }
-  } else {
-    ovcTryDismissLoadingScreen(false);
-  }
+  ovcTryDismissLoadingScreen(false);
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;

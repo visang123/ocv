@@ -80,10 +80,6 @@ const movementTutorialOverlay = document.getElementById("movement-tutorial-overl
 const movementTutorialLineMove = document.getElementById("movement-tutorial-line-move");
 const movementTutorialLineBook = document.getElementById("movement-tutorial-line-book");
 const movementTutorialKeys = document.getElementById("movement-tutorial-keys");
-const storyIntroOverlay = document.getElementById("story-intro-overlay");
-const storyIntroLine = document.getElementById("story-intro-line");
-const storyIntroHint = document.getElementById("story-intro-hint");
-
 export {
   player,
   seed,
@@ -162,8 +158,5 @@ export {
   movementTutorialOverlay,
   movementTutorialLineMove,
   movementTutorialLineBook,
-  movementTutorialKeys,
-  storyIntroOverlay,
-  storyIntroLine,
-  storyIntroHint
+  movementTutorialKeys
 };

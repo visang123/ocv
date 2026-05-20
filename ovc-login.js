@@ -18,6 +18,8 @@ const ovcOnboardingFlowDoneStorageKey = "onboardingFlowDoneV2";
 const ovcOnboardingFlowStepStorageKey = "onboardingFlowStepV2";
 const ovcEverBeenToWorldStorageKey = "ovcEverBeenToWorldV1";
 const ovcTutorialDoneUserSessionKey = "ovcTutorialDoneUserSessionV1";
+/** script.js / story-intro.html 과 동일 */
+const ovcStoryIntroCompleteStorageKey = "storyIntroCompleteV1";
 
 function ovcScopedUserStorageKey(userId, suffix) {
   const uid = String(userId == null ? "" : userId).trim();
@@ -45,6 +47,20 @@ function ovcMigrateUnscopedTutorialFlagsToUserScope(userId) {
       }
     });
   } catch (e) {}
+}
+
+function ovcIsStoryIntroDoneForUserId(userId) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return true;
+  try {
+    return (
+      localStorage.getItem(
+        ovcScopedUserStorageKey(uid, ovcStoryIntroCompleteStorageKey)
+      ) === "true"
+    );
+  } catch (e) {
+    return true;
+  }
 }
 
 function ovcIsOnboardingDoneForUserId(userId) {
@@ -261,6 +277,16 @@ function goToGame(account) {
   }
 
   const htmlFile = onboarded ? "index.html" : "tutorial.html";
+
+  if (accountId && !ovcIsStoryIntroDoneForUserId(accountId)) {
+    const storyUrl = new URL("./story-intro.html", window.location.href);
+    storyUrl.searchParams.set("next", htmlFile);
+    storyUrl.searchParams.set("v", APP_VERSION);
+    storyUrl.searchParams.set("t", String(Date.now()));
+    window.location.replace(storyUrl.toString());
+    return;
+  }
+
   const targetUrl = new URL("./" + htmlFile, window.location.href);
   targetUrl.searchParams.set("v", APP_VERSION);
   targetUrl.searchParams.set("t", String(Date.now()));

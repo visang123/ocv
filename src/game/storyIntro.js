@@ -100,7 +100,6 @@ export function createStoryIntro(options) {
     if (!overlay) return;
     overlay.removeAttribute("hidden");
     overlay.classList.add("is-visible");
-    document.body.classList.add("story-intro-active");
   }
 
   function hideOverlay() {
@@ -110,7 +109,6 @@ export function createStoryIntro(options) {
     clearTimers();
     overlay.classList.remove("is-visible");
     overlay.setAttribute("hidden", "");
-    document.body.classList.remove("story-intro-active");
     lineEl.classList.remove("is-bright", "is-dim");
     lineEl.textContent = "";
     hideHint();
