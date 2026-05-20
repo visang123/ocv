@@ -205,6 +205,7 @@ import {
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
   movementTutorialCompleteKey,
+  storyIntroCompleteKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
@@ -289,7 +290,10 @@ import {
   movementTutorialOverlay,
   movementTutorialLineMove,
   movementTutorialLineBook,
-  movementTutorialKeys
+  movementTutorialKeys,
+  storyIntroOverlay,
+  storyIntroLine,
+  storyIntroHint
 } from "./src/world/dom.js";
 import {
   createInputState,
@@ -395,6 +399,7 @@ import {
   isWorldDocumentEntry
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
+import { createStoryIntro } from "./src/game/storyIntro.js";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1737,6 +1742,17 @@ const movementTutorial = createMovementTutorial({
     };
   }
 });
+const storyIntro = createStoryIntro({
+  storyIntroCompleteKey,
+  getStoredFlag,
+  setStoredFlag,
+  overlay: storyIntroOverlay,
+  lineEl: storyIntroLine,
+  hintEl: storyIntroHint,
+  onDismissLoading: function () {
+    hideAppLoadingScreen({ force: true });
+  }
+});
 let isApplyingWorldState = false;
 let isWorldSyncing = false;
 let isWorldPolling = false;
@@ -2039,6 +2055,7 @@ showAppLoadingScreen("\uBD88\uB7EC\uC624\uB294 \uC911...");
 
 function ovcTryDismissLoadingScreen(force) {
   if (isTabSessionSuperseded && !force) return;
+  if (storyIntro.isActive()) return;
   if (force || isCharacterSelecting) {
     hideAppLoadingScreen();
     return;
@@ -20320,7 +20337,13 @@ try {
       ", color=" +
       selectedPlayerColor
     );
-    openCharacterSelectIfNeeded();
+    function ovcContinueBootAfterStoryIntro() {
+      openCharacterSelectIfNeeded();
+      ovcTryDismissLoadingScreen(false);
+    }
+    if (!storyIntro.tryShow(ovcContinueBootAfterStoryIntro)) {
+      ovcContinueBootAfterStoryIntro();
+    }
     try {
       if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
         sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");

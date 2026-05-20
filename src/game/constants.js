@@ -459,6 +459,8 @@ export const bucketStateKey = "bucketStateV1";
 export const mainDrySeedHandledKey = "mainDrySeedHandledV1";
 export const mainSeedCollectedKey = "mainSeedCollectedV1";
 export const movementTutorialCompleteKey = "movementTutorialCompleteV1";
+/** 계정당 1회 — 첫 로그인 세계관 스토리 인트로 */
+export const storyIntroCompleteKey = "storyIntroCompleteV1";
 export const onboardingFlowStepKey = "onboardingFlowStepV2";
 export const onboardingFlowDoneKey = "onboardingFlowDoneV2";
 export const onboardingTutorialBindSessionKey = "onboardingTutorialBindSessionV1";
@@ -487,6 +489,7 @@ export const appStorageKeys = [
   mainDrySeedHandledKey,
   mainSeedCollectedKey,
   movementTutorialCompleteKey,
+  storyIntroCompleteKey,
   onboardingFlowStepKey,
   onboardingFlowDoneKey,
   onboardingTutorialBindSessionKey,
@@ -505,6 +508,7 @@ export const appStorageKeys = [
  */
 const tutorialProgressStorageKeySet = new Set([
   movementTutorialCompleteKey,
+  storyIntroCompleteKey,
   hasGuideBookKey,
   npcDialogueCompleteKey,
   guidePlantPageUnlockedKey,
