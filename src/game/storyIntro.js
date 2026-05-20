@@ -175,7 +175,6 @@ export function createStoryIntro(options) {
    */
   function tryShow(onComplete) {
     if (!shouldShow()) {
-      if (typeof onComplete === "function") onComplete();
       return false;
     }
     bindInput();

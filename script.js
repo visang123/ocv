@@ -2055,7 +2055,7 @@ showAppLoadingScreen("\uBD88\uB7EC\uC624\uB294 \uC911...");
 
 function ovcTryDismissLoadingScreen(force) {
   if (isTabSessionSuperseded && !force) return;
-  if (storyIntro.isActive()) return;
+  if (storyIntro.isActive() && !force) return;
   if (force || isCharacterSelecting) {
     hideAppLoadingScreen();
     return;
@@ -20339,6 +20339,13 @@ try {
     );
     function ovcContinueBootAfterStoryIntro() {
       openCharacterSelectIfNeeded();
+      if (
+        isWorldServerSyncAvailable() &&
+        !isSharedWorldSyncPausedForTutorial() &&
+        !hasHydratedSharedWorldFromServer
+      ) {
+        showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
+      }
       ovcTryDismissLoadingScreen(false);
     }
     if (!storyIntro.tryShow(ovcContinueBootAfterStoryIntro)) {
@@ -20359,7 +20366,9 @@ try {
       }
     } catch (postTutorialReconnect) {}
     if (isWorldServerSyncAvailable() && !isSharedWorldSyncPausedForTutorial()) {
-      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...");
+      if (!storyIntro.isActive()) {
+        showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...");
+      }
       pollWorldState(true);
     } else {
       hasHydratedSharedWorldFromServer = true;
