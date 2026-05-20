@@ -7,7 +7,7 @@ import { createStoryIntro } from "./game/storyIntro.js";
 
 const STORY_INTRO_COMPLETE_KEY = "storyIntroCompleteV1";
 const CURRENT_USER_ID_KEY = "ovcCurrentUserIdV1";
-const CACHE_BUST = "20260521h";
+const CACHE_BUST = "20260521j";
 
 function getCurrentUserId() {
   try {
@@ -53,11 +53,14 @@ function isTutorialOnboardingDoneForUser() {
 }
 
 function resolveNextPage() {
+  if (isTutorialOnboardingDoneForUser()) {
+    return "index.html";
+  }
   try {
     const next = new URLSearchParams(location.search).get("next");
-    if (next === "index.html" || next === "tutorial.html") return next;
+    if (next === "tutorial.html") return "tutorial.html";
   } catch (e) {}
-  return isTutorialOnboardingDoneForUser() ? "index.html" : "tutorial.html";
+  return "tutorial.html";
 }
 
 function redirectToGame() {

@@ -24,13 +24,19 @@ function isEnterKey(event) {
   return event.key === "Enter" || event.code === "NumpadEnter";
 }
 
-/** 줄바꿈 없이 한 줄에 전체 문장이 들어가도록 글자 크기 조절 */
+const STORY_LINE_MIN_FONT_PX = 16;
+
+/** 줄바꿈 없이 한 줄에 맞추되, 너무 작아지지 않도록 글자 크기만 조절 */
 function fitStoryLineToSingleRow(lineEl) {
   if (!lineEl || !lineEl.textContent) return;
-  const maxWidth = Math.max(200, Math.floor(window.innerWidth * 0.94));
-  let sizePx = 28;
+  lineEl.style.fontSize = "";
+  const maxWidth = Math.max(240, Math.floor(window.innerWidth * 0.92));
+  let sizePx = Math.round(parseFloat(getComputedStyle(lineEl).fontSize) || 28);
+  if (!Number.isFinite(sizePx) || sizePx < STORY_LINE_MIN_FONT_PX) {
+    sizePx = STORY_LINE_MIN_FONT_PX;
+  }
   lineEl.style.fontSize = sizePx + "px";
-  while (lineEl.scrollWidth > maxWidth && sizePx > 9) {
+  while (lineEl.scrollWidth > maxWidth && sizePx > STORY_LINE_MIN_FONT_PX) {
     sizePx -= 1;
     lineEl.style.fontSize = sizePx + "px";
   }
