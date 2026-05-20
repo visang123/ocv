@@ -18614,6 +18614,12 @@ function updateMultiplayerStatus(statusText) {
       : "\uC5F0\uACB0 \uC548\uB428";
   multiplayerStatus.textContent =
     "\uBA40\uD2F0 " + statusLabel + " / \uB85C\uADF8\uC778 " + getOnlinePlayerCount();
+
+  const showHud =
+    !isSharedWorldSyncPausedForTutorial() &&
+    multiplayerStatusText === "\uC5F0\uACB0\uB428";
+  multiplayerStatus.classList.toggle("is-online-hud-visible", showHud);
+  multiplayerStatus.hidden = !showHud;
 }
 
 function clearMultiplayerReconnectTimeout() {

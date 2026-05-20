@@ -31,7 +31,7 @@
   </script>
   <script src="src/app/dev-world-reset-shortcut-head.js?v=20260521a"></script>
   <title>온라인 비상 커뮤니티</title>
-  <link rel="stylesheet" href="style.css?v=20260521b">
+  <link rel="stylesheet" href="style.css?v=20260521c">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -453,7 +453,7 @@
       </button>
     </div>
   </div>
-  <div id="multiplayer-status">멀티 초기화 중 / 로그인 1</div>
+  <div id="multiplayer-status" hidden aria-hidden="true"></div>
   <button id="admin-open-button" type="button" aria-hidden="true"></button>
   <div id="admin-overlay" aria-hidden="true">
     <div id="admin-modal">
@@ -504,7 +504,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260521b"></script>
+  <script type="module" src="src/main.js?v=20260521c"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

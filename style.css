@@ -2889,6 +2889,16 @@ body:not(.is-game-ready) #character-select-overlay.is-open {
   font-weight: 800;
   line-height: 1.25;
   pointer-events: none;
+  display: none;
+}
+
+body.is-game-ready #multiplayer-status.is-online-hud-visible {
+  display: block;
+}
+
+body:not(.is-game-ready) #multiplayer-status,
+body.ovc-page-tutorial #multiplayer-status {
+  display: none !important;
 }
 
 #admin-open-button {
