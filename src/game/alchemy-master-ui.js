@@ -765,11 +765,22 @@ function confirmAlchemyCraft() {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
   }
-  requirementSlotFills = [];
-  requirementSlotDefs = [];
-  requirementsVisible = false;
+  // 재료는 슬롯에 넣은 시점에 가방에서 빠짐 — 칸만 비우고 가방으로 돌리지 않음
+  requirementSlotFills = requirementSlotDefs.map(function () {
+    return 0;
+  });
   host.addBagItems(recipe.outputKey, outputAmount);
-  closeAlchemyCraftPanelKeepInventory();
+  // 창을 닫지 않고 같은 레시피로 이어서 제작할 수 있게 재료 칸만 다시 연다
+  if (selectedRecipeId) {
+    showAlchemyRequirements();
+  } else {
+    requirementsVisible = false;
+    requirementSlotDefs = [];
+    requirementSlotFills = [];
+    renderAlchemyRequirementSlots();
+  }
+  updateAlchemyCraftConfirmButton();
+  renderAlchemyCraftProducts();
   spawnAlchemyCraftSmoke();
   showAlchemyCraftFinishLine();
   host.updateBagInventorySlots();
@@ -777,10 +788,6 @@ function confirmAlchemyCraft() {
   if (host.saveColoredMagicPowderCounts) host.saveColoredMagicPowderCounts();
   if (host.saveButterflyCaughtCounts) host.saveButterflyCaughtCounts();
   host.markWorldDirty();
-}
-
-function closeAlchemyCraftPanelKeepInventory() {
-  closeAlchemyCraftPanel({ keepInventory: true, returnSlots: false });
 }
 
 function spawnAlchemyCraftSmoke() {

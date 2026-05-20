@@ -144,8 +144,8 @@ import {
   grassStage4WorldScale,
   grassStage5WorldScale,
   getMatureSpriteAnchor,
-  PLANT_HOVER_RING_WORLD_SIZE,
   pickupDistance,
+  bucketPickupDistance,
   guideInteractDistance,
   npcInteractDistance,
   wellUseDistance,
@@ -378,7 +378,10 @@ import {
   getPlantWorldAnchorXY,
   getPlantDepthSortY as getPlantDepthSortYCore,
   mapPlantDepthSortYToZIndex,
-  worldRectsOverlap
+  worldRectsOverlap,
+  collectPlantsUnderWorldPoint as collectPlantsUnderWorldPointCore,
+  pickPlantHoverFromUnderPointer as pickPlantHoverFromUnderPointerCore,
+  getPlantsToFadeForHoverTarget as getPlantsToFadeForHoverTargetCore
 } from "./src/game/plantHover.js";
 import {
   HELD_ITEM_SEED,
@@ -625,7 +628,7 @@ let lastPickupToggleAt = 0;
 let lastWorldRockRespawnAt = 0;
 let lastBucketPickupAt = 0;
 let isInteractKeyLatched = false;
-const guidePlaceholderHtml = "<p>???? ??????? ????????????!</p>";
+const guidePlaceholderHtml = "<p>아직 내용이 없습니다!</p>";
 const guidePlantPageHtml = guidePages[1] ? guidePages[1].innerHTML : "";
 let isSetupComplete = false;
 let cameraX = 0;
@@ -4056,7 +4059,7 @@ function getNearestGroundBucketPickInfo() {
 
 function isNearBucket() {
   const info = getNearestGroundBucketPickInfo();
-  return Boolean(info && info.distance < pickupDistance);
+  return Boolean(info && info.distance < bucketPickupDistance);
 }
 
 function isNearWell() {
@@ -5008,7 +5011,7 @@ function updateOnboardingFlowUI() {
     case 1: {
       if (isNearWorldBagPickup() && !hasGuideBook) {
         movementTutorial.hideOverlay();
-        setOnboardingCalloutVisible(true, "E???? ?????? ????? ??????????????.");
+        setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
@@ -5025,7 +5028,7 @@ function updateOnboardingFlowUI() {
     }
     case 3: {
       if (guideOpen) {
-        setOnboardingCalloutVisible(true, "??????(????????)?? ??????????.");
+        setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
         if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
           bagBookStorageSlot.classList.add("onboarding-highlight");
@@ -5038,18 +5041,18 @@ function updateOnboardingFlowUI() {
     case 4: {
       setOnboardingCalloutVisible(
         true,
-        "space??? ????? ????? ?????????. ??????????!"
+        "space바를 누르면 점프를 합니다. 해보세요!"
       );
       if (player) player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
-      setOnboardingCalloutVisible(true, "??????????? ????????????.");
+      setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
-      setOnboardingCalloutVisible(true, "e???? ?????? ???????? ??????????????.");
+      setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
@@ -5066,7 +5069,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 8: {
-      setOnboardingCalloutVisible(true, "?????? ?????? ????????????.");
+      setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
@@ -5076,14 +5079,14 @@ function updateOnboardingFlowUI() {
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
         break;
       }
-      setOnboardingCalloutVisible(true, "q? ?????? ?????? ????? ???????????????.");
+      setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case 10: {
       if (guideOpen) {
-        const line1 = "??????? ???????????.";
-        const line2 = "esc ?????? ????????? ????? ???????? ????????????.";
+        const line1 = "설명을 참고하세요.";
+        const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
         setOnboardingCalloutVisible(
           true,
           onboardingNpcGuideEscHintShown ? line2 + "\n\n" + line1 : line1
@@ -5098,7 +5101,7 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 11: {
-      setOnboardingCalloutVisible(true, "?????????? ???????? ????????????.");
+      setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -5106,7 +5109,7 @@ function updateOnboardingFlowUI() {
     case 12: {
       setOnboardingCalloutVisible(
         true,
-        "?????? ????? ????? E???? ?????? ??????? ?????? ???????."
+        "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
       );
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
@@ -5114,19 +5117,19 @@ function updateOnboardingFlowUI() {
     case 13: {
       setOnboardingCalloutVisible(
         true,
-        "?????? ?????? ??? Q???? ?????? ??? ???? ???????."
+        "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
       );
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 14: {
-      setOnboardingCalloutVisible(true, "?????? ????? ????? ??????????? ????????.");
+      setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
-      setOnboardingCalloutVisible(true, "Q???? ?????? ??? ?????????.");
+      setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       break;
     }
@@ -5134,8 +5137,8 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPostWaterCongratsPhase === 0
-          ? "??????????????! ???? ????????? ???? ????????????????."
-          : "???? ??????????????? ????? ???????????????."
+          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
+          : "아직 남았습니다 끝까지 진행해주세요."
       );
       break;
     }
@@ -5148,13 +5151,13 @@ function updateOnboardingFlowUI() {
       setOnboardingCalloutVisible(
         true,
         onboardingPlantIndexIntroPhase === 0
-          ? "???????????? ?????? ??????? ????????????."
-          : "??? ??????? ?????????? ??? ???????????!"
+          ? "식물지수는 식물을 심으면 올라갑니다."
+          : "맵의 안개가 해제되니 잘 올려보세요!"
       );
       break;
     }
     case ONBOARDING_STEP_DROP_BUCKET: {
-      setOnboardingCalloutVisible(true, "E???? ?????? ??????? ????????????????.");
+      setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
       if (bucket) bucket.classList.add("onboarding-highlight");
       if (player) player.classList.add("onboarding-highlight");
       break;
@@ -5162,7 +5165,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_CHAT: {
       setOnboardingCalloutVisible(
         true,
-        "???? ??????? ?????? ??????? ????, ???????? ??????? ??? ???????? ???????."
+        "💬 버튼을 눌러 채팅을 열고, 메시지를 입력한 뒤 전송해 보세요."
       );
       if (worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
       if (worldChatPanelOpen && worldChatSendBtn) {
@@ -5173,7 +5176,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_HEART: {
       setOnboardingCalloutVisible(
         true,
-        "?? ??????? ?????? ??????? ???? ???????. ???? ?????????????? ?????? ????? ??? ?????????."
+        "❤️ 버튼을 눌러 하트를 보내 보세요. 다른 플레이어에게 반응을 전할 수 있어요."
       );
       if (worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
       break;
@@ -5181,13 +5184,13 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SAD: {
       setOnboardingCalloutVisible(
         true,
-        "???? ??????? ?????? ???????? ???? ???????."
+        "😢 버튼을 눌러 슬퍼요를 보내 보세요."
       );
       if (worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ROCK: {
-      setOnboardingCalloutVisible(true, "????? ????? ????? ????? E????? ???? ???????.");
+      setOnboardingCalloutVisible(true, "땅의 돌에 가까이 가서 E키로 줍아 보세요.");
       if (Array.isArray(appleState.worldRocks)) {
         appleState.worldRocks.forEach(function (rock) {
           if (rock && rock._el && String(rock.id) === TUTORIAL_ONBOARDING_ROCK_ID) {
@@ -5200,7 +5203,7 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_BUTTERFLY: {
       setOnboardingCalloutVisible(
         true,
-        "??????????????? ???????? ????????? E ?????? Q?? ?????? ???????."
+        "날아다니는 나비에 근접하여 E 또는 Q로 잡아 보세요."
       );
       Object.keys(butterflyRenderById).forEach(function (id) {
         const entry = butterflyRenderById[id];
@@ -5211,44 +5214,44 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_TRADE_MASTER: {
-      setOnboardingCalloutVisible(true, "?????? ????????? ????? Q????? ????????? ???????.");
+      setOnboardingCalloutVisible(true, "거래의 달인에게 가서 Q키로 대화해 보세요.");
       if (tradeMaster) tradeMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ALCHEMY_MASTER: {
-      setOnboardingCalloutVisible(true, "?????????? ????????? ????? Q????? ????????? ???????.");
+      setOnboardingCalloutVisible(true, "연금술의 달인에게 가서 Q키로 대화해 보세요.");
       if (alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_ZOOM_INTRO: {
-      setOnboardingCalloutVisible(true, "???????? ??? ?????,?????? ??????????.");
+      setOnboardingCalloutVisible(true, "스크롤해 맵을 축소,확대 해보세요.");
       break;
     }
     case ONBOARDING_STEP_ZOOM_MIN: {
-      setOnboardingCalloutVisible(true, "????? ????? ????? ??????????.");
+      setOnboardingCalloutVisible(true, "가장 작게 축소 해보세요.");
       break;
     }
     case ONBOARDING_STEP_TREE_APPROACH: {
-      setOnboardingCalloutVisible(true, "??????? ??? ?????? ????????????.");
+      setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       break;
     }
     case ONBOARDING_STEP_TREE_CLIMB: {
       setOnboardingCalloutVisible(
         true,
-        "????? ????????? ???????? ??????? ????? ????????????."
+        "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
       );
       if (bigTree) bigTree.classList.add("onboarding-highlight");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_PICK_APPLE: {
-      setOnboardingCalloutVisible(true, "e???? ?????? ????? ?????????.");
+      setOnboardingCalloutVisible(true, "e키를 눌러 열매를 따세요.");
       highlightUnpickedApplesForTutorial();
       break;
     }
     case ONBOARDING_STEP_EAT_APPLE: {
-      setOnboardingCalloutVisible(true, "????? ??? ??? ???? ??? ?????? ??????????.");
+      setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
       if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
       if (bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
@@ -5257,10 +5260,10 @@ function updateOnboardingFlowUI() {
       break;
     }
     case ONBOARDING_STEP_EXTRA_SEED: {
-      const lineSeed = "??????? ?????????? ????????? ???? ????? ???????????????.";
-      const lineB = "??????????? ????????????.";
+      const lineSeed = "씨앗이 생겼으니 원하는 곳에 클릭해 사용하세요.";
+      const lineB = "나무밖으로 이동하세요.";
       if (onboardingPostAppleSeedIntroPhase === 0) {
-        setOnboardingCalloutVisible(true, "???????? ???????????????.");
+        setOnboardingCalloutVisible(true, "씨앗을 얻었습니다.");
       } else {
         setOnboardingCalloutVisible(
           true,
@@ -5276,16 +5279,17 @@ function updateOnboardingFlowUI() {
     case ONBOARDING_STEP_SETTINGS_ESC: {
       setOnboardingCalloutVisible(
         true,
-        "Esc? ?????? ??????? ??? ???, ?????? Esc?? ?????? ???????."
+        "Esc를 눌러 설정을 연 뒤, 다시 Esc로 닫아 보세요."
       );
       break;
     }
     case ONBOARDING_STEP_COMPLETE: {
-      setOnboardingCalloutVisible(true, "??????????????! ??????????? ?????????????!!");
+      setOnboardingCalloutVisible(true, "축하합니다! 튜토리얼이 끝났습니다!!");
       break;
     }
     default:
       setOnboardingCalloutVisible(false, "");
+  }
   }
   updateSettingsTutorialButtons();
 }
@@ -6059,7 +6063,7 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
   const pickInfo = forcedPickInfo || getNearestGroundBucketPickInfo();
   const dist = pickInfo ? pickInfo.distance : bucketDistance;
   if (
-    dist > pickupDistance ||
+    dist > bucketPickupDistance ||
     (pickInfo && pickInfo.type === "main" && !canPickUpSharedBucket())
   ) {
     return false;
@@ -9952,7 +9956,6 @@ function updateExtraSeedsAndPlants() {
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
   });
   syncAllPlantDepthStacking();
-  refreshPlantOccluderFade();
   if (didRemoveDrySoilExtraPlant) {
     saveAppleState();
     markWorldDirty();
@@ -10402,7 +10405,11 @@ function getPlantHoverGeometryOptions() {
     plantSpotHeight: PLANT_SPOT_HEIGHT,
     getSproutStageFromPlant: getSproutStageFromPlant,
     getSproutSizeForStage: getSproutSizeForStage,
-    getSproutWorldPositionForPlant: getSproutWorldPositionForPlant
+    getSproutWorldPositionForPlant: getSproutWorldPositionForPlant,
+    /** 실루엣 겹침 최소 비율 — 인접만 한 식물은 투명 처리 안 함 */
+    visualOverlapMinRatio: 0.06,
+    /** 뒤 식물 실루엣의 이 비율 이상이 앞에 가려지면 “완전 가림” */
+    fullOccludeCoverage: 0.82
   };
 }
 
@@ -10473,43 +10480,41 @@ function setPlantOccluderFadeElements(nextEls) {
   plantOccluderFadeElements = nextEls.slice();
 }
 
-/** 포인터 아래 식물이 다른 식물과 겹치며 앞(큰 depth Y)에 그려지는지 */
-function plantOccludesOverlappingPlant(plant) {
-  if (!plant || plant.removed) return false;
-  if (plant === plantRuntime && !plantRuntime.isSeedPlanted) return false;
-  const plantDepthY = getPlantDepthSortY(plant);
-  const plantRects = getPlantVisibleHoverRectsWorld(plant);
-  let occludes = false;
-  function checkOther(other) {
-    if (occludes || !other || other === plant) return;
-    if (other === plantRuntime && !plantRuntime.isSeedPlanted) return;
-    if (other.removed) return;
-    if (plantDepthY <= getPlantDepthSortY(other)) return;
-    if (!worldRectsOverlap(plantRects, getPlantVisibleHoverRectsWorld(other))) return;
-    occludes = true;
-  }
-  if (plantRuntime.isSeedPlanted) checkOther(plantRuntime);
+function listEligiblePlantsForHover() {
+  const plants = [];
+  if (plantRuntime.isSeedPlanted) plants.push(plantRuntime);
   for (let i = 0; i < appleState.extraPlants.length; i += 1) {
-    checkOther(appleState.extraPlants[i]);
+    const plant = appleState.extraPlants[i];
+    if (plant && !plant.removed) plants.push(plant);
   }
-  return occludes;
+  return plants;
 }
 
-/** 겹침 시 커서가 가리는(앞) 식물 위에 있을 때만 그 식물을 투명 처리 */
+/** 겹침 시 투명 처리: 뒤 식물 호버 → 앞 식물만 / 앞이 완전 가림 → 앞 식물 자신 (호버 UI가 켜진 경우만) */
 function refreshPlantOccluderFade() {
-  if (!hasLastPlantHoverPointer) {
+  const hoverPlant = currentPlantHoverTarget;
+  if (!hoverPlant) {
     clearPlantOccluderFade();
     return;
   }
-  const pointerPlant = pickPlantForHoverFromPointerClient(
-    lastPlantHoverPointerClientX,
-    lastPlantHoverPointerClientY
+  const fadePlants = getPlantsToFadeForHoverTargetCore(
+    hoverPlant,
+    listEligiblePlantsForHover(),
+    getPlantHoverGeometryOptions(),
+    isPlantEligibleForWorldHover
   );
-  if (!pointerPlant || !plantOccludesOverlappingPlant(pointerPlant)) {
+  if (!fadePlants.length) {
     clearPlantOccluderFade();
     return;
   }
-  setPlantOccluderFadeElements(getPlantHoverDomElements(pointerPlant));
+  const fadeEls = [];
+  for (let i = 0; i < fadePlants.length; i += 1) {
+    const els = getPlantHoverDomElements(fadePlants[i]);
+    for (let j = 0; j < els.length; j += 1) {
+      if (els[j]) fadeEls.push(els[j]);
+    }
+  }
+  setPlantOccluderFadeElements(fadeEls);
 }
 
 function isPlantEligibleForWorldHover(plant) {
@@ -10588,36 +10593,18 @@ function pickPlantHoverTarget(clientX, clientY) {
   return pickPlantForProximityHover();
 }
 
-/** 포인터 아래 식물 중 앞(큰 depth Y) 우선 — 겹침 시 가리는 식물 선택 */
+/** 포인터 아래 식물 — 겹침 시 뒤(가려진) 식물 우선, 완전 가림이면 앞 식물 */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
-  const matches = [];
-  function consider(plant) {
-    if (!isPlantEligibleForWorldHover(plant)) return;
-    const rects = getPlantVisibleHoverRectsWorld(plant);
-    for (let i = 0; i < rects.length; i += 1) {
-      const rect = rects[i];
-      if (!isWorldPointInsideRect(pxy.x, pxy.y, rect)) continue;
-      const cx = (rect.left + rect.right) / 2;
-      const cy = (rect.top + rect.bottom) / 2;
-      matches.push({
-        plant: plant,
-        depthY: getPlantDepthSortY(plant),
-        d: Math.hypot(pxy.x - cx, pxy.y - cy)
-      });
-    }
-  }
-  if (plantRuntime.isSeedPlanted) consider(plantRuntime);
-  for (let i = 0; i < appleState.extraPlants.length; i += 1) {
-    consider(appleState.extraPlants[i]);
-  }
-  if (!matches.length) return null;
-  matches.sort(function (a, b) {
-    if (a.depthY !== b.depthY) return b.depthY - a.depthY;
-    return a.d - b.d;
-  });
-  return matches[0].plant;
+  const under = collectPlantsUnderWorldPointCore(
+    pxy.x,
+    pxy.y,
+    listEligiblePlantsForHover(),
+    getPlantHoverGeometryOptions(),
+    isPlantEligibleForWorldHover
+  );
+  return pickPlantHoverFromUnderPointerCore(under, getPlantHoverGeometryOptions());
 }
 
 function bagHasPlantableSeedsForHoverHint() {
@@ -10872,7 +10859,11 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
 
   const plant = pickPlantHoverTarget(clientX, clientY);
   if (plant) {
-    if (plant !== currentPlantHoverTarget) showPlantHoverSignForPlant(plant);
+    if (plant !== currentPlantHoverTarget) {
+      showPlantHoverSignForPlant(plant);
+    } else {
+      refreshPlantOccluderFade();
+    }
   } else hidePlantHoverLabel();
 }
 
@@ -13521,45 +13512,51 @@ function clearPlantHoverRing() {
   plantHoverRing.style.display = "none";
 }
 
-function getPlantHoverRingWorldBounds(plant) {
-  const st = getSproutStageFromPlant(plant);
+/** 호버 링 중심·크기용 — 보이는 식물 본체(새싹 우선, 없으면 흙) */
+function getPlantPrimaryVisualRectWorld(plant) {
+  const px = plant.spotX != null ? plant.spotX : plant.x;
+  const py = plant.spotY != null ? plant.spotY : plant.y;
   const sproutVisible =
     plant.isSproutGrown &&
     plant.status !== "rotten" &&
     plant.status !== "dry" &&
     !plant.isOverwatered;
-  if (
-    sproutVisible &&
-    st >= 4 &&
-    shouldHideSeparateSoilUnderBigGrass(plant) &&
-    !isColoredMaturePlant(plant)
-  ) {
-    const anchor = getPlantHoverAnchorWorld(plant);
-    const size = PLANT_HOVER_RING_WORLD_SIZE;
+  if (sproutVisible) {
+    const st = getSproutStageFromPlant(plant);
+    const sz = getSproutSizeForStage(st, plant);
+    const pos = getSproutWorldPositionForPlant(px, py, sz, st, plant);
     return {
-      x: anchor.cxWorld - size / 2,
-      y: anchor.cyWorld - size / 2,
-      size: size
+      left: pos.x,
+      top: pos.y,
+      right: pos.x + sz.width,
+      bottom: pos.y + sz.height
     };
   }
-  const rects = getPlantVisibleHoverRectsWorld(plant);
-  if (!rects.length) return null;
-  let left = Infinity;
-  let top = Infinity;
-  let right = -Infinity;
-  let bottom = -Infinity;
-  for (let i = 0; i < rects.length; i += 1) {
-    const r = rects[i];
-    left = Math.min(left, r.left);
-    top = Math.min(top, r.top);
-    right = Math.max(right, r.right);
-    bottom = Math.max(bottom, r.bottom);
+  if (shouldHideSeparateSoilUnderBigGrass(plant)) return null;
+  return {
+    left: px,
+    top: py,
+    right: px + PLANT_SPOT_WIDTH,
+    bottom: py + PLANT_SPOT_HEIGHT
+  };
+}
+
+function getPlantHoverRingWorldBounds(plant) {
+  const rect = getPlantPrimaryVisualRectWorld(plant);
+  if (!rect) return null;
+  const st = getSproutStageFromPlant(plant);
+  const matureAnchor =
+    plant && st >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), st) : null;
+  let cx;
+  let cy = (rect.top + rect.bottom) / 2;
+  if (matureAnchor) {
+    cx = getPlantHoverAnchorWorld(plant).cxWorld;
+  } else {
+    cx = (rect.left + rect.right) / 2;
   }
-  const w = right - left;
-  const h = bottom - top;
+  const w = rect.right - rect.left;
+  const h = rect.bottom - rect.top;
   const size = Math.max(w, h) * 1.05;
-  const cx = (left + right) / 2;
-  const cy = (top + bottom) / 2;
   return { x: cx - size / 2, y: cy - size / 2, size: size };
 }
 
@@ -13728,6 +13725,7 @@ function hidePlantHoverLabel() {
   worldNpcHoverAnchorEl = null;
   clearWorldNpcHoverSticky();
   currentPlantHoverTarget = null;
+  hasLastPlantHoverPointer = false;
   if (worldBagInventory) worldBagInventory.classList.remove("is-seed-inventory-hover-hint");
   clearPlantHoverVisuals();
   if (plantHoverLabel) {
@@ -14199,7 +14197,7 @@ function isPlayerNearWorldInteractTarget(target) {
     case "bucket":
       return Boolean(
         target.data &&
-          target.data.distance < pickupDistance &&
+          target.data.distance < bucketPickupDistance &&
           (target.data.type !== "main" || canPickUpSharedBucket())
       );
     default:
@@ -15179,7 +15177,7 @@ function getNextPowderTargetTier(plant) {
 function applyMagicPowderToPlant(plant, bagType) {
   const nextTier = getNextPowderTargetTier(plant);
   if (!nextTier || isPowderUpgradeInProgress(plant)) return false;
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   plant.matureKind = getMatureKindForPowderBagType(bagType);
   plant.powderUpgradeTargetTier = nextTier;
   plant.powderUpgradeStartedAt = now;
@@ -15784,7 +15782,7 @@ function updatePlantCard() {
 }
 
 function updatePlantGrowth() {
-  const now = Date.now();
+  const now = getSharedPlantSimulationNow();
   const powderRatio = getPowderUpgradeRatio(plantRuntime, now);
   if (
     !plantRuntime.isSeedPlanted ||

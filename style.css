@@ -649,6 +649,7 @@ body::-webkit-scrollbar {
   cursor: default;
   object-fit: contain;
   z-index: 3;
+  filter: brightness(1.14);
 }
 
 .extra-plant-spot {
@@ -661,6 +662,7 @@ body::-webkit-scrollbar {
   cursor: default;
   object-fit: contain;
   z-index: 3;
+  filter: brightness(1.14);
 }
 
 #sprout {

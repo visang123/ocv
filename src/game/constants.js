@@ -206,11 +206,11 @@ export const sproutStage5Image = "이미지/grass-stage5-front.png?v=20260510e";
 export const flowerStage4Image = "이미지/flower-stage4-front.png?v=20260516f";
 export const flowerStage5Image = "이미지/flower-stage5-front.png?v=20260516f";
 /** 갈색 마법 가루 4·5단계 나무 */
-export const treeStage4Image = "이미지/tree-stage4-front.png?v=20260517a";
-export const treeStage5Image = "이미지/tree-stage5-front.png?v=20260517a";
+export const treeStage4Image = "이미지/tree-stage4-front.png?v=20260520a";
+export const treeStage5Image = "이미지/tree-stage5-front.png?v=20260520a";
 /** 하얀 마법 가루 4·5단계 선인장 */
-export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260517b";
-export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260517b";
+export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260520a";
+export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260520a";
 /** 4·5단계 선인장 — 풀·나무보다 작게 */
 export const cactusStage4WorldScale = 2.15;
 export const cactusStage5WorldScale = 2.55;
@@ -239,12 +239,12 @@ export const MATURE_SPRITE_ANCHORS = {
     5: { srcW: 500, srcH: 601, centerX: 217, footY: 553, scale: grassStage5WorldScale }
   },
   tree: {
-    4: { srcW: 325, srcH: 294, centerX: 83, footY: 255, scale: grassStage4WorldScale },
-    5: { srcW: 325, srcH: 294, centerX: 81.5, footY: 263, scale: grassStage5WorldScale }
+    4: { srcW: 220, srcH: 253, centerX: 110, footY: 245, scale: grassStage4WorldScale },
+    5: { srcW: 291, srcH: 253, centerX: 145.5, footY: 245, scale: grassStage5WorldScale }
   },
   cactus: {
-    4: { srcW: 325, srcH: 294, centerX: 81.5, footY: 274, scale: cactusStage4WorldScale },
-    5: { srcW: 325, srcH: 294, centerX: 84.5, footY: 293, scale: cactusStage5WorldScale }
+    4: { srcW: 220, srcH: 251, centerX: 110, footY: 243, scale: cactusStage4WorldScale },
+    5: { srcW: 291, srcH: 251, centerX: 145.5, footY: 243, scale: cactusStage5WorldScale }
   }
 };
 
@@ -340,6 +340,8 @@ export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
 export const pickupDistance = 28;
+/** 양동이 줍기 — 씨앗·가방 등은 pickupDistance 유지 */
+export const bucketPickupDistance = 18;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 42;
 /** 우물에서 물 퍼오기·되붓기 판정 거리(짧을수록 우물에 더 붙어야 함) */
