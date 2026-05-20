@@ -11,9 +11,29 @@ export const STORY_INTRO_LINES = [
 
 const FADE_MS = 1400;
 const HINT_BLINK_DELAY_MS = 2000;
+const WORMHOLE_FRAME_MS = 3000;
+
+export const STORY_WORMHOLE_FRAMES = [
+  "이미지/story-wormhole-1.png",
+  "이미지/story-wormhole-2.png",
+  "이미지/story-wormhole-3.png",
+  "이미지/story-wormhole-4.png"
+];
 
 function isEnterKey(event) {
   return event.key === "Enter" || event.code === "NumpadEnter";
+}
+
+/** 줄바꿈 없이 한 줄에 전체 문장이 들어가도록 글자 크기 조절 */
+function fitStoryLineToSingleRow(lineEl) {
+  if (!lineEl || !lineEl.textContent) return;
+  const maxWidth = Math.max(200, Math.floor(window.innerWidth * 0.94));
+  let sizePx = 28;
+  lineEl.style.fontSize = sizePx + "px";
+  while (lineEl.scrollWidth > maxWidth && sizePx > 9) {
+    sizePx -= 1;
+    lineEl.style.fontSize = sizePx + "px";
+  }
 }
 
 export function createStoryIntro(options) {
@@ -23,7 +43,8 @@ export function createStoryIntro(options) {
     setStoredFlag,
     overlay,
     lineEl,
-    hintEl
+    hintEl,
+    wormholeEl
   } = options;
 
   let active = false;
@@ -32,6 +53,7 @@ export function createStoryIntro(options) {
   let isTransitioning = false;
   let fadeTimerId = null;
   let hintBlinkTimerId = null;
+  let wormholeTimerId = null;
   let onCompleteCallback = null;
 
   function clearFadeTimer() {
@@ -48,9 +70,17 @@ export function createStoryIntro(options) {
     }
   }
 
+  function clearWormholeTimer() {
+    if (wormholeTimerId != null) {
+      clearTimeout(wormholeTimerId);
+      wormholeTimerId = null;
+    }
+  }
+
   function clearTimers() {
     clearFadeTimer();
     clearHintBlinkTimer();
+    clearWormholeTimer();
   }
 
   function shouldShow() {
@@ -102,6 +132,14 @@ export function createStoryIntro(options) {
     overlay.classList.add("is-visible");
   }
 
+  function hideWormholeView() {
+    if (!wormholeEl) return;
+    wormholeEl.classList.remove("is-visible");
+    wormholeEl.hidden = true;
+    wormholeEl.removeAttribute("src");
+    if (overlay) overlay.classList.remove("is-wormhole");
+  }
+
   function hideOverlay() {
     active = false;
     canAdvance = false;
@@ -109,9 +147,48 @@ export function createStoryIntro(options) {
     clearTimers();
     overlay.classList.remove("is-visible");
     overlay.setAttribute("hidden", "");
+    lineEl.hidden = false;
     lineEl.classList.remove("is-bright", "is-dim");
     lineEl.textContent = "";
     hideHint();
+    hideWormholeView();
+  }
+
+  function playWormholeSequence(onDone) {
+    if (!wormholeEl || STORY_WORMHOLE_FRAMES.length === 0) {
+      onDone();
+      return;
+    }
+    lineEl.hidden = true;
+    hideHint();
+    canAdvance = false;
+    isTransitioning = true;
+    overlay.classList.add("is-wormhole");
+    wormholeEl.hidden = false;
+
+    let frameIndex = 0;
+
+    function showFrame() {
+      wormholeEl.classList.remove("is-visible");
+      wormholeEl.src = STORY_WORMHOLE_FRAMES[frameIndex];
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          wormholeEl.classList.add("is-visible");
+        });
+      });
+      frameIndex += 1;
+      if (frameIndex >= STORY_WORMHOLE_FRAMES.length) {
+        wormholeTimerId = setTimeout(function () {
+          wormholeTimerId = null;
+          isTransitioning = false;
+          onDone();
+        }, WORMHOLE_FRAME_MS);
+      } else {
+        wormholeTimerId = setTimeout(showFrame, WORMHOLE_FRAME_MS);
+      }
+    }
+
+    showFrame();
   }
 
   function finishIntro() {
@@ -137,6 +214,7 @@ export function createStoryIntro(options) {
   function revealLine(idx) {
     lineIndex = idx;
     lineEl.textContent = STORY_INTRO_LINES[idx];
+    fitStoryLineToSingleRow(lineEl);
     setLineDim();
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
@@ -146,9 +224,15 @@ export function createStoryIntro(options) {
     });
   }
 
+  function endStoryTextThenWormhole() {
+    fadeOutThen(function () {
+      playWormholeSequence(finishIntro);
+    });
+  }
+
   function showLine(idx) {
     if (idx >= STORY_INTRO_LINES.length) {
-      fadeOutThen(finishIntro);
+      endStoryTextThenWormhole();
       return;
     }
     revealLine(idx);
@@ -159,7 +243,7 @@ export function createStoryIntro(options) {
     canAdvance = false;
     const next = lineIndex + 1;
     if (next >= STORY_INTRO_LINES.length) {
-      fadeOutThen(finishIntro);
+      endStoryTextThenWormhole();
       return;
     }
     fadeOutThen(function () {
@@ -180,6 +264,10 @@ export function createStoryIntro(options) {
       },
       true
     );
+    window.addEventListener("resize", function () {
+      if (!active || !lineEl.textContent) return;
+      fitStoryLineToSingleRow(lineEl);
+    });
   }
 
   /**

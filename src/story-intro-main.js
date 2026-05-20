@@ -1,8 +1,13 @@
+import {
+  onboardingFlowDoneKey,
+  onboardingFlowStepKey,
+  everBeenToWorldKey
+} from "./game/constants.js";
 import { createStoryIntro } from "./game/storyIntro.js";
 
 const STORY_INTRO_COMPLETE_KEY = "storyIntroCompleteV1";
 const CURRENT_USER_ID_KEY = "ovcCurrentUserIdV1";
-const CACHE_BUST = "20260521a";
+const CACHE_BUST = "20260521h";
 
 function getCurrentUserId() {
   try {
@@ -31,12 +36,28 @@ function setStoredFlag(logicalKey) {
   } catch (e) {}
 }
 
+function getScopedValue(logicalKey) {
+  try {
+    return localStorage.getItem(getScopedStorageKey(logicalKey)) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/** ovc-login.js goToGame() 과 동일 — 첫 로그인만 tutorial, 완료 계정은 index */
+function isTutorialOnboardingDoneForUser() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return true;
+  if (getScopedValue(onboardingFlowStepKey) === "0") return true;
+  if (getStoredFlag(everBeenToWorldKey)) return true;
+  return false;
+}
+
 function resolveNextPage() {
   try {
     const next = new URLSearchParams(location.search).get("next");
     if (next === "index.html" || next === "tutorial.html") return next;
   } catch (e) {}
-  return "tutorial.html";
+  return isTutorialOnboardingDoneForUser() ? "index.html" : "tutorial.html";
 }
 
 function redirectToGame() {
@@ -55,6 +76,7 @@ if (!userId) {
   const overlay = document.getElementById("story-intro-overlay");
   const lineEl = document.getElementById("story-intro-line");
   const hintEl = document.getElementById("story-intro-hint");
+  const wormholeEl = document.getElementById("story-intro-wormhole");
   const intro = createStoryIntro({
     storyIntroCompleteKey: STORY_INTRO_COMPLETE_KEY,
     getStoredFlag: getStoredFlag,
@@ -63,7 +85,8 @@ if (!userId) {
     },
     overlay: overlay,
     lineEl: lineEl,
-    hintEl: hintEl
+    hintEl: hintEl,
+    wormholeEl: wormholeEl
   });
   if (!intro.tryShow(redirectToGame)) {
     redirectToGame();
