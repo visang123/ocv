@@ -2,7 +2,7 @@ import { createStoryIntro } from "./game/storyIntro.js";
 
 const STORY_INTRO_COMPLETE_KEY = "storyIntroCompleteV1";
 const CURRENT_USER_ID_KEY = "ovcCurrentUserIdV1";
-const CACHE_BUST = "20260520c";
+const CACHE_BUST = "20260521a";
 
 function getCurrentUserId() {
   try {

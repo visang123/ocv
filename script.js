@@ -20345,11 +20345,13 @@ try {
   }
   ovcBootstrapFinished = true;
   finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
+  window.__OVC_BOOT_FINISHED__ = true;
   ovcTryDismissLoadingScreen(false);
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;
   finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
+  window.__OVC_BOOT_FINISHED__ = true;
   ovcTryDismissLoadingScreen(true);
 }
 })();

@@ -1,5 +1,6 @@
 /**
- * index.html <head> — Ctrl+Alt+R / Ctrl+Shift+R / F9 (월드 전용)
+ * index.html <head> — Ctrl+Alt+R / F9 (월드 전용)
+ * Ctrl+Shift+R 은 브라우저 강력 새로고침용으로 비워 둠.
  */
 (function (global) {
   function hasAltModifier(e) {
@@ -23,9 +24,7 @@
     if (e.code === "F9") return true;
     if (!isRKey(e)) return false;
     var ctrlOrMeta = e.ctrlKey || e.metaKey;
-    var shift = e.shiftKey;
     var altMod = hasAltModifier(e);
-    if (ctrlOrMeta && shift) return true;
     if (ctrlOrMeta && altMod) return true;
     return false;
   }
