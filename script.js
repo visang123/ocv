@@ -5290,7 +5290,6 @@ function updateOnboardingFlowUI() {
     default:
       setOnboardingCalloutVisible(false, "");
   }
-  }
   updateSettingsTutorialButtons();
 }
 
@@ -20226,6 +20225,7 @@ function setup() {
   updateBucketPosition();
   updatePlantState();
   updateWorldRocks();
+  updateCamera();
 }
 
 (async function ovcRunBootstrap() {
