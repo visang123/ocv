@@ -14,7 +14,9 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
-  ".ico": "image/x-icon"
+  ".ico": "image/x-icon",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm"
 };
 
 /** 정적 파일 mtime 캐시 — 다수 접속 시 디스크 read 완화 */
@@ -383,7 +385,7 @@ const server = http.createServer((request, response) => {
     }
 
     const ext = path.extname(filePath);
-    const isAsset = /\.(png|jpg|jpeg|webp|ico|svg|woff2?)$/i.test(ext);
+    const isAsset = /\.(png|jpg|jpeg|webp|ico|svg|woff2?|mp4|webm)$/i.test(ext);
     response.writeHead(200, {
       "Content-Type": mimeTypes[ext] || "application/octet-stream",
       "X-Content-Type-Options": "nosniff",

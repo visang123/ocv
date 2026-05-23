@@ -12,10 +12,18 @@ export const STORY_INTRO_LINES = [
 const FADE_MS = 1400;
 const HINT_BLINK_DELAY_MS = 2000;
 
-export const STORY_INTRO_VIDEOS = [
+export const STORY_INTRO_VIDEO_PATHS = [
   "이미지/story-intro-wormhole.mp4",
   "이미지/story-intro-2.mp4"
 ];
+
+export function resolveStoryVideoUrl(relativePath) {
+  try {
+    return new URL(relativePath, window.location.href).href;
+  } catch (e) {
+    return relativePath;
+  }
+}
 
 function isEnterKey(event) {
   return event.key === "Enter" || event.code === "NumpadEnter";
@@ -27,7 +35,12 @@ const STORY_LINE_MIN_FONT_PX = 32;
 function fitStoryLineToSingleRow(lineEl) {
   if (!lineEl || !lineEl.textContent) return;
   lineEl.style.fontSize = "";
-  const maxWidth = Math.max(240, Math.floor(window.innerWidth * 0.92));
+  const stage = lineEl.closest(".story-intro-text-stage");
+  const stageWidth = stage ? stage.clientWidth : 0;
+  const maxWidth = Math.max(
+    240,
+    stageWidth > 0 ? stageWidth : Math.floor(window.innerWidth * 0.92)
+  );
   let sizePx = Math.round(parseFloat(getComputedStyle(lineEl).fontSize) || 70);
   if (!Number.isFinite(sizePx) || sizePx < STORY_LINE_MIN_FONT_PX) {
     sizePx = STORY_LINE_MIN_FONT_PX;
@@ -61,18 +74,18 @@ export function createStoryIntro(options) {
   let skipWormholeFrameFn = null;
   let onCompleteCallback = null;
   let videosPrimed = false;
+  const videoPreloaders = [];
 
   function primeStoryVideos() {
-    if (videosPrimed || !wormholeEl || wormholeEl.tagName !== "VIDEO") return;
+    if (videosPrimed) return;
     videosPrimed = true;
-    wormholeEl.muted = true;
-    wormholeEl.setAttribute("playsinline", "");
-    STORY_INTRO_VIDEOS.forEach(function (src) {
-      const link = document.createElement("link");
-      link.rel = "preload";
-      link.as = "video";
-      link.href = src;
-      document.head.appendChild(link);
+    STORY_INTRO_VIDEO_PATHS.forEach(function (relativePath) {
+      const preloader = document.createElement("video");
+      preloader.muted = true;
+      preloader.preload = "auto";
+      preloader.src = resolveStoryVideoUrl(relativePath);
+      preloader.load();
+      videoPreloaders.push(preloader);
     });
   }
 
@@ -82,22 +95,35 @@ export function createStoryIntro(options) {
     video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
-    video.setAttribute("autoplay", "");
   }
 
-  function tryPlayVideo(video, onFail) {
+  function tryPlayVideo(video) {
     prepareVideoElement(video);
     const playPromise = video.play();
     if (!playPromise || typeof playPromise.then !== "function") {
+      return playPromise;
+    }
+    return playPromise.catch(function () {
+      return new Promise(function (resolve) {
+        window.setTimeout(function () {
+          resolve(video.play());
+        }, 120);
+      });
+    });
+  }
+
+  function whenVideoReady(video, callback) {
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      callback();
       return;
     }
-    playPromise.catch(function () {
-      window.setTimeout(function () {
-        video.play().catch(function () {
-          if (typeof onFail === "function") onFail();
-        });
-      }, 80);
-    });
+    function onReady() {
+      video.removeEventListener("canplay", onReady);
+      video.removeEventListener("loadeddata", onReady);
+      callback();
+    }
+    video.addEventListener("canplay", onReady);
+    video.addEventListener("loadeddata", onReady);
   }
 
   function clearFadeTimer() {
@@ -178,11 +204,9 @@ export function createStoryIntro(options) {
 
   function resetWormholeMedia() {
     if (!wormholeEl) return;
-    wormholeEl.classList.remove("is-visible");
     if (wormholeEl.tagName === "VIDEO") {
       wormholeEl.pause();
       wormholeEl.removeAttribute("src");
-      wormholeEl.removeAttribute("data-preload-src");
       wormholeEl.load();
     } else {
       wormholeEl.removeAttribute("src");
@@ -211,19 +235,8 @@ export function createStoryIntro(options) {
     skipWormholeFrameFn = null;
   }
 
-  function preloadVideoAt(index) {
-    if (!wormholeEl || wormholeEl.tagName !== "VIDEO") return;
-    if (index < 0 || index >= STORY_INTRO_VIDEOS.length) return;
-    const video = wormholeEl;
-    prepareVideoElement(video);
-    if (video.getAttribute("data-preload-src") === STORY_INTRO_VIDEOS[index]) return;
-    video.setAttribute("data-preload-src", STORY_INTRO_VIDEOS[index]);
-    video.src = STORY_INTRO_VIDEOS[index];
-    video.load();
-  }
-
   function playWormholeSequence(onDone) {
-    if (!wormholeEl || STORY_INTRO_VIDEOS.length === 0) {
+    if (!wormholeEl || STORY_INTRO_VIDEO_PATHS.length === 0) {
       onDone();
       return;
     }
@@ -234,20 +247,14 @@ export function createStoryIntro(options) {
     canAdvance = false;
     isTransitioning = true;
     overlay.classList.add("is-wormhole");
-    if (wormholeStageEl) wormholeStageEl.hidden = false;
-
-    let videoIndex = 0;
-    let pendingCanPlayHandler = null;
-
-    function clearPendingCanPlay() {
-      clearWormholeTimer();
-      if (!pendingCanPlayHandler || wormholeEl.tagName !== "VIDEO") return;
-      wormholeEl.removeEventListener("canplay", pendingCanPlayHandler);
-      pendingCanPlayHandler = null;
+    if (wormholeStageEl) {
+      wormholeStageEl.hidden = false;
+      wormholeStageEl.removeAttribute("hidden");
     }
 
+    let currentClipIndex = 0;
+
     function finishWormholeSequence() {
-      clearPendingCanPlay();
       clearWormholeTimer();
       skipWormholeFrameFn = null;
       isTransitioning = false;
@@ -257,14 +264,12 @@ export function createStoryIntro(options) {
 
     skipWormholeFrameFn = function () {
       if (!active || !overlay.classList.contains("is-wormhole")) return;
-      const video = wormholeEl;
-      if (video && video.tagName === "VIDEO") {
-        video.onended = null;
-        video.onerror = null;
-        clearPendingCanPlay();
-        video.pause();
+      if (wormholeEl && wormholeEl.tagName === "VIDEO") {
+        wormholeEl.onended = null;
+        wormholeEl.onerror = null;
+        wormholeEl.pause();
       }
-      playVideoAt(videoIndex + 1);
+      playVideoAt(currentClipIndex + 1);
     };
 
     if (wormholeEl.tagName !== "VIDEO") {
@@ -276,47 +281,46 @@ export function createStoryIntro(options) {
     prepareVideoElement(video);
 
     function playVideoAt(index) {
-      if (index >= STORY_INTRO_VIDEOS.length) {
+      if (index >= STORY_INTRO_VIDEO_PATHS.length) {
         finishWormholeSequence();
         return;
       }
-      clearPendingCanPlay();
-      videoIndex = index;
+      currentClipIndex = index;
       let clipStarted = false;
-      video.classList.remove("is-visible");
       video.pause();
       video.onended = null;
       video.onerror = null;
       video.currentTime = 0;
-      video.removeAttribute("data-preload-src");
-      video.src = STORY_INTRO_VIDEOS[index];
+
+      const src = resolveStoryVideoUrl(STORY_INTRO_VIDEO_PATHS[index]);
+      if (!video.currentSrc || video.currentSrc !== src) {
+        video.src = src;
+      }
       video.load();
 
-      pendingCanPlayHandler = function onReady() {
+      function startClip() {
         if (clipStarted) return;
         clipStarted = true;
-        clearPendingCanPlay();
+        clearWormholeTimer();
         video.onended = function () {
           playVideoAt(index + 1);
         };
         video.onerror = function () {
           playVideoAt(index + 1);
         };
-        requestAnimationFrame(function () {
-          video.classList.add("is-visible");
-          tryPlayVideo(video, function () {
-            playVideoAt(index + 1);
-          });
+        tryPlayVideo(video).catch(function () {
+          playVideoAt(index + 1);
         });
-      };
+      }
 
-      video.addEventListener("canplay", pendingCanPlayHandler, { once: true });
+      whenVideoReady(video, startClip);
+      clearWormholeTimer();
       wormholeTimerId = window.setTimeout(function () {
         wormholeTimerId = null;
-        if (!clipStarted && pendingCanPlayHandler) {
-          pendingCanPlayHandler();
+        if (!clipStarted) {
+          playVideoAt(index + 1);
         }
-      }, 12000);
+      }, 15000);
     }
 
     playVideoAt(0);
@@ -357,7 +361,6 @@ export function createStoryIntro(options) {
 
   function endStoryTextThenWormhole() {
     primeStoryVideos();
-    preloadVideoAt(0);
     fadeOutThen(function () {
       playWormholeSequence(finishIntro);
     });
