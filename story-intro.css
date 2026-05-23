@@ -13,6 +13,7 @@ body {
   position: fixed;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 0 clamp(12px, 4vw, 32px);
@@ -22,11 +23,20 @@ body {
   cursor: pointer;
 }
 
+.story-intro-text-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+  flex: 0 1 auto;
+}
+
 .story-intro-overlay.is-wormhole {
   padding: clamp(8px, 1.5vh, 16px) clamp(8px, 1.5vw, 16px);
 }
 
-.story-intro-overlay.is-wormhole .story-intro-line,
+.story-intro-overlay.is-wormhole .story-intro-text-stage,
 .story-intro-overlay.is-wormhole .story-intro-hint {
   display: none !important;
   visibility: hidden;
@@ -70,7 +80,7 @@ body {
   position: relative;
   z-index: 1;
   display: block;
-  width: 100%;
+  width: max-content;
   max-width: min(96vw, 56rem);
   margin: 0 auto;
   padding: 0;
@@ -80,6 +90,7 @@ body {
   letter-spacing: -0.02em;
   text-align: center;
   white-space: nowrap;
+  align-self: center;
   color: #fff;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85);
   transition: color 1.4s ease;

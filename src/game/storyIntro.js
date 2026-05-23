@@ -60,6 +60,45 @@ export function createStoryIntro(options) {
   let wormholeTimerId = null;
   let skipWormholeFrameFn = null;
   let onCompleteCallback = null;
+  let videosPrimed = false;
+
+  function primeStoryVideos() {
+    if (videosPrimed || !wormholeEl || wormholeEl.tagName !== "VIDEO") return;
+    videosPrimed = true;
+    wormholeEl.muted = true;
+    wormholeEl.setAttribute("playsinline", "");
+    STORY_INTRO_VIDEOS.forEach(function (src) {
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "video";
+      link.href = src;
+      document.head.appendChild(link);
+    });
+  }
+
+  function prepareVideoElement(video) {
+    video.muted = true;
+    video.defaultMuted = true;
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    video.setAttribute("autoplay", "");
+  }
+
+  function tryPlayVideo(video, onFail) {
+    prepareVideoElement(video);
+    const playPromise = video.play();
+    if (!playPromise || typeof playPromise.then !== "function") {
+      return;
+    }
+    playPromise.catch(function () {
+      window.setTimeout(function () {
+        video.play().catch(function () {
+          if (typeof onFail === "function") onFail();
+        });
+      }, 80);
+    });
+  }
 
   function clearFadeTimer() {
     if (fadeTimerId != null) {
@@ -143,6 +182,7 @@ export function createStoryIntro(options) {
     if (wormholeEl.tagName === "VIDEO") {
       wormholeEl.pause();
       wormholeEl.removeAttribute("src");
+      wormholeEl.removeAttribute("data-preload-src");
       wormholeEl.load();
     } else {
       wormholeEl.removeAttribute("src");
@@ -171,8 +211,19 @@ export function createStoryIntro(options) {
     skipWormholeFrameFn = null;
   }
 
+  function preloadVideoAt(index) {
+    if (!wormholeEl || wormholeEl.tagName !== "VIDEO") return;
+    if (index < 0 || index >= STORY_INTRO_VIDEOS.length) return;
+    const video = wormholeEl;
+    prepareVideoElement(video);
+    if (video.getAttribute("data-preload-src") === STORY_INTRO_VIDEOS[index]) return;
+    video.setAttribute("data-preload-src", STORY_INTRO_VIDEOS[index]);
+    video.src = STORY_INTRO_VIDEOS[index];
+    video.load();
+  }
+
   function playWormholeSequence(onDone) {
-    if (!wormholeEl || !STORY_INTRO_VIDEO_SRC) {
+    if (!wormholeEl || STORY_INTRO_VIDEOS.length === 0) {
       onDone();
       return;
     }
@@ -185,7 +236,18 @@ export function createStoryIntro(options) {
     overlay.classList.add("is-wormhole");
     if (wormholeStageEl) wormholeStageEl.hidden = false;
 
+    let videoIndex = 0;
+    let pendingCanPlayHandler = null;
+
+    function clearPendingCanPlay() {
+      clearWormholeTimer();
+      if (!pendingCanPlayHandler || wormholeEl.tagName !== "VIDEO") return;
+      wormholeEl.removeEventListener("canplay", pendingCanPlayHandler);
+      pendingCanPlayHandler = null;
+    }
+
     function finishWormholeSequence() {
+      clearPendingCanPlay();
       clearWormholeTimer();
       skipWormholeFrameFn = null;
       isTransitioning = false;
@@ -195,7 +257,14 @@ export function createStoryIntro(options) {
 
     skipWormholeFrameFn = function () {
       if (!active || !overlay.classList.contains("is-wormhole")) return;
-      finishWormholeSequence();
+      const video = wormholeEl;
+      if (video && video.tagName === "VIDEO") {
+        video.onended = null;
+        video.onerror = null;
+        clearPendingCanPlay();
+        video.pause();
+      }
+      playVideoAt(videoIndex + 1);
     };
 
     if (wormholeEl.tagName !== "VIDEO") {
@@ -204,31 +273,53 @@ export function createStoryIntro(options) {
     }
 
     const video = wormholeEl;
-    video.onended = finishWormholeSequence;
-    video.onerror = finishWormholeSequence;
-    video.currentTime = 0;
-    video.src = STORY_INTRO_VIDEO_SRC;
-    video.load();
+    prepareVideoElement(video);
 
-    function revealAndPlay() {
-      requestAnimationFrame(function () {
+    function playVideoAt(index) {
+      if (index >= STORY_INTRO_VIDEOS.length) {
+        finishWormholeSequence();
+        return;
+      }
+      clearPendingCanPlay();
+      videoIndex = index;
+      let clipStarted = false;
+      video.classList.remove("is-visible");
+      video.pause();
+      video.onended = null;
+      video.onerror = null;
+      video.currentTime = 0;
+      video.removeAttribute("data-preload-src");
+      video.src = STORY_INTRO_VIDEOS[index];
+      video.load();
+
+      pendingCanPlayHandler = function onReady() {
+        if (clipStarted) return;
+        clipStarted = true;
+        clearPendingCanPlay();
+        video.onended = function () {
+          playVideoAt(index + 1);
+        };
+        video.onerror = function () {
+          playVideoAt(index + 1);
+        };
         requestAnimationFrame(function () {
           video.classList.add("is-visible");
-          const playPromise = video.play();
-          if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(function () {
-              finishWormholeSequence();
-            });
-          }
+          tryPlayVideo(video, function () {
+            playVideoAt(index + 1);
+          });
         });
-      });
+      };
+
+      video.addEventListener("canplay", pendingCanPlayHandler, { once: true });
+      wormholeTimerId = window.setTimeout(function () {
+        wormholeTimerId = null;
+        if (!clipStarted && pendingCanPlayHandler) {
+          pendingCanPlayHandler();
+        }
+      }, 12000);
     }
 
-    if (video.readyState >= 2) {
-      revealAndPlay();
-    } else {
-      video.addEventListener("canplay", revealAndPlay, { once: true });
-    }
+    playVideoAt(0);
   }
 
   function finishIntro() {
@@ -265,6 +356,8 @@ export function createStoryIntro(options) {
   }
 
   function endStoryTextThenWormhole() {
+    primeStoryVideos();
+    preloadVideoAt(0);
     fadeOutThen(function () {
       playWormholeSequence(finishIntro);
     });
@@ -304,12 +397,14 @@ export function createStoryIntro(options) {
     if (overlay.dataset.storyIntroBound === "1") return;
     overlay.dataset.storyIntroBound = "1";
     overlay.addEventListener("click", function () {
+      primeStoryVideos();
       advanceIntro();
     });
     window.addEventListener(
       "keydown",
       function (e) {
         if (!active || !isEnterKey(e)) return;
+        primeStoryVideos();
         e.preventDefault();
         e.stopPropagation();
         advanceIntro();
@@ -340,6 +435,7 @@ export function createStoryIntro(options) {
     lineEl.classList.remove("is-bright", "is-dim");
     hideHint();
     showOverlay();
+    primeStoryVideos();
     requestAnimationFrame(function () {
       showLine(0);
     });
