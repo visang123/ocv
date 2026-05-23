@@ -11,20 +11,17 @@ export const STORY_INTRO_LINES = [
 
 const FADE_MS = 1400;
 const HINT_BLINK_DELAY_MS = 2000;
-const WORMHOLE_FRAME_MS = 3000;
 
-export const STORY_WORMHOLE_FRAMES = [
-  "이미지/story-wormhole-1.png",
-  "이미지/story-wormhole-2.png",
-  "이미지/story-wormhole-3.png",
-  "이미지/story-wormhole-4.png"
+export const STORY_INTRO_VIDEOS = [
+  "이미지/story-intro-wormhole.mp4",
+  "이미지/story-intro-2.mp4"
 ];
 
 function isEnterKey(event) {
   return event.key === "Enter" || event.code === "NumpadEnter";
 }
 
-const STORY_LINE_MIN_FONT_PX = 40;
+const STORY_LINE_MIN_FONT_PX = 32;
 
 /** 줄바꿈 없이 한 줄에 맞추되, 너무 작아지지 않도록 글자 크기만 조절 */
 function fitStoryLineToSingleRow(lineEl) {
@@ -140,11 +137,20 @@ export function createStoryIntro(options) {
     overlay.classList.add("is-visible");
   }
 
-  function hideWormholeView() {
-    if (wormholeEl) {
-      wormholeEl.classList.remove("is-visible");
+  function resetWormholeMedia() {
+    if (!wormholeEl) return;
+    wormholeEl.classList.remove("is-visible");
+    if (wormholeEl.tagName === "VIDEO") {
+      wormholeEl.pause();
+      wormholeEl.removeAttribute("src");
+      wormholeEl.load();
+    } else {
       wormholeEl.removeAttribute("src");
     }
+  }
+
+  function hideWormholeView() {
+    resetWormholeMedia();
     if (wormholeStageEl) wormholeStageEl.hidden = true;
     if (overlay) overlay.classList.remove("is-wormhole");
     if (lineEl) lineEl.removeAttribute("aria-hidden");
@@ -166,7 +172,7 @@ export function createStoryIntro(options) {
   }
 
   function playWormholeSequence(onDone) {
-    if (!wormholeEl || STORY_WORMHOLE_FRAMES.length === 0) {
+    if (!wormholeEl || !STORY_INTRO_VIDEO_SRC) {
       onDone();
       return;
     }
@@ -179,45 +185,50 @@ export function createStoryIntro(options) {
     overlay.classList.add("is-wormhole");
     if (wormholeStageEl) wormholeStageEl.hidden = false;
 
-    let frameIndex = 0;
-
     function finishWormholeSequence() {
       clearWormholeTimer();
       skipWormholeFrameFn = null;
       isTransitioning = false;
+      resetWormholeMedia();
       onDone();
-    }
-
-    function showFrame() {
-      wormholeEl.classList.remove("is-visible");
-      wormholeEl.src = STORY_WORMHOLE_FRAMES[frameIndex];
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          wormholeEl.classList.add("is-visible");
-        });
-      });
-      frameIndex += 1;
-      if (frameIndex >= STORY_WORMHOLE_FRAMES.length) {
-        wormholeTimerId = setTimeout(function () {
-          wormholeTimerId = null;
-          finishWormholeSequence();
-        }, WORMHOLE_FRAME_MS);
-      } else {
-        wormholeTimerId = setTimeout(showFrame, WORMHOLE_FRAME_MS);
-      }
     }
 
     skipWormholeFrameFn = function () {
       if (!active || !overlay.classList.contains("is-wormhole")) return;
-      clearWormholeTimer();
-      if (frameIndex >= STORY_WORMHOLE_FRAMES.length) {
-        finishWormholeSequence();
-        return;
-      }
-      showFrame();
+      finishWormholeSequence();
     };
 
-    showFrame();
+    if (wormholeEl.tagName !== "VIDEO") {
+      finishWormholeSequence();
+      return;
+    }
+
+    const video = wormholeEl;
+    video.onended = finishWormholeSequence;
+    video.onerror = finishWormholeSequence;
+    video.currentTime = 0;
+    video.src = STORY_INTRO_VIDEO_SRC;
+    video.load();
+
+    function revealAndPlay() {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          video.classList.add("is-visible");
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(function () {
+              finishWormholeSequence();
+            });
+          }
+        });
+      });
+    }
+
+    if (video.readyState >= 2) {
+      revealAndPlay();
+    } else {
+      video.addEventListener("canplay", revealAndPlay, { once: true });
+    }
   }
 
   function finishIntro() {
