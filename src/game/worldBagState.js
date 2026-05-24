@@ -70,7 +70,8 @@ export function hydrateWorldFloorBagClaimFromLegacy(getStoredFlag, setStoredFlag
 }
 
 /**
- * 월드: 바닥 가방 메시(mesh) 숨김. 튜토리얼: 세션만.
+ * 월드·튜토리얼 공통: 바닥 가방 메시(mesh) 숨김.
+ * 튜토리얼은 같은 탭 sessionStorage + 계정 localStorage(로그아웃 후 재접속) 모두 반영.
  * worldExtraHide: 가이드 책 방 키만 있고 계정 플래그가 아직 안 맞춰진 레거시 등.
  */
 export function shouldHideWorldFloorBagMesh(
@@ -79,11 +80,11 @@ export function shouldHideWorldFloorBagMesh(
   readTutorialSessionFloorBagPicked,
   worldExtraHide
 ) {
-  if (isWorldDocumentEntryFn()) {
-    if (isWorldFloorBagClaimed(getStoredFlag)) return true;
-    if (Boolean(getStoredFlag(hasGuideBookKey))) return true;
-    if (worldExtraHide && worldExtraHide()) return true;
-    return false;
+  if (!isWorldDocumentEntryFn() && readTutorialSessionFloorBagPicked()) {
+    return true;
   }
-  return readTutorialSessionFloorBagPicked();
+  if (isWorldFloorBagClaimed(getStoredFlag)) return true;
+  if (Boolean(getStoredFlag(hasGuideBookKey))) return true;
+  if (worldExtraHide && worldExtraHide()) return true;
+  return false;
 }

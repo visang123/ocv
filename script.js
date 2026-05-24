@@ -416,9 +416,10 @@ import {
 } from "./src/app/ovc-world-hub.js";
 import {
   isWorldMapDevResetShortcut,
-  bootDevWorldReset,
-  finishDevWorldResetBoot,
-  markPendingDevWorldReset
+  bootDevReset,
+  finishDevResetBoot,
+  markPendingDevWorldReset,
+  markPendingDevTutorialReset
 } from "./src/app/dev-world-reset.js";
 import { normalizeHexColor, nameForIngameUiDisplay } from "./src/util/user-display.js";
 import {
@@ -2743,17 +2744,6 @@ function toggleBagInventoryPanelFromBagClick() {
   if (isTradeExchangeOpen() || isAlchemyCraftOpen()) {
     return;
   }
-  if (isOnboardingLinearGateActive() && onboardingFlowStep === 2) {
-    onboardingFlowStep = 3;
-    onboardingInventoryIntroPhase = 0;
-    persistOnboardingStep();
-    updateOnboardingFlowUI();
-    return;
-  }
-  if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
-    flashOnboardingOrderHint("");
-    return;
-  }
   if (worldSocialUiReady && worldChatPanelOpen) {
     setWorldChatPanelOpen(false);
   }
@@ -4189,9 +4179,7 @@ function isWorldFloorBagAwaitingPickup() {
 }
 
 function isNearWorldBagPickup() {
-  if (isWorldDocumentEntry()) {
-    if (hasPickedWorldBagGroundInCurrentRoom()) return false;
-  } else if (readTutorialSessionFloorBagPicked()) {
+  if (isWorldFloorBagHiddenForCurrentView()) {
     return false;
   }
   if (!worldBag) return false;
@@ -4373,13 +4361,14 @@ function restoreWorldHubIfVeteranWithoutActiveReplay() {
   requestAccountTutorialDoneSync({ force: true });
 }
 
-function resetTutorialProgressInStorage() {
-  let allowReset = !getStoredFlag(onboardingFlowDoneKey);
+function resetTutorialProgressInStorage(options) {
+  const force = Boolean(options && options.force);
+  let allowReset = force || !getStoredFlag(onboardingFlowDoneKey);
   if (!allowReset) {
     try {
       allowReset =
         sessionStorage.getItem(ovcTutorialReplaySessionKey) === "1" ||
-        sessionStorage.getItem("ovcTutorialWorldResetPending") === "1";
+        sessionStorage.getItem(ovcTutorialWorldResetPendingKey) === "1";
     } catch (eAllow) {}
   }
   if (!allowReset) return;
@@ -4908,15 +4897,19 @@ function isOnboardingMainPlantWateringTutorialStep() {
 
 function onboardingAllowsGuideBookButtonToggle() {
   const s = onboardingFlowStep;
-  if (s === 2 || isOnboardingInventoryTutorialActive()) return false;
+  if (isOnboardingInventoryTutorialActive()) return false;
   return s === 10 || s >= 16;
 }
 
 function syncOnboardingFlowProgressFromWorld() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
   let changed = false;
-  if (hasGuideBook && onboardingFlowStep < 2) {
-    onboardingFlowStep = 2;
+  if (hasGuideBook && onboardingFlowStep < 3) {
+    onboardingFlowStep = 3;
+    changed = true;
+  }
+  if (onboardingFlowStep === 2) {
+    onboardingFlowStep = 3;
     changed = true;
   }
   // Only catch up seed/plant/NPC steps if the player is already in that branch of the
@@ -4986,6 +4979,10 @@ function loadOnboardingFlowState() {
       ? normalizedRaw
       : 1;
   syncOnboardingFlowProgressFromWorld();
+  if (onboardingFlowStep === 2) {
+    onboardingFlowStep = 3;
+    persistOnboardingStep();
+  }
   if (onboardingFlowStep === ONBOARDING_STEP_EXTRA_SEED) {
     onboardingPostAppleSeedIntroPhase = 1;
   }
@@ -5107,14 +5104,6 @@ function updateOnboardingFlowUI() {
         if (worldBag) worldBag.classList.add("onboarding-highlight");
       } else {
         setOnboardingCalloutVisible(false, "");
-      }
-      break;
-    }
-    case 2: {
-      setOnboardingCalloutVisible(true, "\uC67C\uCABD \uC544\uB798 \uAC00\uBC29\uC744 \uB20C\uB7EC\uBCF4\uC138\uC694.");
-      if (worldBagInventory) {
-        worldBagInventory.classList.add("onboarding-highlight");
-        worldBagInventory.classList.add("onboarding-highlight-book-inv");
       }
       break;
     }
@@ -5489,7 +5478,7 @@ function pickUpWorldGuideBookNoHold() {
 function pickUpWorldBag() {
   if (isOnboardingLinearGateActive()) {
     if (hasGuideBook) return false;
-    if (onboardingFlowStep !== 1 && onboardingFlowStep !== 2) return false;
+    if (onboardingFlowStep !== 1) return false;
   }
   if (!isNearWorldBagPickup()) return false;
 
@@ -5510,7 +5499,8 @@ function pickUpWorldBag() {
   updateBagInventorySlots();
   movementTutorial.complete();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 1) {
-    onboardingFlowStep = 2;
+    onboardingFlowStep = 3;
+    onboardingInventoryIntroPhase = 0;
     persistOnboardingStep();
   }
   return true;
@@ -5546,6 +5536,9 @@ function loadGuideBookState(skipMaybeResetTutorial) {
     movementTutorial.resetMotionState();
     if (isWorldDocumentEntry() && !hasPickedWorldBagGroundInCurrentRoom()) {
       setWorldBagGroundPickedForCurrentRoom();
+    }
+    if (isTutorialDocumentEntry() && !readTutorialSessionFloorBagPicked()) {
+      writeTutorialSessionFloorBagPicked();
     }
   }
   isNpcDialogueComplete = getStoredFlag(npcDialogueCompleteKey);
@@ -5639,7 +5632,68 @@ function resetGameForTesting() {
   }
 }
 
-bootDevWorldReset(resetGameForTesting, isWorldDocumentEntry);
+function resetTutorialForTesting() {
+  const now = Date.now();
+  if (now - lastDevWorldResetAt < 350) return;
+  if (isDevWorldResetInProgress) return;
+  if (!isTutorialDocumentEntry()) return;
+  if (!ovcBootstrapFinished) {
+    markPendingDevTutorialReset();
+    return;
+  }
+  lastDevWorldResetAt = now;
+  isDevWorldResetInProgress = true;
+  try {
+    try {
+      sessionStorage.setItem(ovcTutorialReplaySessionKey, "1");
+      sessionStorage.setItem(ovcTutorialWorldResetPendingKey, "1");
+    } catch (eReplay) {}
+    setOnboardingFlowDoneStored(false);
+    onboardingSeedTutorialSecondLine = false;
+    onboardingTutorialEnteredTree = false;
+    tutorialMainSeedRegenCompleted = false;
+    clearTutorialMainSeedRespawnTimer();
+    resetTutorialProgressInStorage({ force: true });
+    movementTutorial.resetMotionState();
+    if (!applyTutorialWorldResetIfPending()) {
+      applyDefaultState();
+      clearTutorialSessionWorldFloorPickupFlags();
+      loadGuideBookState(true);
+      setWorldPosition(localPlayerRoot, playerX, getPlayerWorldY());
+      updatePlayerColorBodyPosition();
+      updateCamera();
+      savePlayerPosition(true);
+      saveWellState();
+      saveSeedState();
+      saveAppleState();
+      saveBucketState();
+      updatePlantState();
+      updateOnboardingFlowUI();
+      hasHydratedSharedWorldFromServer = true;
+    }
+    updateNpcPosition();
+    updateGuidePages();
+    updateGuideCard();
+    syncWorldPlantFogVisuals();
+    showThrottledWorldSyncToast("\uD29C\uD1A0\uB9AC\uC5BC\uC774 \uCD08\uAE30\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+  } catch (devTutorialResetError) {
+    console.error("[OVC] dev tutorial reset failed:", devTutorialResetError);
+    showThrottledWorldSyncToast(
+      "\uCD08\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uCF5C\uC194\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694."
+    );
+  } finally {
+    isDevWorldResetInProgress = false;
+    dismissAppLoadingScreenAfterDevReset();
+    ovcTryDismissLoadingScreen(true);
+  }
+}
+
+bootDevReset(
+  resetGameForTesting,
+  resetTutorialForTesting,
+  isWorldDocumentEntry,
+  isTutorialDocumentEntry
+);
 
 function persistDefaultStateAfterReset() {
   savePlayerPosition(true);
@@ -6110,8 +6164,9 @@ function startPlantMasterDialogue() {
           onboardingClearEscHintTimer();
           onboardingNpcGuideEscHintShown = false;
           onboardingFlowStep = 10;
-        } else if (onboardingFlowStep < 2) {
-          onboardingFlowStep = 2;
+        } else if (onboardingFlowStep < 3) {
+          onboardingFlowStep = 3;
+          onboardingInventoryIntroPhase = 0;
         }
         persistOnboardingStep();
       }
@@ -20497,7 +20552,12 @@ try {
     }
   }
   ovcBootstrapFinished = true;
-  finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
+  finishDevResetBoot(
+    resetGameForTesting,
+    resetTutorialForTesting,
+    isWorldDocumentEntry,
+    isTutorialDocumentEntry
+  );
   window.__OVC_BOOT_FINISHED__ = true;
   if (isSharedWorldSyncPausedForTutorial() || !isWorldServerSyncAvailable()) {
     ovcTryDismissLoadingScreen(true);
@@ -20507,7 +20567,12 @@ try {
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;
-  finishDevWorldResetBoot(resetGameForTesting, isWorldDocumentEntry);
+  finishDevResetBoot(
+    resetGameForTesting,
+    resetTutorialForTesting,
+    isWorldDocumentEntry,
+    isTutorialDocumentEntry
+  );
   window.__OVC_BOOT_FINISHED__ = true;
   ovcTryDismissLoadingScreen(true);
 }
