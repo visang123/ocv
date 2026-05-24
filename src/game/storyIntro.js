@@ -7,15 +7,14 @@ export const STORY_INTRO_PORTAL_BG = "이미지/story-intro-portal-2350.png";
 export const STORY_INTRO_PORTAL_TEST_BG = "이미지/story-intro-portal-2350.png";
 
 /** 줄 인덱스별 배경(없으면 null) — object-fit: contain 으로 잘리지 않게 표시 */
+/** 이미지+텍스트 6장 후 웜홀 영상 재생 */
 export const STORY_INTRO_LINE_BACKGROUNDS = [
   STORY_INTRO_OPENING_BG,
   STORY_INTRO_WARMING_BG,
   STORY_INTRO_TRAPPIST_BG,
   STORY_INTRO_DISTANCE_BG,
   STORY_INTRO_PORTAL_BG,
-  STORY_INTRO_PORTAL_TEST_BG,
-  STORY_INTRO_PORTAL_BG,
-  null
+  STORY_INTRO_PORTAL_TEST_BG
 ];
 
 export const STORY_INTRO_LINES = [
@@ -24,9 +23,7 @@ export const STORY_INTRO_LINES = [
   "트래피스트-1e로 이주만이 살길이였다.",
   "그러나 그곳은 40광년, 너무 멀었다.",
   "서기 2350년, 순간이동 포탈이 개발된다.",
-  "지금 포탈 첫 이동 테스트를 한다!!",
-  "게임속 포탈은 현실이 되었고 지구 사람들은 어떤 행성이든 이동하게 될 예정이다.",
-  "지금은 최종 포탈 이동 테스트를 앞두고 있다!!"
+  "지금 포탈 첫 이동 테스트를 한다!!"
 ];
 
 const FADE_MS = 1400;
