@@ -1,6 +1,19 @@
 /** 첫 로그인 세계관 인트로 — Enter로 한 줄씩 넘김 (로딩 화면과 분리) */
+export const STORY_INTRO_OPENING_BG = "이미지/story-intro-bg-2300.png";
+export const STORY_INTRO_WARMING_BG = "이미지/story-intro-bg-2325.png";
+export const STORY_INTRO_TRAPPIST_BG = "이미지/story-intro-trappist-1e.png";
+
+/** 줄 인덱스별 배경(없으면 null) — object-fit: contain 으로 잘리지 않게 표시 */
+export const STORY_INTRO_LINE_BACKGROUNDS = [
+  STORY_INTRO_OPENING_BG,
+  STORY_INTRO_WARMING_BG,
+  STORY_INTRO_TRAPPIST_BG
+];
+
 export const STORY_INTRO_LINES = [
-  "지구온난화는 너무나 심해져서 지구는 생존하기 부적합해졌다.",
+  "서기 2300년...",
+  "지구온난화를 겉잡을 수 없었다.",
+  "트래피스트-1e로 이주만이 살길이였다.",
   "사람들은 다른행성으로 눈을 돌렸다.",
   "트래피스트-1e는 지구와 환경이 비슷한 가장 가까운 행성이였다.",
   "그럼에도 40광년은 너무나 멀었다.",
@@ -29,29 +42,6 @@ function isEnterKey(event) {
   return event.key === "Enter" || event.code === "NumpadEnter";
 }
 
-const STORY_LINE_MIN_FONT_PX = 32;
-
-/** 줄바꿈 없이 한 줄에 맞추되, 너무 작아지지 않도록 글자 크기만 조절 */
-function fitStoryLineToSingleRow(lineEl) {
-  if (!lineEl || !lineEl.textContent) return;
-  lineEl.style.fontSize = "";
-  const stage = lineEl.closest(".story-intro-text-stage");
-  const stageWidth = stage ? stage.clientWidth : 0;
-  const maxWidth = Math.max(
-    240,
-    stageWidth > 0 ? stageWidth : Math.floor(window.innerWidth * 0.92)
-  );
-  let sizePx = Math.round(parseFloat(getComputedStyle(lineEl).fontSize) || 70);
-  if (!Number.isFinite(sizePx) || sizePx < STORY_LINE_MIN_FONT_PX) {
-    sizePx = STORY_LINE_MIN_FONT_PX;
-  }
-  lineEl.style.fontSize = sizePx + "px";
-  while (lineEl.scrollWidth > maxWidth && sizePx > STORY_LINE_MIN_FONT_PX) {
-    sizePx -= 1;
-    lineEl.style.fontSize = sizePx + "px";
-  }
-}
-
 export function createStoryIntro(options) {
   const {
     storyIntroCompleteKey,
@@ -61,7 +51,9 @@ export function createStoryIntro(options) {
     lineEl,
     hintEl,
     wormholeEl,
-    wormholeStageEl
+    wormholeStageEl,
+    bgStageEl,
+    bgImgEl
   } = options;
 
   let active = false;
@@ -161,14 +153,61 @@ export function createStoryIntro(options) {
     return active;
   }
 
+  function getCurrentLineElement() {
+    if (!lineEl) return null;
+    return lineEl.querySelector(".story-intro-line") || lineEl;
+  }
+
+  function getLineBackground(lineIndex) {
+    return STORY_INTRO_LINE_BACKGROUNDS[lineIndex] || null;
+  }
+
+  function setOpeningBackground(visible) {
+    if (overlay) {
+      overlay.classList.toggle("has-opening-bg", Boolean(visible));
+      if (!visible) {
+        overlay.classList.remove("has-trappist-bg");
+      }
+    }
+    if (!bgStageEl) return;
+    if (visible) {
+      bgStageEl.hidden = false;
+      bgStageEl.removeAttribute("hidden");
+    } else {
+      bgStageEl.hidden = true;
+    }
+  }
+
+  function setLineBackground(lineIndex) {
+    const src = getLineBackground(lineIndex);
+    if (overlay) {
+      overlay.classList.toggle("has-trappist-bg", src === STORY_INTRO_TRAPPIST_BG);
+    }
+    if (!src) {
+      setOpeningBackground(false);
+      return;
+    }
+    if (bgImgEl) {
+      const resolved = resolveStoryVideoUrl(src);
+      if (!bgImgEl.src.endsWith(src)) {
+        bgImgEl.src = resolved;
+      }
+    }
+    setOpeningBackground(true);
+  }
+
   function setLineBright() {
-    lineEl.classList.remove("is-dim");
-    lineEl.classList.add("is-bright");
+    const el = getCurrentLineElement();
+    if (!el) return;
+    el.classList.remove("is-dim");
+    el.classList.add("is-bright");
   }
 
   function setLineDim() {
-    lineEl.classList.remove("is-bright");
-    lineEl.classList.add("is-dim");
+    const el = getCurrentLineElement();
+    if (!el) return;
+    el.classList.remove("is-bright");
+    el.classList.add("is-dim");
   }
 
   function hideHint() {
@@ -218,6 +257,7 @@ export function createStoryIntro(options) {
     if (wormholeStageEl) wormholeStageEl.hidden = true;
     if (overlay) overlay.classList.remove("is-wormhole");
     if (lineEl) lineEl.removeAttribute("aria-hidden");
+    setOpeningBackground(false);
   }
 
   function hideOverlay() {
@@ -228,8 +268,8 @@ export function createStoryIntro(options) {
     overlay.classList.remove("is-visible");
     overlay.setAttribute("hidden", "");
     lineEl.hidden = false;
-    lineEl.classList.remove("is-bright", "is-dim");
-    lineEl.textContent = "";
+    lineEl.innerHTML = "";
+    setOpeningBackground(false);
     hideHint();
     hideWormholeView();
     skipWormholeFrameFn = null;
@@ -241,8 +281,9 @@ export function createStoryIntro(options) {
       return;
     }
     lineEl.hidden = true;
-    lineEl.textContent = "";
+    lineEl.innerHTML = "";
     lineEl.setAttribute("aria-hidden", "true");
+    setOpeningBackground(false);
     hideHint();
     canAdvance = false;
     isTransitioning = true;
@@ -338,6 +379,9 @@ export function createStoryIntro(options) {
     canAdvance = false;
     isTransitioning = true;
     hideHint();
+    if (!getLineBackground(lineIndex + 1)) {
+      setOpeningBackground(false);
+    }
     setLineDim();
     clearFadeTimer();
     fadeTimerId = setTimeout(function () {
@@ -348,8 +392,12 @@ export function createStoryIntro(options) {
 
   function revealLine(idx) {
     lineIndex = idx;
-    lineEl.textContent = STORY_INTRO_LINES[idx];
-    fitStoryLineToSingleRow(lineEl);
+    setLineBackground(idx);
+    lineEl.innerHTML = "";
+    const lineParagraph = document.createElement("p");
+    lineParagraph.className = "story-intro-line";
+    lineParagraph.textContent = STORY_INTRO_LINES[idx];
+    lineEl.appendChild(lineParagraph);
     setLineDim();
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
@@ -414,10 +462,6 @@ export function createStoryIntro(options) {
       },
       true
     );
-    window.addEventListener("resize", function () {
-      if (!active || !lineEl.textContent) return;
-      fitStoryLineToSingleRow(lineEl);
-    });
   }
 
   /**
@@ -434,8 +478,8 @@ export function createStoryIntro(options) {
     lineIndex = 0;
     canAdvance = false;
     isTransitioning = false;
-    lineEl.textContent = "";
-    lineEl.classList.remove("is-bright", "is-dim");
+    lineEl.innerHTML = "";
+    setOpeningBackground(false);
     hideHint();
     showOverlay();
     primeStoryVideos();

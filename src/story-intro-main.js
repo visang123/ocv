@@ -7,7 +7,7 @@ import { createStoryIntro } from "./game/storyIntro.js";
 
 const STORY_INTRO_COMPLETE_KEY = "storyIntroCompleteV1";
 const CURRENT_USER_ID_KEY = "ovcCurrentUserIdV1";
-const CACHE_BUST = "20260523d";
+const CACHE_BUST = "20260524c";
 
 function getCurrentUserId() {
   try {
@@ -77,10 +77,12 @@ if (!userId) {
   redirectToGame();
 } else {
   const overlay = document.getElementById("story-intro-overlay");
-  const lineEl = document.getElementById("story-intro-line");
+  const lineEl = document.getElementById("story-intro-lines");
   const hintEl = document.getElementById("story-intro-hint");
   const wormholeEl = document.getElementById("story-intro-wormhole");
   const wormholeStageEl = document.getElementById("story-intro-wormhole-stage");
+  const bgStageEl = document.getElementById("story-intro-bg-stage");
+  const bgImgEl = document.querySelector(".story-intro-bg-img");
   const intro = createStoryIntro({
     storyIntroCompleteKey: STORY_INTRO_COMPLETE_KEY,
     getStoredFlag: getStoredFlag,
@@ -91,7 +93,9 @@ if (!userId) {
     lineEl: lineEl,
     hintEl: hintEl,
     wormholeEl: wormholeEl,
-    wormholeStageEl: wormholeStageEl
+    wormholeStageEl: wormholeStageEl,
+    bgStageEl: bgStageEl,
+    bgImgEl: bgImgEl
   });
   if (!intro.tryShow(redirectToGame)) {
     redirectToGame();

@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>온라인 비상 커뮤니티 – 세계관</title>
   <link rel="icon" type="image/png" sizes="512x512" href="이미지/favicon.png">
-  <link rel="stylesheet" href="story-intro.css?v=20260523d">
+  <link rel="stylesheet" href="story-intro.css?v=20260524c">
 </head>
 <body>
   <div
@@ -18,8 +18,16 @@
     aria-live="polite"
     aria-label="세계관 소개"
   >
+    <div id="story-intro-bg-stage" class="story-intro-bg-stage" hidden>
+      <img
+        class="story-intro-bg-img"
+        src="이미지/story-intro-bg-2300.png"
+        alt=""
+        decoding="async"
+      >
+    </div>
     <div id="story-intro-text-stage" class="story-intro-text-stage">
-      <p id="story-intro-line" class="story-intro-line"></p>
+      <div id="story-intro-lines" class="story-intro-lines" aria-live="polite"></div>
     </div>
     <p id="story-intro-hint" class="story-intro-hint" hidden>Enter 또는 클릭으로 넘기기</p>
     <div id="story-intro-wormhole-stage" class="story-intro-wormhole-stage" hidden>
@@ -34,6 +42,6 @@
       ></video>
     </div>
   </div>
-  <script type="module" src="src/story-intro-main.js?v=20260523d"></script>
+  <script type="module" src="src/story-intro-main.js?v=20260524c"></script>
 </body>
 </html>
