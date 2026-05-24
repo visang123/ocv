@@ -4,7 +4,7 @@ export const STORY_INTRO_WARMING_BG = "이미지/story-intro-bg-2325.png";
 export const STORY_INTRO_TRAPPIST_BG = "이미지/story-intro-trappist-1e.png";
 export const STORY_INTRO_DISTANCE_BG = "이미지/story-intro-distance-40ly.png";
 export const STORY_INTRO_PORTAL_BG = "이미지/story-intro-portal-2350.png";
-export const STORY_INTRO_PORTAL_TEST_BG = "이미지/story-intro-portal-2350.png";
+export const STORY_INTRO_PORTAL_TEST_BG = "이미지/story-intro-portal-test.png";
 
 /** 줄 인덱스별 배경(없으면 null) — object-fit: contain 으로 잘리지 않게 표시 */
 /** 이미지+텍스트 6장 후 웜홀 영상 재생 */
