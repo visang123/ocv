@@ -4890,9 +4890,20 @@ function flashOnboardingOrderHint(message) {
 }
 
 function onboardingAllowsBucketQUse() {
-  // 13: ???????? ??, 14~15: ??? ????????, 16+: ????????? ??????????? ???? ????????
-  // ????????? 13?15?????????14????? ???/16 ????? Q?? ?????????????????? ???????
+  // 13: 우물에서 길기, 14~15: 심은 씨앗에 물주기, 16+: 양동이 내려놓기 전까지 Q 사용
   return onboardingFlowStep >= 13;
+}
+
+/** 튜토리얼 중 땅에 놓인 양동이를 E/클릭으로 들 수 있는 단계 */
+function onboardingAllowsBucketGroundPickup() {
+  const s = onboardingFlowStep;
+  return s === 12 || s === 14 || s === 15;
+}
+
+/** 14~15: 메인 식물에 물주기(3단계 새싹이어도 첫 물주기 허용) */
+function isOnboardingMainPlantWateringTutorialStep() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return false;
+  return onboardingFlowStep === 14 || onboardingFlowStep === 15;
 }
 
 function onboardingAllowsGuideBookButtonToggle() {
@@ -5225,11 +5236,13 @@ function updateOnboardingFlowUI() {
     case 14: {
       setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
+      if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 15: {
       setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
+      if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
     case 16: {
@@ -6166,7 +6179,7 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
   ) {
     return false;
   }
-  if (isOnboardingLinearGateActive() && onboardingFlowStep !== 12) {
+  if (isOnboardingLinearGateActive() && !onboardingAllowsBucketGroundPickup()) {
     flashOnboardingOrderHint("");
     return true;
   }
@@ -13786,7 +13799,15 @@ function canWaterPlantByClick(plant) {
   if (plant.status === "rotten" || plant.status === "dry" || plant.isOverwatered) {
     return false;
   }
-  if (shouldSuppressPlantWaterCardForSelfSustaining(plant)) return false;
+  if (shouldSuppressPlantWaterCardForSelfSustaining(plant)) {
+    if (
+      isOnboardingMainPlantWateringTutorialStep() &&
+      plant === plantRuntime
+    ) {
+      return true;
+    }
+    return false;
+  }
   return true;
 }
 
