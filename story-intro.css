@@ -86,11 +86,99 @@ body {
   font-size: clamp(1.75rem, 4.2vw, 2.75rem);
 }
 
+.story-intro-overlay.has-distance-bg .story-intro-bg-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.42) 22%,
+    transparent 42%
+  );
+  pointer-events: none;
+}
+
+.story-intro-overlay.has-distance-bg .story-intro-text-stage {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: clamp(28px, 7vh, 96px);
+}
+
+.story-intro-overlay.has-distance-bg .story-intro-line {
+  max-width: min(96vw, 56rem);
+  font-size: clamp(2rem, 5.8vw, 3.75rem);
+  line-height: 1.35;
+}
+
+.story-intro-overlay.has-portal-bg .story-intro-bg-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.45) 18%,
+    transparent 36%
+  );
+  pointer-events: none;
+}
+
+.story-intro-overlay.has-portal-bg .story-intro-text-stage {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: clamp(24px, 6vh, 88px);
+}
+
+.story-intro-overlay.has-portal-bg .story-intro-line {
+  max-width: min(96vw, 52rem);
+  font-size: clamp(1.85rem, 5.2vw, 3.35rem);
+  line-height: 1.4;
+}
+
+.story-intro-overlay.has-portal-test-bg .story-intro-bg-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.28) 28%,
+    transparent 48%
+  );
+  pointer-events: none;
+}
+
+.story-intro-overlay.has-portal-test-bg .story-intro-bg-img {
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.story-intro-overlay.has-portal-test-bg .story-intro-text-stage {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: clamp(20px, 5vh, 72px) clamp(16px, 4vw, 40px) 0;
+  text-align: left;
+}
+
+.story-intro-overlay.has-portal-test-bg .story-intro-line {
+  max-width: min(72vw, 36rem);
+  font-size: clamp(1.9rem, 5.4vw, 3.5rem);
+  line-height: 1.35;
+  text-align: left;
+}
+
 .story-intro-lines {
   width: 100%;
 }
 
 .story-intro-text-stage {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   align-items: center;
@@ -172,7 +260,8 @@ body {
   overflow-wrap: break-word;
   color: #fff;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85);
-  transition: color 1.4s ease;
+  opacity: 1;
+  transition: opacity 1.4s ease;
 }
 
 @media (max-width: 720px) {
@@ -183,14 +272,39 @@ body {
   .story-intro-overlay.has-opening-bg .story-intro-line {
     font-size: 2rem;
   }
+
+  .story-intro-overlay.has-distance-bg .story-intro-line {
+    font-size: clamp(1.65rem, 5.2vw, 2.35rem);
+  }
+
+  .story-intro-overlay.has-distance-bg .story-intro-text-stage {
+    padding-top: clamp(20px, 5vh, 56px);
+  }
+
+  .story-intro-overlay.has-portal-bg .story-intro-line {
+    font-size: clamp(1.5rem, 4.8vw, 2.25rem);
+  }
+
+  .story-intro-overlay.has-portal-bg .story-intro-text-stage {
+    padding-top: clamp(16px, 4vh, 48px);
+  }
+
+  .story-intro-overlay.has-portal-test-bg .story-intro-line {
+    font-size: clamp(1.55rem, 5vw, 2.35rem);
+    max-width: min(88vw, 32rem);
+  }
+
+  .story-intro-overlay.has-portal-test-bg .story-intro-text-stage {
+    padding-top: clamp(14px, 4vh, 44px);
+  }
 }
 
 .story-intro-line.is-bright {
-  color: #fff;
+  opacity: 1;
 }
 
 .story-intro-line.is-dim {
-  color: #000;
+  opacity: 0;
 }
 
 .story-intro-hint {

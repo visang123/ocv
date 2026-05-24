@@ -2,22 +2,29 @@
 export const STORY_INTRO_OPENING_BG = "이미지/story-intro-bg-2300.png";
 export const STORY_INTRO_WARMING_BG = "이미지/story-intro-bg-2325.png";
 export const STORY_INTRO_TRAPPIST_BG = "이미지/story-intro-trappist-1e.png";
+export const STORY_INTRO_DISTANCE_BG = "이미지/story-intro-distance-40ly.png";
+export const STORY_INTRO_PORTAL_BG = "이미지/story-intro-portal-2350.png";
+export const STORY_INTRO_PORTAL_TEST_BG = "이미지/story-intro-portal-2350.png";
 
 /** 줄 인덱스별 배경(없으면 null) — object-fit: contain 으로 잘리지 않게 표시 */
 export const STORY_INTRO_LINE_BACKGROUNDS = [
   STORY_INTRO_OPENING_BG,
   STORY_INTRO_WARMING_BG,
-  STORY_INTRO_TRAPPIST_BG
+  STORY_INTRO_TRAPPIST_BG,
+  STORY_INTRO_DISTANCE_BG,
+  STORY_INTRO_PORTAL_BG,
+  STORY_INTRO_PORTAL_TEST_BG,
+  STORY_INTRO_PORTAL_BG,
+  null
 ];
 
 export const STORY_INTRO_LINES = [
   "서기 2300년...",
   "지구온난화를 겉잡을 수 없었다.",
   "트래피스트-1e로 이주만이 살길이였다.",
-  "사람들은 다른행성으로 눈을 돌렸다.",
-  "트래피스트-1e는 지구와 환경이 비슷한 가장 가까운 행성이였다.",
-  "그럼에도 40광년은 너무나 멀었다.",
-  "놀랍게도 서기 2350년 세상에 순간이동 장치가 개발된다.",
+  "그러나 그곳은 40광년, 너무 멀었다.",
+  "서기 2350년, 순간이동 포탈이 개발된다.",
+  "지금 포탈 첫 이동 테스트를 한다!!",
   "게임속 포탈은 현실이 되었고 지구 사람들은 어떤 행성이든 이동하게 될 예정이다.",
   "지금은 최종 포탈 이동 테스트를 앞두고 있다!!"
 ];
@@ -159,14 +166,34 @@ export function createStoryIntro(options) {
   }
 
   function getLineBackground(lineIndex) {
-    return STORY_INTRO_LINE_BACKGROUNDS[lineIndex] || null;
+    const bg = STORY_INTRO_LINE_BACKGROUNDS[lineIndex];
+    return bg == null ? null : bg;
+  }
+
+  function setBgImageSrc(relativePath) {
+    if (!bgImgEl || !relativePath) return;
+    const resolved = resolveStoryVideoUrl(relativePath);
+    try {
+      const current = new URL(bgImgEl.currentSrc || bgImgEl.src, window.location.href);
+      const next = new URL(resolved, window.location.href);
+      if (current.pathname !== next.pathname) {
+        bgImgEl.src = resolved;
+      }
+    } catch (e) {
+      bgImgEl.src = resolved;
+    }
   }
 
   function setOpeningBackground(visible) {
     if (overlay) {
       overlay.classList.toggle("has-opening-bg", Boolean(visible));
       if (!visible) {
-        overlay.classList.remove("has-trappist-bg");
+        overlay.classList.remove(
+          "has-trappist-bg",
+          "has-distance-bg",
+          "has-portal-bg",
+          "has-portal-test-bg"
+        );
       }
     }
     if (!bgStageEl) return;
@@ -182,17 +209,15 @@ export function createStoryIntro(options) {
     const src = getLineBackground(lineIndex);
     if (overlay) {
       overlay.classList.toggle("has-trappist-bg", src === STORY_INTRO_TRAPPIST_BG);
+      overlay.classList.toggle("has-distance-bg", src === STORY_INTRO_DISTANCE_BG);
+      overlay.classList.toggle("has-portal-bg", src === STORY_INTRO_PORTAL_BG);
+      overlay.classList.toggle("has-portal-test-bg", src === STORY_INTRO_PORTAL_TEST_BG);
     }
     if (!src) {
       setOpeningBackground(false);
       return;
     }
-    if (bgImgEl) {
-      const resolved = resolveStoryVideoUrl(src);
-      if (!bgImgEl.src.endsWith(src)) {
-        bgImgEl.src = resolved;
-      }
-    }
+    setBgImageSrc(src);
     setOpeningBackground(true);
   }
 
@@ -399,12 +424,17 @@ export function createStoryIntro(options) {
     lineParagraph.textContent = STORY_INTRO_LINES[idx];
     lineEl.appendChild(lineParagraph);
     setLineDim();
+    let lineRevealed = false;
+    function revealLineText() {
+      if (lineRevealed || !active) return;
+      lineRevealed = true;
+      setLineBright();
+      showHintForCurrentLine();
+    }
     requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        setLineBright();
-        showHintForCurrentLine();
-      });
+      requestAnimationFrame(revealLineText);
     });
+    window.setTimeout(revealLineText, 32);
   }
 
   function endStoryTextThenWormhole() {
@@ -479,13 +509,18 @@ export function createStoryIntro(options) {
     canAdvance = false;
     isTransitioning = false;
     lineEl.innerHTML = "";
-    setOpeningBackground(false);
+    lineEl.hidden = false;
+    lineEl.removeAttribute("aria-hidden");
     hideHint();
     showOverlay();
     primeStoryVideos();
-    requestAnimationFrame(function () {
-      showLine(0);
+    STORY_INTRO_LINE_BACKGROUNDS.forEach(function (bg) {
+      if (!bg) return;
+      const img = new Image();
+      img.decoding = "async";
+      img.src = resolveStoryVideoUrl(bg);
     });
+    showLine(0);
     return true;
   }
 
