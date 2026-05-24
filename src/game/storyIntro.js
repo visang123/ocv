@@ -189,6 +189,8 @@ export function createStoryIntro(options) {
       overlay.classList.toggle("has-opening-bg", Boolean(visible));
       if (!visible) {
         overlay.classList.remove(
+          "has-opening-slide",
+          "has-warming-bg",
           "has-trappist-bg",
           "has-distance-bg",
           "has-portal-bg",
@@ -208,6 +210,8 @@ export function createStoryIntro(options) {
   function setLineBackground(lineIndex) {
     const src = getLineBackground(lineIndex);
     if (overlay) {
+      overlay.classList.toggle("has-opening-slide", src === STORY_INTRO_OPENING_BG);
+      overlay.classList.toggle("has-warming-bg", src === STORY_INTRO_WARMING_BG);
       overlay.classList.toggle("has-trappist-bg", src === STORY_INTRO_TRAPPIST_BG);
       overlay.classList.toggle("has-distance-bg", src === STORY_INTRO_DISTANCE_BG);
       overlay.classList.toggle("has-portal-bg", src === STORY_INTRO_PORTAL_BG);
