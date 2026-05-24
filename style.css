@@ -1365,6 +1365,14 @@ body::-webkit-scrollbar {
   animation: onboarding-target-glow 1.1s ease-in-out infinite;
 }
 
+#bag-inventory-panel.onboarding-highlight {
+  z-index: 28 !important;
+  outline: 4px solid #f59e0b;
+  outline-offset: 4px;
+  border-radius: 10px;
+  animation: onboarding-pulse 1.2s ease-in-out infinite;
+}
+
 #bag-inventory-panel .bag-book-storage-slot.onboarding-highlight,
 #bag-inventory-panel .bag-inventory-slot.onboarding-highlight {
   z-index: 28 !important;

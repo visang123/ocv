@@ -561,6 +561,9 @@ let onboardingPostWaterCongratsPhase = 0;
 /** 17????: 0 = ??????????? 1, 1 = ???? ???? 2 */
 let onboardingPlantIndexIntroPhase = 0;
 let onboardingPlantIndexIntroTimerId = null;
+/** 3단계 인벤토리: 0=열기, 1=열림 안내, 2=닫기 안내 */
+let onboardingInventoryIntroPhase = 0;
+let onboardingInventoryCloseHintTimerId = null;
 let onboardingTutorialRockMounted = false;
 const ONBOARDING_MAX_STEP = 34;
 const ONBOARDING_STEP_PLANT_INDEX = 17;
@@ -2707,10 +2710,16 @@ function onGuideInventoryToggleClick() {
 }
 
 function setBagInventoryPanelOpen(open) {
+  const wasOpen = bagInventoryPanelOpen;
   bagInventoryPanelOpen = Boolean(open);
   if (!bagInventoryPanel) return;
   bagInventoryPanel.style.display = bagInventoryPanelOpen ? "flex" : "none";
   bagInventoryPanel.setAttribute("aria-hidden", bagInventoryPanelOpen ? "false" : "true");
+  if (bagInventoryPanelOpen && !wasOpen) {
+    maybeAdvanceOnboardingAfterInventoryOpened();
+  } else if (!bagInventoryPanelOpen && wasOpen) {
+    maybeAdvanceOnboardingAfterInventoryClosed();
+  }
 }
 
 function closeBagInventoryPanel() {
@@ -2734,6 +2743,13 @@ function toggleBagInventoryPanelFromBagClick() {
   if (isTradeExchangeOpen() || isAlchemyCraftOpen()) {
     return;
   }
+  if (isOnboardingLinearGateActive() && onboardingFlowStep === 2) {
+    onboardingFlowStep = 3;
+    onboardingInventoryIntroPhase = 0;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+    return;
+  }
   if (isOnboardingLinearGateActive() && !onboardingAllowsGuideBookButtonToggle()) {
     flashOnboardingOrderHint("");
     return;
@@ -2742,12 +2758,20 @@ function toggleBagInventoryPanelFromBagClick() {
     setWorldChatPanelOpen(false);
   }
   const nextOpen = !bagInventoryPanelOpen;
+  if (isOnboardingInventoryTutorialActive() && onboardingInventoryIntroPhase === 0 && !nextOpen) {
+    return;
+  }
+  if (isOnboardingInventoryTutorialActive() && onboardingInventoryIntroPhase < 2 && !nextOpen) {
+    setBagInventoryPanelOpen(false);
+    updateOnboardingFlowUI();
+    return;
+  }
   setBagInventoryPanelOpen(nextOpen);
   if (nextOpen) {
     updateBagInventorySlots();
   }
-  if (nextOpen && isOnboardingLinearGateActive() && onboardingFlowStep === 2) {
-    isGuideBookOpen = true;
+  if (nextOpen && isOnboardingInventoryTutorialActive()) {
+    isGuideBookOpen = false;
     updateGuideCard();
   }
   updateOnboardingFlowUI();
@@ -2804,6 +2828,11 @@ if (bagInventoryPanel) {
     if (!slot || !bagInventoryPanel.contains(slot)) return;
     if (slot === bagBookStorageSlot) {
       if (!hasGuideBookItemInBagCounts()) return;
+      if (isOnboardingInventoryTutorialActive()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       const wasOpen = isGuideBookOpen || guideCard.style.display === "block";
@@ -3047,11 +3076,7 @@ function dismissGuideBookClickPrompt() {
 
 function maybeAdvanceOnboardingAfterGuideBookClosed() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
-  if (onboardingFlowStep === 3) {
-    onboardingClearEscHintTimer();
-    onboardingFlowStep = 4;
-    persistOnboardingStep();
-  } else if (onboardingFlowStep === 10) {
+  if (onboardingFlowStep === 10) {
     onboardingClearEscHintTimer();
     onboardingNpcGuideEscHintShown = false;
     onboardingFlowStep = 11;
@@ -4230,6 +4255,7 @@ function clearOnboardingHighlights() {
     bagBookStorageSlot.classList.remove("onboarding-highlight");
   }
   if (bagInventoryPanel) {
+    bagInventoryPanel.classList.remove("onboarding-highlight");
     bagInventoryPanel.querySelectorAll(".bag-inventory-slots .bag-inventory-slot").forEach(function (el) {
       el.classList.remove("onboarding-highlight");
     });
@@ -4510,6 +4536,53 @@ function onboardingClearAllOnboardingTimers() {
     window.clearTimeout(onboardingPlantIndexIntroTimerId);
     onboardingPlantIndexIntroTimerId = null;
   }
+  onboardingClearInventoryCloseHintTimer();
+}
+
+function onboardingClearInventoryCloseHintTimer() {
+  if (onboardingInventoryCloseHintTimerId) {
+    window.clearTimeout(onboardingInventoryCloseHintTimerId);
+    onboardingInventoryCloseHintTimerId = null;
+  }
+}
+
+function scheduleOnboardingInventoryCloseHint() {
+  onboardingClearInventoryCloseHintTimer();
+  onboardingInventoryCloseHintTimerId = window.setTimeout(function () {
+    onboardingInventoryCloseHintTimerId = null;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 3) return;
+    if (onboardingInventoryIntroPhase !== 1) return;
+    onboardingInventoryIntroPhase = 2;
+    updateOnboardingFlowUI();
+  }, 3000);
+}
+
+function maybeAdvanceOnboardingAfterInventoryOpened() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep !== 3 || onboardingInventoryIntroPhase !== 0) return;
+  isGuideBookOpen = false;
+  onboardingInventoryIntroPhase = 1;
+  persistOnboardingStep();
+  scheduleOnboardingInventoryCloseHint();
+  updateOnboardingFlowUI();
+}
+
+function maybeAdvanceOnboardingAfterInventoryClosed() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep !== 3 || onboardingInventoryIntroPhase < 2) return;
+  onboardingClearInventoryCloseHintTimer();
+  onboardingInventoryIntroPhase = 0;
+  onboardingFlowStep = 4;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
+function isOnboardingInventoryTutorialActive() {
+  return (
+    isOnboardingLinearGateActive() &&
+    onboardingFlowStep === 3 &&
+    onboardingInventoryIntroPhase <= 2
+  );
 }
 
 /** v1(???? 27????) ??v2(34????) ????????? ???? */
@@ -4824,7 +4897,8 @@ function onboardingAllowsBucketQUse() {
 
 function onboardingAllowsGuideBookButtonToggle() {
   const s = onboardingFlowStep;
-  return s === 2 || s === 3 || s === 10 || s >= 16;
+  if (s === 2 || isOnboardingInventoryTutorialActive()) return false;
+  return s === 10 || s >= 16;
 }
 
 function syncOnboardingFlowProgressFromWorld() {
@@ -4875,6 +4949,7 @@ function loadOnboardingFlowState() {
   onboardingPlantIndexIntroPhase = 0;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
+  onboardingInventoryIntroPhase = 0;
   onboardingClearAllOnboardingTimers();
   if (getStoredFlag(onboardingFlowDoneKey)) {
     onboardingFlowStep = 0;
@@ -5033,14 +5108,32 @@ function updateOnboardingFlowUI() {
       break;
     }
     case 3: {
-      if (guideOpen) {
+      if (onboardingInventoryIntroPhase === 0) {
+        setOnboardingCalloutVisible(
+          true,
+          "tab키를 누르거나 왼쪽아래 가방 이미지를 누르세요."
+        );
+        if (worldBagInventory) {
+          worldBagInventory.classList.add("onboarding-highlight");
+          worldBagInventory.classList.add("onboarding-highlight-book-inv");
+        }
+      } else if (onboardingInventoryIntroPhase === 1) {
         setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
-        if (worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
-        if (bagBookStorageSlot && hasGuideBookItemInBagCounts()) {
-          bagBookStorageSlot.classList.add("onboarding-highlight");
+        if (bagInventoryPanel && bagInventoryPanelOpen) {
+          bagInventoryPanel.classList.add("onboarding-highlight");
         }
       } else {
-        setOnboardingCalloutVisible(false, "");
+        setOnboardingCalloutVisible(
+          true,
+          "tab키 또는 가방을 클릭해 인벤토리를 닫으세요."
+        );
+        if (worldBagInventory) {
+          worldBagInventory.classList.add("onboarding-highlight");
+          worldBagInventory.classList.add("onboarding-highlight-book-inv");
+        }
+        if (bagInventoryPanel && bagInventoryPanelOpen) {
+          bagInventoryPanel.classList.add("onboarding-highlight");
+        }
       }
       break;
     }
@@ -16034,7 +16127,9 @@ function updateGuideCard() {
   syncWorldBagGroundVisibility();
   syncGuideInventoryBar();
   const shouldShow =
-    hasGuideBook && (isGuideBookOpen || (nearSign && !isGuideDismissedAtSign));
+    hasGuideBook &&
+    !isOnboardingInventoryTutorialActive() &&
+    (isGuideBookOpen || (nearSign && !isGuideDismissedAtSign));
 
   if (shouldShow) {
     guideCard.style.display = "block";
@@ -16052,15 +16147,6 @@ function updateGuideCard() {
     );
   }
 
-  if (
-    !getStoredFlag(onboardingFlowDoneKey) &&
-    onboardingFlowStep === 2 &&
-    shouldShow &&
-    guideCard.style.display === "block"
-  ) {
-    onboardingFlowStep = 3;
-    persistOnboardingStep();
-  }
 }
 
 function getGuideMaxPage() {
