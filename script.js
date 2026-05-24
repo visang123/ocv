@@ -562,29 +562,47 @@ let onboardingPostWaterCongratsPhase = 0;
 /** 17????: 0 = ??????????? 1, 1 = ???? ???? 2 */
 let onboardingPlantIndexIntroPhase = 0;
 let onboardingPlantIndexIntroTimerId = null;
+/** 물주기 축하 후 새싹 3단계가 되면 식물지수 튜토리얼 시작 */
+let onboardingPlantIndexAwaitingSprout = false;
 /** 3단계 인벤토리: 0=열기, 1=열림 안내, 2=닫기 안내 */
 let onboardingInventoryIntroPhase = 0;
 let onboardingInventoryCloseHintTimerId = null;
+/** 9단계 책 인벤: 0=인벤 열기, 1=책 칸 클릭 */
+let onboardingBookInvPhase = 0;
 let onboardingTutorialRockMounted = false;
-const ONBOARDING_MAX_STEP = 34;
-const ONBOARDING_STEP_PLANT_INDEX = 17;
-const ONBOARDING_STEP_DROP_BUCKET = 18;
-const ONBOARDING_STEP_CHAT = 19;
-const ONBOARDING_STEP_HEART = 20;
-const ONBOARDING_STEP_SAD = 21;
-const ONBOARDING_STEP_ROCK = 22;
-const ONBOARDING_STEP_BUTTERFLY = 23;
-const ONBOARDING_STEP_TRADE_MASTER = 24;
-const ONBOARDING_STEP_ALCHEMY_MASTER = 25;
-const ONBOARDING_STEP_ZOOM_INTRO = 26;
-const ONBOARDING_STEP_ZOOM_MIN = 27;
-const ONBOARDING_STEP_TREE_APPROACH = 28;
-const ONBOARDING_STEP_TREE_CLIMB = 29;
-const ONBOARDING_STEP_PICK_APPLE = 30;
-const ONBOARDING_STEP_EAT_APPLE = 31;
-const ONBOARDING_STEP_EXTRA_SEED = 32;
-const ONBOARDING_STEP_SETTINGS_ESC = 33;
-const ONBOARDING_STEP_COMPLETE = 34;
+const ONBOARDING_BOOK_INSERT_MIGRATE_KEY = "ovcOnboardingBookStepsInsertV1";
+const ONBOARDING_STEP_GO_BOOK = 7;
+const ONBOARDING_STEP_PICK_BOOK = 8;
+const ONBOARDING_STEP_BOOK_INV = 9;
+const ONBOARDING_STEP_PLANT = 10;
+const ONBOARDING_STEP_PLANT_MASTER = 11;
+const ONBOARDING_STEP_PLANT_MASTER_TALK = 12;
+const ONBOARDING_STEP_NPC_GUIDE = 13;
+const ONBOARDING_STEP_WELL = 14;
+const ONBOARDING_STEP_BUCKET_PICK = 15;
+const ONBOARDING_STEP_BUCKET_FILL = 16;
+const ONBOARDING_STEP_WATER_APPROACH = 17;
+const ONBOARDING_STEP_WATER_POUR = 18;
+const ONBOARDING_STEP_WATER_DONE = 19;
+const ONBOARDING_MAX_STEP = 37;
+const ONBOARDING_STEP_PLANT_INDEX = 20;
+const ONBOARDING_STEP_DROP_BUCKET = 21;
+const ONBOARDING_STEP_CHAT = 22;
+const ONBOARDING_STEP_HEART = 23;
+const ONBOARDING_STEP_SAD = 24;
+const ONBOARDING_STEP_ROCK = 25;
+const ONBOARDING_STEP_BUTTERFLY = 26;
+const ONBOARDING_STEP_TRADE_MASTER = 27;
+const ONBOARDING_STEP_ALCHEMY_MASTER = 28;
+const ONBOARDING_STEP_ZOOM_INTRO = 29;
+const ONBOARDING_STEP_ZOOM_MIN = 30;
+const ONBOARDING_STEP_TREE_APPROACH = 31;
+const ONBOARDING_STEP_TREE_CLIMB = 32;
+const ONBOARDING_STEP_PICK_APPLE = 33;
+const ONBOARDING_STEP_EAT_APPLE = 34;
+const ONBOARDING_STEP_EXTRA_SEED = 35;
+const ONBOARDING_STEP_SETTINGS_ESC = 36;
+const ONBOARDING_STEP_COMPLETE = 37;
 const TUTORIAL_ONBOARDING_ROCK_ID = "tutorial-onboarding-rock-v1";
 /** tutorial.html: ???? ????????? ??????????????????? ???????(ms) */
 const TUTORIAL_MAIN_SEED_RESPAWN_MS = 5000;
@@ -1086,6 +1104,7 @@ function ensurePlantProgressSproutToggleBound() {
     if (!g) return;
     const nowCollapsed = g.classList.toggle("is-collapsed");
     btn.setAttribute("aria-expanded", nowCollapsed ? "false" : "true");
+    onboardingHookPlantIndexSproutToggle(nowCollapsed);
   });
 }
 
@@ -2718,6 +2737,7 @@ function setBagInventoryPanelOpen(open) {
   bagInventoryPanel.setAttribute("aria-hidden", bagInventoryPanelOpen ? "false" : "true");
   if (bagInventoryPanelOpen && !wasOpen) {
     maybeAdvanceOnboardingAfterInventoryOpened();
+    maybeAdvanceOnboardingAfterBookInventoryOpened();
   } else if (!bagInventoryPanelOpen && wasOpen) {
     maybeAdvanceOnboardingAfterInventoryClosed();
   }
@@ -2830,6 +2850,11 @@ if (bagInventoryPanel) {
       isGuideBookOpen = !wasOpen;
       if (wasOpen) {
         dismissGuideBookClickPrompt();
+      } else if (
+        !getStoredFlag(onboardingFlowDoneKey) &&
+        onboardingFlowStep === ONBOARDING_STEP_BOOK_INV
+      ) {
+        maybeAdvanceOnboardingAfterBookSlotClicked();
       }
       updateGuideCard();
       if (wasOpen) {
@@ -3066,10 +3091,10 @@ function dismissGuideBookClickPrompt() {
 
 function maybeAdvanceOnboardingAfterGuideBookClosed() {
   if (getStoredFlag(onboardingFlowDoneKey)) return;
-  if (onboardingFlowStep === 10) {
+  if (onboardingFlowStep === ONBOARDING_STEP_NPC_GUIDE) {
     onboardingClearEscHintTimer();
     onboardingNpcGuideEscHintShown = false;
-    onboardingFlowStep = 11;
+    onboardingFlowStep = ONBOARDING_STEP_WELL;
     persistOnboardingStep();
   }
 }
@@ -3864,7 +3889,7 @@ function createStarterSeedInventoryItem() {
   syncWorldState(true);
   saveAppleState();
   if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === 6) {
-    onboardingFlowStep = 7;
+    onboardingFlowStep = ONBOARDING_STEP_GO_BOOK;
     persistOnboardingStep();
   }
   scheduleTutorialMainSeedRespawnFromGround();
@@ -4227,6 +4252,8 @@ function clearOnboardingHighlights() {
   });
   const plantGauge = document.getElementById("plant-progress-gauge");
   if (plantGauge) plantGauge.classList.remove("onboarding-highlight");
+  const plantIndexSproutToggle = document.getElementById("plant-progress-sprout-toggle");
+  if (plantIndexSproutToggle) plantIndexSproutToggle.classList.remove("onboarding-highlight");
   if (worldChatToggleBtn) worldChatToggleBtn.classList.remove("onboarding-highlight");
   if (worldHeartBtn) worldHeartBtn.classList.remove("onboarding-highlight");
   if (worldSadBtn) worldSadBtn.classList.remove("onboarding-highlight");
@@ -4377,6 +4404,7 @@ function resetTutorialProgressInStorage(options) {
   setOnboardingFlowDoneStored(false);
   setStoredValue(onboardingFlowStepKey, "1");
   removeStoredValue(movementTutorialCompleteKey);
+  removeStoredValue(ONBOARDING_BOOK_INSERT_MIGRATE_KEY);
   setStoredFlag(hasGuideBookKey, false);
   clearWorldFloorBagClaim(removeStoredValue);
   removeRoomKeyedPickupForAllSlugs(GUIDE_BOOK_PICKED_ROOM_KEY_PREFIX);
@@ -4566,6 +4594,22 @@ function maybeAdvanceOnboardingAfterInventoryClosed() {
   updateOnboardingFlowUI();
 }
 
+function maybeAdvanceOnboardingAfterBookInventoryOpened() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep !== ONBOARDING_STEP_BOOK_INV || onboardingBookInvPhase !== 0) return;
+  onboardingBookInvPhase = 1;
+  updateOnboardingFlowUI();
+}
+
+function maybeAdvanceOnboardingAfterBookSlotClicked() {
+  if (getStoredFlag(onboardingFlowDoneKey)) return;
+  if (onboardingFlowStep !== ONBOARDING_STEP_BOOK_INV) return;
+  onboardingBookInvPhase = 0;
+  onboardingFlowStep = ONBOARDING_STEP_PLANT;
+  persistOnboardingStep();
+  updateOnboardingFlowUI();
+}
+
 function isOnboardingInventoryTutorialActive() {
   return (
     isOnboardingLinearGateActive() &&
@@ -4574,7 +4618,7 @@ function isOnboardingInventoryTutorialActive() {
   );
 }
 
-/** v1(???? 27????) ??v2(34????) ????????? ???? */
+/** v1(구 27단계) → v2(34단계) 온보딩 단계 번호 마이그레이션 */
 function migrateLegacyOnboardingFlowStep(raw) {
   const n = Math.floor(Number(raw) || 0);
   if (n <= 16) return n;
@@ -4597,6 +4641,15 @@ function migrateLegacyOnboardingFlowStep(raw) {
   return n;
 }
 
+/** v3: 씨앗 줍기 후 책 튜토리얼(7~9) 삽입 — 기존 7~34 단계 +3 */
+function migrateOnboardingStepForBookInsert(step) {
+  const n = Math.floor(Number(step) || 0);
+  if (n < 7 || n > 34) return n;
+  if (getStoredFlag(ONBOARDING_BOOK_INSERT_MIGRATE_KEY)) return n;
+  setStoredFlag(ONBOARDING_BOOK_INSERT_MIGRATE_KEY, true);
+  return n + 3;
+}
+
 function isOnboardingSocialTutorialStep() {
   return (
     isOnboardingLinearGateActive() &&
@@ -4616,9 +4669,51 @@ function onboardingClearPlantIndexIntroTimer() {
   }
 }
 
+function finishOnboardingPlantIndexIntro() {
+  onboardingClearPlantIndexIntroTimer();
+  onboardingPlantIndexIntroPhase = 0;
+  onboardingPlantIndexAwaitingSprout = false;
+  onboardingFlowStep = ONBOARDING_STEP_DROP_BUCKET;
+  persistOnboardingStep();
+  if (worldPlantFog) worldPlantFog.style.display = "none";
+  if (world) world.style.filter = "";
+  updateOnboardingFlowUI();
+}
+
+function onboardingHookPlantIndexSproutToggle(nowCollapsed) {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+    return;
+  }
+  if (onboardingPlantIndexIntroPhase === 1 && nowCollapsed) {
+    onboardingPlantIndexIntroPhase = 2;
+    updateOnboardingFlowUI();
+    return;
+  }
+  if (onboardingPlantIndexIntroPhase === 2 && !nowCollapsed) {
+    finishOnboardingPlantIndexIntro();
+  }
+}
+
+function onboardingTryStartPlantIndexAfterSproutStage3() {
+  if (getStoredFlag(onboardingFlowDoneKey) || !isOnboardingLinearGateActive()) return;
+  if (!onboardingPlantIndexAwaitingSprout && onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+    return;
+  }
+  if (!plantRuntime || getSproutStageFromPlant(plantRuntime) < 3) return;
+  onboardingPlantIndexAwaitingSprout = false;
+  if (onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+    onboardingFlowStep = ONBOARDING_STEP_PLANT_INDEX;
+    persistOnboardingStep();
+  }
+  if (!onboardingPlantIndexIntroTimerId) {
+    startOnboardingPlantIndexIntro();
+  }
+}
+
 function startOnboardingPlantIndexIntro() {
   onboardingClearPlantIndexIntroTimer();
   onboardingPlantIndexIntroPhase = 0;
+  onboardingPlantIndexAwaitingSprout = false;
   const gauge = document.getElementById("plant-progress-gauge");
   if (gauge) {
     gauge.classList.remove("is-collapsed");
@@ -4633,20 +4728,9 @@ function startOnboardingPlantIndexIntro() {
     if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
       return;
     }
+    if (onboardingPlantIndexIntroPhase !== 0) return;
     onboardingPlantIndexIntroPhase = 1;
     updateOnboardingFlowUI();
-    onboardingPlantIndexIntroTimerId = window.setTimeout(function () {
-      onboardingPlantIndexIntroTimerId = null;
-      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
-        return;
-      }
-      onboardingPlantIndexIntroPhase = 0;
-      onboardingFlowStep = ONBOARDING_STEP_DROP_BUCKET;
-      persistOnboardingStep();
-      if (worldPlantFog) worldPlantFog.style.display = "none";
-      if (world) world.style.filter = "";
-      updateOnboardingFlowUI();
-    }, 4500);
   }, 4500);
 }
 
@@ -4879,26 +4963,33 @@ function flashOnboardingOrderHint(message) {
 }
 
 function onboardingAllowsBucketQUse() {
-  // 13: 우물에서 길기, 14~15: 심은 씨앗에 물주기, 16+: 양동이 내려놓기 전까지 Q 사용
-  return onboardingFlowStep >= 13;
+  return onboardingFlowStep >= ONBOARDING_STEP_BUCKET_FILL;
 }
 
 /** 튜토리얼 중 땅에 놓인 양동이를 E/클릭으로 들 수 있는 단계 */
 function onboardingAllowsBucketGroundPickup() {
   const s = onboardingFlowStep;
-  return s === 12 || s === 14 || s === 15;
+  return (
+    s === ONBOARDING_STEP_BUCKET_PICK ||
+    s === ONBOARDING_STEP_WATER_APPROACH ||
+    s === ONBOARDING_STEP_WATER_POUR
+  );
 }
 
-/** 14~15: 메인 식물에 물주기(3단계 새싹이어도 첫 물주기 허용) */
+/** 17~18: 메인 식물에 물주기(3단계 새싹이어도 첫 물주기 허용) */
 function isOnboardingMainPlantWateringTutorialStep() {
   if (getStoredFlag(onboardingFlowDoneKey)) return false;
-  return onboardingFlowStep === 14 || onboardingFlowStep === 15;
+  return (
+    onboardingFlowStep === ONBOARDING_STEP_WATER_APPROACH ||
+    onboardingFlowStep === ONBOARDING_STEP_WATER_POUR
+  );
 }
 
 function onboardingAllowsGuideBookButtonToggle() {
   const s = onboardingFlowStep;
   if (isOnboardingInventoryTutorialActive()) return false;
-  return s === 10 || s >= 16;
+  if (s === ONBOARDING_STEP_BOOK_INV) return false;
+  return s === ONBOARDING_STEP_NPC_GUIDE || s >= ONBOARDING_STEP_WATER_DONE;
 }
 
 function syncOnboardingFlowProgressFromWorld() {
@@ -4917,27 +5008,38 @@ function syncOnboardingFlowProgressFromWorld() {
   // would jump fresh onboarding straight to "find the plant master" or later.
   if (
     hasPickedMainSeedInCurrentRoom() &&
-    onboardingFlowStep < 7 &&
+    onboardingFlowStep < ONBOARDING_STEP_GO_BOOK &&
     onboardingFlowStep >= 5
   ) {
-    onboardingFlowStep = 7;
+    onboardingFlowStep = ONBOARDING_STEP_GO_BOOK;
     changed = true;
   }
   if (
-    plantRuntime.isSeedPlanted &&
-    onboardingFlowStep < 8 &&
-    onboardingFlowStep >= 7
+    hasGuideBookItemInBagCounts() &&
+    onboardingFlowStep >= ONBOARDING_STEP_GO_BOOK &&
+    onboardingFlowStep < ONBOARDING_STEP_PLANT
   ) {
-    onboardingFlowStep = 8;
+    if (onboardingFlowStep <= ONBOARDING_STEP_PICK_BOOK) {
+      onboardingFlowStep = ONBOARDING_STEP_BOOK_INV;
+      onboardingBookInvPhase = 0;
+      changed = true;
+    }
+  }
+  if (
+    plantRuntime.isSeedPlanted &&
+    onboardingFlowStep < ONBOARDING_STEP_PLANT_MASTER &&
+    onboardingFlowStep >= ONBOARDING_STEP_PLANT
+  ) {
+    onboardingFlowStep = ONBOARDING_STEP_PLANT_MASTER;
     changed = true;
   }
   if (
     isNpcDialogueComplete &&
     plantRuntime.isSeedPlanted &&
-    onboardingFlowStep < 10 &&
-    onboardingFlowStep >= 8
+    onboardingFlowStep < ONBOARDING_STEP_NPC_GUIDE &&
+    onboardingFlowStep >= ONBOARDING_STEP_PLANT_MASTER
   ) {
-    onboardingFlowStep = 10;
+    onboardingFlowStep = ONBOARDING_STEP_NPC_GUIDE;
     changed = true;
   }
   if (changed) {
@@ -4951,9 +5053,11 @@ function loadOnboardingFlowState() {
   onboardingPostAppleSeedIntroPhase = 0;
   onboardingPostWaterCongratsPhase = 0;
   onboardingPlantIndexIntroPhase = 0;
+  onboardingPlantIndexAwaitingSprout = false;
   onboardingButterflyCountBaseline = null;
   onboardingTutorialEnteredTree = false;
   onboardingInventoryIntroPhase = 0;
+  onboardingBookInvPhase = 0;
   onboardingClearAllOnboardingTimers();
   if (getStoredFlag(onboardingFlowDoneKey)) {
     onboardingFlowStep = 0;
@@ -4973,11 +5077,14 @@ function loadOnboardingFlowState() {
     requestAccountTutorialDoneSync({ force: true });
     return;
   }
-  const normalizedRaw = migrateLegacyOnboardingFlowStep(raw);
+  const normalizedRaw = migrateOnboardingStepForBookInsert(migrateLegacyOnboardingFlowStep(raw));
   onboardingFlowStep =
     Number.isFinite(normalizedRaw) && normalizedRaw >= 1 && normalizedRaw <= ONBOARDING_MAX_STEP
       ? normalizedRaw
       : 1;
+  if (onboardingFlowStep === ONBOARDING_STEP_BOOK_INV && hasGuideBookItemInBagCounts()) {
+    onboardingBookInvPhase = bagInventoryPanelOpen ? 1 : 0;
+  }
   syncOnboardingFlowProgressFromWorld();
   if (onboardingFlowStep === 2) {
     onboardingFlowStep = 3;
@@ -4987,10 +5094,14 @@ function loadOnboardingFlowState() {
     onboardingPostAppleSeedIntroPhase = 1;
   }
   if (onboardingFlowStep === ONBOARDING_STEP_PLANT_INDEX && !onboardingPlantIndexIntroTimerId) {
-    startOnboardingPlantIndexIntro();
+    if (plantRuntime && getSproutStageFromPlant(plantRuntime) >= 3) {
+      startOnboardingPlantIndexIntro();
+    } else {
+      onboardingPlantIndexAwaitingSprout = true;
+    }
   }
   if (
-    onboardingFlowStep === 10 &&
+    onboardingFlowStep === ONBOARDING_STEP_NPC_GUIDE &&
     guideCard &&
     guideCard.style.display === "block" &&
     !onboardingNpcGuideEscHintShown
@@ -5002,8 +5113,8 @@ function loadOnboardingFlowState() {
 function onboardingNotifyMainPlantPlanted() {
   clearTutorialMainSeedRespawnTimer();
   if (getStoredFlag(onboardingFlowDoneKey)) return;
-  if (onboardingFlowStep === 7) {
-    onboardingFlowStep = 8;
+  if (onboardingFlowStep === ONBOARDING_STEP_PLANT) {
+    onboardingFlowStep = ONBOARDING_STEP_PLANT_MASTER;
     persistOnboardingStep();
   }
 }
@@ -5015,6 +5126,10 @@ function onboardingAutoAdvanceSteps() {
     onboardingFlowStep = 6;
     persistOnboardingStep();
   }
+  if (onboardingFlowStep === ONBOARDING_STEP_GO_BOOK && isNearGuideBook()) {
+    onboardingFlowStep = ONBOARDING_STEP_PICK_BOOK;
+    persistOnboardingStep();
+  }
   if (
     onboardingFlowStep === ONBOARDING_STEP_ZOOM_MIN &&
     zoomLevel <= getFitZoom() + 0.06
@@ -5022,12 +5137,15 @@ function onboardingAutoAdvanceSteps() {
     onboardingFlowStep = ONBOARDING_STEP_TREE_APPROACH;
     persistOnboardingStep();
   }
-  if (onboardingFlowStep === 8 && isNearPlantMaster()) {
-    onboardingFlowStep = 9;
+  if (onboardingFlowStep === ONBOARDING_STEP_PLANT_MASTER && isNearPlantMaster()) {
+    onboardingFlowStep = ONBOARDING_STEP_PLANT_MASTER_TALK;
     persistOnboardingStep();
   }
-  if (onboardingFlowStep === 11 && (isNearWell() || isNearBucket())) {
-    onboardingFlowStep = 12;
+  if (
+    onboardingFlowStep === ONBOARDING_STEP_WELL &&
+    (isNearWell() || isNearBucket())
+  ) {
+    onboardingFlowStep = ONBOARDING_STEP_BUCKET_PICK;
     persistOnboardingStep();
   }
   if (onboardingFlowStep === ONBOARDING_STEP_TREE_APPROACH && isPlayerNearTutorialTreeArea()) {
@@ -5059,6 +5177,7 @@ function onboardingAutoAdvanceSteps() {
   ensureTutorialOnboardingRock();
   ensureTutorialOnboardingButterflies();
   updateNpcPosition();
+  onboardingTryStartPlantIndexAfterSproutStage3();
 }
 
 function updateOnboardingFlowUI() {
@@ -5092,7 +5211,12 @@ function updateOnboardingFlowUI() {
 
   const guideOpen = guideCard && guideCard.style.display === "block";
 
-  if (onboardingFlowStep === 10 && guideOpen && !onboardingEscHintTimerId && !onboardingNpcGuideEscHintShown) {
+  if (
+    onboardingFlowStep === ONBOARDING_STEP_NPC_GUIDE &&
+    guideOpen &&
+    !onboardingEscHintTimerId &&
+    !onboardingNpcGuideEscHintShown
+  ) {
     scheduleOnboardingNpcGuideEscHint();
   }
 
@@ -5155,24 +5279,54 @@ function updateOnboardingFlowUI() {
       if (seed) seed.classList.add("onboarding-highlight");
       break;
     }
-    case 7: {
+    case ONBOARDING_STEP_GO_BOOK: {
+      setOnboardingCalloutVisible(true, "책으로 이동하세요.");
+      if (guideBook) guideBook.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_PICK_BOOK: {
+      setOnboardingCalloutVisible(true, "e키를 눌러 책을 주우세요.");
+      if (guideBook) guideBook.classList.add("onboarding-highlight");
+      break;
+    }
+    case ONBOARDING_STEP_BOOK_INV: {
+      setOnboardingCalloutVisible(true, "인벤토리를 열어서 책을 눌러보세요.");
+      if (worldBagInventory) {
+        worldBagInventory.classList.add("onboarding-highlight");
+        worldBagInventory.classList.add("onboarding-highlight-book-inv");
+      }
+      if (onboardingBookInvPhase >= 1 && bagInventoryPanelOpen) {
+        if (bagInventoryPanel) bagInventoryPanel.classList.add("onboarding-highlight");
+        if (bagBookStorageSlot) bagBookStorageSlot.classList.add("onboarding-highlight");
+      }
+      break;
+    }
+    case ONBOARDING_STEP_PLANT: {
       setOnboardingCalloutVisible(
         true,
         "\uC2EC\uC744 \uC704\uCE58\uB85C \uC774\uB3D9\uD55C \uB4A4, \uAC00\uBC29\uC744 \uC5F4\uACE0 \uC528\uC557 \uCE78\uC744 \uB20C\uB7EC \uC2EC\uC73C\uC138\uC694."
       );
-      if (player) player.classList.add("onboarding-highlight");
-      if (!tutorialMainSeedRegenCompleted && bagInventoryPanel) {
+      if (worldBagInventory) {
+        worldBagInventory.classList.add("onboarding-highlight");
+        worldBagInventory.classList.add("onboarding-highlight-book-inv");
+      }
+      if (bagInventoryPanel) {
+        if (bagInventoryPanelOpen) {
+          bagInventoryPanel.classList.add("onboarding-highlight");
+        }
         const bagSeedSlot = bagInventoryPanel.querySelector('[data-bag-type="seed"]');
-        if (bagSeedSlot) bagSeedSlot.classList.add("onboarding-highlight");
+        if (bagSeedSlot && getBagInventorySeedCount() > 0) {
+          bagSeedSlot.classList.add("onboarding-highlight");
+        }
       }
       break;
     }
-    case 8: {
+    case ONBOARDING_STEP_PLANT_MASTER: {
       setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
-    case 9: {
+    case ONBOARDING_STEP_PLANT_MASTER_TALK: {
       if (isNpcDialogueRunning) {
         setOnboardingCalloutVisible(false, "");
         if (plantMaster) plantMaster.classList.add("onboarding-highlight");
@@ -5182,7 +5336,7 @@ function updateOnboardingFlowUI() {
       if (plantMaster) plantMaster.classList.add("onboarding-highlight");
       break;
     }
-    case 10: {
+    case ONBOARDING_STEP_NPC_GUIDE: {
       if (guideOpen) {
         const line1 = "설명을 참고하세요.";
         const line2 = "esc 또는 아무곳이나 클릭해 설명창을 닫으세요.";
@@ -5199,13 +5353,13 @@ function updateOnboardingFlowUI() {
       }
       break;
     }
-    case 11: {
+    case ONBOARDING_STEP_WELL: {
       setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
       if (well) well.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
-    case 12: {
+    case ONBOARDING_STEP_BUCKET_PICK: {
       setOnboardingCalloutVisible(
         true,
         "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
@@ -5213,7 +5367,7 @@ function updateOnboardingFlowUI() {
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
-    case 13: {
+    case ONBOARDING_STEP_BUCKET_FILL: {
       setOnboardingCalloutVisible(
         true,
         "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
@@ -5222,39 +5376,54 @@ function updateOnboardingFlowUI() {
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
-    case 14: {
+    case ONBOARDING_STEP_WATER_APPROACH: {
       setOnboardingCalloutVisible(true, "그대로 아까 심은 씨앗으로 가세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
-    case 15: {
+    case ONBOARDING_STEP_WATER_POUR: {
       setOnboardingCalloutVisible(true, "Q키를 눌러 물을 뿌리세요.");
       if (plantSpot) plantSpot.classList.add("onboarding-highlight");
       if (bucket) bucket.classList.add("onboarding-highlight");
       break;
     }
-    case 16: {
-      setOnboardingCalloutVisible(
-        true,
-        onboardingPostWaterCongratsPhase === 0
-          ? "축하합니다! 식물 키우는 법을 배우셨습니다."
-          : "아직 남았습니다 끝까지 진행해주세요."
-      );
+    case ONBOARDING_STEP_WATER_DONE: {
+      if (onboardingPlantIndexAwaitingSprout) {
+        setOnboardingCalloutVisible(
+          true,
+          "새싹이 3단계가 되면 식물지수 안내가 이어집니다."
+        );
+        if (plantSpot) plantSpot.classList.add("onboarding-highlight");
+      } else {
+        setOnboardingCalloutVisible(
+          true,
+          onboardingPostWaterCongratsPhase === 0
+            ? "축하합니다! 식물 키우는 법을 배우셨습니다."
+            : "아직 남았습니다 끝까지 진행해주세요."
+        );
+      }
       break;
     }
     case ONBOARDING_STEP_PLANT_INDEX: {
       const plantGauge = document.getElementById("plant-progress-gauge");
-      if (plantGauge) {
-        plantGauge.classList.remove("is-collapsed");
-        plantGauge.classList.add("onboarding-highlight");
+      const sproutToggle = document.getElementById("plant-progress-sprout-toggle");
+      let calloutText = "";
+      if (onboardingPlantIndexIntroPhase === 0) {
+        calloutText = "식물을 키우면 식물지수가 올라갑니다.";
+        if (plantGauge) {
+          plantGauge.classList.remove("is-collapsed");
+          plantGauge.classList.add("onboarding-highlight");
+        }
+        if (sproutToggle) sproutToggle.setAttribute("aria-expanded", "true");
+      } else if (onboardingPlantIndexIntroPhase === 1) {
+        calloutText = "새싹 아이콘을 누르면 식물지수를 닫을 수 있습니다.";
+        if (sproutToggle) sproutToggle.classList.add("onboarding-highlight");
+      } else if (onboardingPlantIndexIntroPhase === 2) {
+        calloutText = "다시 누르면 다시 나옵니다.";
+        if (sproutToggle) sproutToggle.classList.add("onboarding-highlight");
       }
-      setOnboardingCalloutVisible(
-        true,
-        onboardingPlantIndexIntroPhase === 0
-          ? "식물지수는 식물을 심으면 올라갑니다."
-          : "맵의 안개가 해제되니 잘 올려보세요!"
-      );
+      setOnboardingCalloutVisible(true, calloutText);
       break;
     }
     case ONBOARDING_STEP_DROP_BUCKET: {
@@ -5408,8 +5577,8 @@ function onboardingCheckJumpFinish() {
 }
 
 function onboardingHookWateredMainPlantFromTutorial() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 15) return;
-  onboardingFlowStep = 16;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_POUR) return;
+  onboardingFlowStep = ONBOARDING_STEP_WATER_DONE;
   onboardingPostWaterCongratsPhase = 0;
   persistOnboardingStep();
   if (onboardingCongratsTimerId) {
@@ -5417,24 +5586,24 @@ function onboardingHookWateredMainPlantFromTutorial() {
   }
   onboardingCongratsTimerId = window.setTimeout(function () {
     onboardingCongratsTimerId = null;
-    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
+    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) return;
     onboardingPostWaterCongratsPhase = 1;
     updateOnboardingFlowUI();
     onboardingCongratsTimerId = window.setTimeout(function () {
       onboardingCongratsTimerId = null;
-      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 16) return;
+      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) return;
       onboardingPostWaterCongratsPhase = 0;
-      onboardingFlowStep = ONBOARDING_STEP_PLANT_INDEX;
+      onboardingPlantIndexAwaitingSprout = true;
       persistOnboardingStep();
-      startOnboardingPlantIndexIntro();
+      onboardingTryStartPlantIndexAfterSproutStage3();
     }, 2000);
   }, 1500);
   updateOnboardingFlowUI();
 }
 
 function onboardingHookFilledBucketAtWell() {
-  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== 13) return;
-  onboardingFlowStep = 14;
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_BUCKET_FILL) return;
+  onboardingFlowStep = ONBOARDING_STEP_WATER_APPROACH;
   persistOnboardingStep();
   updateOnboardingFlowUI();
 }
@@ -5458,7 +5627,7 @@ function onboardingHookTutorialRockPicked() {
 
 function pickUpWorldGuideBookNoHold() {
   if (isOnboardingLinearGateActive()) {
-    return false;
+    if (onboardingFlowStep !== ONBOARDING_STEP_PICK_BOOK) return false;
   }
   if (!isNearGuideBook()) return false;
   hasGuideBook = true;
@@ -5472,6 +5641,12 @@ function pickUpWorldGuideBookNoHold() {
   syncGuideInventoryBar();
   updateGuideCard();
   updateBagInventorySlots();
+  if (!getStoredFlag(onboardingFlowDoneKey) && onboardingFlowStep === ONBOARDING_STEP_PICK_BOOK) {
+    onboardingFlowStep = ONBOARDING_STEP_BOOK_INV;
+    onboardingBookInvPhase = 0;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+  }
   return true;
 }
 
@@ -6062,7 +6237,7 @@ function tryTalkToPlantMaster() {
   if (isNpcDialogueRunning) {
     return true;
   }
-  if (isOnboardingLinearGateActive() && onboardingFlowStep < 9) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep < ONBOARDING_STEP_PLANT_MASTER_TALK) {
     flashOnboardingOrderHint("");
     return true;
   }
@@ -6160,10 +6335,10 @@ function startPlantMasterDialogue() {
       guidePageIndex = 0;
       isGuideBookOpen = true;
       if (!getStoredFlag(onboardingFlowDoneKey)) {
-        if (onboardingFlowStep === 9) {
+        if (onboardingFlowStep === ONBOARDING_STEP_PLANT_MASTER_TALK) {
           onboardingClearEscHintTimer();
           onboardingNpcGuideEscHintShown = false;
-          onboardingFlowStep = 10;
+          onboardingFlowStep = ONBOARDING_STEP_NPC_GUIDE;
         } else if (onboardingFlowStep < 3) {
           onboardingFlowStep = 3;
           onboardingInventoryIntroPhase = 0;
@@ -6285,8 +6460,11 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
     syncWorldState(true);
   }
   if (!getStoredFlag(onboardingFlowDoneKey)) {
-    if (onboardingFlowStep === 12 || onboardingFlowStep === 11) {
-      onboardingFlowStep = 13;
+    if (
+      onboardingFlowStep === ONBOARDING_STEP_BUCKET_PICK ||
+      onboardingFlowStep === ONBOARDING_STEP_WELL
+    ) {
+      onboardingFlowStep = ONBOARDING_STEP_BUCKET_FILL;
       persistOnboardingStep();
       updateOnboardingFlowUI();
     }
@@ -9715,7 +9893,7 @@ function dropHeldItem() {
       flashOnboardingOrderHint("");
       return;
     }
-    if (heldItem === HELD_ITEM_SEED && onboardingFlowStep !== 7) {
+    if (heldItem === HELD_ITEM_SEED && onboardingFlowStep !== ONBOARDING_STEP_PLANT) {
       flashOnboardingOrderHint("");
       return;
     }
@@ -9877,7 +10055,7 @@ function updateSeedPosition() {
   const tutorialDecorMainSeedOnGround =
     !usesWorldLooseSeedMode() &&
     !getStoredFlag(onboardingFlowDoneKey) &&
-    onboardingFlowStep >= 7 &&
+    onboardingFlowStep >= ONBOARDING_STEP_PLANT &&
     !plantRuntime.isSeedPlanted &&
     heldItem !== HELD_ITEM_SEED;
   const shouldShowMainSeedOnGround =
@@ -11058,6 +11236,7 @@ function tickSproutEvolution(plant, now) {
     );
     plant.becameEmptyAt = null;
     plant.status = "normal";
+    onboardingTryStartPlantIndexAfterSproutStage3();
   }
 }
 
@@ -12879,7 +13058,7 @@ function getPlayerWorldY() {
 function startPlanting() {
   updateSeedDryState();
 
-  if (isOnboardingLinearGateActive() && onboardingFlowStep !== 7) {
+  if (isOnboardingLinearGateActive() && onboardingFlowStep !== ONBOARDING_STEP_PLANT) {
     flashOnboardingOrderHint("");
     return;
   }
@@ -13258,7 +13437,7 @@ function plantInventorySeed(seedId) {
 
   if (isOnboardingLinearGateActive() && inventorySeed) {
     const isStarter = inventorySeed.id === "starter-seed" || inventorySeed.isStarter;
-    if (isStarter && onboardingFlowStep !== 7) {
+    if (isStarter && onboardingFlowStep !== ONBOARDING_STEP_PLANT) {
       flashOnboardingOrderHint("");
       updateSeedInventory();
       return;
@@ -14020,6 +14199,7 @@ function performInteractActionCore() {
     return;
   }
   if (pickUpWorldBag()) return;
+  if (!hasGuideBookItemInBagCounts() && pickUpWorldGuideBookNoHold()) return;
   if (!hasGuideBook) {
     const bucketPick = getNearestGroundBucketPickInfo();
     const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
@@ -14028,7 +14208,6 @@ function performInteractActionCore() {
   }
   if (tryCatchButterfly()) return;
   if (pickApple()) return;
-  if (pickUpWorldGuideBookNoHold()) return;
   pickUpNearestItem();
 }
 
@@ -14587,10 +14766,10 @@ function tryWaterPlantByPointerClick(clientX, clientY) {
   const anchor = getPlantWorldAnchorXY(plant);
   if (
     !getStoredFlag(onboardingFlowDoneKey) &&
-    onboardingFlowStep === 14 &&
+    onboardingFlowStep === ONBOARDING_STEP_WATER_APPROACH &&
     target.type === "main"
   ) {
-    onboardingFlowStep = 15;
+    onboardingFlowStep = ONBOARDING_STEP_WATER_POUR;
     persistOnboardingStep();
   }
   waterPlant(target);
@@ -15303,10 +15482,10 @@ function useBucket() {
     if (!tryConsumePlantWaterPourCooldown()) return;
     if (
       !getStoredFlag(onboardingFlowDoneKey) &&
-      onboardingFlowStep === 14 &&
+      onboardingFlowStep === ONBOARDING_STEP_WATER_APPROACH &&
       wateringTarget.type === "main"
     ) {
-      onboardingFlowStep = 15;
+      onboardingFlowStep = ONBOARDING_STEP_WATER_POUR;
       persistOnboardingStep();
     }
     waterPlant(wateringTarget);
