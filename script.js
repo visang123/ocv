@@ -412,13 +412,15 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525n";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525n";
-import { initScriptView } from "./src/script/view/index.js?v=20260525n";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525o";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525o";
+import { initScriptView } from "./src/script/view/index.js?v=20260525o";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
-  dismissAppLoadingScreenAfterDevReset
+  dismissAppLoadingScreenAfterDevReset,
+  LOADING_TEXT_DEFAULT,
+  LOADING_TEXT_WORLD
 } from "./src/app/loading-screen.js";
 import {
   setOverlayOpen as setSettingsOverlayOpen,
@@ -1788,7 +1790,7 @@ if (!currentUserName || !currentUserId) {
   throw new Error("OVC login required");
 }
 
-showAppLoadingScreen("\uBD88\uB7EC\uC624\uB294 \uC911...");
+showAppLoadingScreen(LOADING_TEXT_DEFAULT);
 
 
 const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
@@ -2854,7 +2856,7 @@ if (localPlayerRoot) {
 const networkDebugButton = document.createElement("button");
 networkDebugButton.id = "network-debug-button";
 networkDebugButton.type = "button";
-networkDebugButton.setAttribute("aria-label", "???");
+networkDebugButton.setAttribute("aria-label", "\uB124\uD2B8\uC6CC\uD06C \uB514\uBC84\uADF8");
 document.body.appendChild(networkDebugButton);
 function appendAdminDevGrantButton(id) {
   const button = document.createElement("button");
@@ -2946,17 +2948,17 @@ controlsOverlay.id = "controls-overlay";
 controlsOverlay.setAttribute("aria-hidden", "true");
 controlsOverlay.innerHTML =
   '<div id="controls-modal">' +
-  '<div class="controls-header"><strong>??????</strong></div>' +
+  '<div class="controls-header"><strong>\uC870\uC791\uBC95</strong></div>' +
   '<div class="controls-list">' +
-  '<div><span>W / \u2191</span><p>????? ???</p></div>' +
-  '<div><span>A / \u2190</span><p>????????? ???</p></div>' +
-  '<div><span>S / \u2193</span><p>???????? ???</p></div>' +
-  '<div><span>D / \u2192</span><p>?????????? ???</p></div>' +
-  '<div><span>Space</span><p>????</p></div>' +
-  '<div><span>E</span><p>?? / ????????</p></div>' +
-  '<div><span>Q</span><p>?????? / ??????</p></div>' +
-  '<div><span>???????? ???</span><p>?????? / ?????</p></div>' +
-  '<div><span>Esc</span><p>????? ???? / ????</p></div>' +
+  '<div><span>W / \u2191</span><p>\uC704\uB85C \uC774\uB3D9</p></div>' +
+  '<div><span>A / \u2190</span><p>\uC67C\uCABD\uC73C\uB85C \uC774\uB3D9</p></div>' +
+  '<div><span>S / \u2193</span><p>\uC544\uB798\uB85C \uC774\uB3D9</p></div>' +
+  '<div><span>D / \u2192</span><p>\uC624\uB978\uCABD\uC73C\uB85C \uC774\uB3D9</p></div>' +
+  '<div><span>Space</span><p>\uC810\uD504</p></div>' +
+  '<div><span>E</span><p>\uC90D\uAE30 / \uC0C1\uD638\uC791\uC6A9</p></div>' +
+  '<div><span>Q</span><p>\uBB3C \uB07C\uAE30 / \uB0B4\uB824\uB193\uAE30</p></div>' +
+  '<div><span>\uAC00\uBC29\u00B7\uCC45 \uB4F1</span><p>\uCC45 \uC5F4\uAE30 / \uAC00\uBC29</p></div>' +
+  '<div><span>Esc</span><p>\uC124\uC815 \uC5F4\uAE30 / \uB2EB\uAE30</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
 
@@ -2975,7 +2977,11 @@ function updateSettingsTutorialButtons() {
 
 
 function skipTutorialFromSettings() {
-  if (!window.confirm("???????????? ???????? ????????? ???????????????")) {
+  if (
+    !window.confirm(
+      "\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uAC74\uB108\uB6F0\uACE0 \uBCF8\uD3B8(\uC6D4\uB4DC)\uB85C \uC774\uB3D9\uD560\uAE4C\uC694?"
+    )
+  ) {
     return;
   }
   clearTutorialMainSeedRespawnTimer();
@@ -3041,7 +3047,7 @@ function skipTutorialFromSettings() {
 function replayTutorialFromSettings() {
   if (
     !window.confirm(
-      "???????????? ????????? ?????? ?????????????? ?????????? ????????? ????????????."
+      "\uD29C\uD1A0\uB9AC\uC5BC\uC744 \uCC98\uC74C\uBD80\uD130 \uB2E4\uC2DC \uD558\uBA74 \uC9C4\uD589\uC774 \uCD08\uAE30\uD654\uB429\uB2C8\uB2E4. \uACC4\uC18D\uD560\uAE4C\uC694?"
     )
   ) {
     return;
@@ -4401,9 +4407,12 @@ function onboardingAllowsBucketQUse() {
 function onboardingAllowsBucketGroundPickup() {
   const s = getOnboarding().flowStep;
   return (
+    s === ONBOARDING_STEP_WELL ||
     s === ONBOARDING_STEP_BUCKET_PICK ||
+    s === ONBOARDING_STEP_BUCKET_FILL ||
     s === ONBOARDING_STEP_WATER_APPROACH ||
-    s === ONBOARDING_STEP_WATER_POUR
+    s === ONBOARDING_STEP_WATER_POUR ||
+    s === ONBOARDING_STEP_DROP_BUCKET
   );
 }
 
@@ -5419,6 +5428,7 @@ function toggleSeed() {
 }
 
 function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
+  onboardingAutoAdvanceSteps();
   const bucketSize = getBucketSize();
   const pickInfo = forcedPickInfo || getNearestGroundBucketPickInfo();
   const dist = pickInfo ? pickInfo.distance : bucketDistance;
@@ -6753,12 +6763,27 @@ function loadAppleState() {
     clearExtraSeedAndPlantElements();
   }
 
-  rebuildWorldRockDom();
+  ensureWorldRocksForWorldEntry();
   rebuildPlacedCraftFurnitureDom();
   rebuildWorldExtraBucketDom();
   updateApples();
   updateExtraSeedsAndPlants();
   updateSeedPosition();
+}
+
+function ensureWorldRocksForWorldEntry() {
+  if (!isWorldDocumentEntry()) return;
+  const rocks = getApple().worldRocks;
+  if (Array.isArray(rocks) && rocks.length === WORLD_LOOSE_ROCK_COUNT) {
+    rebuildWorldRockDom();
+    return;
+  }
+  getApple().worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
+  if (!Array.isArray(getApple().worldRockPickedIds)) {
+    getApple().worldRockPickedIds = [];
+  }
+  rebuildWorldRockDom();
+  markWorldDirty();
 }
 
 
@@ -6815,8 +6840,13 @@ function buildNetworkDeps() {
     HELD_ITEM_BUCKET,
     MAIN_BUCKET_ID,
     REMOTE_BUTTERFLY_CATCH_ACTION_MS,
+    WORLD_LOOSE_ROCK_COUNT,
     WORLD_ROCK_PICKUP_ACTION_MS,
     WORLD_ROCK_SIZE,
+    WORLD_ROCK_SPAWN_X_MARGIN,
+    WORLD_ROCK_SPAWN_Y_MIN,
+    WORLD_ROCK_SPAWN_Y_MAX,
+    WORLD_WIDTH,
     PLANT_SPOT_WIDTH,
     WATER_NEEDED_SIZE,
     accountDisplayNameForUi,
@@ -7398,6 +7428,9 @@ function buildLayerDeps() {
     WORLD_LOOSE_SEED_X,
     WORLD_LOOSE_SEED_Y,
     WORLD_ROCK_SIZE,
+    WORLD_ROCK_SPAWN_X_MARGIN,
+    WORLD_ROCK_SPAWN_Y_MIN,
+    WORLD_ROCK_SPAWN_Y_MAX,
     accountDisplayNameForUi,
     addBucketTrace,
     addNetworkDebugLog,
@@ -8199,7 +8232,7 @@ function refreshUiAfterSharedWorldApply() {
   updateSeedInventory();
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
-  rebuildWorldRockDom();
+  ensureWorldRocksForWorldEntry();
   rebuildPlacedCraftFurnitureDom();
   rebuildWorldExtraBucketDom();
   rebuildWorldBagDropDom();
@@ -13028,7 +13061,7 @@ function postJson(url, payload) {
   }).then(function (response) {
     return response.json().then(function (data) {
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "??? ??????.");
+        throw new Error(data.message || "\uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
       }
 
       return data;
@@ -14364,8 +14397,8 @@ function syncPlayerColorToServer(forceSync) {
       addNetworkDebugLog("color synced online: " + colorToSync);
     }).catch(function (error) {
       showOnlineDebugMessage(
-      "?? ?? ??: " +
-        (error && error.message ? error.message : "??? ?? ?? ??")
+        "\uC0C9 \uC800\uC7A5 \uC2E4\uD328: " +
+          (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
       );
     });
     return;
@@ -14380,8 +14413,8 @@ function syncPlayerColorToServer(forceSync) {
     addNetworkDebugLog("color synced local: " + colorToSync);
   }).catch(function (error) {
     showOnlineDebugMessage(
-      "?? ?? ??: " +
-      (error && error.message ? error.message : "??? ?? ?? ??")
+      "\uC0C9 \uC800\uC7A5 \uC2E4\uD328: " +
+        (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
     );
   });
 }
@@ -14470,7 +14503,7 @@ async function validateCurrentAccount() {
         if (typeof window.OVCOnline.getAccount === "function") {
           const account = await window.OVCOnline.getAccount(currentUserId);
           if (!account) {
-            showOnlineDebugMessage("??? ?????. ???????.");
+            showOnlineDebugMessage("\uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB85C\uADF8\uC544\uC6C3\uD569\uB2C8\uB2E4.");
             setTimeout(logout, 800);
             return;
           }
@@ -14479,7 +14512,9 @@ async function validateCurrentAccount() {
       }
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
-        showOnlineDebugMessage("?? ???? ????? ???????.");
+        showOnlineDebugMessage(
+          "\uC138\uC158\uC774 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694."
+        );
         setTimeout(logout, 1200);
         return;
       }
@@ -15517,7 +15552,7 @@ try {
       }
     } catch (postTutorialReconnect) {}
     if (isWorldServerSyncAvailable() && !isSharedWorldSyncPausedForTutorial()) {
-      showAppLoadingScreen("\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...", { force: true });
+      showAppLoadingScreen(LOADING_TEXT_WORLD, { force: true });
       pollWorldState(true);
     } else {
       hasHydratedSharedWorldFromServer = true;
