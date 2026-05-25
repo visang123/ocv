@@ -272,7 +272,7 @@ export function createModule(d) {
     mainIsFull: mainBucket.isFull,
     updatedAt: now
   };
-  Promise.resolve(multiplayerChannel.send({
+  Promise.resolve(d.multiplayerChannel.send({
     type: "broadcast",
     event: "bucket_state",
     payload

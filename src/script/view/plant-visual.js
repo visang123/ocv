@@ -77,10 +77,10 @@ export function createModule(d) {
   function tryPlant(plant, x, y) {
     if (!plant) return;
     if (plant.status !== "dry" && plant.status !== "rotten" && !plant.isOverwatered) return;
-    const d = d.getCenterDistance(x, y, d.PLANT_SPOT_WIDTH, d.PLANT_SPOT_HEIGHT);
-    if (d <= d.plantWaterDistance && d < bestDist) {
-      bestDist = d;
-      best = { plant, distance: d };
+    const dist = d.getCenterDistance(x, y, d.PLANT_SPOT_WIDTH, d.PLANT_SPOT_HEIGHT);
+    if (dist <= d.plantWaterDistance && dist < bestDist) {
+      bestDist = dist;
+      best = { plant, distance: dist };
     }
   }
   if (d.getPlant().isSeedPlanted) {

@@ -43,7 +43,7 @@ export function createWorldPollSync(d) {
       return;
     }
     if (!forceSave && !d.isWorldDirty) return;
-    if (!d.hasHydratedSharedWorldFromServer() && d.isWorldServerSyncAvailable()) {
+    if (!d.hasHydratedSharedWorldFromServer && d.isWorldServerSyncAvailable()) {
       d.isWorldDirty = true;
       pollWorldState(true);
       return;
@@ -52,7 +52,7 @@ export function createWorldPollSync(d) {
       forceSave &&
       !skipPrefetch &&
       d.isWorldServerSyncAvailable() &&
-      d.hasHydratedSharedWorldFromServer()
+      d.hasHydratedSharedWorldFromServer
     ) {
       d.isWorldDirty = true;
       pollWorldState(true);
@@ -64,7 +64,7 @@ export function createWorldPollSync(d) {
     d.lastWorldSaveAt = now;
     const expectedUpdatedAt =
       d.isWorldServerSyncAvailable() &&
-      d.hasHydratedSharedWorldFromServer() &&
+      d.hasHydratedSharedWorldFromServer &&
       d.lastWorldUpdatedAt
         ? d.lastWorldUpdatedAt
         : "";
