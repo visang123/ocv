@@ -372,7 +372,7 @@ export function createModule(d) {
     return;
   }
 
-  if (!canPlayerMoveByHealth(d.getPlayer().health)) {
+  if (!d.canPlayerMoveByHealth(d.getPlayer().health)) {
     d.getPlayer().lastMovementTickMs = performance.now();
     d.getPlayer().healthPosePrev = { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY };
     d.getPlayer().healthPoseInitialized = true;
@@ -414,11 +414,11 @@ export function createModule(d) {
       ? d.treeMoveSpeed
       : d.speed;
 
-  if (keys.ArrowLeft || keys.a) {
+  if (d.keys.ArrowLeft || d.keys.a) {
     d.getPlayer().x -= speedSide * frameScale;
   }
 
-  if (keys.ArrowRight || keys.d) {
+  if (d.keys.ArrowRight || d.keys.d) {
     d.getPlayer().x += speedSide * frameScale;
   }
 
@@ -453,23 +453,23 @@ export function createModule(d) {
     d.getPlayer().velocityY = 0;
     d.getPlayer().isOnGround = true;
 
-    const wantsTreeDown = keys.ArrowDown || keys.s;
+    const wantsTreeDown = d.keys.ArrowDown || d.keys.s;
     const isAtTreeBase = !isInCanopy && d.getPlayer().depth <= groundMaxDepth + d.treeClimbSpeed * frameScale + 2;
     if (wantsTreeDown && isAtTreeBase) {
       d.getPlayer().depth -= d.speed * frameScale;
       shouldClampToTree = false;
       d.getPlayer().wasInTree = false;
-    } else if (keys.ArrowUp || keys.w) {
+    } else if (d.keys.ArrowUp || d.keys.w) {
       d.movePlayerVerticallyInTree(d.treeClimbSpeed * frameScale);
     } else if (wantsTreeDown) {
       d.movePlayerVerticallyInTree(-d.treeClimbSpeed * frameScale);
     }
   } else {
-    if (keys.ArrowUp || keys.w) {
+    if (d.keys.ArrowUp || d.keys.w) {
       d.getPlayer().depth += d.speed * frameScale;
     }
 
-    if (keys.ArrowDown || keys.s) {
+    if (d.keys.ArrowDown || d.keys.s) {
       d.getPlayer().depth -= d.speed * frameScale;
     }
     d.getPlayer().velocityY += d.gravity * frameScale;
@@ -538,7 +538,7 @@ export function createModule(d) {
 
   const poseNow = { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY };
   if (
-    !d.isPlayerMovementKeyActive(keys) ||
+    !d.isPlayerMovementKeyActive(d.keys) ||
     d.isPlayerPoseUnchanged(healthPosePrev, poseNow)
   ) {
     d.getPlayer().healthPosePrev = poseNow;

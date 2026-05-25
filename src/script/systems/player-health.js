@@ -20,7 +20,7 @@ export function createModule(d) {
     isCharacterSelecting: d.isCharacterSelecting,
     isTabSessionSuperseded: d.isTabSessionSuperseded,
     health: d.getPlayer().health,
-    keys: keys,
+    keys: d.keys,
     isSittingOnChair: Boolean(d.getPlayer().sittingChairId),
     isInsideEnteredCraftHouse: d.isPlayerInsideEnteredCraftHouse(),
     isPlanting: Boolean(d.getPlant().isPlanting),
@@ -51,7 +51,7 @@ export function createModule(d) {
   d.setStoredValue(
     d.playerHealthKey,
     JSON.stringify({
-      health: clampPlayerHealth(d.getPlayer().health),
+      health: d.clampPlayerHealth(d.getPlayer().health),
       lastTickAt: d.getPlayer().lastHealthTickAt || 0,
       gaugeVisible: Boolean(d.getPlayer().healthGaugeVisible),
       savedAt: Date.now()
@@ -67,7 +67,7 @@ export function createModule(d) {
     ? d.getPlayer().healthPosePrev
     : { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY };
   const ctx = d.getPlayerHealthTickContext(healthPosePrev);
-  const shouldDrain = shouldDrainPlayerHealth(ctx);
+  const shouldDrain = d.shouldDrainPlayerHealth(ctx);
   const result = tickPlayerHealthState(
     {
       health: d.getPlayer().health,
@@ -103,8 +103,8 @@ export function createModule(d) {
     d.savePlayerHealthState();
   }
   if (
-    isPlayerHealthDepleted(d.getPlayer().health) &&
-    !isPlayerHealthDepleted(healthBefore)
+    d.isPlayerHealthDepleted(d.getPlayer().health) &&
+    !d.isPlayerHealthDepleted(healthBefore)
   ) {
     d.cancelTradeOnPlayerHealthDepleted();
   }

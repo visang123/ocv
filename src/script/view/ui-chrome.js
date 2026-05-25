@@ -283,7 +283,7 @@ export function createModule(d) {
 
   function showDialogueLine(lineInfo) {
   npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
-  d.playerBubble.style.display = lineInfo.speaker === "d.player" ? "block" : "none";
+  d.playerBubble.style.display = lineInfo.speaker === "player" ? "block" : "none";
 
   if (lineInfo.speaker === "npc") {
     npcBubble.textContent = lineInfo.text;
@@ -314,14 +314,14 @@ export function createModule(d) {
 
   function showOnlineDebugMessage(message) {
   if (!d.onlineDebugToast || !message) return;
-  onlineDebugToast.textContent = message;
-  onlineDebugToast.classList.add("is-visible");
+  d.onlineDebugToast.textContent = message;
+  d.onlineDebugToast.classList.add("is-visible");
   d.addNetworkDebugLog("toast: " + message);
   if (d.onlineDebugToastTimeout) {
     clearTimeout(d.onlineDebugToastTimeout);
   }
   d.onlineDebugToastTimeout = setTimeout(function () {
-    onlineDebugToast.classList.remove("is-visible");
+    d.onlineDebugToast.classList.remove("is-visible");
   }, 3000);
   }
 
@@ -404,14 +404,14 @@ export function createModule(d) {
     (d.getWorldItems().isGuideBookOpen || (nearSign && !d.getWorldItems().isGuideDismissedAtSign));
 
   if (shouldShow) {
-    guideCard.style.display = "block";
+    d.guideCard.style.display = "block";
     updateGuidePages();
   } else {
-    guideCard.style.display = "none";
+    d.guideCard.style.display = "none";
   }
 
-  if (d.guideBook) guideBook.classList.remove("is-near");
-  if (d.worldBag) worldBag.classList.remove("is-near");
+  if (d.guideBook) d.guideBook.classList.remove("is-near");
+  if (d.worldBag) d.worldBag.classList.remove("is-near");
   if (d.worldBagInventory) {
     d.worldBagInventory.classList.toggle(
       "is-click-prompt",
@@ -437,20 +437,20 @@ export function createModule(d) {
     d.getNpc().guidePageIndex = maxPage;
   }
 
-  guidePages.forEach(function (page, index) {
+  d.guidePages.forEach(function (page, index) {
     page.classList.toggle("is-active", index === d.getNpc().guidePageIndex);
   });
 
-  guidePrev.style.display = maxPage > 0 && d.getNpc().guidePageIndex > 0 ? "block" : "none";
-  guideNext.style.display =
+  d.guidePrev.style.display = maxPage > 0 && d.getNpc().guidePageIndex > 0 ? "block" : "none";
+  d.guideNext.style.display =
     maxPage > 0 && d.getNpc().guidePageIndex < maxPage ? "block" : "none";
-  guidePageText.textContent = d.getNpc().guidePageIndex + 1 + "/" + (maxPage + 1);
+  d.guidePageText.textContent = d.getNpc().guidePageIndex + 1 + "/" + (maxPage + 1);
   }
 
   function updateMagicPowderInventoryUi() {
   if (d.magicPowderInventory) {
-    magicPowderInventory.style.display = "none";
-    magicPowderInventory.classList.remove("is-near");
+    d.magicPowderInventory.style.display = "none";
+    d.magicPowderInventory.classList.remove("is-near");
     d.setInstantHoverTip(d.magicPowderInventory, null);
   }
   if (d.magicPowderCountText) {
@@ -488,7 +488,7 @@ export function createModule(d) {
 
   d.clearOnboardingHighlights();
 
-  const guideOpen = d.guideCard && guideCard.style.display === "block";
+  const guideOpen = d.guideCard && d.guideCard.style.display === "block";
 
   if (
     d.getOnboarding().flowStep === d.ONBOARDING_STEP_NPC_GUIDE &&
@@ -504,7 +504,7 @@ export function createModule(d) {
       if (d.isNearWorldBagPickup() && !d.getWorldItems().hasGuideBook) {
         movementTutorial.hideOverlay();
         d.setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
-        if (d.worldBag) worldBag.classList.add("onboarding-highlight");
+        if (d.worldBag) d.worldBag.classList.add("onboarding-highlight");
       } else {
         d.setOnboardingCalloutVisible(false, "");
       }
@@ -523,7 +523,7 @@ export function createModule(d) {
       } else if (d.getOnboarding().inventoryIntroPhase === 1) {
         d.setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
         if (d.bagInventoryPanel && d.bagInventoryPanelOpen) {
-          bagInventoryPanel.classList.add("onboarding-highlight");
+          d.bagInventoryPanel.classList.add("onboarding-highlight");
         }
       } else {
         d.setOnboardingCalloutVisible(
@@ -535,7 +535,7 @@ export function createModule(d) {
           d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
         }
         if (d.bagInventoryPanel && d.bagInventoryPanelOpen) {
-          bagInventoryPanel.classList.add("onboarding-highlight");
+          d.bagInventoryPanel.classList.add("onboarding-highlight");
         }
       }
       break;
@@ -560,21 +560,21 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_GO_BOOK: {
       d.setOnboardingCalloutVisible(true, "책으로 이동하세요.");
-      if (d.guideBook) guideBook.classList.add("onboarding-highlight");
+      if (d.guideBook) d.guideBook.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_PICK_BOOK: {
       d.setOnboardingCalloutVisible(true, "e키를 눌러 책을 주우세요.");
-      if (d.guideBook) guideBook.classList.add("onboarding-highlight");
+      if (d.guideBook) d.guideBook.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_BOOK_INV: {
       if (d.getOnboarding().bookInvPhase === 2) {
         d.setOnboardingCalloutVisible(true, "아직 내용이 없습니다.");
-        if (guideOpen && d.guideCard) guideCard.classList.add("onboarding-highlight");
+        if (guideOpen && d.guideCard) d.guideCard.classList.add("onboarding-highlight");
       } else if (d.getOnboarding().bookInvPhase >= 3) {
         d.setOnboardingCalloutVisible(true, "책에 안내창을 닫아보세요");
-        if (d.guideCard) guideCard.classList.add("onboarding-highlight");
+        if (d.guideCard) d.guideCard.classList.add("onboarding-highlight");
       } else {
         d.setOnboardingCalloutVisible(true, "인벤토리를 열어서 책을 눌러보세요.");
         if (d.worldBagInventory) {
@@ -582,7 +582,7 @@ export function createModule(d) {
           d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
         }
         if (d.getOnboarding().bookInvPhase >= 1 && d.bagInventoryPanelOpen) {
-          if (d.bagInventoryPanel) bagInventoryPanel.classList.add("onboarding-highlight");
+          if (d.bagInventoryPanel) d.bagInventoryPanel.classList.add("onboarding-highlight");
           if (d.bagBookStorageSlot) bagBookStorageSlot.classList.add("onboarding-highlight");
         }
       }
@@ -599,9 +599,9 @@ export function createModule(d) {
       }
       if (d.bagInventoryPanel) {
         if (d.bagInventoryPanelOpen) {
-          bagInventoryPanel.classList.add("onboarding-highlight");
+          d.bagInventoryPanel.classList.add("onboarding-highlight");
         }
-        const bagSeedSlot = bagInventoryPanel.querySelector('[data-bag-type="d.seed"]');
+        const bagSeedSlot = d.bagInventoryPanel.querySelector('[data-bag-type="seed"]');
         if (bagSeedSlot && d.getBagInventorySeedCount() > 0) {
           bagSeedSlot.classList.add("onboarding-highlight");
         }
@@ -633,7 +633,7 @@ export function createModule(d) {
         );
         if (d.worldBagInventory) d.worldBagInventory.classList.add("onboarding-highlight");
         if (d.getOnboarding().npcGuideEscHintShown && d.guideCard) {
-          guideCard.classList.add("onboarding-highlight");
+          d.guideCard.classList.add("onboarding-highlight");
         }
       } else {
         d.setOnboardingCalloutVisible(false, "");
@@ -814,7 +814,7 @@ export function createModule(d) {
       d.setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
       if (d.worldBagInventory) d.worldBagInventory.classList.add("onboarding-highlight");
       if (d.bagInventoryPanel) {
-        const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
+        const bagAppleSlot = d.bagInventoryPanel.querySelector('[data-bag-type="apple"]');
         if (bagAppleSlot) bagAppleSlot.classList.add("onboarding-highlight");
       }
       break;
@@ -831,7 +831,7 @@ export function createModule(d) {
         );
       }
       if (d.bagInventoryPanel) {
-        const bagSeedSlot = bagInventoryPanel.querySelector('[data-bag-type="d.seed"]');
+        const bagSeedSlot = d.bagInventoryPanel.querySelector('[data-bag-type="seed"]');
         if (bagSeedSlot) bagSeedSlot.classList.add("onboarding-highlight");
       }
       break;

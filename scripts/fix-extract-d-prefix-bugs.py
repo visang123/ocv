@@ -36,6 +36,24 @@ DOM_REFS = (
     "playerHealthGaugeEl",
     "playerHealthHeartBtn",
     "playerName",
+    "guidePages",
+    "guidePrev",
+    "guideNext",
+    "guidePageText",
+    "guideCard",
+    "guideBook",
+    "worldBag",
+    "bagInventoryPanel",
+    "magicPowderInventory",
+    "magicPowderCountText",
+    "onlineDebugToast",
+)
+
+SYSTEMS_FUNCS = (
+    "canPlayerMoveByHealth",
+    "clampPlayerHealth",
+    "shouldDrainPlayerHealth",
+    "isPlayerHealthDepleted",
 )
 
 STRING_FIXES = [
@@ -52,6 +70,8 @@ STRING_FIXES = [
     ("is-d.well-dock", "is-well-dock"),
     ("is-d.world-npc-name", "is-world-npc-name"),
     ("is-plant-d.world-sign", "is-plant-world-sign"),
+    ('[data-bag-type="d.seed"]', '[data-bag-type="seed"]'),
+    ('lineInfo.speaker === "d.player"', 'lineInfo.speaker === "player"'),
 ]
 
 
@@ -60,6 +80,11 @@ def fix_text(text: str) -> str:
         text = text.replace(old, new)
     for ref in DOM_REFS:
         text = re.sub(rf"(?<!d\.)\b{ref}\.", rf"d.{ref}.", text)
+        text = re.sub(rf"(?<!d\.)\b{ref}\.forEach\b", rf"d.{ref}.forEach", text)
+    for fn in SYSTEMS_FUNCS:
+        text = re.sub(rf"(?<!d\.)\b{fn}\b", rf"d.{fn}", text)
+    text = re.sub(r"(?<!d\.)(?<!Object\.)\bkeys\.", "d.keys.", text)
+    text = re.sub(r"\bkeys: keys\b", "keys: d.keys", text)
     text = re.sub(r"(?<!d\.)placedCraftFurniture\.", "d.placedCraftFurniture.", text)
     text = re.sub(
         r"(?<!d\.)\blocalPlayerRoot && localPlayerRoot\.",
@@ -87,6 +112,8 @@ def fix_text(text: str) -> str:
 def main() -> None:
     changed = []
     for path in sorted(SCRIPT_DIR.rglob("*.js")):
+        if path.name.startswith("_"):
+            continue
         raw = path.read_text(encoding="utf-8")
         fixed = fix_text(raw)
         if fixed != raw:

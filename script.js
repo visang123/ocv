@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525i";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525i";
-import { initScriptView } from "./src/script/view/index.js?v=20260525i";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525j";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525j";
+import { initScriptView } from "./src/script/view/index.js?v=20260525j";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -7066,6 +7066,7 @@ function buildLayerDeps() {
     set butterflyState(v) { butterflyState = v; },
     cactusLevel5GrowMs,
     canDiscardBagItemKey,
+    canPlayerMoveByHealth,
     cancelTradeOnPlayerHealthDepleted,
     clampButterflyPointToActiveBounds,
     clampPlayerToTreeOutline,
@@ -7177,6 +7178,7 @@ function buildLayerDeps() {
     isPlayerInWellWaterArea,
     isPlayerInsideEnteredCraftHouse,
     isPlayerMovementKeyActive,
+    keys,
     isPlayerNearTreeTrunk,
     isPlayerPoseUnchanged,
     isPlayerSupportedByTree,
@@ -7192,6 +7194,7 @@ function buildLayerDeps() {
     isWorldChatBlockingGameInput,
     get isWorldDirty() { return isWorldDirty; },
     set isWorldDirty(v) { isWorldDirty = v; },
+    get _networkApi() { return _networkApi; },
     isWorldDocumentEntry,
     isWorldRockPickupUnlocked,
     isWorldServerSyncAvailable,
@@ -7498,6 +7501,7 @@ function buildLayerDeps() {
     isPlantEligibleForWorldHover,
     isPlantMasterVisible,
     isPlayerHealthDepleted,
+    shouldDrainPlayerHealth,
     isPlayerNearPlantWorld,
     isPointerInElementRect,
     isReloadingForWorldReset,
