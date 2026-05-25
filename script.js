@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525f";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525f";
-import { initScriptView } from "./src/script/view/index.js?v=20260525f";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525g";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525g";
+import { initScriptView } from "./src/script/view/index.js?v=20260525g";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -7020,6 +7020,9 @@ function initOvcScriptNetworkLayer() {
 }
 
 /** Systems/Logic — src/script/systems/ */
+const stage3CompleteMagicHint =
+  "\uC131\uC7A5 \uC644\uB8CC, \uB354 \uD0A4\uC6B0\uB824\uBA74 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \uD544\uC694.";
+
 function buildLayerDeps() {
   return {
     PLAYER_WIDTH,
@@ -7683,11 +7686,7 @@ function initOvcScriptViewLayer() {
   _viewApi = initScriptView(_layerDeps);
 }
 
-initOvcScriptNetworkLayer();
-initOvcScriptSystemsLayer();
-initOvcScriptViewLayer();
-
-/** DOM/UI that calls view-layer wrappers — must run after init above */
+/** DOM/UI that calls view-layer wrappers — must run after init (see ovcInitScriptLayers below) */
 function runOvcLayersPostInitBootstrap() {
   bindPlayerBaseImageLoadHandlers();
   if (plantHoverLabel) {
@@ -7697,302 +7696,308 @@ function runOvcLayersPostInitBootstrap() {
   }
   ensureWorldSocialUi();
 }
-runOvcLayersPostInitBootstrap();
+
+function ovcInitScriptLayers() {
+  initOvcScriptNetworkLayer();
+  initOvcScriptSystemsLayer();
+  initOvcScriptViewLayer();
+  runOvcLayersPostInitBootstrap();
+}
 
 /** View layer wrappers (src/script/view/) */
-function applyPlantHoverVisuals(plant) { return _viewApi.applyPlantHoverVisuals(plant); }
-function assignExtraSeedInventoryOwner(seed) { return _viewApi.assignExtraSeedInventoryOwner(seed); }
-function bagDiscardInventoryEligible(itemKey) { return _viewApi.bagDiscardInventoryEligible(itemKey); }
-function canDiscardBagItemFromBagPanel(itemKey) { return _viewApi.canDiscardBagItemFromBagPanel(itemKey); }
-function canDiscardBagItemNow(itemKey) { return _viewApi.canDiscardBagItemNow(itemKey); }
-function canUseBagInventoryGameplay() { return _viewApi.canUseBagInventoryGameplay(); }
-function clearBagInventoryDragVisual() { return _viewApi.clearBagInventoryDragVisual(); }
-function clearPlantHoverVisuals() { return _viewApi.clearPlantHoverVisuals(); }
-function closeBagInventoryPanel() { return _viewApi.closeBagInventoryPanel(); }
-function closeGuideCardFromClick() { return _viewApi.closeGuideCardFromClick(); }
-function closeSettingsOverlayFromBackdrop() { return _viewApi.closeSettingsOverlayFromBackdrop(); }
-function closeSettingsOverlayFromEscape() { return _viewApi.closeSettingsOverlayFromEscape(); }
-function createRandomApples(count) { return _viewApi.createRandomApples(count); }
-function createRandomWorldRocks(ctx) { return _viewApi.createRandomWorldRocks(ctx); }
-function createStarterSeedInventoryItem() { return _viewApi.createStarterSeedInventoryItem(); }
-function discardBagItemsToGround(itemKey, amount, options) { return _viewApi.discardBagItemsToGround(itemKey, amount, options); }
-function discardInventorySeed(seedId) { return _viewApi.discardInventorySeed(seedId); }
-function dismissGuideBookClickPrompt() { return _viewApi.dismissGuideBookClickPrompt(); }
-function ensureBagInventoryDragGhost(html) { return _viewApi.ensureBagInventoryDragGhost(html); }
-function ensureSharedPlantVisuals() { return _viewApi.ensureSharedPlantVisuals(); }
-function extraPlantFromDomElement(el) { return _viewApi.extraPlantFromDomElement(el); }
-function flashOnboardingOrderHint(message) { return _viewApi.flashOnboardingOrderHint(message); }
-function getBagInventoryCountsByKey() { return _viewApi.getBagInventoryCountsByKey(); }
-function getBagInventoryItemCount(itemKey) { return _viewApi.getBagInventoryItemCount(itemKey); }
-function getBagInventorySeedCount() { return _viewApi.getBagInventorySeedCount(); }
-function getBagItemKeyFromInventorySlot(slot) { return _viewApi.getBagItemKeyFromInventorySlot(slot); }
-function getNearestBadSoilPlantForProximityCard() { return _viewApi.getNearestBadSoilPlantForProximityCard(); }
-function getPlantHoverDomElements(plant) { return _viewApi.getPlantHoverDomElements(plant); }
-function getPlantPrimaryVisualRectWorld(plant) { return _viewApi.getPlantPrimaryVisualRectWorld(plant); }
-function getPlayerRenderedHeight() { return _viewApi.getPlayerRenderedHeight(); }
-function getRenderedAdminAccounts() { return _viewApi.getRenderedAdminAccounts(); }
-function getSproutImageForPlant(plant, stage) { return _viewApi.getSproutImageForPlant(plant, stage); }
-function getWorldNpcPromptBubbleEl(npcEl) { return _viewApi.getWorldNpcPromptBubbleEl(npcEl); }
-function groundScreenPxToWorldX(px) { return _viewApi.groundScreenPxToWorldX(px); }
-function groundScreenPxToWorldY(px) { return _viewApi.groundScreenPxToWorldY(px); }
-function hidePlantHoverLabel() { return _viewApi.hidePlantHoverLabel(); }
-function isOnboardingInventoryTutorialActive() { return _viewApi.isOnboardingInventoryTutorialActive(); }
-function isPointerInsideBagInventoryPanel(clientX, clientY) { return _viewApi.isPointerInsideBagInventoryPanel(clientX, clientY); }
-function isPointerOutsideBagInventoryPanel(clientX, clientY) { return _viewApi.isPointerOutsideBagInventoryPanel(clientX, clientY); }
-function isPointerOverBagInventoryUi(clientX, clientY) { return _viewApi.isPointerOverBagInventoryUi(clientX, clientY); }
-function layoutNpcSpeechBubble() { return _viewApi.layoutNpcSpeechBubble(); }
-function layoutPlantHoverRing(plant, urgentWater) { return _viewApi.layoutPlantHoverRing(plant, urgentWater); }
-function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) { return _viewApi.layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble); }
-function loadBagInventoryOrder() { return _viewApi.loadBagInventoryOrder(); }
-function loadRockInventoryCount() { return _viewApi.loadRockInventoryCount(); }
-function maybeAdvanceOnboardingAfterBookInventoryOpened() { return _viewApi.maybeAdvanceOnboardingAfterBookInventoryOpened(); }
-function maybeAdvanceOnboardingAfterInventoryClosed() { return _viewApi.maybeAdvanceOnboardingAfterInventoryClosed(); }
-function maybeAdvanceOnboardingAfterInventoryOpened() { return _viewApi.maybeAdvanceOnboardingAfterInventoryOpened(); }
-function normalizeBagInventoryOrderByCounts(counts) { return _viewApi.normalizeBagInventoryOrderByCounts(counts); }
-function onBagInventorySlotPointerCancel(event) { return _viewApi.onBagInventorySlotPointerCancel(event); }
-function onBagInventorySlotPointerDown(event) { return _viewApi.onBagInventorySlotPointerDown(event); }
-function onBagInventorySlotPointerMove(event) { return _viewApi.onBagInventorySlotPointerMove(event); }
-function onBagInventorySlotPointerUp(event) { return _viewApi.onBagInventorySlotPointerUp(event); }
-function onGuideInventoryToggleClick() { return _viewApi.onGuideInventoryToggleClick(); }
-function onWorldBagInventoryClick(event) { return _viewApi.onWorldBagInventoryClick(event); }
-function onboardingClearInventoryCloseHintTimer() { return _viewApi.onboardingClearInventoryCloseHintTimer(); }
-function onboardingScheduleTutorialCompleteHide() { return _viewApi.onboardingScheduleTutorialCompleteHide(); }
-function openSettingsOverlay() { return _viewApi.openSettingsOverlay(); }
-function ovcTryDismissLoadingScreen(force) { return _viewApi.ovcTryDismissLoadingScreen(force); }
-function pickRandomButterflyColor() { return _viewApi.pickRandomButterflyColor(); }
-function pickRandomButterflySpawnPoint() { return _viewApi.pickRandomButterflySpawnPoint(); }
-function plantInventorySeed(seedId) { return _viewApi.plantInventorySeed(seedId); }
-function plantShowsUrgentWaterHoverEmphasis(plant, now) { return _viewApi.plantShowsUrgentWaterHoverEmphasis(plant, now); }
-function rebuildPlacedCraftFurnitureDom() { return _viewApi.rebuildPlacedCraftFurnitureDom(); }
-function rebuildWorldBagDropDom() { return _viewApi.rebuildWorldBagDropDom(); }
-function rebuildWorldExtraBucketDom() { return _viewApi.rebuildWorldExtraBucketDom(); }
-function rebuildWorldRockDom() { return _viewApi.rebuildWorldRockDom(); }
-function refreshPlantWaterHoverIfShown(plant) { return _viewApi.refreshPlantWaterHoverIfShown(plant); }
-function removeBagItemsFromInventory(itemKey, amount) { return _viewApi.removeBagItemsFromInventory(itemKey, amount); }
-function renderAdminAccounts(accounts) { return _viewApi.renderAdminAccounts(accounts); }
-function renderPlantCardForPlant(plant) { return _viewApi.renderPlantCardForPlant(plant); }
-function renderPlayerPosition() { return _viewApi.renderPlayerPosition(); }
-function restorePlantHoverLabelToWorldDom() { return _viewApi.restorePlantHoverLabelToWorldDom(); }
-function saveBagInventoryOrder() { return _viewApi.saveBagInventoryOrder(); }
-function saveRockInventoryCount() { return _viewApi.saveRockInventoryCount(); }
-function scheduleOnboardingInventoryCloseHint() { return _viewApi.scheduleOnboardingInventoryCloseHint(); }
-function setBagInventoryPanelOpen(open) { return _viewApi.setBagInventoryPanelOpen(open); }
-function setLocalChatBubble(text, hideAt) { return _viewApi.setLocalChatBubble(text, hideAt); }
-function setNpcBubbleWorldPosition(worldX, worldY) { return _viewApi.setNpcBubbleWorldPosition(worldX, worldY); }
-function setPlayerBubbleWorldPosition(worldX, worldY) { return _viewApi.setPlayerBubbleWorldPosition(worldX, worldY); }
-function setSpeechBubbleTransform(bubbleEl, worldX, worldY) { return _viewApi.setSpeechBubbleTransform(bubbleEl, worldX, worldY); }
-function setWorldBagGroundPickedForCurrentRoom() { return _viewApi.setWorldBagGroundPickedForCurrentRoom(); }
-function setWorldChatPanelOpen(nextOpen) { return _viewApi.setWorldChatPanelOpen(nextOpen); }
-function setWorldChatUserPickerOpen(open) { return _viewApi.setWorldChatUserPickerOpen(open); }
-function setWorldGuideBookOffGroundPickedForCurrentRoom() { return _viewApi.setWorldGuideBookOffGroundPickedForCurrentRoom(); }
-function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) { return _viewApi.shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed); }
-function shouldHideSeparateSoilUnderBigGrass(plant) { return _viewApi.shouldHideSeparateSoilUnderBigGrass(plant); }
-function shouldShowFirstWaterNeededDroplet(plant) { return _viewApi.shouldShowFirstWaterNeededDroplet(plant); }
-function shouldShowIncomingWorldChatPayload(payload) { return _viewApi.shouldShowIncomingWorldChatPayload(payload); }
-function shouldShowWorldBagInventoryUi() { return _viewApi.shouldShowWorldBagInventoryUi(); }
-function shouldSkipPlantHoverVisualEmphasis(plant, now) { return _viewApi.shouldSkipPlantHoverVisualEmphasis(plant, now); }
-function shouldSuppressPlantWaterCardForSelfSustaining(plant) { return _viewApi.shouldSuppressPlantWaterCardForSelfSustaining(plant); }
-function showBagInventoryFullFailMessage() { return _viewApi.showBagInventoryFullFailMessage(); }
-function showBagRequiredForGameplayMessage() { return _viewApi.showBagRequiredForGameplayMessage(); }
-function showCraftChairOccupiedAlert(chair) { return _viewApi.showCraftChairOccupiedAlert(chair); }
-function showDialogueLine(lineInfo) { return _viewApi.showDialogueLine(lineInfo); }
-function showOnboardingSocialDemoChatBubble(text) { return _viewApi.showOnboardingSocialDemoChatBubble(text); }
-function showOnlineDebugMessage(message) { return _viewApi.showOnlineDebugMessage(message); }
-function showPlantHoverSignForPlant(plant) { return _viewApi.showPlantHoverSignForPlant(plant); }
-function showPlayerAlert(options) { return _viewApi.showPlayerAlert(options); }
-function showUiShortcutHoverLabel(text, anchorEl) { return _viewApi.showUiShortcutHoverLabel(text, anchorEl); }
-function showWorldNpcHoverLabel(text, anchorEl) { return _viewApi.showWorldNpcHoverLabel(text, anchorEl); }
-function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld) { return _viewApi.speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld); }
-function syncCharacterPreviewVisual(color) { return _viewApi.syncCharacterPreviewVisual(color); }
-function syncGuideInventoryBar() { return _viewApi.syncGuideInventoryBar(); }
-function syncLocalPlayerInsideCraftHouseVisual() { return _viewApi.syncLocalPlayerInsideCraftHouseVisual(); }
-function syncLocalPlayerPoseVisual() { return _viewApi.syncLocalPlayerPoseVisual(); }
-function syncLocalPlayerVisibility() { return _viewApi.syncLocalPlayerVisibility(); }
-function syncPlantCardWaterReadoutVisibility(showWater) { return _viewApi.syncPlantCardWaterReadoutVisibility(showWater); }
-function syncPlantHoverWellDockLayout() { return _viewApi.syncPlantHoverWellDockLayout(); }
-function teardownExtraPlantDom(p) { return _viewApi.teardownExtraPlantDom(p); }
-function toScreenX(worldX) { return _viewApi.toScreenX(worldX); }
-function toScreenY(worldY) { return _viewApi.toScreenY(worldY); }
-function toggleBagInventoryPanelFromBagClick() { return _viewApi.toggleBagInventoryPanelFromBagClick(); }
-function togglePlayerHealthGaugeVisible() { return _viewApi.togglePlayerHealthGaugeVisible(); }
-function updateApples() { return _viewApi.updateApples(); }
-function updateBagInventorySlots() { return _viewApi.updateBagInventorySlots(); }
-function updateBucketPosition() { return _viewApi.updateBucketPosition(); }
-function updateCamera() { return _viewApi.updateCamera(); }
-function updateGuideCard() { return _viewApi.updateGuideCard(); }
-function updateGuidePages() { return _viewApi.updateGuidePages(); }
-function updateMagicPowderInventoryUi() { return _viewApi.updateMagicPowderInventoryUi(); }
-function updateNpcPosition() { return _viewApi.updateNpcPosition(); }
-function updateNpcPrompt() { return _viewApi.updateNpcPrompt(); }
-function updateOnboardingFlowUI() { return _viewApi.updateOnboardingFlowUI(); }
-function updatePlacedCraftFurnitureDom() { return _viewApi.updatePlacedCraftFurnitureDom(); }
-function updatePlantCard() { return _viewApi.updatePlantCard(); }
-function updatePlantGrowth() { return _viewApi.updatePlantGrowth(); }
-function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) { return _viewApi.updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio); }
-function updatePlantProgressGauge() { return _viewApi.updatePlantProgressGauge(); }
-function updatePlantState() { return _viewApi.updatePlantState(); }
-function updatePlayerAlert() { return _viewApi.updatePlayerAlert(); }
-function updatePlayerBubblePosition() { return _viewApi.updatePlayerBubblePosition(); }
-function updatePlayerChatBubbleOverlay() { return _viewApi.updatePlayerChatBubbleOverlay(); }
-function updatePlayerColorBodyPosition() { return _viewApi.updatePlayerColorBodyPosition(); }
-function updatePlayerHealthUi() { return _viewApi.updatePlayerHealthUi(); }
-function updatePlayerName() { return _viewApi.updatePlayerName(); }
-function updatePlayerStatus() { return _viewApi.updatePlayerStatus(); }
-function updateSeedCard() { return _viewApi.updateSeedCard(); }
-function updateSeedDryState() { return _viewApi.updateSeedDryState(); }
-function updateSeedInventory() { return _viewApi.updateSeedInventory(); }
-function updateSeedPosition() { return _viewApi.updateSeedPosition(); }
-function updateWorldExtraBuckets() { return _viewApi.updateWorldExtraBuckets(); }
-function updateWorldSocialChatUiEnabled() { return _viewApi.updateWorldSocialChatUiEnabled(); }
-function worldChatBubbleWobble(sessionIdForPhase, nowMs) { return _viewApi.worldChatBubbleWobble(sessionIdForPhase, nowMs); }
+function applyPlantHoverVisuals(plant) { return _viewApi ? _viewApi.applyPlantHoverVisuals(plant) : undefined; }
+function assignExtraSeedInventoryOwner(seed) { return _viewApi ? _viewApi.assignExtraSeedInventoryOwner(seed) : undefined; }
+function bagDiscardInventoryEligible(itemKey) { return _viewApi ? _viewApi.bagDiscardInventoryEligible(itemKey) : undefined; }
+function canDiscardBagItemFromBagPanel(itemKey) { return _viewApi ? _viewApi.canDiscardBagItemFromBagPanel(itemKey) : undefined; }
+function canDiscardBagItemNow(itemKey) { return _viewApi ? _viewApi.canDiscardBagItemNow(itemKey) : undefined; }
+function canUseBagInventoryGameplay() { return _viewApi ? _viewApi.canUseBagInventoryGameplay() : undefined; }
+function clearBagInventoryDragVisual() { return _viewApi ? _viewApi.clearBagInventoryDragVisual() : undefined; }
+function clearPlantHoverVisuals() { return _viewApi ? _viewApi.clearPlantHoverVisuals() : undefined; }
+function closeBagInventoryPanel() { return _viewApi ? _viewApi.closeBagInventoryPanel() : undefined; }
+function closeGuideCardFromClick() { return _viewApi ? _viewApi.closeGuideCardFromClick() : undefined; }
+function closeSettingsOverlayFromBackdrop() { return _viewApi ? _viewApi.closeSettingsOverlayFromBackdrop() : undefined; }
+function closeSettingsOverlayFromEscape() { return _viewApi ? _viewApi.closeSettingsOverlayFromEscape() : undefined; }
+function createRandomApples(count) { return _viewApi ? _viewApi.createRandomApples(count) : undefined; }
+function createRandomWorldRocks(ctx) { return _viewApi ? _viewApi.createRandomWorldRocks(ctx) : undefined; }
+function createStarterSeedInventoryItem() { return _viewApi ? _viewApi.createStarterSeedInventoryItem() : undefined; }
+function discardBagItemsToGround(itemKey, amount, options) { return _viewApi ? _viewApi.discardBagItemsToGround(itemKey, amount, options) : undefined; }
+function discardInventorySeed(seedId) { return _viewApi ? _viewApi.discardInventorySeed(seedId) : undefined; }
+function dismissGuideBookClickPrompt() { return _viewApi ? _viewApi.dismissGuideBookClickPrompt() : undefined; }
+function ensureBagInventoryDragGhost(html) { return _viewApi ? _viewApi.ensureBagInventoryDragGhost(html) : undefined; }
+function ensureSharedPlantVisuals() { return _viewApi ? _viewApi.ensureSharedPlantVisuals() : undefined; }
+function extraPlantFromDomElement(el) { return _viewApi ? _viewApi.extraPlantFromDomElement(el) : undefined; }
+function flashOnboardingOrderHint(message) { return _viewApi ? _viewApi.flashOnboardingOrderHint(message) : undefined; }
+function getBagInventoryCountsByKey() { return _viewApi ? _viewApi.getBagInventoryCountsByKey() : undefined; }
+function getBagInventoryItemCount(itemKey) { return _viewApi ? _viewApi.getBagInventoryItemCount(itemKey) : undefined; }
+function getBagInventorySeedCount() { return _viewApi ? _viewApi.getBagInventorySeedCount() : undefined; }
+function getBagItemKeyFromInventorySlot(slot) { return _viewApi ? _viewApi.getBagItemKeyFromInventorySlot(slot) : undefined; }
+function getNearestBadSoilPlantForProximityCard() { return _viewApi ? _viewApi.getNearestBadSoilPlantForProximityCard() : undefined; }
+function getPlantHoverDomElements(plant) { return _viewApi ? _viewApi.getPlantHoverDomElements(plant) : undefined; }
+function getPlantPrimaryVisualRectWorld(plant) { return _viewApi ? _viewApi.getPlantPrimaryVisualRectWorld(plant) : undefined; }
+function getPlayerRenderedHeight() { return _viewApi ? _viewApi.getPlayerRenderedHeight() : undefined; }
+function getRenderedAdminAccounts() { return _viewApi ? _viewApi.getRenderedAdminAccounts() : undefined; }
+function getSproutImageForPlant(plant, stage) { return _viewApi ? _viewApi.getSproutImageForPlant(plant, stage) : undefined; }
+function getWorldNpcPromptBubbleEl(npcEl) { return _viewApi ? _viewApi.getWorldNpcPromptBubbleEl(npcEl) : undefined; }
+function groundScreenPxToWorldX(px) { return _viewApi ? _viewApi.groundScreenPxToWorldX(px) : undefined; }
+function groundScreenPxToWorldY(px) { return _viewApi ? _viewApi.groundScreenPxToWorldY(px) : undefined; }
+function hidePlantHoverLabel() { return _viewApi ? _viewApi.hidePlantHoverLabel() : undefined; }
+function isOnboardingInventoryTutorialActive() { return _viewApi ? _viewApi.isOnboardingInventoryTutorialActive() : undefined; }
+function isPointerInsideBagInventoryPanel(clientX, clientY) { return _viewApi ? _viewApi.isPointerInsideBagInventoryPanel(clientX, clientY) : undefined; }
+function isPointerOutsideBagInventoryPanel(clientX, clientY) { return _viewApi ? _viewApi.isPointerOutsideBagInventoryPanel(clientX, clientY) : undefined; }
+function isPointerOverBagInventoryUi(clientX, clientY) { return _viewApi ? _viewApi.isPointerOverBagInventoryUi(clientX, clientY) : undefined; }
+function layoutNpcSpeechBubble() { return _viewApi ? _viewApi.layoutNpcSpeechBubble() : undefined; }
+function layoutPlantHoverRing(plant, urgentWater) { return _viewApi ? _viewApi.layoutPlantHoverRing(plant, urgentWater) : undefined; }
+function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) { return _viewApi ? _viewApi.layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) : undefined; }
+function loadBagInventoryOrder() { return _viewApi ? _viewApi.loadBagInventoryOrder() : undefined; }
+function loadRockInventoryCount() { return _viewApi ? _viewApi.loadRockInventoryCount() : undefined; }
+function maybeAdvanceOnboardingAfterBookInventoryOpened() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterBookInventoryOpened() : undefined; }
+function maybeAdvanceOnboardingAfterInventoryClosed() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterInventoryClosed() : undefined; }
+function maybeAdvanceOnboardingAfterInventoryOpened() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterInventoryOpened() : undefined; }
+function normalizeBagInventoryOrderByCounts(counts) { return _viewApi ? _viewApi.normalizeBagInventoryOrderByCounts(counts) : undefined; }
+function onBagInventorySlotPointerCancel(event) { return _viewApi ? _viewApi.onBagInventorySlotPointerCancel(event) : undefined; }
+function onBagInventorySlotPointerDown(event) { return _viewApi ? _viewApi.onBagInventorySlotPointerDown(event) : undefined; }
+function onBagInventorySlotPointerMove(event) { return _viewApi ? _viewApi.onBagInventorySlotPointerMove(event) : undefined; }
+function onBagInventorySlotPointerUp(event) { return _viewApi ? _viewApi.onBagInventorySlotPointerUp(event) : undefined; }
+function onGuideInventoryToggleClick() { return _viewApi ? _viewApi.onGuideInventoryToggleClick() : undefined; }
+function onWorldBagInventoryClick(event) { return _viewApi ? _viewApi.onWorldBagInventoryClick(event) : undefined; }
+function onboardingClearInventoryCloseHintTimer() { return _viewApi ? _viewApi.onboardingClearInventoryCloseHintTimer() : undefined; }
+function onboardingScheduleTutorialCompleteHide() { return _viewApi ? _viewApi.onboardingScheduleTutorialCompleteHide() : undefined; }
+function openSettingsOverlay() { return _viewApi ? _viewApi.openSettingsOverlay() : undefined; }
+function ovcTryDismissLoadingScreen(force) { return _viewApi ? _viewApi.ovcTryDismissLoadingScreen(force) : undefined; }
+function pickRandomButterflyColor() { return _viewApi ? _viewApi.pickRandomButterflyColor() : undefined; }
+function pickRandomButterflySpawnPoint() { return _viewApi ? _viewApi.pickRandomButterflySpawnPoint() : undefined; }
+function plantInventorySeed(seedId) { return _viewApi ? _viewApi.plantInventorySeed(seedId) : undefined; }
+function plantShowsUrgentWaterHoverEmphasis(plant, now) { return _viewApi ? _viewApi.plantShowsUrgentWaterHoverEmphasis(plant, now) : undefined; }
+function rebuildPlacedCraftFurnitureDom() { return _viewApi ? _viewApi.rebuildPlacedCraftFurnitureDom() : undefined; }
+function rebuildWorldBagDropDom() { return _viewApi ? _viewApi.rebuildWorldBagDropDom() : undefined; }
+function rebuildWorldExtraBucketDom() { return _viewApi ? _viewApi.rebuildWorldExtraBucketDom() : undefined; }
+function rebuildWorldRockDom() { return _viewApi ? _viewApi.rebuildWorldRockDom() : undefined; }
+function refreshPlantWaterHoverIfShown(plant) { return _viewApi ? _viewApi.refreshPlantWaterHoverIfShown(plant) : undefined; }
+function removeBagItemsFromInventory(itemKey, amount) { return _viewApi ? _viewApi.removeBagItemsFromInventory(itemKey, amount) : undefined; }
+function renderAdminAccounts(accounts) { return _viewApi ? _viewApi.renderAdminAccounts(accounts) : undefined; }
+function renderPlantCardForPlant(plant) { return _viewApi ? _viewApi.renderPlantCardForPlant(plant) : undefined; }
+function renderPlayerPosition() { return _viewApi ? _viewApi.renderPlayerPosition() : undefined; }
+function restorePlantHoverLabelToWorldDom() { return _viewApi ? _viewApi.restorePlantHoverLabelToWorldDom() : undefined; }
+function saveBagInventoryOrder() { return _viewApi ? _viewApi.saveBagInventoryOrder() : undefined; }
+function saveRockInventoryCount() { return _viewApi ? _viewApi.saveRockInventoryCount() : undefined; }
+function scheduleOnboardingInventoryCloseHint() { return _viewApi ? _viewApi.scheduleOnboardingInventoryCloseHint() : undefined; }
+function setBagInventoryPanelOpen(open) { return _viewApi ? _viewApi.setBagInventoryPanelOpen(open) : undefined; }
+function setLocalChatBubble(text, hideAt) { return _viewApi ? _viewApi.setLocalChatBubble(text, hideAt) : undefined; }
+function setNpcBubbleWorldPosition(worldX, worldY) { return _viewApi ? _viewApi.setNpcBubbleWorldPosition(worldX, worldY) : undefined; }
+function setPlayerBubbleWorldPosition(worldX, worldY) { return _viewApi ? _viewApi.setPlayerBubbleWorldPosition(worldX, worldY) : undefined; }
+function setSpeechBubbleTransform(bubbleEl, worldX, worldY) { return _viewApi ? _viewApi.setSpeechBubbleTransform(bubbleEl, worldX, worldY) : undefined; }
+function setWorldBagGroundPickedForCurrentRoom() { return _viewApi ? _viewApi.setWorldBagGroundPickedForCurrentRoom() : undefined; }
+function setWorldChatPanelOpen(nextOpen) { return _viewApi ? _viewApi.setWorldChatPanelOpen(nextOpen) : undefined; }
+function setWorldChatUserPickerOpen(open) { return _viewApi ? _viewApi.setWorldChatUserPickerOpen(open) : undefined; }
+function setWorldGuideBookOffGroundPickedForCurrentRoom() { return _viewApi ? _viewApi.setWorldGuideBookOffGroundPickedForCurrentRoom() : undefined; }
+function shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) { return _viewApi ? _viewApi.shouldHideExtraSeedOverlappingDesignatedGroundPickSlot(extraSeed) : undefined; }
+function shouldHideSeparateSoilUnderBigGrass(plant) { return _viewApi ? _viewApi.shouldHideSeparateSoilUnderBigGrass(plant) : undefined; }
+function shouldShowFirstWaterNeededDroplet(plant) { return _viewApi ? _viewApi.shouldShowFirstWaterNeededDroplet(plant) : undefined; }
+function shouldShowIncomingWorldChatPayload(payload) { return _viewApi ? _viewApi.shouldShowIncomingWorldChatPayload(payload) : undefined; }
+function shouldShowWorldBagInventoryUi() { return _viewApi ? _viewApi.shouldShowWorldBagInventoryUi() : undefined; }
+function shouldSkipPlantHoverVisualEmphasis(plant, now) { return _viewApi ? _viewApi.shouldSkipPlantHoverVisualEmphasis(plant, now) : undefined; }
+function shouldSuppressPlantWaterCardForSelfSustaining(plant) { return _viewApi ? _viewApi.shouldSuppressPlantWaterCardForSelfSustaining(plant) : undefined; }
+function showBagInventoryFullFailMessage() { return _viewApi ? _viewApi.showBagInventoryFullFailMessage() : undefined; }
+function showBagRequiredForGameplayMessage() { return _viewApi ? _viewApi.showBagRequiredForGameplayMessage() : undefined; }
+function showCraftChairOccupiedAlert(chair) { return _viewApi ? _viewApi.showCraftChairOccupiedAlert(chair) : undefined; }
+function showDialogueLine(lineInfo) { return _viewApi ? _viewApi.showDialogueLine(lineInfo) : undefined; }
+function showOnboardingSocialDemoChatBubble(text) { return _viewApi ? _viewApi.showOnboardingSocialDemoChatBubble(text) : undefined; }
+function showOnlineDebugMessage(message) { return _viewApi ? _viewApi.showOnlineDebugMessage(message) : undefined; }
+function showPlantHoverSignForPlant(plant) { return _viewApi ? _viewApi.showPlantHoverSignForPlant(plant) : undefined; }
+function showPlayerAlert(options) { return _viewApi ? _viewApi.showPlayerAlert(options) : undefined; }
+function showUiShortcutHoverLabel(text, anchorEl) { return _viewApi ? _viewApi.showUiShortcutHoverLabel(text, anchorEl) : undefined; }
+function showWorldNpcHoverLabel(text, anchorEl) { return _viewApi ? _viewApi.showWorldNpcHoverLabel(text, anchorEl) : undefined; }
+function speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld) { return _viewApi ? _viewApi.speechBubbleTopWorldYFromHead(headTopWorldY, bubbleElement, gapAboveHeadWorld) : undefined; }
+function syncCharacterPreviewVisual(color) { return _viewApi ? _viewApi.syncCharacterPreviewVisual(color) : undefined; }
+function syncGuideInventoryBar() { return _viewApi ? _viewApi.syncGuideInventoryBar() : undefined; }
+function syncLocalPlayerInsideCraftHouseVisual() { return _viewApi ? _viewApi.syncLocalPlayerInsideCraftHouseVisual() : undefined; }
+function syncLocalPlayerPoseVisual() { return _viewApi ? _viewApi.syncLocalPlayerPoseVisual() : undefined; }
+function syncLocalPlayerVisibility() { return _viewApi ? _viewApi.syncLocalPlayerVisibility() : undefined; }
+function syncPlantCardWaterReadoutVisibility(showWater) { return _viewApi ? _viewApi.syncPlantCardWaterReadoutVisibility(showWater) : undefined; }
+function syncPlantHoverWellDockLayout() { return _viewApi ? _viewApi.syncPlantHoverWellDockLayout() : undefined; }
+function teardownExtraPlantDom(p) { return _viewApi ? _viewApi.teardownExtraPlantDom(p) : undefined; }
+function toScreenX(worldX) { return _viewApi ? _viewApi.toScreenX(worldX) : undefined; }
+function toScreenY(worldY) { return _viewApi ? _viewApi.toScreenY(worldY) : undefined; }
+function toggleBagInventoryPanelFromBagClick() { return _viewApi ? _viewApi.toggleBagInventoryPanelFromBagClick() : undefined; }
+function togglePlayerHealthGaugeVisible() { return _viewApi ? _viewApi.togglePlayerHealthGaugeVisible() : undefined; }
+function updateApples() { return _viewApi ? _viewApi.updateApples() : undefined; }
+function updateBagInventorySlots() { return _viewApi ? _viewApi.updateBagInventorySlots() : undefined; }
+function updateBucketPosition() { return _viewApi ? _viewApi.updateBucketPosition() : undefined; }
+function updateCamera() { return _viewApi ? _viewApi.updateCamera() : undefined; }
+function updateGuideCard() { return _viewApi ? _viewApi.updateGuideCard() : undefined; }
+function updateGuidePages() { return _viewApi ? _viewApi.updateGuidePages() : undefined; }
+function updateMagicPowderInventoryUi() { return _viewApi ? _viewApi.updateMagicPowderInventoryUi() : undefined; }
+function updateNpcPosition() { return _viewApi ? _viewApi.updateNpcPosition() : undefined; }
+function updateNpcPrompt() { return _viewApi ? _viewApi.updateNpcPrompt() : undefined; }
+function updateOnboardingFlowUI() { return _viewApi ? _viewApi.updateOnboardingFlowUI() : undefined; }
+function updatePlacedCraftFurnitureDom() { return _viewApi ? _viewApi.updatePlacedCraftFurnitureDom() : undefined; }
+function updatePlantCard() { return _viewApi ? _viewApi.updatePlantCard() : undefined; }
+function updatePlantGrowth() { return _viewApi ? _viewApi.updatePlantGrowth() : undefined; }
+function updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) { return _viewApi ? _viewApi.updatePlantGrowthMeter(element, fill, x, y, firstRatio, secondRatio) : undefined; }
+function updatePlantProgressGauge() { return _viewApi ? _viewApi.updatePlantProgressGauge() : undefined; }
+function updatePlantState() { return _viewApi ? _viewApi.updatePlantState() : undefined; }
+function updatePlayerAlert() { return _viewApi ? _viewApi.updatePlayerAlert() : undefined; }
+function updatePlayerBubblePosition() { return _viewApi ? _viewApi.updatePlayerBubblePosition() : undefined; }
+function updatePlayerChatBubbleOverlay() { return _viewApi ? _viewApi.updatePlayerChatBubbleOverlay() : undefined; }
+function updatePlayerColorBodyPosition() { return _viewApi ? _viewApi.updatePlayerColorBodyPosition() : undefined; }
+function updatePlayerHealthUi() { return _viewApi ? _viewApi.updatePlayerHealthUi() : undefined; }
+function updatePlayerName() { return _viewApi ? _viewApi.updatePlayerName() : undefined; }
+function updatePlayerStatus() { return _viewApi ? _viewApi.updatePlayerStatus() : undefined; }
+function updateSeedCard() { return _viewApi ? _viewApi.updateSeedCard() : undefined; }
+function updateSeedDryState() { return _viewApi ? _viewApi.updateSeedDryState() : undefined; }
+function updateSeedInventory() { return _viewApi ? _viewApi.updateSeedInventory() : undefined; }
+function updateSeedPosition() { return _viewApi ? _viewApi.updateSeedPosition() : undefined; }
+function updateWorldExtraBuckets() { return _viewApi ? _viewApi.updateWorldExtraBuckets() : undefined; }
+function updateWorldSocialChatUiEnabled() { return _viewApi ? _viewApi.updateWorldSocialChatUiEnabled() : undefined; }
+function worldChatBubbleWobble(sessionIdForPhase, nowMs) { return _viewApi ? _viewApi.worldChatBubbleWobble(sessionIdForPhase, nowMs) : undefined; }
 
 
-function addPlantWorldRockAvoidZone(zones, plant, pad) { return _systemsApi.addPlantWorldRockAvoidZone(zones, plant, pad); }
-function applyButterflyCatchable(entry, catchable) { return _systemsApi.applyButterflyCatchable(entry, catchable); }
-function applyButterflyFacing(entry, facingRight) { return _systemsApi.applyButterflyFacing(entry, facingRight); }
-function applyButterflySpriteFrame(entry, color, frame) { return _systemsApi.applyButterflySpriteFrame(entry, color, frame); }
-function applyPlantWaterDecay(plant, now) { return _systemsApi.applyPlantWaterDecay(plant, now); }
-function areButterfliesUnlockedForPlantFogWorld() { return _systemsApi.areButterfliesUnlockedForPlantFogWorld(); }
-function areButterfliesUnlockedForTutorialOnboarding() { return _systemsApi.areButterfliesUnlockedForTutorialOnboarding(); }
-function authorityFillToCapInstantly(now) { return _systemsApi.authorityFillToCapInstantly(now); }
-function authoritySpawnButterfliesIfNeeded(now) { return _systemsApi.authoritySpawnButterfliesIfNeeded(now); }
-function broadcastButterflyState(now) { return _systemsApi.broadcastButterflyState(now); }
-function buildWorldBagDropElement(drop, stackIndex) { return _systemsApi.buildWorldBagDropElement(drop, stackIndex); }
-function buildWorldRockSpawnContext() { return _systemsApi.buildWorldRockSpawnContext(); }
-function clampButterflyPointToActiveBounds(x, y) { return _systemsApi.clampButterflyPointToActiveBounds(x, y); }
-function clampPlayerToTreeOutline() { return _systemsApi.clampPlayerToTreeOutline(); }
-function clearLiveButterfliesForPlantFogLock(now) { return _systemsApi.clearLiveButterfliesForPlantFogLock(now); }
-function collectWorldRockAvoidZones(ctx) { return _systemsApi.collectWorldRockAvoidZones(ctx); }
-function createButterfly(now, options) { return _systemsApi.createButterfly(now, options); }
-function createRandomApple(id) { return _systemsApi.createRandomApple(id); }
-function ensureButterflyRenderEntry(butterfly) { return _systemsApi.ensureButterflyRenderEntry(butterfly); }
-function ensureWorldBagDropsArray() { return _systemsApi.ensureWorldBagDropsArray(); }
-function ensureWorldLooseSeedShape() { return _systemsApi.ensureWorldLooseSeedShape(); }
-function expandWorldRockAvoidRect(left, top, w, h, pad) { return _systemsApi.expandWorldRockAvoidRect(left, top, w, h, pad); }
-function getActiveButterflyBounds() { return _systemsApi.getActiveButterflyBounds(); }
-function getAutoTier5GrowMsForPlant(plant) { return _systemsApi.getAutoTier5GrowMsForPlant(plant); }
-function getBucketSize() { return _systemsApi.getBucketSize(); }
-function getButterflyAnimationFrame(now, butterfly) { return _systemsApi.getButterflyAnimationFrame(now, butterfly); }
-function getButterflyCatchDistanceAtWorldCenter(cx, cy) { return _systemsApi.getButterflyCatchDistanceAtWorldCenter(cx, cy); }
-function getButterflyStateForSnapshot() { return _systemsApi.getButterflyStateForSnapshot(); }
-function getCenterDistance(x, y, width, height) { return _systemsApi.getCenterDistance(x, y, width, height); }
-function getCraftChairById(chairId) { return _systemsApi.getCraftChairById(chairId); }
-function getDefaultButterflyBounds() { return _systemsApi.getDefaultButterflyBounds(); }
-function getGrassAutoTier5GrowthRatio(plant, now) { return _systemsApi.getGrassAutoTier5GrowthRatio(plant, now); }
-function getLocalPlayerBodyHeight() { return _systemsApi.getLocalPlayerBodyHeight(); }
-function getLocalPlayerBodyWidth() { return _systemsApi.getLocalPlayerBodyWidth(); }
-function getMaxGroundedPlayerDepth() { return _systemsApi.getMaxGroundedPlayerDepth(); }
-function getMaxTreePlayerDepth() { return _systemsApi.getMaxTreePlayerDepth(); }
-function getMinGroundedPlayerDepth() { return _systemsApi.getMinGroundedPlayerDepth(); }
-function getMinTreePlayerDepth() { return _systemsApi.getMinTreePlayerDepth(); }
-function getNumericButterflyValue(value, fallback) { return _systemsApi.getNumericButterflyValue(value, fallback); }
-function getPlantFogClearRectForCurrentScore() { return _systemsApi.getPlantFogClearRectForCurrentScore(); }
-function getPlantFogClearRectForMovementClamp() { return _systemsApi.getPlantFogClearRectForMovementClamp(); }
-function getPlantGrowthRatio(plant, now) { return _systemsApi.getPlantGrowthRatio(plant, now); }
-function getPlantIndexScoringOptions(now) { return _systemsApi.getPlantIndexScoringOptions(now); }
-function getPlantMaturityLevelForPlantingSpacing(plant) { return _systemsApi.getPlantMaturityLevelForPlantingSpacing(plant); }
-function getPlantSecondGrowthRatio(plant, now) { return _systemsApi.getPlantSecondGrowthRatio(plant, now); }
-function getPlantStateForStorage() { return _systemsApi.getPlantStateForStorage(); }
-function getPlantWaterCapacity(plant) { return _systemsApi.getPlantWaterCapacity(plant); }
-function getPlayerBox() { return _systemsApi.getPlayerBox(); }
-function getPlayerCenterX() { return _systemsApi.getPlayerCenterX(); }
-function getPlayerFootY() { return _systemsApi.getPlayerFootY(); }
-function getPlayerHeadFogProbeBoxForPose(px, pd, jy) { return _systemsApi.getPlayerHeadFogProbeBoxForPose(px, pd, jy); }
-function getPlayerHealthTickContext(healthPosePrev) { return _systemsApi.getPlayerHealthTickContext(healthPosePrev); }
-function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) { return _systemsApi.getPlayerWorldRockCollisionBoxForPose(px, pd, jy); }
-function getPlayerWorldY() { return _systemsApi.getPlayerWorldY(); }
-function getPowderUpgradeRatio(plant, now) { return _systemsApi.getPowderUpgradeRatio(plant, now); }
-function getSharedPlantSimulationNow() { return _systemsApi.getSharedPlantSimulationNow(); }
-function getSproutStageFromPlant(plant) { return _systemsApi.getSproutStageFromPlant(plant); }
-function getSynchronizedNow() { return _systemsApi.getSynchronizedNow(); }
-function getTotalPlantIndexScore() { return _systemsApi.getTotalPlantIndexScore(); }
-function getUnpickedWorldRockCount() { return _systemsApi.getUnpickedWorldRockCount(); }
-function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) { return _systemsApi.getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl); }
-function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) { return _systemsApi.getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH); }
-function getWellSize() { return _systemsApi.getWellSize(); }
-function hasActiveGreenGrowthProgress(plant, now) { return _systemsApi.hasActiveGreenGrowthProgress(plant, now); }
-function hasFreshButterflyAuthorityBroadcast(now) { return _systemsApi.hasFreshButterflyAuthorityBroadcast(now); }
-function isAppleInTrunkArea(localX, localY, size) { return _systemsApi.isAppleInTrunkArea(localX, localY, size); }
-function isButterflyAuthority() { return _systemsApi.isButterflyAuthority(); }
-function isCraftFurnitureInstalling() { return _systemsApi.isCraftFurnitureInstalling(); }
-function isMainGameTutorialInProgress() { return _systemsApi.isMainGameTutorialInProgress(); }
-function isNearWellForCard() { return _systemsApi.isNearWellForCard(); }
-function isPlantFogMovementClampActive() { return _systemsApi.isPlantFogMovementClampActive(); }
-function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) { return _systemsApi.isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps); }
-function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) { return _systemsApi.isPlayerCollidingVisibleWorldRockForPose(px, pd, jy); }
-function isPlayerGameplayBlockedByNpcDialogue() { return _systemsApi.isPlayerGameplayBlockedByNpcDialogue(); }
-function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) { return _systemsApi.isPlayerHeadFogClearForPose(px, pd, jy, rect, eps); }
-function isPlayerInTreeCanopy() { return _systemsApi.isPlayerInTreeCanopy(); }
-function isPlayerInWellWaterArea() { return _systemsApi.isPlayerInWellWaterArea(); }
-function isPlayerInsideEnteredCraftHouse() { return _systemsApi.isPlayerInsideEnteredCraftHouse(); }
-function isPlayerNearTreeTrunk() { return _systemsApi.isPlayerNearTreeTrunk(); }
-function isPlayerSupportedByTree() { return _systemsApi.isPlayerSupportedByTree(); }
-function isPlayerTimedActionBusy() { return _systemsApi.isPlayerTimedActionBusy(); }
-function isPowderUpgradeInProgress(plant) { return _systemsApi.isPowderUpgradeInProgress(plant); }
-function isSharedWorldMergeActive() { return _systemsApi.isSharedWorldMergeActive(); }
-function isSproutStage3Or5IdleNoGrowth(plant, now) { return _systemsApi.isSproutStage3Or5IdleNoGrowth(plant, now); }
+function addPlantWorldRockAvoidZone(zones, plant, pad) { return _systemsApi ? _systemsApi.addPlantWorldRockAvoidZone(zones, plant, pad) : undefined; }
+function applyButterflyCatchable(entry, catchable) { return _systemsApi ? _systemsApi.applyButterflyCatchable(entry, catchable) : undefined; }
+function applyButterflyFacing(entry, facingRight) { return _systemsApi ? _systemsApi.applyButterflyFacing(entry, facingRight) : undefined; }
+function applyButterflySpriteFrame(entry, color, frame) { return _systemsApi ? _systemsApi.applyButterflySpriteFrame(entry, color, frame) : undefined; }
+function applyPlantWaterDecay(plant, now) { return _systemsApi ? _systemsApi.applyPlantWaterDecay(plant, now) : undefined; }
+function areButterfliesUnlockedForPlantFogWorld() { return _systemsApi ? _systemsApi.areButterfliesUnlockedForPlantFogWorld() : undefined; }
+function areButterfliesUnlockedForTutorialOnboarding() { return _systemsApi ? _systemsApi.areButterfliesUnlockedForTutorialOnboarding() : undefined; }
+function authorityFillToCapInstantly(now) { return _systemsApi ? _systemsApi.authorityFillToCapInstantly(now) : undefined; }
+function authoritySpawnButterfliesIfNeeded(now) { return _systemsApi ? _systemsApi.authoritySpawnButterfliesIfNeeded(now) : undefined; }
+function broadcastButterflyState(now) { return _systemsApi ? _systemsApi.broadcastButterflyState(now) : undefined; }
+function buildWorldBagDropElement(drop, stackIndex) { return _systemsApi ? _systemsApi.buildWorldBagDropElement(drop, stackIndex) : undefined; }
+function buildWorldRockSpawnContext() { return _systemsApi ? _systemsApi.buildWorldRockSpawnContext() : undefined; }
+function clampButterflyPointToActiveBounds(x, y) { return _systemsApi ? _systemsApi.clampButterflyPointToActiveBounds(x, y) : undefined; }
+function clampPlayerToTreeOutline() { return _systemsApi ? _systemsApi.clampPlayerToTreeOutline() : undefined; }
+function clearLiveButterfliesForPlantFogLock(now) { return _systemsApi ? _systemsApi.clearLiveButterfliesForPlantFogLock(now) : undefined; }
+function collectWorldRockAvoidZones(ctx) { return _systemsApi ? _systemsApi.collectWorldRockAvoidZones(ctx) : undefined; }
+function createButterfly(now, options) { return _systemsApi ? _systemsApi.createButterfly(now, options) : undefined; }
+function createRandomApple(id) { return _systemsApi ? _systemsApi.createRandomApple(id) : undefined; }
+function ensureButterflyRenderEntry(butterfly) { return _systemsApi ? _systemsApi.ensureButterflyRenderEntry(butterfly) : undefined; }
+function ensureWorldBagDropsArray() { return _systemsApi ? _systemsApi.ensureWorldBagDropsArray() : undefined; }
+function ensureWorldLooseSeedShape() { return _systemsApi ? _systemsApi.ensureWorldLooseSeedShape() : undefined; }
+function expandWorldRockAvoidRect(left, top, w, h, pad) { return _systemsApi ? _systemsApi.expandWorldRockAvoidRect(left, top, w, h, pad) : undefined; }
+function getActiveButterflyBounds() { return _systemsApi ? _systemsApi.getActiveButterflyBounds() : undefined; }
+function getAutoTier5GrowMsForPlant(plant) { return _systemsApi ? _systemsApi.getAutoTier5GrowMsForPlant(plant) : undefined; }
+function getBucketSize() { return _systemsApi ? _systemsApi.getBucketSize() : undefined; }
+function getButterflyAnimationFrame(now, butterfly) { return _systemsApi ? _systemsApi.getButterflyAnimationFrame(now, butterfly) : undefined; }
+function getButterflyCatchDistanceAtWorldCenter(cx, cy) { return _systemsApi ? _systemsApi.getButterflyCatchDistanceAtWorldCenter(cx, cy) : undefined; }
+function getButterflyStateForSnapshot() { return _systemsApi ? _systemsApi.getButterflyStateForSnapshot() : undefined; }
+function getCenterDistance(x, y, width, height) { return _systemsApi ? _systemsApi.getCenterDistance(x, y, width, height) : undefined; }
+function getCraftChairById(chairId) { return _systemsApi ? _systemsApi.getCraftChairById(chairId) : undefined; }
+function getDefaultButterflyBounds() { return _systemsApi ? _systemsApi.getDefaultButterflyBounds() : undefined; }
+function getGrassAutoTier5GrowthRatio(plant, now) { return _systemsApi ? _systemsApi.getGrassAutoTier5GrowthRatio(plant, now) : undefined; }
+function getLocalPlayerBodyHeight() { return _systemsApi ? _systemsApi.getLocalPlayerBodyHeight() : undefined; }
+function getLocalPlayerBodyWidth() { return _systemsApi ? _systemsApi.getLocalPlayerBodyWidth() : undefined; }
+function getMaxGroundedPlayerDepth() { return _systemsApi ? _systemsApi.getMaxGroundedPlayerDepth() : 0; }
+function getMaxTreePlayerDepth() { return _systemsApi ? _systemsApi.getMaxTreePlayerDepth() : undefined; }
+function getMinGroundedPlayerDepth() { return _systemsApi ? _systemsApi.getMinGroundedPlayerDepth() : 0; }
+function getMinTreePlayerDepth() { return _systemsApi ? _systemsApi.getMinTreePlayerDepth() : undefined; }
+function getNumericButterflyValue(value, fallback) { return _systemsApi ? _systemsApi.getNumericButterflyValue(value, fallback) : undefined; }
+function getPlantFogClearRectForCurrentScore() { return _systemsApi ? _systemsApi.getPlantFogClearRectForCurrentScore() : undefined; }
+function getPlantFogClearRectForMovementClamp() { return _systemsApi ? _systemsApi.getPlantFogClearRectForMovementClamp() : undefined; }
+function getPlantGrowthRatio(plant, now) { return _systemsApi ? _systemsApi.getPlantGrowthRatio(plant, now) : undefined; }
+function getPlantIndexScoringOptions(now) { return _systemsApi ? _systemsApi.getPlantIndexScoringOptions(now) : undefined; }
+function getPlantMaturityLevelForPlantingSpacing(plant) { return _systemsApi ? _systemsApi.getPlantMaturityLevelForPlantingSpacing(plant) : undefined; }
+function getPlantSecondGrowthRatio(plant, now) { return _systemsApi ? _systemsApi.getPlantSecondGrowthRatio(plant, now) : undefined; }
+function getPlantStateForStorage() { return _systemsApi ? _systemsApi.getPlantStateForStorage() : undefined; }
+function getPlantWaterCapacity(plant) { return _systemsApi ? _systemsApi.getPlantWaterCapacity(plant) : undefined; }
+function getPlayerBox() { return _systemsApi ? _systemsApi.getPlayerBox() : undefined; }
+function getPlayerCenterX() { return _systemsApi ? _systemsApi.getPlayerCenterX() : undefined; }
+function getPlayerFootY() { return _systemsApi ? _systemsApi.getPlayerFootY() : undefined; }
+function getPlayerHeadFogProbeBoxForPose(px, pd, jy) { return _systemsApi ? _systemsApi.getPlayerHeadFogProbeBoxForPose(px, pd, jy) : undefined; }
+function getPlayerHealthTickContext(healthPosePrev) { return _systemsApi ? _systemsApi.getPlayerHealthTickContext(healthPosePrev) : undefined; }
+function getPlayerWorldRockCollisionBoxForPose(px, pd, jy) { return _systemsApi ? _systemsApi.getPlayerWorldRockCollisionBoxForPose(px, pd, jy) : undefined; }
+function getPlayerWorldY() { return _systemsApi ? _systemsApi.getPlayerWorldY() : undefined; }
+function getPowderUpgradeRatio(plant, now) { return _systemsApi ? _systemsApi.getPowderUpgradeRatio(plant, now) : undefined; }
+function getSharedPlantSimulationNow() { return _systemsApi ? _systemsApi.getSharedPlantSimulationNow() : undefined; }
+function getSproutStageFromPlant(plant) { return _systemsApi ? _systemsApi.getSproutStageFromPlant(plant) : undefined; }
+function getSynchronizedNow() { return _systemsApi ? _systemsApi.getSynchronizedNow() : undefined; }
+function getTotalPlantIndexScore() { return _systemsApi ? _systemsApi.getTotalPlantIndexScore() : undefined; }
+function getUnpickedWorldRockCount() { return _systemsApi ? _systemsApi.getUnpickedWorldRockCount() : undefined; }
+function getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) { return _systemsApi ? _systemsApi.getVisibleWorldRockCollisionRect(rx, ry, sz, rockEl) : undefined; }
+function getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) { return _systemsApi ? _systemsApi.getVisibleWorldRockCollisionRectFromBox(boxLeft, boxTop, boxW, boxH) : undefined; }
+function getWellSize() { return _systemsApi ? _systemsApi.getWellSize() : undefined; }
+function hasActiveGreenGrowthProgress(plant, now) { return _systemsApi ? _systemsApi.hasActiveGreenGrowthProgress(plant, now) : undefined; }
+function hasFreshButterflyAuthorityBroadcast(now) { return _systemsApi ? _systemsApi.hasFreshButterflyAuthorityBroadcast(now) : undefined; }
+function isAppleInTrunkArea(localX, localY, size) { return _systemsApi ? _systemsApi.isAppleInTrunkArea(localX, localY, size) : undefined; }
+function isButterflyAuthority() { return _systemsApi ? _systemsApi.isButterflyAuthority() : undefined; }
+function isCraftFurnitureInstalling() { return _systemsApi ? _systemsApi.isCraftFurnitureInstalling() : undefined; }
+function isMainGameTutorialInProgress() { return _systemsApi ? _systemsApi.isMainGameTutorialInProgress() : undefined; }
+function isNearWellForCard() { return _systemsApi ? _systemsApi.isNearWellForCard() : undefined; }
+function isPlantFogMovementClampActive() { return _systemsApi ? _systemsApi.isPlantFogMovementClampActive() : undefined; }
+function isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) { return _systemsApi ? _systemsApi.isPlayerBoxFullyInsidePlantFogClearRect(playerBox, rect, eps) : undefined; }
+function isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) { return _systemsApi ? _systemsApi.isPlayerCollidingVisibleWorldRockForPose(px, pd, jy) : undefined; }
+function isPlayerGameplayBlockedByNpcDialogue() { return _systemsApi ? _systemsApi.isPlayerGameplayBlockedByNpcDialogue() : undefined; }
+function isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) { return _systemsApi ? _systemsApi.isPlayerHeadFogClearForPose(px, pd, jy, rect, eps) : undefined; }
+function isPlayerInTreeCanopy() { return _systemsApi ? _systemsApi.isPlayerInTreeCanopy() : undefined; }
+function isPlayerInWellWaterArea() { return _systemsApi ? _systemsApi.isPlayerInWellWaterArea() : undefined; }
+function isPlayerInsideEnteredCraftHouse() { return _systemsApi ? _systemsApi.isPlayerInsideEnteredCraftHouse() : undefined; }
+function isPlayerNearTreeTrunk() { return _systemsApi ? _systemsApi.isPlayerNearTreeTrunk() : undefined; }
+function isPlayerSupportedByTree() { return _systemsApi ? _systemsApi.isPlayerSupportedByTree() : undefined; }
+function isPlayerTimedActionBusy() { return _systemsApi ? _systemsApi.isPlayerTimedActionBusy() : undefined; }
+function isPowderUpgradeInProgress(plant) { return _systemsApi ? _systemsApi.isPowderUpgradeInProgress(plant) : undefined; }
+function isSharedWorldMergeActive() { return _systemsApi ? _systemsApi.isSharedWorldMergeActive() : undefined; }
+function isSproutStage3Or5IdleNoGrowth(plant, now) { return _systemsApi ? _systemsApi.isSproutStage3Or5IdleNoGrowth(plant, now) : undefined; }
 function isWorldChatBlockingGameInput() { return _systemsApi ? _systemsApi.isWorldChatBlockingGameInput() : false; }
-function isWorldRockPickupUnlocked() { return _systemsApi.isWorldRockPickupUnlocked(); }
-function isWorldServerSyncAvailable() { return _systemsApi.isWorldServerSyncAvailable(); }
-function keepButterfliesInsideActiveBounds() { return _systemsApi.keepButterfliesInsideActiveBounds(); }
-function markWorldDirty() { return _systemsApi.markWorldDirty(); }
-function movePlayerVerticallyInTree(deltaDepth) { return _systemsApi.movePlayerVerticallyInTree(deltaDepth); }
-function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) { return _systemsApi.pickRandomWorldRockSpawnPosition(size, ctx, existingRocks); }
-function pruneButterflyAuthorityWaypointsToList() { return _systemsApi.pruneButterflyAuthorityWaypointsToList(); }
-function pruneStaleMultiplayerRoomSessions(now) { return _systemsApi.pruneStaleMultiplayerRoomSessions(now); }
-function pruneStaleRemotePlayers() { return _systemsApi.pruneStaleRemotePlayers(); }
-function refillWellIfNeeded() { return _systemsApi.refillWellIfNeeded(); }
-function removeButterflyRenderEntry(id) { return _systemsApi.removeButterflyRenderEntry(id); }
-function removeExpiredWorldBagDrops(now) { return _systemsApi.removeExpiredWorldBagDrops(now); }
-function respawnApplesIfNeeded() { return _systemsApi.respawnApplesIfNeeded(); }
-function saveAppleState() { return _systemsApi.saveAppleState(); }
-function savePlayerHealthState() { return _systemsApi.savePlayerHealthState(); }
-function saveSeedState(opts) { return _systemsApi.saveSeedState(opts); }
-function setInstantHoverTip(el, text) { return _systemsApi.setInstantHoverTip(el, text); }
-function setWorldPosition(element, x, y) { return _systemsApi.setWorldPosition(element, x, y); }
-function setWorldSize(element, width, height) { return _systemsApi.setWorldSize(element, width, height); }
-function shouldPauseWaterDecayForPlant(plant, now) { return _systemsApi.shouldPauseWaterDecayForPlant(plant, now); }
-function shouldRunButterflyMotionSimulation(now, onlineAvailable) { return _systemsApi.shouldRunButterflyMotionSimulation(now, onlineAvailable); }
-function shouldSkipPlantWaterDecayNow(simNow) { return _systemsApi.shouldSkipPlantWaterDecayNow(simNow); }
-function simulateButterflyAuthorityStep(butterfly, now) { return _systemsApi.simulateButterflyAuthorityStep(butterfly, now); }
-function snapPlayerToCraftChair(chair) { return _systemsApi.snapPlayerToCraftChair(chair); }
-function standUpFromChair() { return _systemsApi.standUpFromChair(); }
-function syncWorldState(forceSave, options) { return _systemsApi.syncWorldState(forceSave, options); }
-function teardownWorldBagDropDom(drop) { return _systemsApi.teardownWorldBagDropDom(drop); }
-function tickPlayerHealth(nowMs) { return _systemsApi.tickPlayerHealth(nowMs); }
-function tickPlayerPosition() { return _systemsApi.tickPlayerPosition(); }
-function tickWorldBagDropDespawn(now) { return _systemsApi.tickWorldBagDropDespawn(now); }
-function tickWorldRockRespawn(now) { return _systemsApi.tickWorldRockRespawn(now); }
-function tryRespawnOneWorldRockIfBelowCap() { return _systemsApi.tryRespawnOneWorldRockIfBelowCap(); }
-function updateButterflies() { return _systemsApi.updateButterflies(); }
-function updatePlantWaterLevel() { return _systemsApi.updatePlantWaterLevel(); }
-function updateRemotePlayerCount() { return _systemsApi.updateRemotePlayerCount(); }
-function updateWellCard() { return _systemsApi.updateWellCard(); }
-function updateWellImage() { return _systemsApi.updateWellImage(); }
-function updateWorldBagDropDom(forceRebuild) { return _systemsApi.updateWorldBagDropDom(forceRebuild); }
-function updateWorldRocks() { return _systemsApi.updateWorldRocks(); }
-function worldRockOverlapsAnyAvoidRect(rockRect, zones) { return _systemsApi.worldRockOverlapsAnyAvoidRect(rockRect, zones); }
-function worldRockRect(x, y, size) { return _systemsApi.worldRockRect(x, y, size); }
+function isWorldRockPickupUnlocked() { return _systemsApi ? _systemsApi.isWorldRockPickupUnlocked() : undefined; }
+function isWorldServerSyncAvailable() { return _systemsApi ? _systemsApi.isWorldServerSyncAvailable() : undefined; }
+function keepButterfliesInsideActiveBounds() { return _systemsApi ? _systemsApi.keepButterfliesInsideActiveBounds() : undefined; }
+function markWorldDirty() { return _systemsApi ? _systemsApi.markWorldDirty() : undefined; }
+function movePlayerVerticallyInTree(deltaDepth) { return _systemsApi ? _systemsApi.movePlayerVerticallyInTree(deltaDepth) : undefined; }
+function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) { return _systemsApi ? _systemsApi.pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) : undefined; }
+function pruneButterflyAuthorityWaypointsToList() { return _systemsApi ? _systemsApi.pruneButterflyAuthorityWaypointsToList() : undefined; }
+function pruneStaleMultiplayerRoomSessions(now) { return _systemsApi ? _systemsApi.pruneStaleMultiplayerRoomSessions(now) : undefined; }
+function pruneStaleRemotePlayers() { return _systemsApi ? _systemsApi.pruneStaleRemotePlayers() : undefined; }
+function refillWellIfNeeded() { return _systemsApi ? _systemsApi.refillWellIfNeeded() : undefined; }
+function removeButterflyRenderEntry(id) { return _systemsApi ? _systemsApi.removeButterflyRenderEntry(id) : undefined; }
+function removeExpiredWorldBagDrops(now) { return _systemsApi ? _systemsApi.removeExpiredWorldBagDrops(now) : undefined; }
+function respawnApplesIfNeeded() { return _systemsApi ? _systemsApi.respawnApplesIfNeeded() : undefined; }
+function saveAppleState() { return _systemsApi ? _systemsApi.saveAppleState() : undefined; }
+function savePlayerHealthState() { return _systemsApi ? _systemsApi.savePlayerHealthState() : undefined; }
+function saveSeedState(opts) { return _systemsApi ? _systemsApi.saveSeedState(opts) : undefined; }
+function setInstantHoverTip(el, text) { return _systemsApi ? _systemsApi.setInstantHoverTip(el, text) : undefined; }
+function setWorldPosition(element, x, y) { return _systemsApi ? _systemsApi.setWorldPosition(element, x, y) : undefined; }
+function setWorldSize(element, width, height) { return _systemsApi ? _systemsApi.setWorldSize(element, width, height) : undefined; }
+function shouldPauseWaterDecayForPlant(plant, now) { return _systemsApi ? _systemsApi.shouldPauseWaterDecayForPlant(plant, now) : undefined; }
+function shouldRunButterflyMotionSimulation(now, onlineAvailable) { return _systemsApi ? _systemsApi.shouldRunButterflyMotionSimulation(now, onlineAvailable) : undefined; }
+function shouldSkipPlantWaterDecayNow(simNow) { return _systemsApi ? _systemsApi.shouldSkipPlantWaterDecayNow(simNow) : undefined; }
+function simulateButterflyAuthorityStep(butterfly, now) { return _systemsApi ? _systemsApi.simulateButterflyAuthorityStep(butterfly, now) : undefined; }
+function snapPlayerToCraftChair(chair) { return _systemsApi ? _systemsApi.snapPlayerToCraftChair(chair) : undefined; }
+function standUpFromChair() { return _systemsApi ? _systemsApi.standUpFromChair() : undefined; }
+function syncWorldState(forceSave, options) { return _systemsApi ? _systemsApi.syncWorldState(forceSave, options) : undefined; }
+function teardownWorldBagDropDom(drop) { return _systemsApi ? _systemsApi.teardownWorldBagDropDom(drop) : undefined; }
+function tickPlayerHealth(nowMs) { return _systemsApi ? _systemsApi.tickPlayerHealth(nowMs) : undefined; }
+function tickPlayerPosition() { return _systemsApi ? _systemsApi.tickPlayerPosition() : undefined; }
+function tickWorldBagDropDespawn(now) { return _systemsApi ? _systemsApi.tickWorldBagDropDespawn(now) : undefined; }
+function tickWorldRockRespawn(now) { return _systemsApi ? _systemsApi.tickWorldRockRespawn(now) : undefined; }
+function tryRespawnOneWorldRockIfBelowCap() { return _systemsApi ? _systemsApi.tryRespawnOneWorldRockIfBelowCap() : undefined; }
+function updateButterflies() { return _systemsApi ? _systemsApi.updateButterflies() : undefined; }
+function updatePlantWaterLevel() { return _systemsApi ? _systemsApi.updatePlantWaterLevel() : undefined; }
+function updateRemotePlayerCount() { return _systemsApi ? _systemsApi.updateRemotePlayerCount() : undefined; }
+function updateWellCard() { return _systemsApi ? _systemsApi.updateWellCard() : undefined; }
+function updateWellImage() { return _systemsApi ? _systemsApi.updateWellImage() : undefined; }
+function updateWorldBagDropDom(forceRebuild) { return _systemsApi ? _systemsApi.updateWorldBagDropDom(forceRebuild) : undefined; }
+function updateWorldRocks() { return _systemsApi ? _systemsApi.updateWorldRocks() : undefined; }
+function worldRockOverlapsAnyAvoidRect(rockRect, zones) { return _systemsApi ? _systemsApi.worldRockOverlapsAnyAvoidRect(rockRect, zones) : undefined; }
+function worldRockRect(x, y, size) { return _systemsApi ? _systemsApi.worldRockRect(x, y, size) : undefined; }
 
 
 
-function addNetworkDebugLog(message) { return _networkApi.addNetworkDebugLog(message); }
-function applyServerWorldRowTimestamps(row) { return _networkApi.applyServerWorldRowTimestamps(row); }
-function saveSharedWorldAndReload(options) { return _networkApi.saveSharedWorldAndReload(options); }
-function pollWorldState(forcePoll) { return _networkApi.pollWorldState(forcePoll); }
-function getSharedWorldSnapshot() { return _networkApi.getSharedWorldSnapshot(); }
-function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) { return _networkApi.applySharedWorldSnapshot(snapshot, serverRowUpdatedAt); }
-function ingestSharedPlantIndexBonus(snapshot) { return _networkApi.ingestSharedPlantIndexBonus(snapshot); }
-function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) { return _networkApi.syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt); }
-function holdLocalPlantStateAgainstStaleSnapshot(ms) { return _networkApi.holdLocalPlantStateAgainstStaleSnapshot(ms); }
-function holdLocalAppleStateAgainstStaleSnapshot(ms) { return _networkApi.holdLocalAppleStateAgainstStaleSnapshot(ms); }
-function flushPassiveSimulationBeforeSharedSnapshot() { return _networkApi.flushPassiveSimulationBeforeSharedSnapshot(); }
-function setupMultiplayer() { return _networkApi.setupMultiplayer(); }
-function sendMultiplayerPresence(forceSend) { return _networkApi.sendMultiplayerPresence(forceSend); }
-function renderRemotePlayersFromPresence(presenceState) { return _networkApi.renderRemotePlayersFromPresence(presenceState); }
-function broadcastBucketState(forceSend) { return _networkApi.broadcastBucketState(forceSend); }
-function handleRemoteBucketBroadcast(payload) { return _networkApi.handleRemoteBucketBroadcast(payload); }
-function sendMultiplayerLeave() { return _networkApi.sendMultiplayerLeave(); }
+function addNetworkDebugLog(message) { return _networkApi ? _networkApi.addNetworkDebugLog(message) : undefined; }
+function applyServerWorldRowTimestamps(row) { return _networkApi ? _networkApi.applyServerWorldRowTimestamps(row) : undefined; }
+function saveSharedWorldAndReload(options) { return _networkApi ? _networkApi.saveSharedWorldAndReload(options) : undefined; }
+function pollWorldState(forcePoll) { return _networkApi ? _networkApi.pollWorldState(forcePoll) : undefined; }
+function getSharedWorldSnapshot() { return _networkApi ? _networkApi.getSharedWorldSnapshot() : undefined; }
+function applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) { return _networkApi ? _networkApi.applySharedWorldSnapshot(snapshot, serverRowUpdatedAt) : undefined; }
+function ingestSharedPlantIndexBonus(snapshot) { return _networkApi ? _networkApi.ingestSharedPlantIndexBonus(snapshot) : undefined; }
+function syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) { return _networkApi ? _networkApi.syncServerClockOffsetFromRowUpdatedAt(serverRowUpdatedAt) : undefined; }
+function holdLocalPlantStateAgainstStaleSnapshot(ms) { return _networkApi ? _networkApi.holdLocalPlantStateAgainstStaleSnapshot(ms) : undefined; }
+function holdLocalAppleStateAgainstStaleSnapshot(ms) { return _networkApi ? _networkApi.holdLocalAppleStateAgainstStaleSnapshot(ms) : undefined; }
+function flushPassiveSimulationBeforeSharedSnapshot() { return _networkApi ? _networkApi.flushPassiveSimulationBeforeSharedSnapshot() : undefined; }
+function setupMultiplayer() { return _networkApi ? _networkApi.setupMultiplayer() : undefined; }
+function sendMultiplayerPresence(forceSend) { return _networkApi ? _networkApi.sendMultiplayerPresence(forceSend) : undefined; }
+function renderRemotePlayersFromPresence(presenceState) { return _networkApi ? _networkApi.renderRemotePlayersFromPresence(presenceState) : undefined; }
+function broadcastBucketState(forceSend) { return _networkApi ? _networkApi.broadcastBucketState(forceSend) : undefined; }
+function handleRemoteBucketBroadcast(payload) { return _networkApi ? _networkApi.handleRemoteBucketBroadcast(payload) : undefined; }
+function sendMultiplayerLeave() { return _networkApi ? _networkApi.sendMultiplayerLeave() : undefined; }
 
 
 /*** Plant timestamps in snapshots use the saver's Date.now(). Another client's clock
@@ -9436,9 +9441,6 @@ function isFinalMaturePlantNoWaterCare(plant, now) {
 }
 
 /** 3???? ??????4?5????? ????????????? ??? ?????? ????? ?????(UI ??????? ????) */
-
-
-const stage3CompleteMagicHint = "\uC131\uC7A5 \uC644\uB8CC, \uB354 \uD0A4\uC6B0\uB824\uBA74 \uB9C8\uBC95\uC758 \uAC00\uB8E8 \uD544\uC694.";
 
 function isStage3CompleteAwaitingMagicPowder(plant) {
   if (!plant || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
@@ -15380,6 +15382,8 @@ function setup() {
   updateWorldRocks();
   updateCamera();
 }
+
+ovcInitScriptLayers();
 
 (async function ovcRunBootstrap() {
 try {
