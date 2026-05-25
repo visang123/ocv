@@ -1,0 +1,17 @@
+# Local dev / secrets
+data/accounts.json
+
+# Python
+scripts/__pycache__/
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+._*
+
+# Backups & scratch
+*.bak
+*.orig
+._ovc_test_chunk.js
