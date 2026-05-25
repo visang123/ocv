@@ -3421,10 +3421,8 @@ function applyRemoteSharedMainBucketHeldPose(x, y, isFull) {
 }
 
 function isMainBucketOnGroundForPickup() {
-  if (!bucket || isHoldingMainBucket()) return false;
-  const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
-  if (heldBy && heldBy !== currentSessionId) return false;
-  return true;
+  if (isHoldingMainBucket()) return false;
+  return canPickUpSharedBucket();
 }
 
 function groundBucketsOverlap(ax, ay, bx, by, bucketSz) {
@@ -5654,10 +5652,15 @@ function canPickUpSharedBucket() {
   if (!heldBy || heldBy === currentSessionId) return true;
 
   const holder = remotePlayers[heldBy];
+  if (!holder) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    addBucketTrace("pickup", "recovered unknown holder=" + heldBy, 0);
+    return true;
+  }
+
   const holderIsActive =
-    holder &&
-    Number.isFinite(holder.lastSeenAt) &&
-    Date.now() - holder.lastSeenAt < 5000;
+    Number.isFinite(holder.lastSeenAt) && Date.now() - holder.lastSeenAt < 5000;
 
   if (!holderIsActive) {
     // Recover from stale holder ownership that blocks pickup forever.
@@ -6838,7 +6841,10 @@ function saveBucketState() {
 function buildNetworkDeps() {
   return {
     HELD_ITEM_BUCKET,
+    HELD_ITEM_SEED,
     MAIN_BUCKET_ID,
+    WORLD_LOOSE_SEED_X,
+    WORLD_LOOSE_SEED_Y,
     REMOTE_BUTTERFLY_CATCH_ACTION_MS,
     WORLD_LOOSE_ROCK_COUNT,
     WORLD_ROCK_PICKUP_ACTION_MS,

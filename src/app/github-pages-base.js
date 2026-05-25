@@ -3,10 +3,13 @@
  * 루트(visang123.github.io/)로 열면 style.css·src/main.js가 404 → CSS/JS 미적용처럼 보입니다.
  */
 (function () {
-  if (location.hostname !== "visang123.github.io") return;
-
   var repoBase = "/ocv/";
   var path = location.pathname || "/";
+  var onGhPages =
+    location.hostname === "visang123.github.io" ||
+    location.hostname.endsWith(".github.io");
+
+  if (!onGhPages) return;
 
   if (path.indexOf(repoBase) !== 0) {
     var file = path === "/" || path === "/index.html" ? "index.html" : path.replace(/^\//, "");
