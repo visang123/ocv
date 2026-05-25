@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525e";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525e";
-import { initScriptView } from "./src/script/view/index.js?v=20260525e";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525f";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525f";
+import { initScriptView } from "./src/script/view/index.js?v=20260525f";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -6874,11 +6874,11 @@ function buildNetworkDeps() {
     handleRemoteButterflyStateBroadcast,
     handleRemoteWorldBagDropBroadcast,
     handleRemoteWorldBagDropPickupBroadcast,
-    handleRemoteWorldChatBroadcast,
-    handleRemoteWorldHeartBroadcast,
+    handleWorldChatBroadcast,
+    handleWorldHeartBroadcast,
     handleRemoteWorldLooseSeedPickupBroadcast,
     handleRemoteWorldRockPickupBroadcast,
-    handleRemoteWorldSadBroadcast,
+    handleWorldSadBroadcast,
     get hasHydratedSharedWorldFromServer() { return hasHydratedSharedWorldFromServer; },
     set hasHydratedSharedWorldFromServer(v) { hasHydratedSharedWorldFromServer = v; },
     hasPickedMainSeedInCurrentRoom,
@@ -7931,7 +7931,7 @@ function isPlayerTimedActionBusy() { return _systemsApi.isPlayerTimedActionBusy(
 function isPowderUpgradeInProgress(plant) { return _systemsApi.isPowderUpgradeInProgress(plant); }
 function isSharedWorldMergeActive() { return _systemsApi.isSharedWorldMergeActive(); }
 function isSproutStage3Or5IdleNoGrowth(plant, now) { return _systemsApi.isSproutStage3Or5IdleNoGrowth(plant, now); }
-function isWorldChatBlockingGameInput() { return _systemsApi.isWorldChatBlockingGameInput(); }
+function isWorldChatBlockingGameInput() { return _systemsApi ? _systemsApi.isWorldChatBlockingGameInput() : false; }
 function isWorldRockPickupUnlocked() { return _systemsApi.isWorldRockPickupUnlocked(); }
 function isWorldServerSyncAvailable() { return _systemsApi.isWorldServerSyncAvailable(); }
 function keepButterfliesInsideActiveBounds() { return _systemsApi.keepButterfliesInsideActiveBounds(); }

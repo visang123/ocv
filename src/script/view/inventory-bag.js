@@ -3,8 +3,8 @@
 export function createModule(d) {
   function assignExtraSeedInventoryOwner(seed) {
   if (!seed) return;
-  seed.ownerUserId = d.getLocalExtraSeedOwnerUserId();
-  seed.ownerSessionId = d.getLocalExtraSeedOwnerSessionId();
+  d.seed.ownerUserId = d.getLocalExtraSeedOwnerUserId();
+  d.seed.ownerSessionId = d.getLocalExtraSeedOwnerSessionId();
   }
 
   function bagDiscardInventoryEligible(itemKey) {
@@ -22,7 +22,7 @@ export function createModule(d) {
     const seed = d.getApple().extraSeeds[seedIndex];
     if (
       d.isOnboardingLinearGateActive() &&
-      (seed.isStarter || seed.id === "starter-seed")
+      (d.seed.isStarter || d.seed.id === "starter-seed")
     ) {
       return false;
     }

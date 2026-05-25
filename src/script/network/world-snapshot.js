@@ -302,9 +302,9 @@ export function createModule(d) {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
     // Apply snapshot bucket fallback only when realtime channel is not subscribed.
     if (snapshot.bucket && !d.isMultiplayerSubscribed) {
-      const heldBy = String(snapshot.bucket.heldBy || "");
-      const nextBucketX = Number(snapshot.bucket.x);
-      const nextBucketY = Number(snapshot.bucket.y);
+      const heldBy = String(snapshot.d.bucket.heldBy || "");
+      const nextBucketX = Number(snapshot.d.bucket.x);
+      const nextBucketY = Number(snapshot.d.bucket.y);
       if (d.isHoldingMainBucket()) {
         // While local player is carrying the bucket, keep local ownership/state authoritative.
         window.OVC_SHARED_BUCKET_HELD_BY = d.currentSessionId;
@@ -314,7 +314,7 @@ export function createModule(d) {
           d.applyRemoteSharedMainBucketGround(
             nextBucketX,
             nextBucketY,
-            snapshot.bucket.isFull
+            snapshot.d.bucket.isFull
           );
         }
       } else {
@@ -323,27 +323,27 @@ export function createModule(d) {
           d.applyRemoteSharedMainBucketGround(
             nextBucketX,
             nextBucketY,
-            snapshot.bucket.isFull
+            snapshot.d.bucket.isFull
           );
         }
       }
     }
 
     if (snapshot.seed) {
-      const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
-      const nextSeedX = Number(snapshot.seed.x);
-      const nextSeedY = Number(snapshot.seed.y);
+      const nextSeedCreatedAt = Number(snapshot.d.seed.createdAt);
+      const nextSeedX = Number(snapshot.d.seed.x);
+      const nextSeedY = Number(snapshot.d.seed.y);
       const canApplyMainSeedState =
         hasServerRowTime ||
         !snapshotSavedAt ||
         snapshotSavedAt >= d.getSeedWorld().lastMainSeedStateChangeAt;
       // Per-account tutorial seed uses room-scoped storage; do not mirror shared snapshot here.
-      if (canApplyMainSeedState && typeof snapshot.seed.isDryHandled === "boolean") {
-        d.getSeedWorld().hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
+      if (canApplyMainSeedState && typeof snapshot.d.seed.isDryHandled === "boolean") {
+        d.getSeedWorld().hasHandledDryMainSeed = Boolean(snapshot.d.seed.isDryHandled);
         d.setStoredFlag(d.mainDrySeedHandledKey, d.getSeedWorld().hasHandledDryMainSeed);
       }
-      if (canApplyMainSeedState && typeof snapshot.seed.isMainSeedAvailable === "boolean") {
-        if (snapshot.seed.isMainSeedAvailable) {
+      if (canApplyMainSeedState && typeof snapshot.d.seed.isMainSeedAvailable === "boolean") {
+        if (snapshot.d.seed.isMainSeedAvailable) {
           d.clearMainSeedPickedForCurrentRoom();
           d.getSeedWorld().isMainSeedAvailable = true;
         } else {
@@ -363,8 +363,8 @@ export function createModule(d) {
           d.getPlant().seedCreatedAt = nextSeedCreatedAt;
           d.setStoredValue(d.seedCreatedAtKey, String(nextSeedCreatedAt));
         }
-        if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.seed.isDry === "boolean") {
-          d.getPlant().isSeedDry = Boolean(snapshot.seed.isDry);
+        if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.d.seed.isDry === "boolean") {
+          d.getPlant().isSeedDry = Boolean(snapshot.d.seed.isDry);
         }
       }
     }
@@ -373,8 +373,8 @@ export function createModule(d) {
 /** ?????????? ????????????? ???? ???????? ??? ??d.appStorageKeysSharedWorldReset???? ?????????????? ?????. local??????? */
     // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
     if (snapshot.well) {
-      d.getWell().water = Math.max(0, Math.min(d.maxWellWater, Number(snapshot.well.water) || 0));
-      d.getWell().lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
+      d.getWell().water = Math.max(0, Math.min(d.maxWellWater, Number(snapshot.d.well.water) || 0));
+      d.getWell().lastRefillAt = Number(snapshot.d.well.lastRefillAt) || Date.now();
       d.refillWellIfNeeded();
       if (snapshotSavedAt) {
         d.getWell().lastStateChangeAt = Math.max(d.getWell().lastStateChangeAt, snapshotSavedAt);
@@ -442,13 +442,13 @@ export function createModule(d) {
         d.getNpc().x = Number(snapshot.mainPlant.npcX) || d.getNpc().x;
         d.getNpc().y = Number(snapshot.mainPlant.npcY) || d.getNpc().y;
         if (d.getPlant().isSeedPlanted) {
-          plantSpot.src = d.getPlantSoilSrc(d.getPlant());
+          d.plantSpot.src = d.getPlantSoilSrc(d.getPlant());
           d.setWorldPosition(d.plantSpot, d.getPlant().spotX, d.getPlant().spotY);
           const mainRot = d.getPlant().status === "rotten" || d.getPlant().isOverwatered;
-          plantSpot.style.display =
+          d.plantSpot.style.display =
             mainRot || !d.shouldHideSeparateSoilUnderBigGrass(d.getPlant()) ? "block" : "none";
         } else {
-          plantSpot.style.display = "none";
+          d.plantSpot.style.display = "none";
         }
         if (snapshotSavedAt) {
           d.getPlant().lastMainPlantStateChangeAt = Math.max(
@@ -524,7 +524,7 @@ export function createModule(d) {
       d.getApple().nextSeedOffset = Math.max(0, Number(snapshot.apples.nextSeedOffset) || 0);
       d.getApple().lastSpawnAt = Number(snapshot.apples.lastSpawnAt) || Date.now();
       d.getApple().apples = Array.isArray(snapshot.apples.apples)
-        ? snapshot.apples.apples.map(parseTreeAppleFromSnapshot)
+        ? snapshot.apples.apples.map(d.parseTreeAppleFromSnapshot)
         : d.getApple().apples;
       if (d.usesWorldLooseSeedMode()) {
         const wls = snapshot.apples.worldLooseSeed;
@@ -549,8 +549,8 @@ export function createModule(d) {
             y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
             nextSpawnAt: mergedNextSpawnAt
           };
-          worldLoosePickupLockUntil = Math.max(
-            Number(worldLoosePickupLockUntil || 0),
+          d.worldLoosePickupLockUntil = Math.max(
+            Number(d.worldLoosePickupLockUntil || 0),
             Number(mergedNextSpawnAt || 0)
           );
           d.syncWorldLoosePickupLock(syncedNow);
@@ -702,9 +702,9 @@ export function createModule(d) {
         d.normalizePlantSproutFieldsWhenSoilDry(ep);
       });
       const now = syncedNow;
-      Object.keys(localApplePickedAtById).forEach(function (appleId) {
-        const pickedAt = Number(localApplePickedAtById[appleId] || 0);
-        if (!pickedAt || now - pickedAt >= appleRespawnMs) return;
+      Object.keys(d.localApplePickedAtById).forEach(function (appleId) {
+        const pickedAt = Number(d.localApplePickedAtById[appleId] || 0);
+        if (!pickedAt || now - pickedAt >= d.appleRespawnMs) return;
         if (!d.getApple().pickedIds.includes(appleId)) {
           d.getApple().pickedIds.push(appleId);
         }

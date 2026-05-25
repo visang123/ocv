@@ -14,7 +14,7 @@ export function createModule(d) {
     const pos = d.pickRandomWorldRockSpawnPosition(size, ctx, rocks);
     if (!pos) continue;
     rocks.push({
-      id: "d.ground-rock-" + (i + 1),
+      id: "ground-rock-" + (i + 1),
       x: pos.x,
       y: pos.y,
       size: size
@@ -30,26 +30,26 @@ export function createModule(d) {
 
   function rebuildPlacedCraftFurnitureDom() {
   if (!d.ground) return;
-  ground.querySelectorAll(".world-craft-furniture").forEach(function (node) {
+  d.ground.querySelectorAll(".world-craft-furniture").forEach(function (node) {
     node.remove();
   });
   if (!d.isWorldDocumentEntry()) return;
   const insertBeforeEl = d.getCraftFurnitureInsertBeforeEl();
-  placedCraftFurniture.forEach(function (entry) {
+  d.placedCraftFurniture.forEach(function (entry) {
     const spec = d.getCraftFurnitureWorldSpec(entry.kind);
     if (!spec) return;
     const el = document.createElement("img");
     el.className =
-      "d.world-craft-furniture d.world-craft-furniture--" +
+      "world-craft-furniture d.world-craft-furniture--" +
       entry.kind.replace(/^craft/, "").toLowerCase();
     el.src = spec.src;
     el.alt = "";
     el.draggable = false;
     el.setAttribute("aria-hidden", "true");
     if (insertBeforeEl) {
-      ground.insertBefore(el, insertBeforeEl);
+      d.ground.insertBefore(el, insertBeforeEl);
     } else {
-      ground.appendChild(el);
+      d.ground.appendChild(el);
     }
     entry._el = el;
   });
@@ -59,7 +59,7 @@ export function createModule(d) {
   function rebuildWorldBagDropDom() {
   if (!d.ground) return;
   d.ensureWorldBagDropsArray();
-  ground.querySelectorAll(".world-bag-drop").forEach(function (node) {
+  d.ground.querySelectorAll(".world-bag-drop").forEach(function (node) {
     node.remove();
   });
   d.getApple().worldBagDrops.forEach(function (drop) {
@@ -70,7 +70,7 @@ export function createModule(d) {
 
   function rebuildWorldRockDom() {
   if (!d.ground) return;
-  ground.querySelectorAll(".world-d.ground-rock").forEach(function (node) {
+  d.ground.querySelectorAll(".world-ground-rock").forEach(function (node) {
     node.remove();
   });
   if (!d.isWorldDocumentEntry() || !Array.isArray(d.getApple().worldRocks)) return;
@@ -82,13 +82,13 @@ export function createModule(d) {
         : null;
   d.getApple().worldRocks.forEach(function (rock) {
     const el = document.createElement("div");
-    el.className = "d.world-d.ground-rock";
+    el.className = "world-ground-rock";
     el.dataset.rockId = rock.id;
     el.setAttribute("aria-hidden", "true");
     if (insertBeforeEl) {
-      ground.insertBefore(el, insertBeforeEl);
+      d.ground.insertBefore(el, insertBeforeEl);
     } else {
-      ground.appendChild(el);
+      d.ground.appendChild(el);
     }
     rock._el = el;
   });
@@ -113,7 +113,7 @@ export function createModule(d) {
 
   function updateApples() {
   d.respawnApplesIfNeeded();
-  treeAppleElements.forEach(function (appleElement) {
+  d.treeAppleElements.forEach(function (appleElement) {
     const apple = d.getApple().apples.find(function (candidate) {
       return candidate.id === appleElement.dataset.appleId;
     });
@@ -134,8 +134,8 @@ export function createModule(d) {
   }
 
   function updateBucketPosition() {
-  bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
-  playerBucketOverlay.style.backgroundImage =
+  d.bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+  d.playerBucketOverlay.style.backgroundImage =
     'url("' + (d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY) + '")';
   const isBucketHeldByRemotePlayer = d.isMainBucketHeldByRemotePlayer();
   if (isBucketHeldByRemotePlayer) {
@@ -150,14 +150,14 @@ export function createModule(d) {
   Object.keys(d.remotePlayers).forEach(function (remoteId) {
     const remotePlayer = d.remotePlayers[remoteId];
     if (!remotePlayer || !remotePlayer.element) return;
-    remotePlayer.element.classList.remove("is-carrying-d.bucket", "is-carrying-d.bucket-full");
+    remotePlayer.element.classList.remove("is-carrying-bucket", "is-carrying-bucket-full");
     const holdsMain = String(window.OVC_SHARED_BUCKET_HELD_BY || "") === remoteId;
     const extraHold = d.remotePlayerHeldBucketById[remoteId];
     // ?? ???? ?? #bucket ??? ? ??? ??? ? ::after ?? ?? ??
     if (extraHold && !holdsMain) {
-      remotePlayer.element.classList.add("is-carrying-d.bucket");
+      remotePlayer.element.classList.add("is-carrying-bucket");
       if (Boolean(extraHold.isFull)) {
-        remotePlayer.element.classList.add("is-carrying-d.bucket-full");
+        remotePlayer.element.classList.add("is-carrying-bucket-full");
       }
     }
   });
@@ -171,22 +171,22 @@ export function createModule(d) {
     if (d.isHoldingMainBucket()) {
       d.markWorldDirty();
       d.broadcastBucketState(false);
-      bucket.style.display = "none";
+      d.bucket.style.display = "none";
     } else if (d.isHoldingExtraBucket()) {
       const mainGround = d.getMainBucketGroundState();
-      bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
-      bucket.style.display = "block";
+      d.bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+      d.bucket.style.display = "block";
       d.setWorldPosition(d.bucket, mainGround.x, mainGround.y);
-      bucket.style.zIndex = String(d.getGroundBucketZIndex(mainGround.y));
+      d.bucket.style.zIndex = String(d.getGroundBucketZIndex(mainGround.y));
       d.markWorldDirty();
       d.broadcastBucketState(false);
     } else if (isBucketHeldByRemotePlayer) {
       d.syncMainBucketToRemoteHolderHand();
-      bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
-      bucket.style.display = "block";
+      d.bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+      d.bucket.style.display = "block";
       d.setWorldPosition(d.bucket, d.getWorldItems().bucketX, d.getWorldItems().bucketY);
     }
-    playerBucketOverlay.style.display = "block";
+    d.playerBucketOverlay.style.display = "block";
   } else if (isBucketHeldByRemotePlayer) {
     const bucketSize = d.getBucketSize();
     if (!d.syncMainBucketToRemoteHolderHand()) {
@@ -195,19 +195,19 @@ export function createModule(d) {
         d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - bucketSize.height;
       }
     }
-    bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
-    bucket.style.display = "block";
-    playerBucketOverlay.style.display = "none";
+    d.bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+    d.bucket.style.display = "block";
+    d.playerBucketOverlay.style.display = "none";
   } else {
-    bucket.style.display = "block";
-    playerBucketOverlay.style.display = "none";
+    d.bucket.style.display = "block";
+    d.playerBucketOverlay.style.display = "none";
     // While idle on ground, periodically publish authoritative world bucket state.
     // This helps recover peers that missed a pickup/drop edge event.
     d.broadcastBucketState(false);
   }
 
   if (
-    bucket.style.display === "block" &&
+    d.bucket.style.display === "block" &&
     !d.isHoldingExtraBucket() &&
     (!Number.isFinite(d.getWorldItems().bucketX) || !Number.isFinite(d.getWorldItems().bucketY))
   ) {
@@ -216,24 +216,24 @@ export function createModule(d) {
     d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - bucketSize.height;
   }
 
-  if (bucket.style.display === "block" && !d.isHoldingExtraBucket()) {
+  if (d.bucket.style.display === "block" && !d.isHoldingExtraBucket()) {
     const mainGround = d.getMainBucketGroundState();
-    bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+    d.bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
     d.setWorldPosition(d.bucket, mainGround.x, mainGround.y);
-    bucket.style.zIndex = String(d.getGroundBucketZIndex(mainGround.y));
+    d.bucket.style.zIndex = String(d.getGroundBucketZIndex(mainGround.y));
     if (d.BUCKET_DEBUG_TRACE) {
       const mode =
         d.getInventory().heldItem === d.HELD_ITEM_BUCKET
           ? "local-held"
           : isBucketHeldByRemotePlayer
             ? "remote-held"
-            : "d.world";
+            : "world";
       const renderKey =
         mode + "|" + Math.round(d.getWorldItems().bucketX || 0) + "|" + Math.round(d.getWorldItems().bucketY || 0);
       if (renderKey !== d.lastBucketRenderLoggedKey) {
         d.lastBucketRenderLoggedKey = renderKey;
         d.addNetworkDebugLog(
-          "[d.bucket:render] mode=" +
+          "[bucket:render] mode=" +
             mode +
             " x=" +
             Math.round(d.getWorldItems().bucketX || 0) +
@@ -248,7 +248,7 @@ export function createModule(d) {
 
   function updatePlacedCraftFurnitureDom() {
   if (!d.isWorldDocumentEntry()) return;
-  placedCraftFurniture.forEach(function (entry) {
+  d.placedCraftFurniture.forEach(function (entry) {
     if (!entry._el) return;
     d.setWorldSize(entry._el, entry.width, entry.height);
     d.setWorldPosition(entry._el, entry.x, entry.y);
@@ -257,8 +257,8 @@ export function createModule(d) {
 
   function updateSeedCard() {
   updateSeedDryState();
-  seedCard.style.display = "none";
-  seedWorldText.style.display = "none";
+  d.seedCard.style.display = "none";
+  d.seedWorldText.style.display = "none";
   }
 
   function updateSeedDryState() {
@@ -335,11 +335,11 @@ export function createModule(d) {
   }
   const showMainSeedSprite =
     shouldShowMainSeedOnGround || d.getInventory().heldItem === d.HELD_ITEM_SEED;
-  seed.style.display = showMainSeedSprite ? "block" : "none";
+  d.seed.style.display = showMainSeedSprite ? "block" : "none";
   if (!showMainSeedSprite) {
     d.getSeedWorld().isHoveringMainSeed = false;
   }
-  seed.src = d.getPlant().isSeedDry ? d.IMG_SEED_DRY : d.IMG_SEED;
+  d.seed.src = d.getPlant().isSeedDry ? d.IMG_SEED_DRY : d.IMG_SEED;
 
   if (d.getInventory().heldItem === d.HELD_ITEM_SEED && d.getPlant().isSeedDry) {
     d.getInventory().heldItem = null;

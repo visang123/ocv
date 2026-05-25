@@ -21,13 +21,13 @@ export function createModule(d) {
   if (!visual) return null;
 
   const root = document.createElement("div");
-  root.className = "d.world-bag-drop";
+  root.className = "world-bag-drop";
   root.dataset.dropId = String(drop.id);
   root.setAttribute("aria-hidden", "true");
   root.style.zIndex = String(d.getWorldBagDropZIndex(drop, stackIndex));
 
   const inner = document.createElement("div");
-  inner.className = "d.world-bag-drop__inner";
+  inner.className = "world-bag-drop__inner";
   const dropAgeMs = Date.now() - (Number(drop.droppedAt) || 0);
   if (dropAgeMs >= 0 && dropAgeMs < 600) {
     inner.classList.add("is-settling");
@@ -41,18 +41,18 @@ export function createModule(d) {
   }
 
   const stack = document.createElement("div");
-  stack.className = "d.world-bag-drop__stack";
+  stack.className = "world-bag-drop__stack";
 
   if (visual.kind === "img") {
     const img = document.createElement("img");
-    img.className = "d.world-bag-drop__icon";
+    img.className = "world-bag-drop__icon";
     img.src = visual.src;
     img.alt = visual.alt || "";
     img.draggable = false;
     stack.appendChild(img);
   } else {
     const icon = document.createElement("span");
-    icon.className = "d.world-bag-drop__icon " + (visual.className || "bag-drop-icon");
+    icon.className = "world-bag-drop__icon " + (visual.className || "bag-drop-icon");
     icon.setAttribute("aria-hidden", "true");
     stack.appendChild(icon);
   }
@@ -60,7 +60,7 @@ export function createModule(d) {
   const count = Math.max(1, Math.floor(Number(drop.count) || 0));
   if (count > 1) {
     const countEl = document.createElement("span");
-    countEl.className = "d.world-bag-drop__count";
+    countEl.className = "world-bag-drop__count";
     countEl.textContent = d.formatWorldBagDropCountLabel(count);
     stack.appendChild(countEl);
   }
@@ -550,10 +550,10 @@ export function createModule(d) {
     worldRockPickedIds: d.getApple().worldRockPickedIds,
     worldExtraBuckets: (d.getApple().worldExtraBuckets || []).map(function (bucket) {
       return {
-        id: bucket.id,
-        x: Number(bucket.x) || 0,
-        y: Number(bucket.y) || 0,
-        isFull: Boolean(bucket.isFull)
+        id: d.bucket.id,
+        x: Number(d.bucket.x) || 0,
+        y: Number(d.bucket.y) || 0,
+        isFull: Boolean(d.bucket.isFull)
       };
     }),
     placedCraftFurniture: d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
@@ -639,7 +639,7 @@ export function createModule(d) {
   if (!rock) {
     if (d.getApple().worldRocks.length >= d.WORLD_LOOSE_ROCK_COUNT) return false;
     rock = {
-      id: "d.ground-rock-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
+      id: "ground-rock-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
       x: pos.x,
       y: pos.y,
       size: size
@@ -662,7 +662,7 @@ export function createModule(d) {
           ? d.player
           : null;
     const el = document.createElement("div");
-    el.className = "d.world-d.ground-rock";
+    el.className = "world-ground-rock";
     el.dataset.rockId = rock.id;
     el.setAttribute("aria-hidden", "true");
     if (insertBeforeEl) {
@@ -731,7 +731,7 @@ export function createModule(d) {
             (inner && inner.querySelector(".world-bag-drop__stack")) || inner;
           if (mount) {
             const next = document.createElement("span");
-            next.className = "d.world-bag-drop__count";
+            next.className = "world-bag-drop__count";
             next.textContent = d.formatWorldBagDropCountLabel(count);
             mount.appendChild(next);
           }

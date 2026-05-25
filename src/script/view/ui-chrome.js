@@ -190,7 +190,7 @@ export function createModule(d) {
 
   function rebuildWorldExtraBucketDom() {
   if (!d.ground) return;
-  ground.querySelectorAll(".world-extra-d.bucket").forEach(function (node) {
+  d.ground.querySelectorAll(".world-extra-bucket").forEach(function (node) {
     node.remove();
   });
   if (!d.isWorldDocumentEntry() || !Array.isArray(d.getApple().worldExtraBuckets)) return;
@@ -198,16 +198,16 @@ export function createModule(d) {
   d.getApple().worldExtraBuckets.forEach(function (entry) {
     if (!entry) return;
     const el = document.createElement("img");
-    el.className = "d.world-extra-d.bucket";
+    el.className = "world-extra-d.bucket";
     el.dataset.bucketId = entry.id;
     el.src = entry.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
     el.alt = "";
     el.setAttribute("aria-hidden", "true");
     el.draggable = false;
     if (insertBeforeEl) {
-      ground.insertBefore(el, insertBeforeEl);
+      d.ground.insertBefore(el, insertBeforeEl);
     } else {
-      ground.appendChild(el);
+      d.ground.appendChild(el);
     }
     entry._el = el;
   });
@@ -550,12 +550,12 @@ export function createModule(d) {
     }
     case 5: {
       d.setOnboardingCalloutVisible(true, "씨앗으로 이동하세요.");
-      if (d.seed) seed.classList.add("onboarding-highlight");
+      if (d.seed) d.seed.classList.add("onboarding-highlight");
       break;
     }
     case 6: {
       d.setOnboardingCalloutVisible(true, "e키를 눌러 씨앗을 소지하세요.");
-      if (d.seed) seed.classList.add("onboarding-highlight");
+      if (d.seed) d.seed.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_GO_BOOK: {
@@ -642,8 +642,8 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_WELL: {
       d.setOnboardingCalloutVisible(true, "우물근처에 양동이로 이동하세요.");
-      if (d.well) well.classList.add("onboarding-highlight");
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.well) d.well.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_BUCKET_PICK: {
@@ -651,7 +651,7 @@ export function createModule(d) {
         true,
         "양동이 근처로 가서 E키를 눌러 양동이를 들어 주세요."
       );
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_BUCKET_FILL: {
@@ -659,8 +659,8 @@ export function createModule(d) {
         true,
         "우물로 이동한 뒤 Q키를 눌러 물을 길어 주세요."
       );
-      if (d.well) well.classList.add("onboarding-highlight");
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.well) d.well.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_WATER_APPROACH: {
@@ -669,13 +669,13 @@ export function createModule(d) {
         "그대로 아까 심은 씨앗으로 다가가세요. Q 또는 식물 클릭으로 식물에 물을 주세요."
       );
       if (d.plantSpot) plantSpot.classList.add("onboarding-highlight");
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_WATER_POUR: {
       d.setOnboardingCalloutVisible(true, "Q 또는 식물 클릭으로 식물에 물을 주세요.");
       if (d.plantSpot) plantSpot.classList.add("onboarding-highlight");
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_WATER_DONE: {
@@ -718,7 +718,7 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_DROP_BUCKET: {
       d.setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
-      if (d.bucket) bucket.classList.add("onboarding-highlight");
+      if (d.bucket) d.bucket.classList.add("onboarding-highlight");
       if (d.player) player.classList.add("onboarding-highlight");
       break;
     }
