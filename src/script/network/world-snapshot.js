@@ -1,6 +1,6 @@
 /** Shared world row serialize / apply (Supabase world_state) */
 import { parseMainPlantFromSnapshot, resolveSnapshotSavedAt, dedupeExtraSeedsPreferInventory } from "../../game/worldSnapshot.js";
-import { syncServerClockOffsetCore } from "../../game/timeSync.js";
+import { syncServerClockOffset as syncServerClockOffsetCore } from "../../game/timeSync.js";
 
 export function createModule(d) {
   function flushPassiveSimulationBeforeSharedSnapshot() {
@@ -199,7 +199,7 @@ export function createModule(d) {
             ? d.getApple().worldRockPickedIds.map(String)
             : [])
         : undefined,
-      d.placedCraftFurniture: d.isWorldDocumentEntry()
+      placedCraftFurniture: d.isWorldDocumentEntry()
         ? d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
         : undefined,
       worldExtraBuckets: d.isWorldDocumentEntry()
@@ -296,7 +296,7 @@ export function createModule(d) {
   }
   d.isApplyingWorldState = true;
   const shouldDeferRemotePlantApply = Date.now() < d.localPlantActionLockUntil;
-  const d.shouldDeferRemoteAppleApply = Date.now() < d.localAppleActionLockUntil;
+  const shouldDeferRemoteAppleApply = Date.now() < d.localAppleActionLockUntil;
 
   try {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
@@ -462,7 +462,7 @@ export function createModule(d) {
     // Snapshot apply rule (apples/extra seeds/plants):
     // - defer during local apples lock window,
     // - then resume full merge on subsequent polls.
-    if (snapshot.apples && !d.shouldDeferRemoteAppleApply) {
+    if (snapshot.apples && !shouldDeferRemoteAppleApply) {
       const priorExtraSeeds = d.getApple().extraSeeds.slice();
       const priorExtraPlants = d.getApple().extraPlants.slice();
       const priorWorldLooseNextSpawnAt =
@@ -698,7 +698,7 @@ export function createModule(d) {
         }
         d.sanitizePrematureRemotePlantDryState(ep, extraPlantClockNow, snapRefPlants);
         d.stabilizeFirstWaterHintFlags(ep);
-        d.sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, getExtraDryDelayMs);
+        d.sanitizeSharedPlantHydrationAfterRemoteSnapshot(ep, extraPlantClockNow, d.getExtraDryDelayMs);
         d.normalizePlantSproutFieldsWhenSoilDry(ep);
       });
       const now = syncedNow;
@@ -754,17 +754,17 @@ export function createModule(d) {
           });
           d.getApple().worldRockPickedIds = Array.from(merged);
         }
-        if (!d.shouldDeferRemoteAppleApply) {
+        if (!shouldDeferRemoteAppleApply) {
           const snapFurniture = snapApples.placedCraftFurniture;
           if (Array.isArray(snapFurniture)) {
             d.placedCraftFurniture = d.parsePlacedCraftFurnitureFromSnapshot(snapFurniture);
             d.rebuildPlacedCraftFurnitureDom();
           }
         }
-        if (!d.shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
+        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
           d.applyWorldExtraBucketsFromSharedSnapshot(snapApples.worldExtraBuckets);
         }
-        if (!d.shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldBagDrops)) {
+        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldBagDrops)) {
           d.mergeWorldBagDropsFromSnapshot(snapApples.worldBagDrops);
         }
       }

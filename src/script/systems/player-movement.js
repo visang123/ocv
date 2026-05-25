@@ -57,10 +57,10 @@ export function createModule(d) {
   function getPlantIndexScoringOptions(now) {
   return {
     now: now != null ? now : d.getSharedPlantSimulationNow(),
-    d.getSproutStageFromPlant: d.getSproutStageFromPlant,
-    d.isPowderUpgradeInProgress: d.isPowderUpgradeInProgress,
-    d.getPowderUpgradeRatio: d.getPowderUpgradeRatio,
-    d.getGrassAutoTier5GrowthRatio: d.getGrassAutoTier5GrowthRatio
+    getSproutStageFromPlant: d.getSproutStageFromPlant,
+    isPowderUpgradeInProgress: d.isPowderUpgradeInProgress,
+    getPowderUpgradeRatio: d.getPowderUpgradeRatio,
+    getGrassAutoTier5GrowthRatio: d.getGrassAutoTier5GrowthRatio
   };
   }
 

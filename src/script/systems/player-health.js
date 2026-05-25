@@ -1,5 +1,5 @@
 /** Systems — 플레이어 체력 틱. */
-import { tickPlayerHealthState } from "../../game/d.player-health.js";
+import { tickPlayerHealthState } from "../../game/player-health.js";
 
 export function createModule(d) {
   function getLocalPlayerBodyWidth() {
@@ -16,24 +16,24 @@ export function createModule(d) {
 
   function getPlayerHealthTickContext(healthPosePrev) {
   return {
-    d.hasSpawnedCharacter: d.hasSpawnedCharacter,
-    d.isCharacterSelecting: d.isCharacterSelecting,
-    d.isTabSessionSuperseded: d.isTabSessionSuperseded,
+    hasSpawnedCharacter: d.hasSpawnedCharacter,
+    isCharacterSelecting: d.isCharacterSelecting,
+    isTabSessionSuperseded: d.isTabSessionSuperseded,
     health: d.getPlayer().health,
     keys: keys,
     isSittingOnChair: Boolean(d.getPlayer().sittingChairId),
     isInsideEnteredCraftHouse: d.isPlayerInsideEnteredCraftHouse(),
     isPlanting: Boolean(d.getPlant().isPlanting),
     isEating: Boolean(d.getApple().isEating),
-    d.isTradeExchangeOpen: d.isTradeExchangeOpen(),
-    d.isAlchemyCraftOpen: d.isAlchemyCraftOpen(),
+    isTradeExchangeOpen: d.isTradeExchangeOpen(),
+    isAlchemyCraftOpen: d.isAlchemyCraftOpen(),
     isGameplayBlockedByNpcDialogue: d.isPlayerGameplayBlockedByNpcDialogue(),
-    d.getPlayer().velocityY: d.getPlayer().velocityY,
+    velocityY: d.getPlayer().velocityY,
     previousPose: healthPosePrev,
     currentPose: { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY },
     footCenterX: d.getPlayerCenterX(),
     footY: d.getPlayerFootY(),
-    d.placedCraftFurniture: d.placedCraftFurniture
+    placedCraftFurniture: d.placedCraftFurniture
   };
   }
 
@@ -80,7 +80,7 @@ export function createModule(d) {
       rechargeContext: {
         footCenterX: ctx.footCenterX,
         footY: ctx.footY,
-        d.placedCraftFurniture: ctx.placedCraftFurniture,
+        placedCraftFurniture: ctx.placedCraftFurniture,
         isSittingOnChair: ctx.isSittingOnChair,
         isInsideEnteredCraftHouse: ctx.isInsideEnteredCraftHouse
       }

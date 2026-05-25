@@ -2590,7 +2590,7 @@ bindTradeMaster({
   showPlayerAlert: showPlayerAlert,
   canUseBagInventoryGameplay: canUseBagInventoryGameplay,
   consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
-  getNpc().isDialogueRunning: function () {
+  isNpcDialogueRunning: function () {
     return getNpc().isDialogueRunning;
   },
   isAlchemyMasterDialogueRunning: isAlchemyMasterDialogueRunning,
@@ -2646,7 +2646,7 @@ bindAlchemyMaster({
   showPlayerAlert: showPlayerAlert,
   canUseBagInventoryGameplay: canUseBagInventoryGameplay,
   consumeCraftTradeDragClickSuppress: consumeCraftTradeDragClickSuppress,
-  getNpc().isDialogueRunning: function () {
+  isNpcDialogueRunning: function () {
     return getNpc().isDialogueRunning;
   },
   isTradeMasterDialogueRunning: isTradeMasterDialogueRunning,
@@ -2958,7 +2958,7 @@ function updateSettingsTutorialButtons() {
     currentUserId,
     hasSpawnedCharacter,
     onboardingDone: getStoredFlag(onboardingFlowDoneKey),
-    getOnboarding().flowStep
+    onboardingFlowStep: getOnboarding().flowStep
   });
 }
 
@@ -6789,10 +6789,10 @@ function saveBucketState() {
   setStoredValue(
     bucketStateKey,
     JSON.stringify({
-      getInventory().isBucketFull: mainBucket.isFull,
-      getWorldItems().bucketX: mainBucket.x,
-      getWorldItems().bucketY: mainBucket.y,
-      getInventory().heldItem: null,
+      isBucketFull: mainBucket.isFull,
+      bucketX: mainBucket.x,
+      bucketY: mainBucket.y,
+      heldItem: null,
       savedAt: Date.now()
     })
   );
@@ -6846,6 +6846,7 @@ function buildNetworkDeps() {
     getInventory,
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
+    getExtraDryDelayMs,
     getMultiplayerWorldPollMinMs,
     getNpc,
     getPlant,
@@ -6986,7 +6987,6 @@ function buildNetworkDeps() {
     setStoredFlag,
     setStoredValue,
     setWorldPosition,
-    shouldDeferRemoteAppleApply,
     shouldHideSeparateSoilUnderBigGrass,
     shouldIgnoreEmptyRemoteMainPlant,
     shouldPauseWaterDecayForPlant,
@@ -7571,6 +7571,13 @@ function buildLayerDeps() {
     remoteBucketUpdateAtById,
     remotePlayerHeldBucketById,
     remotePlayers,
+    get remotePlayerCount() { return remotePlayerCount; },
+    set remotePlayerCount(v) { remotePlayerCount = v; },
+    get multiplayerStatusText() { return multiplayerStatusText; },
+    getRemotePlayerIdentityKey,
+    pruneDuplicateRemotePlayerSessions,
+    removeRemotePlayer,
+    updateMultiplayerStatus,
     removeMainPlant,
     removeOneBagItemForTrade,
     resetInputKeys,
@@ -15268,8 +15275,8 @@ function savePlayerPosition(forceSave) {
   setStoredValue(
     playerPositionKey,
     JSON.stringify({
-      getPlayer().x,
-      getPlayer().depth,
+      x: getPlayer().x,
+      depth: getPlayer().depth,
       savedAt: now
     })
   );

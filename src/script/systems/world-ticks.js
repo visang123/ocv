@@ -76,7 +76,7 @@ export function createModule(d) {
     worldLooseSeed: d.getApple().worldLooseSeed,
     extraSeeds: d.getApple().extraSeeds,
     extraPlants: d.getApple().extraPlants,
-    d.plantSpot:
+    plantSpot:
       d.getPlant().isSeedPlanted &&
       Number.isFinite(d.getPlant().spotX) &&
       Number.isFinite(d.getPlant().spotY) &&
@@ -280,10 +280,10 @@ export function createModule(d) {
   function getPlantIndexScoringOptions(now) {
   return {
     now: now != null ? now : d.getSharedPlantSimulationNow(),
-    d.getSproutStageFromPlant: d.getSproutStageFromPlant,
-    d.isPowderUpgradeInProgress: d.isPowderUpgradeInProgress,
-    d.getPowderUpgradeRatio: d.getPowderUpgradeRatio,
-    d.getGrassAutoTier5GrowthRatio: d.getGrassAutoTier5GrowthRatio
+    getSproutStageFromPlant: d.getSproutStageFromPlant,
+    isPowderUpgradeInProgress: d.isPowderUpgradeInProgress,
+    getPowderUpgradeRatio: d.getPowderUpgradeRatio,
+    getGrassAutoTier5GrowthRatio: d.getGrassAutoTier5GrowthRatio
   };
   }
 
@@ -453,8 +453,8 @@ export function createModule(d) {
       // clients. Persist only to localStorage so a tab reload sees the latest
       // computed value without forcing a multiplayer broadcast.
       d.saveWellStateToStorage({
-        d.wellWaterKey,
-        d.lastWellRefillKey,
+        wellWaterKey: d.wellWaterKey,
+        lastWellRefillKey: d.lastWellRefillKey,
         wellWater: d.getWell().water,
         lastWellRefillAt: d.getWell().lastRefillAt
       });
@@ -535,7 +535,7 @@ export function createModule(d) {
   d.getApple().lastStateChangeAt = Date.now();
   d.ensureWorldLooseSeedShape();
   d.saveAppleStateToStorage({
-    d.appleStateKey,
+    appleStateKey: d.appleStateKey,
     appleCount: d.getApple().count,
     seedCount: d.getApple().seedCount,
     overgrowthSeedCount: d.getApple().overgrowthSeedCount,
@@ -548,15 +548,15 @@ export function createModule(d) {
     worldLooseSeed: d.getApple().worldLooseSeed,
     worldRocks: d.getApple().worldRocks,
     worldRockPickedIds: d.getApple().worldRockPickedIds,
-    worldExtraBuckets: (d.getApple().worldExtraBuckets || []).map(function (d.bucket) {
+    worldExtraBuckets: (d.getApple().worldExtraBuckets || []).map(function (bucket) {
       return {
-        id: d.bucket.id,
-        x: Number(d.bucket.x) || 0,
-        y: Number(d.bucket.y) || 0,
-        isFull: Boolean(d.bucket.isFull)
+        id: bucket.id,
+        x: Number(bucket.x) || 0,
+        y: Number(bucket.y) || 0,
+        isFull: Boolean(bucket.isFull)
       };
     }),
-    d.placedCraftFurniture: d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
+    placedCraftFurniture: d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
   });
   d.markWorldDirty();
   }

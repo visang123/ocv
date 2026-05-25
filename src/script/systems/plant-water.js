@@ -208,8 +208,8 @@ export function createModule(d) {
   const bump = opts.bumpMergeGuard !== false;
   if (bump) d.getPlant().lastMainPlantStateChangeAt = Date.now();
   d.saveSeedStateToStorage({
-    d.seedCreatedAtKey,
-    d.seedPlantedStateKey,
+    seedCreatedAtKey: d.seedCreatedAtKey,
+    seedPlantedStateKey: d.seedPlantedStateKey,
     seedCreatedAt: d.getPlant().seedCreatedAt,
     plantedState: d.getPlantStateForStorage()
   });
