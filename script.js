@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525k";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525k";
-import { initScriptView } from "./src/script/view/index.js?v=20260525k";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525l";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525l";
+import { initScriptView } from "./src/script/view/index.js?v=20260525l";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,

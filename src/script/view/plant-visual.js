@@ -353,7 +353,7 @@ export function createModule(d) {
   d.plantHoverLabel.textContent = "";
   if (String(label || "").trim()) {
     const titleEl = document.createElement("div");
-    titleEl.className = "plant-d.world-sign-title";
+    titleEl.className = "plant-world-sign-title";
     titleEl.textContent = label;
     d.plantHoverLabel.appendChild(titleEl);
   }

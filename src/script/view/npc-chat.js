@@ -118,7 +118,7 @@ export function createModule(d) {
   d.worldChatPanelEl.classList.toggle("is-open", d.worldChatPanelOpen);
   d.worldChatPanelEl.setAttribute("aria-hidden", d.worldChatPanelOpen ? "false" : "true");
   if (d.worldChatPanelOpen && d.worldChatInputEl) {
-    d.resetInputKeys(keys);
+    d.resetInputKeys(d.keys);
     d.isInteractKeyLatched = false;
     d.worldChatInputEl.focus();
   }

@@ -93,7 +93,7 @@ export function createModule(d) {
 
   function getRenderedAdminAccounts() {
   try {
-    const parsed = JSON.parse(adminAccountList.dataset.accounts || "[]");
+    const parsed = JSON.parse(d.adminAccountList.dataset.accounts || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     return [];
@@ -215,13 +215,13 @@ export function createModule(d) {
   }
 
   function renderAdminAccounts(accounts) {
-  adminAccountList.innerHTML = "";
+  d.adminAccountList.innerHTML = "";
 
   if (!accounts.length) {
     const empty = document.createElement("div");
     empty.className = "admin-empty";
     empty.textContent = "\uAC00\uC785\uB41C \uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.";
-    adminAccountList.appendChild(empty);
+    d.adminAccountList.appendChild(empty);
     return;
   }
 
@@ -254,18 +254,18 @@ export function createModule(d) {
         const remainingAccounts = getRenderedAdminAccounts().filter(function (savedAccount) {
           return savedAccount.id !== account.id;
         });
-        adminAccountList.dataset.accounts = JSON.stringify(remainingAccounts);
+        d.adminAccountList.dataset.accounts = JSON.stringify(remainingAccounts);
         renderAdminAccounts(remainingAccounts);
 
         if (account.id === d.currentUserId) {
           d.logout();
           return;
         }
-  adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
+  d.adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
         loadAdminAccounts();
       } catch (error) {
         deleteButton.disabled = false;
-        adminMessage.textContent = error.message;
+        d.adminMessage.textContent = error.message;
       }
     });
 
@@ -273,7 +273,7 @@ export function createModule(d) {
     info.appendChild(meta);
     row.appendChild(info);
     row.appendChild(deleteButton);
-    adminAccountList.appendChild(row);
+    d.adminAccountList.appendChild(row);
   });
   }
 
@@ -282,11 +282,11 @@ export function createModule(d) {
   }
 
   function showDialogueLine(lineInfo) {
-  npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
+  d.npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
   d.playerBubble.style.display = lineInfo.speaker === "player" ? "block" : "none";
 
   if (lineInfo.speaker === "npc") {
-    npcBubble.textContent = lineInfo.text;
+    d.npcBubble.textContent = lineInfo.text;
     d.updateNpcPosition();
     return;
   }
@@ -473,7 +473,7 @@ export function createModule(d) {
   if (d.isWorldDocumentEntry()) {
     d.setOnboardingCalloutVisible(false, "");
     d.clearOnboardingHighlights();
-    movementTutorial.hideOverlay();
+    d.movementTutorial.hideOverlay();
     d.updateSettingsTutorialButtons();
     return;
   }
@@ -502,7 +502,7 @@ export function createModule(d) {
   switch (d.getOnboarding().flowStep) {
     case 1: {
       if (d.isNearWorldBagPickup() && !d.getWorldItems().hasGuideBook) {
-        movementTutorial.hideOverlay();
+        d.movementTutorial.hideOverlay();
         d.setOnboardingCalloutVisible(true, "E키를 눌러 가방을 소지하세요.");
         if (d.worldBag) d.worldBag.classList.add("onboarding-highlight");
       } else {
@@ -583,7 +583,7 @@ export function createModule(d) {
         }
         if (d.getOnboarding().bookInvPhase >= 1 && d.bagInventoryPanelOpen) {
           if (d.bagInventoryPanel) d.bagInventoryPanel.classList.add("onboarding-highlight");
-          if (d.bagBookStorageSlot) bagBookStorageSlot.classList.add("onboarding-highlight");
+          if (d.bagBookStorageSlot) d.bagBookStorageSlot.classList.add("onboarding-highlight");
         }
       }
       break;
@@ -610,17 +610,17 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_PLANT_MASTER: {
       d.setOnboardingCalloutVisible(true, "식물의 달인을 찾아가세요.");
-      if (d.plantMaster) plantMaster.classList.add("onboarding-highlight");
+      if (d.plantMaster) d.plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_PLANT_MASTER_TALK: {
       if (d.getNpc().isDialogueRunning) {
         d.setOnboardingCalloutVisible(false, "");
-        if (d.plantMaster) plantMaster.classList.add("onboarding-highlight");
+        if (d.plantMaster) d.plantMaster.classList.add("onboarding-highlight");
         break;
       }
       d.setOnboardingCalloutVisible(true, "q를 눌러 식물의 달인과 대화하세요.");
-      if (d.plantMaster) plantMaster.classList.add("onboarding-highlight");
+      if (d.plantMaster) d.plantMaster.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_NPC_GUIDE: {
@@ -727,9 +727,9 @@ export function createModule(d) {
         true,
         "💬 버튼을 눌러 채팅을 열고, 메시지를 입력한 뒤 전송해 보세요."
       );
-      if (d.worldChatToggleBtn) worldChatToggleBtn.classList.add("onboarding-highlight");
+      if (d.worldChatToggleBtn) d.worldChatToggleBtn.classList.add("onboarding-highlight");
       if (d.worldChatPanelOpen && d.worldChatSendBtn) {
-        worldChatSendBtn.classList.add("onboarding-highlight");
+        d.worldChatSendBtn.classList.add("onboarding-highlight");
       }
       break;
     }
@@ -738,7 +738,7 @@ export function createModule(d) {
         true,
         "❤️ 버튼을 눌러 하트를 보내 보세요. 다른 플레이어에게 반응을 전할 수 있어요."
       );
-      if (d.worldHeartBtn) worldHeartBtn.classList.add("onboarding-highlight");
+      if (d.worldHeartBtn) d.worldHeartBtn.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_SAD: {
@@ -746,7 +746,7 @@ export function createModule(d) {
         true,
         "😢 버튼을 눌러 슬퍼요를 보내 보세요."
       );
-      if (d.worldSadBtn) worldSadBtn.classList.add("onboarding-highlight");
+      if (d.worldSadBtn) d.worldSadBtn.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_ROCK: {
@@ -775,12 +775,12 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_TRADE_MASTER: {
       d.setOnboardingCalloutVisible(true, "거래의 달인에게 가서 Q키로 대화해 보세요.");
-      if (d.tradeMaster) tradeMaster.classList.add("onboarding-highlight");
+      if (d.tradeMaster) d.tradeMaster.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_ALCHEMY_MASTER: {
       d.setOnboardingCalloutVisible(true, "연금술의 달인에게 가서 Q키로 대화해 보세요.");
-      if (d.alchemyMaster) alchemyMaster.classList.add("onboarding-highlight");
+      if (d.alchemyMaster) d.alchemyMaster.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_ZOOM_INTRO: {
@@ -793,7 +793,7 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_TREE_APPROACH: {
       d.setOnboardingCalloutVisible(true, "정중앙 위 나무로 이동하세요.");
-      if (d.bigTree) bigTree.classList.add("onboarding-highlight");
+      if (d.bigTree) d.bigTree.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_TREE_CLIMB: {
@@ -801,7 +801,7 @@ export function createModule(d) {
         true,
         "나무를 이동하여 올라타고 열매들 근처로 이동하세요."
       );
-      if (d.bigTree) bigTree.classList.add("onboarding-highlight");
+      if (d.bigTree) d.bigTree.classList.add("onboarding-highlight");
       d.highlightUnpickedApplesForTutorial();
       break;
     }
@@ -863,10 +863,10 @@ export function createModule(d) {
         : "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADD3\uB9D0..."
       : "\uBA40\uD2F0 \uC5F0\uACB0 \uD6C4 \uCC57";
   }
-  if (d.worldChatSendBtn) worldChatSendBtn.disabled = !ok;
-  if (d.worldChatUsersBtn) worldChatUsersBtn.disabled = !d.isWorldSocialRealtimeReady();
-  if (d.worldHeartBtn) worldHeartBtn.disabled = !ok;
-  if (d.worldSadBtn) worldSadBtn.disabled = !ok;
+  if (d.worldChatSendBtn) d.worldChatSendBtn.disabled = !ok;
+  if (d.worldChatUsersBtn) d.worldChatUsersBtn.disabled = !d.isWorldSocialRealtimeReady();
+  if (d.worldHeartBtn) d.worldHeartBtn.disabled = !ok;
+  if (d.worldSadBtn) d.worldSadBtn.disabled = !ok;
   }
 
   return {

@@ -227,13 +227,13 @@ export function createModule(d) {
   d.playerName.style.visibility = "";
 
   const npcLineShowing =
-    d.getNpc().isDialogueRunning && npcBubble.style.display === "block";
+    d.getNpc().isDialogueRunning && d.npcBubble.style.display === "block";
   d.playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
   }
 
   function updatePlayerStatus() {
   const playerBox = d.getPlayerBox();
-  const textWidth = playerStatus.offsetWidth || 40;
+  const textWidth = d.playerStatus.offsetWidth || 40;
   const halfTextWidth = textWidth / 2;
   const targetX = d.toScreenX(playerBox.left + playerBox.width / 2 + 13);
   const clampedX = Math.max(
@@ -243,20 +243,20 @@ export function createModule(d) {
   const yWorld = d.toScreenY(playerBox.top + 26);
 
   if (d.isPlayerTimedActionBusy()) {
-    playerStatus.style.display = "block";
-    playerStatus.style.transform =
+    d.playerStatus.style.display = "block";
+    d.playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
     return;
   }
 
   if (Date.now() < d.plantProximityWarnUntil) {
-    playerStatus.style.display = "block";
-    playerStatus.style.transform =
+    d.playerStatus.style.display = "block";
+    d.playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
     return;
   }
 
-  playerStatus.style.display = "none";
+  d.playerStatus.style.display = "none";
   }
 
   return {
