@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525m";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525m";
-import { initScriptView } from "./src/script/view/index.js?v=20260525m";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525n";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525n";
+import { initScriptView } from "./src/script/view/index.js?v=20260525n";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -7149,6 +7149,31 @@ function buildLayerDeps() {
     gravity,
     ground,
     groundFootInset,
+    jumpPower,
+    MOVEMENT_REFERENCE_HZ,
+    MOVEMENT_DT_CAP_SEC,
+    TREE_DEPTH_CLAMP_MAX_STEP,
+    BIG_TREE_X,
+    BIG_TREE_Y,
+    BIG_TREE_WIDTH,
+    BIG_TREE_HEIGHT,
+    TREE_CANOPY_LEFT,
+    TREE_CANOPY_RIGHT,
+    TREE_CANOPY_TOP,
+    TREE_CANOPY_BOTTOM,
+    TREE_TRUNK_X,
+    TREE_TRUNK_WIDTH,
+    TREE_TRUNK_TOP,
+    TREE_CSS_ROOTS_LEFT,
+    TREE_CSS_ROOTS_WIDTH,
+    TREE_CSS_ROOTS_HEIGHT,
+    TREE_CSS_ROOTS_BOTTOM_EXTEND,
+    ROCK_GROUND_SVG_W,
+    ROCK_GROUND_SVG_H,
+    ROCK_GROUND_HIT_LEFT,
+    ROCK_GROUND_HIT_RIGHT,
+    ROCK_GROUND_HIT_TOP,
+    ROCK_GROUND_HIT_BOTTOM,
     hasActiveGreenGrowthProgress,
     hasFreshButterflyAuthorityBroadcast,
     get hasHydratedSharedWorldFromServer() { return hasHydratedSharedWorldFromServer; },
