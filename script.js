@@ -560,6 +560,10 @@ let onboardingPostAppleSeedIntroPhase = 0;
 let onboardingFruitIntroTimerId = null;
 /** 16????: 0 = ????? ??, 1 = ????????????(??????????? ????? 16) */
 let onboardingPostWaterCongratsPhase = 0;
+/** 물주기 축하(16단계) 시작 시각 — setTimeout 대신 게임 루프에서 진행 */
+let onboardingWaterDoneCongratsStartedAt = 0;
+const ONBOARDING_WATER_DONE_CONGRATS_PHASE1_MS = 1500;
+const ONBOARDING_WATER_DONE_CONGRATS_END_MS = 3500;
 /** 17????: 0 = ??????????? 1, 1 = ???? ???? 2 */
 let onboardingPlantIndexIntroPhase = 0;
 let onboardingPlantIndexIntroTimerId = null;
@@ -4861,6 +4865,12 @@ function onboardingTryStartPlantIndexAfterSproutStage3() {
   }
   if (!plantRuntime || getSproutStageFromPlant(plantRuntime) < 3) return;
   onboardingPlantIndexAwaitingSprout = false;
+  onboardingWaterDoneCongratsStartedAt = 0;
+  onboardingPostWaterCongratsPhase = 0;
+  if (onboardingCongratsTimerId) {
+    window.clearTimeout(onboardingCongratsTimerId);
+    onboardingCongratsTimerId = null;
+  }
   if (onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
     onboardingFlowStep = ONBOARDING_STEP_PLANT_INDEX;
     persistOnboardingStep();
@@ -4891,6 +4901,15 @@ function startOnboardingPlantIndexIntro() {
     if (onboardingPlantIndexIntroPhase !== 0) return;
     onboardingPlantIndexIntroPhase = 1;
     updateOnboardingFlowUI();
+    onboardingPlantIndexIntroTimerId = window.setTimeout(function () {
+      onboardingPlantIndexIntroTimerId = null;
+      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_PLANT_INDEX) {
+        return;
+      }
+      if (onboardingPlantIndexIntroPhase < 2) {
+        finishOnboardingPlantIndexIntro();
+      }
+    }, 9000);
   }, 4500);
 }
 
@@ -5218,6 +5237,7 @@ function loadOnboardingFlowState() {
   onboardingNpcGuideEscHintShown = false;
   onboardingPostAppleSeedIntroPhase = 0;
   onboardingPostWaterCongratsPhase = 0;
+  onboardingWaterDoneCongratsStartedAt = 0;
   onboardingPlantIndexIntroPhase = 0;
   onboardingPlantIndexAwaitingSprout = false;
   onboardingButterflyCountBaseline = null;
@@ -5273,6 +5293,9 @@ function loadOnboardingFlowState() {
       }
     } else {
       onboardingPlantIndexAwaitingSprout = true;
+      onboardingPostWaterCongratsPhase = 0;
+      onboardingWaterDoneCongratsStartedAt =
+        Date.now() - ONBOARDING_WATER_DONE_CONGRATS_END_MS;
     }
   }
   if (
@@ -5762,28 +5785,57 @@ function onboardingCheckJumpFinish() {
   }
 }
 
+function tickOnboardingWaterDoneCongrats(now) {
+  if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) {
+    onboardingWaterDoneCongratsStartedAt = 0;
+    return;
+  }
+  if (!onboardingWaterDoneCongratsStartedAt) return;
+
+  const elapsed = Math.max(0, now - onboardingWaterDoneCongratsStartedAt);
+  const simNow = getSharedPlantSimulationNow();
+  if (advanceOnboardingTutorialSproutForPlantIndex(plantRuntime, simNow)) {
+    saveSeedState({ bumpMergeGuard: false });
+    updatePlantState();
+  }
+  onboardingTryStartPlantIndexAfterSproutStage3();
+  if (onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) return;
+
+  let nextPhase = onboardingPostWaterCongratsPhase;
+  if (elapsed < ONBOARDING_WATER_DONE_CONGRATS_PHASE1_MS) {
+    nextPhase = 0;
+  } else if (elapsed < ONBOARDING_WATER_DONE_CONGRATS_END_MS) {
+    nextPhase = 1;
+  } else {
+    nextPhase = 0;
+    if (!onboardingPlantIndexAwaitingSprout) {
+      onboardingPlantIndexAwaitingSprout = true;
+      persistOnboardingStep();
+    }
+  }
+  if (nextPhase !== onboardingPostWaterCongratsPhase) {
+    onboardingPostWaterCongratsPhase = nextPhase;
+    updateOnboardingFlowUI();
+  }
+}
+
 function onboardingHookWateredMainPlantFromTutorial() {
   if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_POUR) return;
   onboardingFlowStep = ONBOARDING_STEP_WATER_DONE;
   onboardingPostWaterCongratsPhase = 0;
+  onboardingPlantIndexAwaitingSprout = true;
+  onboardingWaterDoneCongratsStartedAt = Date.now();
   persistOnboardingStep();
   if (onboardingCongratsTimerId) {
     window.clearTimeout(onboardingCongratsTimerId);
-  }
-  onboardingCongratsTimerId = window.setTimeout(function () {
     onboardingCongratsTimerId = null;
-    if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) return;
-    onboardingPostWaterCongratsPhase = 1;
-    updateOnboardingFlowUI();
-    onboardingCongratsTimerId = window.setTimeout(function () {
-      onboardingCongratsTimerId = null;
-      if (getStoredFlag(onboardingFlowDoneKey) || onboardingFlowStep !== ONBOARDING_STEP_WATER_DONE) return;
-      onboardingPostWaterCongratsPhase = 0;
-      onboardingPlantIndexAwaitingSprout = true;
-      persistOnboardingStep();
-      onboardingTryStartPlantIndexAfterSproutStage3();
-    }, 2000);
-  }, 1500);
+  }
+  const simNow = getSharedPlantSimulationNow();
+  if (advanceOnboardingTutorialSproutForPlantIndex(plantRuntime, simNow)) {
+    saveSeedState({ bumpMergeGuard: false });
+    updatePlantState();
+  }
+  onboardingTryStartPlantIndexAfterSproutStage3();
   updateOnboardingFlowUI();
 }
 
@@ -6225,6 +6277,7 @@ function applyDefaultState(options) {
     onboardingSeedTutorialSecondLine = false;
     onboardingPostAppleSeedIntroPhase = 0;
     onboardingPostWaterCongratsPhase = 0;
+    onboardingWaterDoneCongratsStartedAt = 0;
     onboardingButterflyCountBaseline = null;
     onboardingTutorialEnteredTree = false;
     onboardingClearAllOnboardingTimers();
@@ -20688,6 +20741,7 @@ function gameLoop() {
     updateAlchemyCraftEffects(Date.now());
     updateGuideCard();
     updatePlantProgressGauge();
+    tickOnboardingWaterDoneCongrats(Date.now());
     updateOnboardingFlowUI();
     pruneStaleRemotePlayers();
     updatePlayerAlert();
