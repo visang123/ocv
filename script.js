@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525b";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525b";
-import { initScriptView } from "./src/script/view/index.js?v=20260525b";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525c";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525c";
+import { initScriptView } from "./src/script/view/index.js?v=20260525c";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -960,22 +960,23 @@ function migrateLegacyMixedMagicPowderIntoBase() {
       seenMagicPowder.add("magicPowder");
       return true;
     });
-    saveBagInventoryOrder();
+    saveBagInventoryOrderCore(setStoredValue, bagInventoryItemOrder);
     changed = true;
   }
   return changed;
 }
 
-bagInventoryItemOrder = loadBagInventoryOrder();
+/** View layer init 전에 실행되므로 _viewApi 대신 bag-inventory 코어를 직접 호출 */
+bagInventoryItemOrder = loadBagInventoryOrderCore(getStoredValue);
 if (bagInventoryItemOrder.some(function (key) { return key === "book"; })) {
   bagInventoryItemOrder = bagInventoryItemOrder.filter(function (key) {
     return key !== "book";
   });
-  saveBagInventoryOrder();
+  saveBagInventoryOrderCore(setStoredValue, bagInventoryItemOrder);
 }
 if (bagInventoryItemOrder.length > BAG_INVENTORY_SLOT_COUNT) {
   bagInventoryItemOrder = bagInventoryItemOrder.slice(0, BAG_INVENTORY_SLOT_COUNT);
-  saveBagInventoryOrder();
+  saveBagInventoryOrderCore(setStoredValue, bagInventoryItemOrder);
 }
 
 let plantProgressScoreTickRowBound = false;
