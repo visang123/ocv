@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525d";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525d";
-import { initScriptView } from "./src/script/view/index.js?v=20260525d";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525e";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525e";
+import { initScriptView } from "./src/script/view/index.js?v=20260525e";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -540,6 +540,12 @@ import {
   isPlayerPoseUnchanged,
   tickPlayerHealthState
 } from "./src/game/player-health.js";
+
+/** Network/Systems/View layer handles — top-level so early module code does not hit TDZ */
+let _networkApi = null;
+let _layerDeps = null;
+let _systemsApi = null;
+let _viewApi = null;
 
 initGameState({ playerX: 100 });
 
@@ -2705,12 +2711,11 @@ seed.addEventListener("mouseleave", function () {
   getSeedWorld().isHoveringMainSeed = false;
 });
 
-/* ?????????(#world-bag-inventory) ??????document ????????? ??? ????????? ???? */
-if (plantHoverLabel) {
-  document.addEventListener("pointermove", function (e) {
-    syncPlantHoverFromPointerClient(e.clientX, e.clientY);
-  });
-}
+let currentPlantHoverTarget = null;
+let lastPlantHoverPointerClientX = 0;
+let lastPlantHoverPointerClientY = 0;
+let hasLastPlantHoverPointer = false;
+
 document.addEventListener("pointerup", function (e) {
   if (e.button !== 0) return;
   if (tryWaterPlantByPointerClick(e.clientX, e.clientY)) return;
@@ -2802,7 +2807,6 @@ function bindPlayerBaseImageLoadHandlers() {
     playerSitBaseImageReady = true;
   }
 }
-bindPlayerBaseImageLoadHandlers();
 
 const playerHealthRoot = document.createElement("div");
 playerHealthRoot.id = "player-health";
@@ -2955,7 +2959,6 @@ controlsOverlay.innerHTML =
   '<div><span>Esc</span><p>????? ???? / ????</p></div>' +
   '</div></div>';
 document.body.appendChild(controlsOverlay);
-ensureWorldSocialUi();
 
 function updateSettingsTutorialButtons() {
   updateSettingsTutorialButtonsUi({
@@ -6807,10 +6810,6 @@ function saveBucketState() {
 
 
 /** Network/Sync — src/script/network/ (poll·snapshot·presence·debug) */
-/** @type {ReturnType<typeof initScriptNetwork> | null} */
-let _networkApi = null;
-
-
 function buildNetworkDeps() {
   return {
     HELD_ITEM_BUCKET,
@@ -7021,11 +7020,6 @@ function initOvcScriptNetworkLayer() {
 }
 
 /** Systems/Logic — src/script/systems/ */
-/** @type {ReturnType<typeof initScriptSystems> | null} */
-/** @type {object | null} */
-let _layerDeps = null;
-let _systemsApi = null;
-
 function buildLayerDeps() {
   return {
     PLAYER_WIDTH,
@@ -7685,9 +7679,6 @@ function initOvcScriptSystemsLayer() {
 }
 
 /** View — src/script/view/ */
-/** @type {ReturnType<typeof initScriptView> | null} */
-let _viewApi = null;
-
 function initOvcScriptViewLayer() {
   _viewApi = initScriptView(_layerDeps);
 }
@@ -7695,6 +7686,18 @@ function initOvcScriptViewLayer() {
 initOvcScriptNetworkLayer();
 initOvcScriptSystemsLayer();
 initOvcScriptViewLayer();
+
+/** DOM/UI that calls view-layer wrappers — must run after init above */
+function runOvcLayersPostInitBootstrap() {
+  bindPlayerBaseImageLoadHandlers();
+  if (plantHoverLabel) {
+    document.addEventListener("pointermove", function (e) {
+      syncPlantHoverFromPointerClient(e.clientX, e.clientY);
+    });
+  }
+  ensureWorldSocialUi();
+}
+runOvcLayersPostInitBootstrap();
 
 /** View layer wrappers (src/script/view/) */
 function applyPlantHoverVisuals(plant) { return _viewApi.applyPlantHoverVisuals(plant); }
@@ -8918,10 +8921,6 @@ function getPlantVisibleHoverRectsWorld(plant) {
 
 const PLANT_DEPTH_Z_MIN = 3;
 const PLANT_DEPTH_Z_MAX = 14;
-let currentPlantHoverTarget = null;
-let lastPlantHoverPointerClientX = 0;
-let lastPlantHoverPointerClientY = 0;
-let hasLastPlantHoverPointer = false;
 /** @type {HTMLElement[]} */
 let plantOccluderFadeElements = [];
 
@@ -13015,8 +13014,10 @@ function applyPlayerColor(color) {
   if (playerColorBody) {
     playerColorBody.style.display = "none";
   }
-  syncCharacterPreviewVisual(normalizedColor);
-  syncLocalPlayerPoseVisual();
+  if (_viewApi) {
+    syncCharacterPreviewVisual(normalizedColor);
+    syncLocalPlayerPoseVisual();
+  }
   addNetworkDebugLog("apply color: " + normalizedColor);
   syncPlayerColorToServer();
 }
