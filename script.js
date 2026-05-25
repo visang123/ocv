@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525h";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525h";
-import { initScriptView } from "./src/script/view/index.js?v=20260525h";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525i";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525i";
+import { initScriptView } from "./src/script/view/index.js?v=20260525i";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -7136,6 +7136,7 @@ function buildLayerDeps() {
     getSproutStageFromPlant,
     getStoredFlag,
     getSynchronizedNow,
+    getSynchronizedNowCore,
     getTotalPlantIndexScore,
     getUnpickedWorldRockCount,
     getVisibleWorldRockCollisionRect,

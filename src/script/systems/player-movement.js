@@ -109,7 +109,7 @@ export function createModule(d) {
   }
 
   function getSynchronizedNow() {
-  return getSynchronizedNowCore(d.serverClockOffsetMs);
+  return d.getSynchronizedNowCore(d.serverClockOffsetMs);
   }
 
   function getTotalPlantIndexScore() {
