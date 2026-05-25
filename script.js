@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525c";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525c";
-import { initScriptView } from "./src/script/view/index.js?v=20260525c";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525d";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525d";
+import { initScriptView } from "./src/script/view/index.js?v=20260525d";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1569,31 +1569,8 @@ const playerBaseImage = new Image();
 const playerSitBaseImage = new Image();
 let playerBaseImageReady = false;
 let playerSitBaseImageReady = false;
-playerBaseImage.addEventListener("load", function () {
-  playerBaseImageReady = true;
-  playerTintCache.clear();
-  if (characterSelectOverlay && characterSelectOverlay.classList.contains("is-open")) {
-    syncCharacterPreviewVisual(selectedPlayerColor);
-  }
-  if (hasChosenPlayerColor && selectedPlayerColor && !getPlayer().sittingChairId) {
-    applyPlayerColor(selectedPlayerColor);
-  }
-});
-playerSitBaseImage.addEventListener("load", function () {
-  playerSitBaseImageReady = true;
-  playerSitTintCache.clear();
-  if (getPlayer().sittingChairId) {
-    syncLocalPlayerPoseVisual();
-  }
-});
 playerBaseImage.src = PLAYER_BASE_IMAGE_SRC;
 playerSitBaseImage.src = PLAYER_SIT_IMAGE_SRC;
-if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
-  playerBaseImageReady = true;
-}
-if (playerSitBaseImage.complete && playerSitBaseImage.naturalWidth) {
-  playerSitBaseImageReady = true;
-}
 
 /** World-units per frame at ~60 Hz; multiplied by frameScale so real speed is monitor-independent. */
 const speed = 1;
@@ -1665,7 +1642,7 @@ const spawnPortalHeight = SPAWN_PORTAL_HEIGHT;
 const spawnPortalX = SPAWN_PORTAL_X;
 const spawnPortalY = SPAWN_PORTAL_Y;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
-const spawnPlayerDepth = getMinGroundedPlayerDepth();
+const spawnPlayerDepth = 0;
 /** ??? ???? ???? ???????????? ??????????? ???? ???????????? ????? ?????) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 4;
 /**
@@ -2799,6 +2776,34 @@ if (player && player.parentNode) {
 } else if (player) {
   player.insertAdjacentElement("afterend", playerColorBody);
 }
+
+function bindPlayerBaseImageLoadHandlers() {
+  playerBaseImage.addEventListener("load", function () {
+    playerBaseImageReady = true;
+    playerTintCache.clear();
+    if (characterSelectOverlay && characterSelectOverlay.classList.contains("is-open")) {
+      syncCharacterPreviewVisual(selectedPlayerColor);
+    }
+    if (hasChosenPlayerColor && selectedPlayerColor && !getPlayer().sittingChairId) {
+      applyPlayerColor(selectedPlayerColor);
+    }
+  });
+  playerSitBaseImage.addEventListener("load", function () {
+    playerSitBaseImageReady = true;
+    playerSitTintCache.clear();
+    if (getPlayer().sittingChairId) {
+      syncLocalPlayerPoseVisual();
+    }
+  });
+  if (playerBaseImage.complete && playerBaseImage.naturalWidth) {
+    playerBaseImageReady = true;
+  }
+  if (playerSitBaseImage.complete && playerSitBaseImage.naturalWidth) {
+    playerSitBaseImageReady = true;
+  }
+}
+bindPlayerBaseImageLoadHandlers();
+
 const playerHealthRoot = document.createElement("div");
 playerHealthRoot.id = "player-health";
 playerHealthRoot.className = "remote-player-health-root";
@@ -7687,6 +7692,10 @@ function initOvcScriptViewLayer() {
   _viewApi = initScriptView(_layerDeps);
 }
 
+initOvcScriptNetworkLayer();
+initOvcScriptSystemsLayer();
+initOvcScriptViewLayer();
+
 /** View layer wrappers (src/script/view/) */
 function applyPlantHoverVisuals(plant) { return _viewApi.applyPlantHoverVisuals(plant); }
 function assignExtraSeedInventoryOwner(seed) { return _viewApi.assignExtraSeedInventoryOwner(seed); }
@@ -8197,10 +8206,6 @@ function refreshSharedWaterIndicators() {
  * `getSynchronizedNow()`(???? ????? ??? ??????????? ????????????
  * ????????`Date.now()`????? ??????????????? ?????????????? ?? ???????
  */
-
-initOvcScriptNetworkLayer();
-initOvcScriptSystemsLayer();
-initOvcScriptViewLayer();
 
 function dropHeldItem() {
   if (isOnboardingLinearGateActive()) {
@@ -13004,8 +13009,12 @@ function applyPlayerColor(color) {
     localStorage.setItem(currentUserColorKey, normalizedColor);
     localStorage.setItem("ovcUserColorV1:" + currentUserId, normalizedColor);
   }
-  player.style.setProperty("--player-color", normalizedColor);
-  playerColorBody.style.display = "none";
+  if (player) {
+    player.style.setProperty("--player-color", normalizedColor);
+  }
+  if (playerColorBody) {
+    playerColorBody.style.display = "none";
+  }
   syncCharacterPreviewVisual(normalizedColor);
   syncLocalPlayerPoseVisual();
   addNetworkDebugLog("apply color: " + normalizedColor);
