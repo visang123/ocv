@@ -646,6 +646,8 @@ function readOvcTabSessionUserName() {
     const fromLocal = (localStorage.getItem(currentUserIdKey) || "").trim();
     if (!fromLocal) return;
     sessionStorage.setItem(ovcSessionUserIdKey, fromLocal);
+    const fromName = (localStorage.getItem(currentUserKey) || "").trim();
+    if (fromName) sessionStorage.setItem(ovcSessionUserNameKey, fromName);
   } catch (eSync) {}
 })();
 
@@ -668,9 +670,7 @@ const currentUserId = tabSessionUserId ? tabSessionUserId : localLoginUserId;
 const currentUserName = (function () {
   if (tabSessionUserId) {
     if (tabSessionUserName) return tabSessionUserName;
-    if (localLoginUserId === tabSessionUserId && localLoginUserName) {
-      return localLoginUserName;
-    }
+    if (localLoginUserName) return localLoginUserName;
     return "";
   }
   return localLoginUserName;
@@ -1785,7 +1785,7 @@ const playerPositionNetwork = createPlayerPositionNetwork({
   log: addNetworkDebugLog
 });
 
-if (!currentUserName || !currentUserId) {
+if (!currentUserId) {
   window.location.replace("ovc-login.html?v=20260509a");
   throw new Error("OVC login required");
 }
@@ -7767,10 +7767,14 @@ function runOvcLayersPostInitBootstrap() {
 }
 
 function ovcInitScriptLayers() {
-  initOvcScriptNetworkLayer();
-  initOvcScriptSystemsLayer();
-  initOvcScriptViewLayer();
-  runOvcLayersPostInitBootstrap();
+  try {
+    initOvcScriptNetworkLayer();
+    initOvcScriptSystemsLayer();
+    initOvcScriptViewLayer();
+    runOvcLayersPostInitBootstrap();
+  } catch (layerInitError) {
+    console.error("[OVC] layer init failed:", layerInitError);
+  }
 }
 
 /** View layer wrappers (src/script/view/) */
