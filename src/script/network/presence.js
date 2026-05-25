@@ -1,7 +1,7 @@
 /** Realtime presence channel — OVCOnline + playerPositionNetwork */
 export function createModule(d) {
   function setupMultiplayer() {
-  if (d.isTabSessionSuperseded) return;
+  if (d.isTabSessionSuperseded()) return;
   if (!d.hasSpawnedCharacter) {
     d.updateMultiplayerStatus("\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804");
     d.addNetworkDebugLog("multiplayer skipped: character not spawned");
@@ -173,7 +173,7 @@ export function createModule(d) {
   }
 
   function sendMultiplayerPresence(forceSend) {
-  if (!d.hasSpawnedCharacter || d.isTabSessionSuperseded) return;
+  if (!d.hasSpawnedCharacter || d.isTabSessionSuperseded()) return;
   if (d.isSharedWorldSyncPausedForTutorial()) return;
 
   const now = Date.now();

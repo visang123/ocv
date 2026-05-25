@@ -283,7 +283,7 @@ export function createModule(d) {
 
   function showDialogueLine(lineInfo) {
   npcBubble.style.display = lineInfo.speaker === "npc" ? "block" : "none";
-  playerBubble.style.display = lineInfo.speaker === "d.player" ? "block" : "none";
+  d.playerBubble.style.display = lineInfo.speaker === "d.player" ? "block" : "none";
 
   if (lineInfo.speaker === "npc") {
     npcBubble.textContent = lineInfo.text;
@@ -291,7 +291,7 @@ export function createModule(d) {
     return;
   }
 
-  playerBubble.textContent = lineInfo.text;
+  d.playerBubble.textContent = lineInfo.text;
   d.updatePlayerBubblePosition();
   }
 
@@ -335,61 +335,61 @@ export function createModule(d) {
     window.clearTimeout(d.playerAlertHideTimerId);
     d.playerAlertHideTimerId = null;
   }
-  playerAlert.textContent = message;
-  playerAlert.classList.toggle("is-butterfly-catch", butterflyCatch);
-  playerAlert.style.display = "block";
+  d.playerAlert.textContent = message;
+  d.playerAlert.classList.toggle("is-butterfly-catch", butterflyCatch);
+  d.playerAlert.style.display = "block";
   d.updatePlayerAlert();
   d.playerAlertHideTimerId = window.setTimeout(function () {
     d.playerAlertHideTimerId = null;
-    playerAlert.style.display = "none";
-    playerAlert.classList.remove("is-butterfly-catch");
+    d.playerAlert.style.display = "none";
+    d.playerAlert.classList.remove("is-butterfly-catch");
   }, durationMs);
   }
 
   function showUiShortcutHoverLabel(text, anchorEl) {
   if (!d.plantHoverLabel || !anchorEl || !anchorEl.isConnected) return;
   d.ensurePlantHoverLabelOnBodyForFixedUi();
-  plantHoverLabel.classList.remove(
-    "is-d.seed-inventory-hint",
+  d.plantHoverLabel.classList.remove(
+    "is-seed-inventory-hint",
     "is-stage3-complete",
-    "is-d.well-dock",
-    "is-d.world-npc-name",
-    "is-plant-d.world-sign",
+    "is-well-dock",
+    "is-world-npc-name",
+    "is-plant-world-sign",
     "is-dry",
     "is-overwatered"
   );
-  plantHoverLabel.classList.add("is-ui-shortcut-hint");
-  plantHoverLabel.textContent = text;
-  plantHoverLabel.style.display = "block";
-  plantHoverLabel.style.position = "fixed";
-  plantHoverLabel.style.zIndex = "220";
-  plantHoverLabel.style.transform = "none";
-  plantHoverLabel.style.height = "";
-  plantHoverLabel.style.width = "";
-  plantHoverLabel.style.minWidth = "";
-  plantHoverLabel.style.right = "";
+  d.plantHoverLabel.classList.add("is-ui-shortcut-hint");
+  d.plantHoverLabel.textContent = text;
+  d.plantHoverLabel.style.display = "block";
+  d.plantHoverLabel.style.position = "fixed";
+  d.plantHoverLabel.style.zIndex = "220";
+  d.plantHoverLabel.style.transform = "none";
+  d.plantHoverLabel.style.height = "";
+  d.plantHoverLabel.style.width = "";
+  d.plantHoverLabel.style.minWidth = "";
+  d.plantHoverLabel.style.right = "";
   const r = anchorEl.getBoundingClientRect();
-  void plantHoverLabel.offsetWidth;
-  const w = plantHoverLabel.offsetWidth || 1;
-  const h = plantHoverLabel.offsetHeight || 1;
+  void d.plantHoverLabel.offsetWidth;
+  const w = d.plantHoverLabel.offsetWidth || 1;
+  const h = d.plantHoverLabel.offsetHeight || 1;
   const gap = 8;
   let left = r.left + r.width / 2 - w / 2;
   let top = r.top - h - gap;
   left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
   top = Math.max(8, top);
-  plantHoverLabel.style.left = left + "px";
-  plantHoverLabel.style.top = top + "px";
+  d.plantHoverLabel.style.left = left + "px";
+  d.plantHoverLabel.style.top = top + "px";
   }
 
   function syncGuideInventoryBar() {
   if (d.guideBookButton) {
-    guideBookButton.style.display = "none";
-    guideBookButton.hidden = true;
+    d.guideBookButton.style.display = "none";
+    d.guideBookButton.hidden = true;
   }
   if (d.worldBagInventory) {
     const show = d.shouldShowWorldBagInventoryUi();
-    worldBagInventory.style.display = show ? "block" : "none";
-    worldBagInventory.hidden = !show;
+    d.worldBagInventory.style.display = show ? "block" : "none";
+    d.worldBagInventory.hidden = !show;
   }
   d.updatePlantProgressGauge();
   }
@@ -413,7 +413,7 @@ export function createModule(d) {
   if (d.guideBook) guideBook.classList.remove("is-near");
   if (d.worldBag) worldBag.classList.remove("is-near");
   if (d.worldBagInventory) {
-    worldBagInventory.classList.toggle(
+    d.worldBagInventory.classList.toggle(
       "is-click-prompt",
       d.getWorldItems().hasGuideBook && d.getWorldItems().isGuideBookClickPromptActive
     );
@@ -517,8 +517,8 @@ export function createModule(d) {
           "tab키를 누르거나 왼쪽아래 가방 이미지를 누르세요."
         );
         if (d.worldBagInventory) {
-          worldBagInventory.classList.add("onboarding-highlight");
-          worldBagInventory.classList.add("onboarding-highlight-book-inv");
+          d.worldBagInventory.classList.add("onboarding-highlight");
+          d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
         }
       } else if (d.getOnboarding().inventoryIntroPhase === 1) {
         d.setOnboardingCalloutVisible(true, "인벤토리(저장소)가 열립니다.");
@@ -531,8 +531,8 @@ export function createModule(d) {
           "tab키 또는 가방을 클릭해 인벤토리를 닫으세요."
         );
         if (d.worldBagInventory) {
-          worldBagInventory.classList.add("onboarding-highlight");
-          worldBagInventory.classList.add("onboarding-highlight-book-inv");
+          d.worldBagInventory.classList.add("onboarding-highlight");
+          d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
         }
         if (d.bagInventoryPanel && d.bagInventoryPanelOpen) {
           bagInventoryPanel.classList.add("onboarding-highlight");
@@ -545,7 +545,7 @@ export function createModule(d) {
         true,
         "space바를 누르면 점프를 합니다. 해보세요!"
       );
-      if (d.player) player.classList.add("onboarding-highlight");
+      if (d.player) d.player.classList.add("onboarding-highlight");
       break;
     }
     case 5: {
@@ -578,8 +578,8 @@ export function createModule(d) {
       } else {
         d.setOnboardingCalloutVisible(true, "인벤토리를 열어서 책을 눌러보세요.");
         if (d.worldBagInventory) {
-          worldBagInventory.classList.add("onboarding-highlight");
-          worldBagInventory.classList.add("onboarding-highlight-book-inv");
+          d.worldBagInventory.classList.add("onboarding-highlight");
+          d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
         }
         if (d.getOnboarding().bookInvPhase >= 1 && d.bagInventoryPanelOpen) {
           if (d.bagInventoryPanel) bagInventoryPanel.classList.add("onboarding-highlight");
@@ -594,8 +594,8 @@ export function createModule(d) {
         "씨앗을 심을 위치로 이동 후, 인벤토리에 씨앗을 눌러 심으세요."
       );
       if (d.worldBagInventory) {
-        worldBagInventory.classList.add("onboarding-highlight");
-        worldBagInventory.classList.add("onboarding-highlight-book-inv");
+        d.worldBagInventory.classList.add("onboarding-highlight");
+        d.worldBagInventory.classList.add("onboarding-highlight-book-inv");
       }
       if (d.bagInventoryPanel) {
         if (d.bagInventoryPanelOpen) {
@@ -631,7 +631,7 @@ export function createModule(d) {
           true,
           d.getOnboarding().npcGuideEscHintShown ? line2 : line1
         );
-        if (d.worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
+        if (d.worldBagInventory) d.worldBagInventory.classList.add("onboarding-highlight");
         if (d.getOnboarding().npcGuideEscHintShown && d.guideCard) {
           guideCard.classList.add("onboarding-highlight");
         }
@@ -719,7 +719,7 @@ export function createModule(d) {
     case d.ONBOARDING_STEP_DROP_BUCKET: {
       d.setOnboardingCalloutVisible(true, "E키를 눌러 양동이를 내려놓으세요.");
       if (d.bucket) d.bucket.classList.add("onboarding-highlight");
-      if (d.player) player.classList.add("onboarding-highlight");
+      if (d.player) d.player.classList.add("onboarding-highlight");
       break;
     }
     case d.ONBOARDING_STEP_CHAT: {
@@ -812,7 +812,7 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_EAT_APPLE: {
       d.setOnboardingCalloutVisible(true, "가방을 연 뒤 사과 칸을 눌러 먹으세요.");
-      if (d.worldBagInventory) worldBagInventory.classList.add("onboarding-highlight");
+      if (d.worldBagInventory) d.worldBagInventory.classList.add("onboarding-highlight");
       if (d.bagInventoryPanel) {
         const bagAppleSlot = bagInventoryPanel.querySelector('[data-bag-type="apple"]');
         if (bagAppleSlot) bagAppleSlot.classList.add("onboarding-highlight");

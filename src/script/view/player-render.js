@@ -3,9 +3,9 @@
 export function createModule(d) {
   function getPlayerRenderedHeight() {
   if (d.getPlayer().sittingChairId) {
-    return player.offsetHeight || d.PLAYER_SIT_HEIGHT;
+    return d.player.offsetHeight || d.PLAYER_SIT_HEIGHT;
   }
-  return player.offsetHeight || d.PLAYER_HEIGHT;
+  return d.player.offsetHeight || d.PLAYER_HEIGHT;
   }
 
   function renderPlayerPosition() {
@@ -19,13 +19,13 @@ export function createModule(d) {
   function syncCharacterPreviewVisual(color) {
   if (!d.characterPreview) return;
   const normalized = d.normalizeHexColor(color) || "#ffffff";
-  let img = characterPreview.querySelector("img");
+  let img = d.characterPreview.querySelector("img");
   if (!img) {
     img = document.createElement("img");
     img.alt = "";
     img.draggable = false;
-    characterPreview.replaceChildren(img);
-    characterPreview.classList.add("has-tinted-preview");
+    d.characterPreview.replaceChildren(img);
+    d.characterPreview.classList.add("has-tinted-preview");
   }
   const applySrc = function () {
     img.src = d.getTintedPlayerSrc(normalized, false);
@@ -35,16 +35,16 @@ export function createModule(d) {
     applySrc();
   } else {
     img.src = d.PLAYER_BASE_IMAGE_SRC;
-    playerBaseImage.addEventListener("load", applySrc, { once: true });
+    d.playerBaseImage.addEventListener("load", applySrc, { once: true });
   }
   }
 
   function syncLocalPlayerInsideCraftHouseVisual() {
   if (!d.localPlayerRoot) return;
   const inside = d.isPlayerInsideEnteredCraftHouse();
-  localPlayerRoot.classList.toggle("is-inside-craft-house", inside);
+  d.localPlayerRoot.classList.toggle("is-inside-craft-house", inside);
   if (d.player) {
-    player.classList.toggle("is-inside-craft-house", inside);
+    d.player.classList.toggle("is-inside-craft-house", inside);
   }
   }
 
@@ -53,32 +53,32 @@ export function createModule(d) {
   const sitting = Boolean(d.getPlayer().sittingChairId);
   const bodyW = sitting ? d.PLAYER_SIT_WIDTH : d.PLAYER_WIDTH;
   const bodyH = sitting ? d.PLAYER_SIT_HEIGHT : d.PLAYER_HEIGHT;
-  player.classList.toggle("is-sitting", sitting);
+  d.player.classList.toggle("is-sitting", sitting);
   d.setWorldSize(d.localPlayerRoot, bodyW, sitting ? bodyH : undefined);
   d.setWorldSize(d.playerColorBody, bodyW, bodyH);
   if (d.shouldApplyLocalPlayerTint()) {
-    player.src = d.getTintedPlayerSrc(d.selectedPlayerColor, sitting);
-    player.classList.toggle("needs-outline", d.needsDarkOutline(d.selectedPlayerColor));
-    player.classList.add("is-colorized");
+    d.player.src = d.getTintedPlayerSrc(d.selectedPlayerColor, sitting);
+    d.player.classList.toggle("needs-outline", d.needsDarkOutline(d.selectedPlayerColor));
+    d.player.classList.add("is-colorized");
   } else {
-    player.src = sitting ? d.getTintedPlayerSrc("#ffffff", true) : playerBaseImage.src;
-    player.classList.remove("is-colorized");
+    d.player.src = sitting ? d.getTintedPlayerSrc("#ffffff", true) : d.playerBaseImage.src;
+    d.player.classList.remove("is-colorized");
   }
   }
 
   function syncLocalPlayerVisibility() {
   if (!d.player || !d.localPlayerRoot) return;
-  localPlayerRoot.style.display = "block";
+  d.localPlayerRoot.style.display = "block";
   if (d.hasSpawnedCharacter) {
-    player.classList.remove("is-hidden-before-spawn");
-    player.style.display = "block";
-    if (!player.getAttribute("src")) {
-      player.src = d.PLAYER_BASE_IMAGE_SRC;
+    d.player.classList.remove("is-hidden-before-spawn");
+    d.player.style.display = "block";
+    if (!d.player.getAttribute("src")) {
+      d.player.src = d.PLAYER_BASE_IMAGE_SRC;
     }
     return;
   }
-  player.style.display = "";
-  player.classList.add("is-hidden-before-spawn");
+  d.player.style.display = "";
+  d.player.classList.add("is-hidden-before-spawn");
   }
 
   function togglePlayerHealthGaugeVisible() {
@@ -88,13 +88,13 @@ export function createModule(d) {
   }
 
   function updatePlayerAlert() {
-  if (playerAlert.style.display !== "block") return;
+  if (d.playerAlert.style.display !== "block") return;
 
-  if (playerAlert.classList.contains("is-butterfly-catch")) {
-    const playerRenderedHeight = player.offsetHeight || d.PLAYER_HEIGHT;
+  if (d.playerAlert.classList.contains("is-butterfly-catch")) {
+    const playerRenderedHeight = d.player.offsetHeight || d.PLAYER_HEIGHT;
     const playerWorldTop =
       d.GROUND_WORLD_HEIGHT - playerRenderedHeight - d.getPlayer().depth + d.getPlayer().jumpY;
-    const alertWidth = playerAlert.offsetWidth || 36;
+    const alertWidth = d.playerAlert.offsetWidth || 36;
     const alertWorldY = d.speechBubbleTopWorldYFromHead(
       playerWorldTop,
       d.playerAlert,
@@ -109,27 +109,27 @@ export function createModule(d) {
   }
 
   const playerBox = d.getPlayerBox();
-  const alertWidth = playerAlert.offsetWidth || 10;
-  const alertHeight = playerAlert.offsetHeight || 10;
+  const alertWidth = d.playerAlert.offsetWidth || 10;
+  const alertHeight = d.playerAlert.offsetHeight || 10;
   const x = d.toScreenX(playerBox.left + playerBox.width / 2) - alertWidth / 2;
   const y = d.toScreenY(playerBox.top) - alertHeight - 4;
-  playerAlert.style.transform = "translate(" + x + "px, " + y + "px)";
+  d.playerAlert.style.transform = "translate(" + x + "px, " + y + "px)";
   }
 
   function updatePlayerBubblePosition() {
   const playerWorldLeft = d.getPlayer().x;
-  const playerRenderedHeight = player.offsetHeight || d.PLAYER_HEIGHT;
+  const playerRenderedHeight = d.player.offsetHeight || d.PLAYER_HEIGHT;
   const playerWorldTop =
     d.GROUND_WORLD_HEIGHT - playerRenderedHeight - d.getPlayer().depth + d.getPlayer().jumpY;
-  const bw = playerBubble.offsetWidth || 36;
+  const bw = d.playerBubble.offsetWidth || 36;
   const bubbleWorldY =
     d.speechBubbleTopWorldYFromHead(playerWorldTop, d.playerBubble) -
     d.PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD;
-  playerBubble.classList.toggle(
+  d.playerBubble.classList.toggle(
     "is-in-front-of-name",
     Boolean(
       (d.getNpc().isDialogueRunning || d.isAlchemyMasterDialogueRunning()) &&
-        playerBubble.style.display === "block"
+        d.playerBubble.style.display === "block"
     )
   );
   d.setPlayerBubbleWorldPosition(
@@ -142,24 +142,24 @@ export function createModule(d) {
   if (!d.playerChatBubbleEl) return;
   const now = Date.now();
   if (!d.localChatBubbleText || now >= d.localChatBubbleHideAt) {
-    playerChatBubbleEl.style.display = "none";
+    d.playerChatBubbleEl.style.display = "none";
     if (now >= d.localChatBubbleHideAt) d.localChatBubbleText = "";
     return;
   }
   if (!d.hasSpawnedCharacter || d.isCharacterSelecting) {
-    playerChatBubbleEl.style.display = "none";
+    d.playerChatBubbleEl.style.display = "none";
     return;
   }
-  const rect = player.getBoundingClientRect();
+  const rect = d.player.getBoundingClientRect();
   if (!d.layoutWorldChatBubbleOnScreen(d.playerChatBubbleEl, rect, now, null)) {
-    playerChatBubbleEl.style.display = "none";
+    d.playerChatBubbleEl.style.display = "none";
   }
   }
 
   function updatePlayerColorBodyPosition() {
   // Keep legacy overlay disabled; color is rendered directly on #player image.
-  playerColorBody.style.display = "none";
-  if (!d.hasSpawnedCharacter || player.classList.contains("is-hidden-before-spawn")) return;
+  d.playerColorBody.style.display = "none";
+  if (!d.hasSpawnedCharacter || d.player.classList.contains("is-hidden-before-spawn")) return;
   }
 
   function updatePlayerHealthUi() {
@@ -167,34 +167,34 @@ export function createModule(d) {
   if (
     !d.hasSpawnedCharacter ||
     !d.player ||
-    player.classList.contains("is-hidden-before-spawn") ||
+    d.player.classList.contains("is-hidden-before-spawn") ||
     d.isPlayerInsideEnteredCraftHouse()
   ) {
-    playerHealthRoot.style.display = "none";
+    d.playerHealthRoot.style.display = "none";
     return;
   }
-  playerHealthRoot.style.display = "flex";
+  d.playerHealthRoot.style.display = "flex";
   const hp = d.clampPlayerHealth(d.getPlayer().health);
   const pct = Math.max(0, Math.min(100, (hp / d.PLAYER_MAX_HEALTH) * 100));
   if (d.playerHealthGaugeFill) {
-    playerHealthGaugeFill.style.width = pct + "%";
+    d.playerHealthGaugeFill.style.width = pct + "%";
   }
   if (d.playerHealthGaugeLabel) {
-    playerHealthGaugeLabel.textContent = String(hp);
+    d.playerHealthGaugeLabel.textContent = String(hp);
   }
   if (d.playerHealthGaugeEl) {
-    playerHealthGaugeEl.hidden = !d.getPlayer().healthGaugeVisible;
-    playerHealthGaugeEl.setAttribute("aria-hidden", d.getPlayer().healthGaugeVisible ? "false" : "true");
+    d.playerHealthGaugeEl.hidden = !d.getPlayer().healthGaugeVisible;
+    d.playerHealthGaugeEl.setAttribute("aria-hidden", d.getPlayer().healthGaugeVisible ? "false" : "true");
   }
   if (d.playerHealthHeartBtn) {
-    playerHealthHeartBtn.classList.toggle("is-active", d.getPlayer().healthGaugeVisible);
-    playerHealthHeartBtn.setAttribute("aria-pressed", d.getPlayer().healthGaugeVisible ? "true" : "false");
+    d.playerHealthHeartBtn.classList.toggle("is-active", d.getPlayer().healthGaugeVisible);
+    d.playerHealthHeartBtn.setAttribute("aria-pressed", d.getPlayer().healthGaugeVisible ? "true" : "false");
   }
   if (d.player) {
-    player.classList.toggle("is-health-recharging", d.isPlayerHealthDepleted(hp));
+    d.player.classList.toggle("is-health-recharging", d.isPlayerHealthDepleted(hp));
   }
   if (d.localPlayerRoot) {
-    localPlayerRoot.classList.toggle("is-health-recharging", d.isPlayerHealthDepleted(hp));
+    d.localPlayerRoot.classList.toggle("is-health-recharging", d.isPlayerHealthDepleted(hp));
   }
   if (
     d.isPlayerHealthDepleted(hp) &&
@@ -208,27 +208,27 @@ export function createModule(d) {
   if (!d.playerName) return;
   if (
     !d.player ||
-    player.classList.contains("is-hidden-before-spawn")
+    d.player.classList.contains("is-hidden-before-spawn")
   ) {
-    playerName.style.display = "none";
-    playerName.classList.remove("is-dialogue-layer");
+    d.playerName.style.display = "none";
+    d.playerName.classList.remove("is-dialogue-layer");
     return;
   }
 
-  playerName.textContent = d.nameForIngameUiDisplay(d.accountDisplayNameForUi() || "OVC");
-  playerName.style.display = "block";
-  playerName.style.position = "";
-  playerName.style.left = "";
-  playerName.style.top = "";
-  playerName.style.right = "";
-  playerName.style.bottom = "";
-  playerName.style.margin = "";
-  playerName.style.transform = "";
-  playerName.style.visibility = "";
+  d.playerName.textContent = d.nameForIngameUiDisplay(d.accountDisplayNameForUi() || "OVC");
+  d.playerName.style.display = "block";
+  d.playerName.style.position = "";
+  d.playerName.style.left = "";
+  d.playerName.style.top = "";
+  d.playerName.style.right = "";
+  d.playerName.style.bottom = "";
+  d.playerName.style.margin = "";
+  d.playerName.style.transform = "";
+  d.playerName.style.visibility = "";
 
   const npcLineShowing =
     d.getNpc().isDialogueRunning && npcBubble.style.display === "block";
-  playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
+  d.playerName.classList.toggle("is-dialogue-layer", npcLineShowing);
   }
 
   function updatePlayerStatus() {

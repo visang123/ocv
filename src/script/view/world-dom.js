@@ -75,7 +75,7 @@ export function createModule(d) {
   });
   if (!d.isWorldDocumentEntry() || !Array.isArray(d.getApple().worldRocks)) return;
   const insertBeforeEl =
-    d.localPlayerRoot && localPlayerRoot.parentNode === d.ground
+    d.localPlayerRoot && d.localPlayerRoot.parentNode === d.ground
       ? d.localPlayerRoot
       : d.player && player.parentNode === d.ground
         ? d.player

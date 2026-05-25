@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525g";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525g";
-import { initScriptView } from "./src/script/view/index.js?v=20260525g";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525h";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525h";
+import { initScriptView } from "./src/script/view/index.js?v=20260525h";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -6900,7 +6900,9 @@ function buildNetworkDeps() {
     isRemotePresenceSameLoggedInAccount,
     isSharedWorldMergeActive,
     isSharedWorldSyncPausedForTutorial,
-    isTabSessionSuperseded,
+    isTabSessionSuperseded: function () {
+      return isTabSessionSuperseded;
+    },
     get isWorldDirty() { return isWorldDirty; },
     set isWorldDirty(v) { isWorldDirty = v; },
     isWorldDocumentEntry,
