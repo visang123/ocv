@@ -302,9 +302,9 @@ export function createModule(d) {
     // Bucket uses realtime bucket_state as primary source while multiplayer is connected.
     // Apply snapshot bucket fallback only when realtime channel is not subscribed.
     if (snapshot.bucket && !d.isMultiplayerSubscribed) {
-      const heldBy = String(snapshot.d.bucket.heldBy || "");
-      const nextBucketX = Number(snapshot.d.bucket.x);
-      const nextBucketY = Number(snapshot.d.bucket.y);
+      const heldBy = String(snapshot.bucket.heldBy || "");
+      const nextBucketX = Number(snapshot.bucket.x);
+      const nextBucketY = Number(snapshot.bucket.y);
       if (d.isHoldingMainBucket()) {
         // While local player is carrying the bucket, keep local ownership/state authoritative.
         window.OVC_SHARED_BUCKET_HELD_BY = d.currentSessionId;
@@ -314,36 +314,47 @@ export function createModule(d) {
           d.applyRemoteSharedMainBucketGround(
             nextBucketX,
             nextBucketY,
-            snapshot.d.bucket.isFull
+            snapshot.bucket.isFull
           );
         }
       } else {
-        window.OVC_SHARED_BUCKET_HELD_BY = heldBy;
-        if (heldBy !== d.currentSessionId) {
+        let resolvedHeldBy = heldBy;
+        if (resolvedHeldBy && resolvedHeldBy !== d.currentSessionId) {
+          const holder = d.remotePlayers[resolvedHeldBy];
+          const holderActive =
+            holder &&
+            Number.isFinite(holder.lastSeenAt) &&
+            Date.now() - holder.lastSeenAt < 5000;
+          if (!holderActive) {
+            resolvedHeldBy = "";
+          }
+        }
+        window.OVC_SHARED_BUCKET_HELD_BY = resolvedHeldBy;
+        if (resolvedHeldBy !== d.currentSessionId) {
           d.applyRemoteSharedMainBucketGround(
             nextBucketX,
             nextBucketY,
-            snapshot.d.bucket.isFull
+            snapshot.bucket.isFull
           );
         }
       }
     }
 
     if (snapshot.seed) {
-      const nextSeedCreatedAt = Number(snapshot.d.seed.createdAt);
-      const nextSeedX = Number(snapshot.d.seed.x);
-      const nextSeedY = Number(snapshot.d.seed.y);
+      const nextSeedCreatedAt = Number(snapshot.seed.createdAt);
+      const nextSeedX = Number(snapshot.seed.x);
+      const nextSeedY = Number(snapshot.seed.y);
       const canApplyMainSeedState =
         hasServerRowTime ||
         !snapshotSavedAt ||
         snapshotSavedAt >= d.getSeedWorld().lastMainSeedStateChangeAt;
       // Per-account tutorial seed uses room-scoped storage; do not mirror shared snapshot here.
-      if (canApplyMainSeedState && typeof snapshot.d.seed.isDryHandled === "boolean") {
-        d.getSeedWorld().hasHandledDryMainSeed = Boolean(snapshot.d.seed.isDryHandled);
+      if (canApplyMainSeedState && typeof snapshot.seed.isDryHandled === "boolean") {
+        d.getSeedWorld().hasHandledDryMainSeed = Boolean(snapshot.seed.isDryHandled);
         d.setStoredFlag(d.mainDrySeedHandledKey, d.getSeedWorld().hasHandledDryMainSeed);
       }
-      if (canApplyMainSeedState && typeof snapshot.d.seed.isMainSeedAvailable === "boolean") {
-        if (snapshot.d.seed.isMainSeedAvailable) {
+      if (canApplyMainSeedState && typeof snapshot.seed.isMainSeedAvailable === "boolean") {
+        if (snapshot.seed.isMainSeedAvailable) {
           d.clearMainSeedPickedForCurrentRoom();
           d.getSeedWorld().isMainSeedAvailable = true;
         } else {
@@ -355,7 +366,7 @@ export function createModule(d) {
         d.getSeedWorld().lastMainSeedStateChangeAt = Math.max(d.getSeedWorld().lastMainSeedStateChangeAt, snapshotSavedAt);
       }
       if (canApplyMainSeedState) {
-        if (d.getInventory().heldItem !== HELD_ITEM_SEED) {
+        if (d.getInventory().heldItem !== d.HELD_ITEM_SEED) {
           if (Number.isFinite(nextSeedX)) d.getWorldItems().seedX = nextSeedX;
           if (Number.isFinite(nextSeedY)) d.getWorldItems().seedY = nextSeedY;
         }
@@ -363,8 +374,8 @@ export function createModule(d) {
           d.getPlant().seedCreatedAt = nextSeedCreatedAt;
           d.setStoredValue(d.seedCreatedAtKey, String(nextSeedCreatedAt));
         }
-        if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.d.seed.isDry === "boolean") {
-          d.getPlant().isSeedDry = Boolean(snapshot.d.seed.isDry);
+        if (!Number.isFinite(nextSeedCreatedAt) && typeof snapshot.seed.isDry === "boolean") {
+          d.getPlant().isSeedDry = Boolean(snapshot.seed.isDry);
         }
       }
     }
@@ -373,8 +384,8 @@ export function createModule(d) {
 /** ?????????? ????????????? ???? ???????? ??? ??d.appStorageKeysSharedWorldReset???? ?????????????? ?????. local??????? */
     // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
     if (snapshot.well) {
-      d.getWell().water = Math.max(0, Math.min(d.maxWellWater, Number(snapshot.d.well.water) || 0));
-      d.getWell().lastRefillAt = Number(snapshot.d.well.lastRefillAt) || Date.now();
+      d.getWell().water = Math.max(0, Math.min(d.maxWellWater, Number(snapshot.well.water) || 0));
+      d.getWell().lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
       d.refillWellIfNeeded();
       if (snapshotSavedAt) {
         d.getWell().lastStateChangeAt = Math.max(d.getWell().lastStateChangeAt, snapshotSavedAt);
@@ -545,8 +556,8 @@ export function createModule(d) {
             mergedNextSpawnAt = Math.max(incomingNext, priorWorldLooseNextSpawnAt);
           }
           d.getApple().worldLooseSeed = {
-            x: Number(wls.x) || WORLD_LOOSE_SEED_X,
-            y: Number(wls.y) || WORLD_LOOSE_SEED_Y,
+            x: Number(wls.x) || d.WORLD_LOOSE_SEED_X,
+            y: Number(wls.y) || d.WORLD_LOOSE_SEED_Y,
             nextSpawnAt: mergedNextSpawnAt
           };
           d.worldLoosePickupLockUntil = Math.max(
@@ -716,9 +727,9 @@ export function createModule(d) {
         const snapApples = snapshot.apples;
         const sr = snapApples.worldRocks;
         const sp = snapApples.worldRockPickedIds;
-        if (Array.isArray(sr) && sr.length === WORLD_LOOSE_ROCK_COUNT) {
-          const m = WORLD_ROCK_SPAWN_X_MARGIN;
-          const xMax = WORLD_WIDTH - m - d.WORLD_ROCK_SIZE;
+        if (Array.isArray(sr) && sr.length === d.WORLD_LOOSE_ROCK_COUNT) {
+          const m = d.WORLD_ROCK_SPAWN_X_MARGIN;
+          const xMax = d.WORLD_WIDTH - m - d.WORLD_ROCK_SIZE;
           const rocksOk = sr.every(function (r) {
             if (!r || typeof r.id !== "string") return false;
             const x = Number(r.x);
@@ -730,8 +741,8 @@ export function createModule(d) {
               Number(sz) === d.WORLD_ROCK_SIZE &&
               x >= m &&
               x <= xMax &&
-              y >= WORLD_ROCK_SPAWN_Y_MIN &&
-              y <= WORLD_ROCK_SPAWN_Y_MAX
+              y >= d.WORLD_ROCK_SPAWN_Y_MIN &&
+              y <= d.WORLD_ROCK_SPAWN_Y_MAX
             );
           });
           if (rocksOk) {

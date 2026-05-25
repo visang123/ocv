@@ -1,5 +1,9 @@
 const appLoadingScreen = document.getElementById("app-loading-screen");
 const appLoadingText = document.getElementById("app-loading-text");
+
+/** ASCII-safe literals (UTF-8 file encoding independent). */
+export const LOADING_TEXT_DEFAULT = "\uBD88\uB7EC\uC624\uB294 \uC911...";
+export const LOADING_TEXT_WORLD = "\uC6D4\uB4DC \uBD88\uB7EC\uC624\uB294 \uC911...";
 let appLoadingHideTimer = null;
 let appLoadingDismissed = false;
 

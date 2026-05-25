@@ -340,8 +340,8 @@ export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
 export const pickupDistance = 28;
-/** 양동이 줍기 — 씨앗·가방 등은 pickupDistance 유지 */
-export const bucketPickupDistance = 18;
+/** 양동이 줍기 — 씨앗·가방보다 약간 짧게(우물 근처 정밀 배치) */
+export const bucketPickupDistance = 24;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 42;
 /** 우물에서 물 퍼오기·되붓기 판정 거리(짧을수록 우물에 더 붙어야 함) */

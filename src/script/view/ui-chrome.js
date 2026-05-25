@@ -198,7 +198,7 @@ export function createModule(d) {
   d.getApple().worldExtraBuckets.forEach(function (entry) {
     if (!entry) return;
     const el = document.createElement("img");
-    el.className = "world-extra-d.bucket";
+    el.className = "world-extra-bucket";
     el.dataset.bucketId = entry.id;
     el.src = entry.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
     el.alt = "";
@@ -856,8 +856,8 @@ export function createModule(d) {
   function updateWorldSocialChatUiEnabled() {
   const ok = d.isOnboardingSocialDemoReady();
   if (d.worldChatInputEl) {
-    worldChatInputEl.disabled = !ok;
-    worldChatInputEl.placeholder = ok
+    d.worldChatInputEl.disabled = !ok;
+    d.worldChatInputEl.placeholder = ok
       ? d.isOnboardingSocialTutorialStep()
         ? "\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD55C \uB4A4 \uC804\uC1A1"
         : "\uC804\uCCB4: \uBA54\uC2DC\uC9C0 \uB610\uB294 \uC774\uB9841, \uC774\uB9842: \uADD3\uB9D0..."

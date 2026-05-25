@@ -92,7 +92,7 @@ export function createWorldPollSync(d) {
         }
         d.addNetworkDebugLog(
           "world save error: " +
-            (error && error.message ? error.message : "??? ?? ?? ??")
+            (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
         );
         d.showThrottledWorldSyncToast(
           "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."
@@ -140,7 +140,7 @@ export function createWorldPollSync(d) {
       .catch(function (error) {
         d.addNetworkDebugLog(
           "world reset save error: " +
-            (error && error.message ? error.message : "??? ?? ?? ??")
+            (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
         );
         d.showThrottledWorldSyncToast(
           "\uC6D4\uB4DC \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD569\uB2C8\uB2E4."

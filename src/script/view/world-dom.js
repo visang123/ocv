@@ -78,7 +78,7 @@ export function createModule(d) {
   const insertBeforeEl =
     d.localPlayerRoot && d.localPlayerRoot.parentNode === d.ground
       ? d.localPlayerRoot
-      : d.player && player.parentNode === d.ground
+      : d.player && d.player.parentNode === d.ground
         ? d.player
         : null;
   d.getApple().worldRocks.forEach(function (rock) {

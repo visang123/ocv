@@ -550,10 +550,10 @@ export function createModule(d) {
     worldRockPickedIds: d.getApple().worldRockPickedIds,
     worldExtraBuckets: (d.getApple().worldExtraBuckets || []).map(function (bucket) {
       return {
-        id: d.bucket.id,
-        x: Number(d.bucket.x) || 0,
-        y: Number(d.bucket.y) || 0,
-        isFull: Boolean(d.bucket.isFull)
+        id: String(bucket.id || ""),
+        x: Number(bucket.x) || 0,
+        y: Number(bucket.y) || 0,
+        isFull: Boolean(bucket.isFull)
       };
     }),
     placedCraftFurniture: d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)

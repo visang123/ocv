@@ -3,8 +3,8 @@
 export function createModule(d) {
   function assignExtraSeedInventoryOwner(seed) {
   if (!seed) return;
-  d.seed.ownerUserId = d.getLocalExtraSeedOwnerUserId();
-  d.seed.ownerSessionId = d.getLocalExtraSeedOwnerSessionId();
+  seed.ownerUserId = d.getLocalExtraSeedOwnerUserId();
+  seed.ownerSessionId = d.getLocalExtraSeedOwnerSessionId();
   }
 
   function bagDiscardInventoryEligible(itemKey) {
@@ -22,7 +22,7 @@ export function createModule(d) {
     const seed = d.getApple().extraSeeds[seedIndex];
     if (
       d.isOnboardingLinearGateActive() &&
-      (d.seed.isStarter || d.seed.id === "starter-seed")
+      (seed.isStarter || seed.id === "starter-seed")
     ) {
       return false;
     }
@@ -163,7 +163,11 @@ export function createModule(d) {
 
   function getBagInventorySeedCount() {
   if (d.usesWorldLooseSeedMode()) {
-    return Math.max(0, Number(d.getApple().seedCount) || 0);
+    let count = Math.max(0, Number(d.getApple().seedCount) || 0);
+    if (d.getInventory().plantingInventorySeedId && count > 0) {
+      count -= 1;
+    }
+    return count;
   }
   return d.getApple().extraSeeds.filter(function (extraSeed) {
     return (
@@ -581,8 +585,18 @@ export function createModule(d) {
       slot.innerHTML = "";
       return;
     }
-    const descriptor = d.getBagItemDescriptorCore(itemKey);
     const itemCount = Math.max(0, Number(counts[itemKey] || 0));
+    if (itemCount <= 0) {
+      slot.dataset.bagType = "empty";
+      delete slot.dataset.butterflyColor;
+      slot.removeAttribute("data-ovc-tip");
+      slot.removeAttribute("aria-label");
+      slot.classList.add("bag-inventory-slot--empty");
+      slot.classList.add("is-empty");
+      slot.innerHTML = "";
+      return;
+    }
+    const descriptor = d.getBagItemDescriptorCore(itemKey);
     slot.dataset.bagType = descriptor.bagType;
     if (descriptor.label) {
       slot.setAttribute("data-ovc-tip", descriptor.label);
@@ -597,7 +611,7 @@ export function createModule(d) {
       delete slot.dataset.butterflyColor;
     }
     slot.classList.remove("bag-inventory-slot--empty");
-    slot.classList.toggle("is-empty", itemCount <= 0);
+    slot.classList.remove("is-empty");
     slot.innerHTML = descriptor.iconHtml + '<span class="bag-slot-count">' + itemCount + "</span>";
   });
 
