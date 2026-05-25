@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525a";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525a";
-import { initScriptView } from "./src/script/view/index.js?v=20260525a";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525b";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525b";
+import { initScriptView } from "./src/script/view/index.js?v=20260525b";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -6847,6 +6847,12 @@ function buildNetworkDeps() {
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
     getExtraDryDelayMs,
+    appleRespawnMs,
+    parseTreeAppleFromSnapshot,
+    get localApplePickedAtById() { return localApplePickedAtById; },
+    set localApplePickedAtById(v) { localApplePickedAtById = v; },
+    get worldLoosePickupLockUntil() { return worldLoosePickupLockUntil; },
+    set worldLoosePickupLockUntil(v) { worldLoosePickupLockUntil = v; },
     getMultiplayerWorldPollMinMs,
     getNpc,
     getPlant,
