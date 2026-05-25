@@ -43,7 +43,7 @@ export function createModule(d) {
   const stack = document.createElement("div");
   stack.className = "world-bag-drop__stack";
 
-  if (visual.kind === "img") {
+  if (visual.kind === "img" && visual.src) {
     const img = document.createElement("img");
     img.className = "world-bag-drop__icon";
     img.src = visual.src;
@@ -685,13 +685,19 @@ export function createModule(d) {
   const wellImage = d.getWell().water > 0 ? d.IMG_WELL : d.IMG_WELL_EMPTY;
 
   d.wellCard.style.display = isVisible ? "flex" : "none";
-  d.wellCardImage.src = wellImage;
+  if (wellImage && d.wellCardImage) {
+    d.wellCardImage.src = wellImage;
+  }
   d.wellWaterText.textContent = d.getWell().water + "/" + d.maxWellWater;
   d.wellWaterFill.style.width = waterRatio * 100 + "%";
   }
 
   function updateWellImage() {
-  d.well.src = d.getWell().water > 0 ? d.IMG_WELL : d.IMG_WELL_EMPTY;
+  if (!d.well) return;
+  const src = d.getWell().water > 0 ? d.IMG_WELL : d.IMG_WELL_EMPTY;
+  if (src) {
+    d.well.src = src;
+  }
   }
 
   function updateWorldBagDropDom(forceRebuild) {

@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525j";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525j";
-import { initScriptView } from "./src/script/view/index.js?v=20260525j";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260525k";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260525k";
+import { initScriptView } from "./src/script/view/index.js?v=20260525k";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -7305,6 +7305,10 @@ function buildLayerDeps() {
     IMG_SOIL_ROTTEN,
     IMG_SOIL_WET,
     IMG_TILLED_SOIL,
+    IMG_SPROUT,
+    IMG_WATER_NEEDED,
+    IMG_WELL,
+    IMG_WELL_EMPTY,
     NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD,
     NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD,
     NPC_WIDTH,

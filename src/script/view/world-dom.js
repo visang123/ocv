@@ -40,8 +40,9 @@ export function createModule(d) {
     if (!spec) return;
     const el = document.createElement("img");
     el.className =
-      "world-craft-furniture d.world-craft-furniture--" +
+      "world-craft-furniture world-craft-furniture--" +
       entry.kind.replace(/^craft/, "").toLowerCase();
+    if (!spec.src) return;
     el.src = spec.src;
     el.alt = "";
     el.draggable = false;
