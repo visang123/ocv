@@ -5671,10 +5671,37 @@ function canPickUpSharedBucket() {
   if (!heldBy || heldBy === currentSessionId) return true;
 
   const holder = remotePlayers[heldBy];
+  if (
+    holder &&
+    isRemotePresenceSameLoggedInAccount({
+      id: heldBy,
+      userId: holder.userId,
+      name: holder.name
+    })
+  ) {
+    // Same-account ghost ownership should never block local pickup.
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    addBucketTrace("pickup", "recovered same-account holder=" + heldBy, 0);
+    return true;
+  }
   if (!holder) {
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     markWorldDirty();
     addBucketTrace("pickup", "recovered unknown holder=" + heldBy, 0);
+    return true;
+  }
+
+  const holderExtraBucketState = remotePlayerHeldBucketById[heldBy];
+  if (
+    holderExtraBucketState &&
+    String(holderExtraBucketState.bucketId || "") &&
+    String(holderExtraBucketState.bucketId || "") !== MAIN_BUCKET_ID
+  ) {
+    // If that player is known to hold an extra bucket, shared main lock is stale.
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    addBucketTrace("pickup", "recovered stale-main-lock holder=" + heldBy, 0);
     return true;
   }
 
