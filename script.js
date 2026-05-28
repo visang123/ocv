@@ -3530,7 +3530,10 @@ function getNearestGroundBucketPickInfo() {
 
 function isNearBucket() {
   const info = getNearestGroundBucketPickInfo();
-  return Boolean(info && info.distance < bucketPickupDistance);
+  if (!info) return false;
+  const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
+  const allowedDistance = info.type === "main" ? mainBucketPickupDistance : bucketPickupDistance;
+  return info.distance < allowedDistance;
 }
 
 function isNearWell() {
@@ -5449,8 +5452,13 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
   const bucketSize = getBucketSize();
   const pickInfo = forcedPickInfo || getNearestGroundBucketPickInfo();
   const dist = pickInfo ? pickInfo.distance : bucketDistance;
+  const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
+  const allowedDistance =
+    pickInfo && pickInfo.type === "main"
+      ? mainBucketPickupDistance
+      : bucketPickupDistance;
   if (
-    dist > bucketPickupDistance ||
+    dist > allowedDistance ||
     (pickInfo && pickInfo.type === "main" && !canPickUpSharedBucket())
   ) {
     return false;
@@ -11462,11 +11470,18 @@ function isPlayerNearWorldInteractTarget(target) {
       return getCenterDistance(rock.x, rock.y, sz, sz) <= pickupDistance;
     }
     case "bucket":
+      {
+        const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
+        const allowedDistance =
+          target.data && target.data.type === "main"
+            ? mainBucketPickupDistance
+            : bucketPickupDistance;
       return Boolean(
         target.data &&
-          target.data.distance < bucketPickupDistance &&
+            target.data.distance < allowedDistance &&
           (target.data.type !== "main" || canPickUpSharedBucket())
       );
+      }
     default:
       return false;
   }
