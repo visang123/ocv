@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260528a";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260528a";
-import { initScriptView } from "./src/script/view/index.js?v=20260528a";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260528c";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260528c";
+import { initScriptView } from "./src/script/view/index.js?v=20260528c";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -2158,8 +2158,14 @@ document.addEventListener("keydown", function (event) {
       return;
     }
     isInteractKeyLatched = true;
-    if (isPlayerNearMainBucketPickupZone() && !getInventory().heldItem && pickUpMainBucketDirect()) {
-      return;
+    if (!getInventory().heldItem) {
+      if (pickUpMainBucketDirect()) {
+        return;
+      }
+      if (isPlayerOverlappingWellBucketZone() || isNearWellForCard()) {
+        flashPlantProximityWarning("\uC591\uB3D9\uC774\uB97C \uB4E4 \uC218 \uC5C6\uC5B4\uC694. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.");
+        return;
+      }
     }
     performInteractAction();
   }
@@ -3235,7 +3241,57 @@ function getHandPositionFromPlayerPose(playerWorldX, playerWorldY, itemWidth, it
 }
 
 function getHandPosition(itemWidth, itemHeight) {
-  return getHandPositionFromPlayerPose(getPlayer().x, getPlayerWorldY(), itemWidth, itemHeight);
+  return getHandPositionFromPlayerPose(
+    getPlayer().x,
+    getLocalPlayerWorldYForInteract(),
+    itemWidth,
+    itemHeight
+  );
+}
+
+/** 파일 분리 후에도 양동이·우물 상호작용이 깨지지 않도록 systems 래퍼 없이 좌표 계산 */
+function getLocalPlayerWorldYForInteract() {
+  return -getPlayer().depth + getPlayer().jumpY;
+}
+
+function getLocalPlayerBoxForInteract() {
+  const p = getPlayer();
+  const bodyW = p.sittingChairId ? PLAYER_SIT_WIDTH : PLAYER_WIDTH;
+  const bodyH = p.sittingChairId ? PLAYER_SIT_HEIGHT : PLAYER_HEIGHT;
+  const top = GROUND_WORLD_HEIGHT - bodyH - p.depth + p.jumpY;
+  const bottom = GROUND_WORLD_HEIGHT - p.depth + p.jumpY;
+  return {
+    left: p.x,
+    top: top,
+    right: p.x + bodyW,
+    bottom: bottom,
+    width: bodyW,
+    height: bodyH
+  };
+}
+
+function getLocalCenterDistanceForInteract(x, y, width, height) {
+  return getCenterDistanceUtil(getLocalPlayerBoxForInteract(), x, y, width, height);
+}
+
+function isLocalNearWellForBucketPickup() {
+  return (
+    getLocalCenterDistanceForInteract(
+      getWorldItems().wellX,
+      getWorldItems().wellY,
+      WELL_SIZE,
+      WELL_SIZE
+    ) < wellUseDistance
+  );
+}
+
+function forceMainBucketHeldVisualLocal() {
+  if (!bucket || !playerBucketOverlay) return;
+  const img = getInventory().isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
+  bucket.src = img;
+  bucket.style.display = "none";
+  playerBucketOverlay.style.backgroundImage = 'url("' + img + '")';
+  playerBucketOverlay.style.display = "block";
 }
 
 function isNearSeed() {
@@ -3476,28 +3532,51 @@ function isMainBucketOnGroundForPickup() {
   return !isHoldingMainBucket();
 }
 
-/** 우물·양동이 근처 — E 집기 판정(넉넉한 범위) */
-function isPlayerNearMainBucketPickupZone() {
-  if (isNearBucket()) return true;
-  if (isNearWellIncludingBucketReach()) return true;
-  const bucketSize = getBucketSize();
-  const coords = getMainBucketGroundPickCoords();
-  const wellDefault = {
-    x: getWorldItems().wellX - bucketSize.width - 8,
-    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
+function getWellBucketPickupZoneRect() {
+  const padX = 40;
+  const padY = 32;
+  const left = getWorldItems().wellX - BUCKET_SIZE - 8 - padX;
+  const top = getWorldItems().wellY - padY;
+  return {
+    left: left,
+    top: top,
+    right: getWorldItems().wellX + WELL_SIZE + padX,
+    bottom: getWorldItems().wellY + WELL_SIZE + padY
   };
-  const px = coords ? coords.x : wellDefault.x;
-  const py = coords ? coords.y : wellDefault.y;
-  const dist = getCenterDistance(px, py, bucketSize.width, bucketSize.height);
-  return dist <= Math.max(pickupDistance + 22, bucketPickupDistance + 16, 46);
+}
+
+function isPlayerOverlappingWellBucketZone() {
+  return isOverlappingRect(getLocalPlayerBoxForInteract(), getWellBucketPickupZoneRect());
+}
+
+function reconcileStaleSelfBucketOwnership() {
+  const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+  if (heldBy && heldBy === currentSessionId && !isHoldingMainBucket()) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+  }
+}
+
+/** 우물·양동이 근처 — 발/몸통이 우물·양동이 영역과 겹치면 집기 허용 */
+function isPlayerNearMainBucketPickupZone() {
+  if (isPlayerOverlappingWellBucketZone()) return true;
+  if (isLocalNearWellForBucketPickup()) return true;
+  if (isNearBucket()) return true;
+  if (typeof isNearWellForCard === "function" && isNearWellForCard()) return true;
+  return isNearWellIncludingBucketReach();
 }
 
 /** 우물/양동이 근처 — 거리·pickInfo 없이 메인 양동이를 바로 든다 */
 function pickUpMainBucketDirect() {
+  reconcileStaleSelfBucketOwnership();
   if (isHoldingMainBucket()) return true;
   if (!isPlayerNearMainBucketPickupZone()) return false;
 
-  if (isOnboardingLinearGateActive() && !onboardingAllowsBucketGroundPickup()) {
+  if (
+    isOnboardingLinearGateActive() &&
+    !onboardingAllowsBucketGroundPickup() &&
+    !isPlayerOverlappingWellBucketZone()
+  ) {
     flashOnboardingOrderHint("");
     return false;
   }
@@ -3509,7 +3588,7 @@ function pickUpMainBucketDirect() {
 
   onboardingAutoAdvanceSteps();
   window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
-  const bucketSize = getBucketSize();
+  const bucketSize = { width: BUCKET_SIZE, height: BUCKET_SIZE };
   getInventory().heldBucketId = MAIN_BUCKET_ID;
   getInventory().mainBucketParkedX = getWorldItems().bucketX;
   getInventory().mainBucketParkedY = getWorldItems().bucketY;
@@ -3524,8 +3603,13 @@ function pickUpMainBucketDirect() {
   getSeedWorld().lastBucketPickupAt = Date.now();
   markWorldDirty();
   updateBucketPosition();
+  forceMainBucketHeldVisualLocal();
+  saveBucketState();
   broadcastBucketState(true);
-  syncWorldState(true);
+  if (isSharedWorldMergeActive()) {
+    syncWorldState(true);
+  }
+  flashPlantProximityWarning("\uC591\uB3D9\uC774\uB97C \uB4E4\uC5C8\uC5B4\uC694.");
   if (!getStoredFlag(onboardingFlowDoneKey)) {
     if (
       getOnboarding().flowStep === ONBOARDING_STEP_BUCKET_PICK ||
@@ -3546,10 +3630,9 @@ function tryForcePickMainBucketNearby() {
 /** 집기·거리 판정용 — 원격 손 위치가 아닌 땅에 보이는 좌표 */
 function getMainBucketGroundPickCoords() {
   if (isHoldingMainBucket()) return null;
-  const bucketSize = getBucketSize();
   const wellDefault = {
-    x: getWorldItems().wellX - bucketSize.width - 8,
-    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
+    x: getWorldItems().wellX - BUCKET_SIZE - 8,
+    y: getWorldItems().wellY + WELL_SIZE - BUCKET_SIZE
   };
   const x = Number.isFinite(getWorldItems().bucketX) ? getWorldItems().bucketX : wellDefault.x;
   const y = Number.isFinite(getWorldItems().bucketY) ? getWorldItems().bucketY : wellDefault.y;
@@ -3631,17 +3714,16 @@ function resolveGroundBucketDropPosition(preferredX, preferredY, options) {
 }
 
 function getNearestGroundBucketPickInfo() {
-  const bucketSize = getBucketSize();
   let best = null;
   let bestDist = Infinity;
   if (isMainBucketOnGroundForPickup()) {
     const mainCoords = getMainBucketGroundPickCoords();
     if (!mainCoords) return best;
-    const mainDist = getCenterDistance(
+    const mainDist = getLocalCenterDistanceForInteract(
       mainCoords.x,
       mainCoords.y,
-      bucketSize.width,
-      bucketSize.height
+      BUCKET_SIZE,
+      BUCKET_SIZE
     );
     if (mainDist < bestDist) {
       bestDist = mainDist;
@@ -3651,7 +3733,7 @@ function getNearestGroundBucketPickInfo() {
   const extras = Array.isArray(getApple().worldExtraBuckets) ? getApple().worldExtraBuckets : [];
   extras.forEach(function (entry) {
     if (!entry) return;
-    const dist = getCenterDistance(entry.x, entry.y, bucketSize.width, bucketSize.height);
+    const dist = getLocalCenterDistanceForInteract(entry.x, entry.y, BUCKET_SIZE, BUCKET_SIZE);
     if (dist < bestDist) {
       bestDist = dist;
       best = { type: "extra", id: String(entry.id), distance: dist };
@@ -5822,13 +5904,12 @@ function canPickUpSharedBucket() {
 
   // Failsafe: when local player is physically close to the main bucket,
   // treat stale ownership as recoverable and unblock pickup.
-  const bucketSize = getBucketSize();
   const mainCoords = getMainBucketGroundPickCoords() || getMainBucketGroundState();
-  const localMainBucketDistance = getCenterDistance(
+  const localMainBucketDistance = getLocalCenterDistanceForInteract(
     mainCoords.x,
     mainCoords.y,
-    bucketSize.width,
-    bucketSize.height
+    BUCKET_SIZE,
+    BUCKET_SIZE
   );
   const proximityRecoverDistance = Math.max(bucketPickupDistance, pickupDistance + 10);
   if (localMainBucketDistance <= proximityRecoverDistance) {
@@ -7774,6 +7855,7 @@ function buildLayerDeps() {
     isMagicPowderBagType,
     isMagicPowderBagTypeUsableNow,
     isMainBucketHeldByRemotePlayer,
+    reconcileStaleSelfBucketOwnership,
     isNearPlantMaster,
     isNearSignBoard,
     isNearWorldBagPickup,
