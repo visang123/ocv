@@ -2138,10 +2138,16 @@ document.addEventListener("keydown", function (event) {
   if (key === "e" && !event.repeat) {
     event.preventDefault();
     if (isInteractKeyLatched) return;
-    isInteractKeyLatched = true;
+    if (!hasSpawnedCharacter || isCharacterSelecting) return;
     if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
-    if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) return;
+    if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
+      if (isPlayerNearMainBucketPickupZone()) {
+        flashPlantProximityWarning("\uC9C0\uAE08\uC740 \uC591\uB3D9\uC774\uB97C \uB4E4 \uC218 \uC5C6\uC5B4\uC694.");
+      }
+      return;
+    }
+    isInteractKeyLatched = true;
     performInteractAction();
   }
 
@@ -2279,6 +2285,7 @@ document.addEventListener("keyup", function (event) {
 
 window.addEventListener("blur", function () {
   resetInputKeys(keys);
+  isInteractKeyLatched = false;
 });
 window.addEventListener("pagehide", function () {
   if (isTradeExchangeOpen()) closeTradeExchangePanel();
@@ -3453,7 +3460,56 @@ function isMainBucketVisibleOnGroundForLocalPickup() {
 }
 
 function isMainBucketOnGroundForPickup() {
-  return isMainBucketVisibleOnGroundForLocalPickup();
+  return !isHoldingMainBucket();
+}
+
+/** 우물·양동이 근처 — E 집기 판정(넉넉한 범위) */
+function isPlayerNearMainBucketPickupZone() {
+  if (isNearBucket()) return true;
+  if (isNearWellIncludingBucketReach()) return true;
+  const bucketSize = getBucketSize();
+  const coords = getMainBucketGroundPickCoords();
+  const wellDefault = {
+    x: getWorldItems().wellX - bucketSize.width - 8,
+    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
+  };
+  const px = coords ? coords.x : wellDefault.x;
+  const py = coords ? coords.y : wellDefault.y;
+  const dist = getCenterDistance(px, py, bucketSize.width, bucketSize.height);
+  return dist <= Math.max(pickupDistance + 22, bucketPickupDistance + 16, 46);
+}
+
+/** 우물/양동이 근처에서 메인 양동이 집기(멀티 잠금·거리 보정) */
+function tryForcePickMainBucketNearby() {
+  if (isHoldingMainBucket()) return false;
+  if (!isPlayerNearMainBucketPickupZone()) return false;
+
+  const bucketSize = getBucketSize();
+  const coords = getMainBucketGroundPickCoords();
+  const wellDefault = {
+    x: getWorldItems().wellX - bucketSize.width - 8,
+    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
+  };
+  const pickX = coords ? coords.x : wellDefault.x;
+  const pickY = coords ? coords.y : wellDefault.y;
+  const dist = getCenterDistance(pickX, pickY, bucketSize.width, bucketSize.height);
+
+  if (!canPickUpSharedBucket()) {
+    flashPlantProximityWarning("\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uAC00 \uC591\uB3D9\uC774\uB97C \uB4E4\uACE0 \uC788\uC5B4\uC694.");
+    return false;
+  }
+
+  if (String(window.OVC_SHARED_BUCKET_HELD_BY || "") && window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+  }
+
+  if (isOnboardingLinearGateActive() && !onboardingAllowsBucketGroundPickup()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
+
+  return tryPickSharedBucket(dist, { type: "main", distance: dist });
 }
 
 /** 집기·거리 판정용 — 원격 손 위치가 아닌 땅에 보이는 좌표 */
@@ -11165,6 +11221,7 @@ function performInteractActionCore() {
     dropHeldItem();
     return;
   }
+  if (tryForcePickMainBucketNearby()) return;
   const bucketPick = getNearestGroundBucketPickInfo();
   const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
   if (pickUpWorldBag()) return;
@@ -11181,12 +11238,19 @@ function performInteractActionCore() {
 }
 
 function performInteractAction() {
+  if (!hasSpawnedCharacter || isCharacterSelecting) return;
   if (isPlayerInsideEnteredCraftHouse()) return;
   if (isPlayerHealthGameplayBlocked()) return;
-  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) return;
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
+    if (isPlayerNearMainBucketPickupZone()) {
+      flashPlantProximityWarning("\uC9C0\uAE08\uC740 \uC591\uB3D9\uC774\uB97C \uB4E4 \uC218 \uC5C6\uC5B4\uC694.");
+    }
+    return;
+  }
   const now = Date.now();
   if (now - getSeedWorld().lastPickupToggleAt < 180) return;
   getSeedWorld().lastPickupToggleAt = now;
+  if (!getInventory().heldItem && tryForcePickMainBucketNearby()) return;
   performInteractActionCore();
 }
 
