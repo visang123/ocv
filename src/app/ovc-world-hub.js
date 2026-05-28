@@ -44,7 +44,6 @@ export function ovcClearPendingWorldHubMarkers(userId) {
 export function ovcHtmlPageUrl(htmlFile) {
   const u = new URL(htmlFile, window.location.href);
   u.searchParams.set("v", "20260517e");
-  u.searchParams.set("t", String(Date.now()));
   return u.toString();
 }
 
@@ -61,7 +60,6 @@ export function ovcHardNavigateToWorldIndex() {
     var u = new URL("index.html", window.location.href);
     u.searchParams.set(ovcForceWorldHubUrlParam, "1");
     u.searchParams.set("v", "20260517e");
-    u.searchParams.set("t", String(Date.now()));
     var url = u.toString();
     try {
       window.top.location.replace(url);
@@ -70,13 +68,9 @@ export function ovcHardNavigateToWorldIndex() {
     }
   } catch (eNav) {
     try {
-      window.top.location.replace(
-        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
-      );
+      window.top.location.replace("index.html?ovc_world=1&v=20260517e");
     } catch (eTop2) {
-      window.location.replace(
-        "index.html?ovc_world=1&v=20260517e&t=" + String(Date.now())
-      );
+      window.location.replace("index.html?ovc_world=1&v=20260517e");
     }
   }
 }

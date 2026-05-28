@@ -63,7 +63,7 @@ export function attachCoreRuntimeTimers(opts) {
 
   setTimeout(function () {
     ovcTryDismissLoadingScreen(true);
-  }, 12000);
+  }, 3500);
 
   setInterval(function () {
     if (isTabSessionSuperseded()) return;

@@ -1,6 +1,9 @@
 /** View — 온보딩·설정·알림·가이드 UI. */
 
 export function createModule(d) {
+  const WORLD_SYNC_LOADING_MAX_WAIT_MS = 2200;
+  let worldSyncLoadingWaitStartedAt = 0;
+
   function closeGuideCardFromClick() {
   if (
     d.isOnboardingBookGuideIntroActive() &&
@@ -169,14 +172,20 @@ export function createModule(d) {
   if (d.isTabSessionSuperseded && !force) return;
   if (force || d.isCharacterSelecting) {
     d.hideAppLoadingScreen();
+    worldSyncLoadingWaitStartedAt = 0;
     return;
   }
   if (!d.ovcBootstrapFinished) return;
   if (d.isSharedWorldSyncPausedForTutorial() || !d.isWorldServerSyncAvailable()) {
     d.hideAppLoadingScreen();
+    worldSyncLoadingWaitStartedAt = 0;
     return;
   }
-  if (!d.hasHydratedSharedWorldFromServer) return;
+  if (!d.hasHydratedSharedWorldFromServer) {
+    if (!worldSyncLoadingWaitStartedAt) worldSyncLoadingWaitStartedAt = Date.now();
+    if (Date.now() - worldSyncLoadingWaitStartedAt < WORLD_SYNC_LOADING_MAX_WAIT_MS) return;
+  }
+  worldSyncLoadingWaitStartedAt = 0;
   d.hideAppLoadingScreen();
   }
 
