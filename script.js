@@ -5364,10 +5364,9 @@ function startPlantMasterDialogue() {
         { speaker: "npc", text: "\uC790\uB124....", delayAfterMs: 1000 },
         { speaker: "npc", text: "\uC2DD\uBB3C\uC774\uB780", delayAfterMs: 500 },
         { speaker: "npc", text: "\uBB34\uC5C7\uC774\uB77C \uC0DD\uAC01\uD558\uB098?!", delayAfterMs: 1500 },
-        { speaker: "player", text: "\uC798 \uBAA8\uB974\uACA0\uC2B5\uB2C8\uB2E4...", delayAfterMs: 2500 },
-        { speaker: "npc", text: "\uC2DD\uBB3C\uC774\uB780...", delayAfterMs: 3500 },
-        { speaker: "npc", text: "$%#@!", delayAfterMs: 2000 },
-        { speaker: "npc", text: "\uC77C\uC138.", delayAfterMs: 3000 },
+        { speaker: "player", text: "\uC798 \uBAA8\uB974\uACA0\uC2B5\uB2C8\uB2E4...", delayAfterMs: 1500 },
+        { speaker: "npc", text: "\uC2DD\uBB3C\uC774\uB780...", delayAfterMs: 1500 },
+        { speaker: "npc", text: "\uC0AC\uB791\uC774\uC9C0!", delayAfterMs: 1000 },
         { speaker: "player", text: "!!!", delayAfterMs: 1200 }
       ]
     : [
