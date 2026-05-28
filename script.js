@@ -5678,6 +5678,28 @@ function canPickUpSharedBucket() {
   const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
   if (!heldBy || heldBy === currentSessionId) return true;
 
+  // Failsafe: when local player is physically close to the main bucket,
+  // treat stale ownership as recoverable and unblock pickup.
+  const bucketSize = getBucketSize();
+  const mainGround = getMainBucketGroundState();
+  const localMainBucketDistance = getCenterDistance(
+    mainGround.x,
+    mainGround.y,
+    bucketSize.width,
+    bucketSize.height
+  );
+  const proximityRecoverDistance = Math.max(bucketPickupDistance, pickupDistance + 10);
+  if (localMainBucketDistance <= proximityRecoverDistance) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    addBucketTrace(
+      "pickup",
+      "recovered proximity-lock holder=" + heldBy + " d=" + Math.round(localMainBucketDistance),
+      0
+    );
+    return true;
+  }
+
   const holder = remotePlayers[heldBy];
   if (
     holder &&
