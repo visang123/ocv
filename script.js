@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260525o";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260525o";
-import { initScriptView } from "./src/script/view/index.js?v=20260525o";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260528a";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260528a";
+import { initScriptView } from "./src/script/view/index.js?v=20260528a";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -2027,6 +2027,11 @@ document.addEventListener("keydown", function (event) {
     event.preventDefault();
     return;
   }
+  if (event.code === "KeyE" && !event.repeat && isWorldChatBlockingGameInput()) {
+    event.preventDefault();
+    flashPlantProximityWarning("\uCC44\uD305 \uC785\uB825\uC744 \uB05D\uB0B8 \uB4A4 E\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694.");
+    return;
+  }
   const key = getControlKey(event);
 
   if (isCharacterSelecting) {
@@ -2135,10 +2140,15 @@ document.addEventListener("keydown", function (event) {
     getPlayer().isOnGround = false;
   }
 
-  if (key === "e" && !event.repeat) {
+  if ((key === "e" || event.code === "KeyE") && !event.repeat) {
     event.preventDefault();
     if (isInteractKeyLatched) return;
-    if (!hasSpawnedCharacter || isCharacterSelecting) return;
+    if (!hasSpawnedCharacter || isCharacterSelecting) {
+      if (isPlayerNearMainBucketPickupZone()) {
+        flashPlantProximityWarning("\uCE90\uB9AD\uD130\uB97C \uC120\uD0DD\uD55C \uB4A4 \uC591\uB3D9\uC774\uB97C \uB4E4 \uC218 \uC788\uC5B4\uC694.");
+      }
+      return;
+    }
     if (isPlayerInsideEnteredCraftHouse()) return;
     if (isPlayerHealthGameplayBlocked()) return;
     if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
@@ -2148,6 +2158,9 @@ document.addEventListener("keydown", function (event) {
       return;
     }
     isInteractKeyLatched = true;
+    if (isPlayerNearMainBucketPickupZone() && !getInventory().heldItem && pickUpMainBucketDirect()) {
+      return;
+    }
     performInteractAction();
   }
 
@@ -3479,42 +3492,60 @@ function isPlayerNearMainBucketPickupZone() {
   return dist <= Math.max(pickupDistance + 22, bucketPickupDistance + 16, 46);
 }
 
-/** 우물/양동이 근처에서 메인 양동이 집기(멀티 잠금·거리 보정) */
-function tryForcePickMainBucketNearby() {
-  if (isHoldingMainBucket()) return false;
+/** 우물/양동이 근처 — 거리·pickInfo 없이 메인 양동이를 바로 든다 */
+function pickUpMainBucketDirect() {
+  if (isHoldingMainBucket()) return true;
   if (!isPlayerNearMainBucketPickupZone()) return false;
-
-  const bucketSize = getBucketSize();
-  const coords = getMainBucketGroundPickCoords();
-  const wellDefault = {
-    x: getWorldItems().wellX - bucketSize.width - 8,
-    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
-  };
-  const pickX = coords ? coords.x : wellDefault.x;
-  const pickY = coords ? coords.y : wellDefault.y;
-  const dist = getCenterDistance(pickX, pickY, bucketSize.width, bucketSize.height);
-
-  if (!canPickUpSharedBucket()) {
-    flashPlantProximityWarning("\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uAC00 \uC591\uB3D9\uC774\uB97C \uB4E4\uACE0 \uC788\uC5B4\uC694.");
-    return false;
-  }
-
-  if (String(window.OVC_SHARED_BUCKET_HELD_BY || "") && window.OVC_SHARED_BUCKET_HELD_BY !== currentSessionId) {
-    window.OVC_SHARED_BUCKET_HELD_BY = "";
-    markWorldDirty();
-  }
 
   if (isOnboardingLinearGateActive() && !onboardingAllowsBucketGroundPickup()) {
     flashOnboardingOrderHint("");
     return false;
   }
 
-  return tryPickSharedBucket(dist, { type: "main", distance: dist });
+  if (!canPickUpSharedBucket()) {
+    flashPlantProximityWarning("\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uAC00 \uC591\uB3D9\uC774\uB97C \uB4E4\uACE0 \uC788\uC5B4\uC694.");
+    return false;
+  }
+
+  onboardingAutoAdvanceSteps();
+  window.OVC_SHARED_BUCKET_HELD_BY = currentSessionId;
+  const bucketSize = getBucketSize();
+  getInventory().heldBucketId = MAIN_BUCKET_ID;
+  getInventory().mainBucketParkedX = getWorldItems().bucketX;
+  getInventory().mainBucketParkedY = getWorldItems().bucketY;
+  getInventory().mainBucketParkedIsFull = Boolean(getInventory().isBucketFull);
+  getInventory().heldExtraBucketMainX = 0;
+  getInventory().heldExtraBucketMainY = 0;
+  getInventory().heldExtraBucketMainIsFull = false;
+  const handPosition = getHandPosition(bucketSize.width, bucketSize.height);
+  getWorldItems().bucketX = handPosition.x;
+  getWorldItems().bucketY = handPosition.y;
+  getInventory().heldItem = HELD_ITEM_BUCKET;
+  getSeedWorld().lastBucketPickupAt = Date.now();
+  markWorldDirty();
+  updateBucketPosition();
+  broadcastBucketState(true);
+  syncWorldState(true);
+  if (!getStoredFlag(onboardingFlowDoneKey)) {
+    if (
+      getOnboarding().flowStep === ONBOARDING_STEP_BUCKET_PICK ||
+      getOnboarding().flowStep === ONBOARDING_STEP_WELL
+    ) {
+      getOnboarding().flowStep = ONBOARDING_STEP_BUCKET_FILL;
+      persistOnboardingStep();
+      updateOnboardingFlowUI();
+    }
+  }
+  return true;
+}
+
+function tryForcePickMainBucketNearby() {
+  return pickUpMainBucketDirect();
 }
 
 /** 집기·거리 판정용 — 원격 손 위치가 아닌 땅에 보이는 좌표 */
 function getMainBucketGroundPickCoords() {
-  if (!isMainBucketVisibleOnGroundForLocalPickup()) return null;
+  if (isHoldingMainBucket()) return null;
   const bucketSize = getBucketSize();
   const wellDefault = {
     x: getWorldItems().wellX - bucketSize.width - 8,
@@ -11221,7 +11252,7 @@ function performInteractActionCore() {
     dropHeldItem();
     return;
   }
-  if (tryForcePickMainBucketNearby()) return;
+  if (pickUpMainBucketDirect()) return;
   const bucketPick = getNearestGroundBucketPickInfo();
   const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
   if (pickUpWorldBag()) return;
@@ -11250,7 +11281,7 @@ function performInteractAction() {
   const now = Date.now();
   if (now - getSeedWorld().lastPickupToggleAt < 180) return;
   getSeedWorld().lastPickupToggleAt = now;
-  if (!getInventory().heldItem && tryForcePickMainBucketNearby()) return;
+  if (!getInventory().heldItem && pickUpMainBucketDirect()) return;
   performInteractActionCore();
 }
 
@@ -12320,7 +12351,11 @@ function getCraftFurniturePlacementBlockMessage(placement) {
 
 function flashPlantProximityWarning(message) {
   plantProximityWarnUntil = Date.now() + 2800;
-  playerStatus.textContent = message || "";
+  if (playerStatus) {
+    playerStatus.textContent = message || "";
+    playerStatus.style.display = "block";
+  }
+  updatePlayerStatus();
 }
 
 function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
