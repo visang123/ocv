@@ -5296,6 +5296,26 @@ function tryTalkToPlantMaster() {
   if (getNpc().isDialogueRunning) {
     return true;
   }
+  if (!getWorldItems().hasGuideBook) {
+    abortPlantMasterDialogue();
+    getNpc().isDialogueRunning = true;
+    showDialogueLine({
+      speaker: "npc",
+      text: "\uC790\uB124 ovc \uBC31\uACFC\uC0AC\uC804\uC774 \uC5C6\uAD70. \uBA3C\uC800 \uCC45\uC744 \uCC3E\uAC8C\uB098",
+      delayAfterMs: 2200
+    });
+    schedulePlantMasterDialogueTask(function () {
+      if (npcBubble) {
+        npcBubble.style.display = "none";
+        npcBubble.dataset.promptShown = "false";
+      }
+      if (playerBubble) {
+        playerBubble.style.display = "none";
+      }
+      getNpc().isDialogueRunning = false;
+    }, 2200);
+    return true;
+  }
   if (isOnboardingLinearGateActive() && getOnboarding().flowStep < ONBOARDING_STEP_PLANT_MASTER_TALK) {
     flashOnboardingOrderHint("");
     return true;
@@ -7666,7 +7686,8 @@ function buildLayerDeps() {
     removeOneBagItemForTrade,
     resetInputKeys,
     respawnApplesIfNeeded,
-    rockInventoryCount,
+    get rockInventoryCount() { return rockInventoryCount; },
+    set rockInventoryCount(v) { rockInventoryCount = v; },
     rockInventoryCountKey,
     sanitizeWorldChatText,
     saveBagInventoryOrderCore,
@@ -11039,6 +11060,8 @@ function performInteractActionCore() {
     const bucketPick = getNearestGroundBucketPickInfo();
     const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
     if (tryPickupNearestWorldRock(bucketDistance)) return;
+    // Even before guidebook acquisition, allow direct bucket pickup with E.
+    if (tryPickSharedBucket(bucketDistance, bucketPick)) return;
     return;
   }
   if (tryCatchButterfly()) return;
