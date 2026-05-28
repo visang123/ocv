@@ -3420,9 +3420,53 @@ function applyRemoteSharedMainBucketHeldPose(x, y, isFull) {
   }
 }
 
-function isMainBucketOnGroundForPickup() {
+/** 로컬 플레이어가 메인 양동이를 땅에서 집을 수 있는지(소유권 잠금과 분리) */
+function isMainBucketVisibleOnGroundForLocalPickup() {
   if (isHoldingMainBucket()) return false;
-  return canPickUpSharedBucket();
+  const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
+  if (!heldBy || heldBy === currentSessionId) return true;
+
+  const holder = remotePlayers[heldBy];
+  if (!holder) return true;
+  if (
+    isRemotePresenceSameLoggedInAccount({
+      id: heldBy,
+      userId: holder.userId,
+      name: holder.name
+    })
+  ) {
+    return true;
+  }
+
+  const holderExtraBucketState = remotePlayerHeldBucketById[heldBy];
+  if (
+    holderExtraBucketState &&
+    String(holderExtraBucketState.bucketId || "") &&
+    String(holderExtraBucketState.bucketId || "") !== MAIN_BUCKET_ID
+  ) {
+    return true;
+  }
+
+  const holderIsActive =
+    Number.isFinite(holder.lastSeenAt) && Date.now() - holder.lastSeenAt < 5000;
+  return !holderIsActive;
+}
+
+function isMainBucketOnGroundForPickup() {
+  return isMainBucketVisibleOnGroundForLocalPickup();
+}
+
+/** 집기·거리 판정용 — 원격 손 위치가 아닌 땅에 보이는 좌표 */
+function getMainBucketGroundPickCoords() {
+  if (!isMainBucketVisibleOnGroundForLocalPickup()) return null;
+  const bucketSize = getBucketSize();
+  const wellDefault = {
+    x: getWorldItems().wellX - bucketSize.width - 8,
+    y: getWorldItems().wellY + WELL_SIZE - bucketSize.height
+  };
+  const x = Number.isFinite(getWorldItems().bucketX) ? getWorldItems().bucketX : wellDefault.x;
+  const y = Number.isFinite(getWorldItems().bucketY) ? getWorldItems().bucketY : wellDefault.y;
+  return { x: x, y: y };
 }
 
 function groundBucketsOverlap(ax, ay, bx, by, bucketSz) {
@@ -3504,10 +3548,11 @@ function getNearestGroundBucketPickInfo() {
   let best = null;
   let bestDist = Infinity;
   if (isMainBucketOnGroundForPickup()) {
-    const mainGround = getMainBucketGroundState();
+    const mainCoords = getMainBucketGroundPickCoords();
+    if (!mainCoords) return best;
     const mainDist = getCenterDistance(
-      mainGround.x,
-      mainGround.y,
+      mainCoords.x,
+      mainCoords.y,
       bucketSize.width,
       bucketSize.height
     );
@@ -5451,21 +5496,31 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
   onboardingAutoAdvanceSteps();
   const bucketSize = getBucketSize();
   const pickInfo = forcedPickInfo || getNearestGroundBucketPickInfo();
-  const dist = pickInfo ? pickInfo.distance : bucketDistance;
+  let dist = pickInfo ? pickInfo.distance : bucketDistance;
+  if (pickInfo && pickInfo.type === "main") {
+    const mainCoords = getMainBucketGroundPickCoords();
+    if (mainCoords) {
+      dist = getCenterDistance(mainCoords.x, mainCoords.y, bucketSize.width, bucketSize.height);
+    }
+    if (!canPickUpSharedBucket()) {
+      window.OVC_SHARED_BUCKET_HELD_BY = "";
+      markWorldDirty();
+    }
+  }
   const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
   const allowedDistance =
     pickInfo && pickInfo.type === "main"
       ? mainBucketPickupDistance
       : bucketPickupDistance;
-  if (
-    dist > allowedDistance ||
-    (pickInfo && pickInfo.type === "main" && !canPickUpSharedBucket())
-  ) {
+  if (dist > allowedDistance) {
+    return false;
+  }
+  if (pickInfo && pickInfo.type === "main" && !canPickUpSharedBucket()) {
     return false;
   }
   if (isOnboardingLinearGateActive() && !onboardingAllowsBucketGroundPickup()) {
     flashOnboardingOrderHint("");
-    return true;
+    return false;
   }
   getInventory().heldBucketId = MAIN_BUCKET_ID;
   if (pickInfo && pickInfo.type === "extra" && Array.isArray(getApple().worldExtraBuckets)) {
@@ -5681,10 +5736,10 @@ function canPickUpSharedBucket() {
   // Failsafe: when local player is physically close to the main bucket,
   // treat stale ownership as recoverable and unblock pickup.
   const bucketSize = getBucketSize();
-  const mainGround = getMainBucketGroundState();
+  const mainCoords = getMainBucketGroundPickCoords() || getMainBucketGroundState();
   const localMainBucketDistance = getCenterDistance(
-    mainGround.x,
-    mainGround.y,
+    mainCoords.x,
+    mainCoords.y,
     bucketSize.width,
     bucketSize.height
   );
@@ -11110,16 +11165,16 @@ function performInteractActionCore() {
     dropHeldItem();
     return;
   }
+  const bucketPick = getNearestGroundBucketPickInfo();
+  const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
   if (pickUpWorldBag()) return;
   if (!hasGuideBookItemInBagCounts() && pickUpWorldGuideBookNoHold()) return;
   if (!getWorldItems().hasGuideBook) {
-    const bucketPick = getNearestGroundBucketPickInfo();
-    const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
     if (tryPickupNearestWorldRock(bucketDistance)) return;
-    // Even before guidebook acquisition, allow direct bucket pickup with E.
     if (tryPickSharedBucket(bucketDistance, bucketPick)) return;
     return;
   }
+  if (isNearBucket() && tryPickSharedBucket(bucketDistance, bucketPick)) return;
   if (tryCatchButterfly()) return;
   if (pickApple()) return;
   pickUpNearestItem();
@@ -11218,11 +11273,13 @@ function getGroundBucketPickInfoAtWorldPoint(wx, wy) {
   }
 
   if (isMainBucketOnGroundForPickup()) {
-    const main = getMainBucketGroundState();
-    consider(main.x, main.y, {
-      type: "main",
-      distance: getCenterDistance(main.x, main.y, bucketSize.width, bucketSize.height)
-    });
+    const mainCoords = getMainBucketGroundPickCoords();
+    if (mainCoords) {
+      consider(mainCoords.x, mainCoords.y, {
+        type: "main",
+        distance: getCenterDistance(mainCoords.x, mainCoords.y, bucketSize.width, bucketSize.height)
+      });
+    }
   }
   const extras = Array.isArray(getApple().worldExtraBuckets) ? getApple().worldExtraBuckets : [];
   extras.forEach(function (entry) {
