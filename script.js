@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260528c";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260528c";
-import { initScriptView } from "./src/script/view/index.js?v=20260528c";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260528d";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260528d";
+import { initScriptView } from "./src/script/view/index.js?v=20260528d";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -2746,6 +2746,7 @@ let hasLastPlantHoverPointer = false;
 
 document.addEventListener("pointerup", function (e) {
   if (e.button !== 0) return;
+  if (tryScoopWellWaterByPointerClick(e.clientX, e.clientY)) return;
   if (tryWaterPlantByPointerClick(e.clientX, e.clientY)) return;
   if (isPointerBlockedForWorldInteract(e)) return;
   tryWorldInteractByPointerClick(e.clientX, e.clientY);
@@ -3294,6 +3295,55 @@ function forceMainBucketHeldVisualLocal() {
   playerBucketOverlay.style.display = "block";
 }
 
+function getDefaultMainBucketWellCoords() {
+  return {
+    x: getWorldItems().wellX - BUCKET_SIZE - 8,
+    y: getWorldItems().wellY + WELL_SIZE - BUCKET_SIZE
+  };
+}
+
+function isMainBucketNearDefaultWellSpot() {
+  const coords = getMainBucketGroundPickCoords();
+  if (!coords) return false;
+  const wellDefault = getDefaultMainBucketWellCoords();
+  return (
+    Math.abs(coords.x - wellDefault.x) < 14 &&
+    Math.abs(coords.y - wellDefault.y) < 14
+  );
+}
+
+function getLocalDropMainBucketCoords() {
+  const box = getLocalPlayerBoxForInteract();
+  return {
+    x: box.left + box.width / 2 - BUCKET_SIZE / 2,
+    y: box.bottom - BUCKET_SIZE
+  };
+}
+
+function sanitizeMainBucketGroundCoords(x, y) {
+  const bx = Number(x);
+  const by = Number(y);
+  if (Number.isFinite(bx) && Number.isFinite(by)) {
+    return { x: bx, y: by };
+  }
+  return getLocalDropMainBucketCoords();
+}
+
+function showMainBucketOnGroundAt(x, y) {
+  const coords = sanitizeMainBucketGroundCoords(x, y);
+  getWorldItems().bucketX = coords.x;
+  getWorldItems().bucketY = coords.y;
+  if (!bucket) return;
+  const img = getInventory().isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
+  bucket.src = img;
+  bucket.style.display = "block";
+  setWorldPosition(bucket, coords.x, coords.y);
+  bucket.style.zIndex = String(getGroundBucketZIndex(coords.y));
+  if (playerBucketOverlay) {
+    playerBucketOverlay.style.display = "none";
+  }
+}
+
 function isNearSeed() {
   const seedSize = getSeedSize();
 
@@ -3461,9 +3511,17 @@ function getMainBucketGroundState() {
       isFull: Boolean(getInventory().isBucketFull)
     };
   }
+  const coords = sanitizeMainBucketGroundCoords(
+    getWorldItems().bucketX,
+    getWorldItems().bucketY
+  );
+  if (!isHoldingMainBucket() && !isHoldingExtraBucket()) {
+    getWorldItems().bucketX = coords.x;
+    getWorldItems().bucketY = coords.y;
+  }
   return {
-    x: getWorldItems().bucketX,
-    y: getWorldItems().bucketY,
+    x: coords.x,
+    y: coords.y,
     isFull: Boolean(getInventory().isBucketFull)
   };
 }
@@ -3559,9 +3617,10 @@ function reconcileStaleSelfBucketOwnership() {
 
 /** 우물·양동이 근처 — 발/몸통이 우물·양동이 영역과 겹치면 집기 허용 */
 function isPlayerNearMainBucketPickupZone() {
+  if (isNearBucket()) return true;
+  if (!isMainBucketNearDefaultWellSpot()) return false;
   if (isPlayerOverlappingWellBucketZone()) return true;
   if (isLocalNearWellForBucketPickup()) return true;
-  if (isNearBucket()) return true;
   if (typeof isNearWellForCard === "function" && isNearWellForCard()) return true;
   return isNearWellIncludingBucketReach();
 }
@@ -3647,7 +3706,7 @@ function groundBucketsOverlap(ax, ay, bx, by, bucketSz) {
 }
 
 function listGroundBucketPositionsForDropResolve(options) {
-  const bucketSz = getBucketSize();
+  const bucketSz = { width: BUCKET_SIZE, height: BUCKET_SIZE };
   const out = [];
   const opts = options || {};
   if (!opts.skipMain) {
@@ -8667,10 +8726,9 @@ function dropExtraSeed() {
 }
 
 function dropBucket() {
-  const playerBox = getPlayerBox();
-  const bucketSize = getBucketSize();
-  const dropX = playerBox.left + playerBox.width / 2 - bucketSize.width / 2;
-  const dropY = playerBox.bottom - bucketSize.height;
+  const dropCoords = getLocalDropMainBucketCoords();
+  const dropX = dropCoords.x;
+  const dropY = dropCoords.y;
 
   if (isHoldingExtraBucket()) {
     if (!Array.isArray(getApple().worldExtraBuckets)) getApple().worldExtraBuckets = [];
@@ -8711,7 +8769,8 @@ function dropBucket() {
     return;
   }
 
-  const resolvedMainDrop = resolveGroundBucketDropPosition(dropX, dropY, { skipMain: true });
+  const rawMainDrop = resolveGroundBucketDropPosition(dropX, dropY, { skipMain: true });
+  const resolvedMainDrop = sanitizeMainBucketGroundCoords(rawMainDrop.x, rawMainDrop.y);
   getWorldItems().bucketX = resolvedMainDrop.x;
   getWorldItems().bucketY = resolvedMainDrop.y;
   getInventory().heldItem = null;
@@ -8723,6 +8782,8 @@ function dropBucket() {
   getInventory().mainBucketParkedY = 0;
   getInventory().mainBucketParkedIsFull = false;
   window.OVC_SHARED_BUCKET_HELD_BY = "";
+  showMainBucketOnGroundAt(resolvedMainDrop.x, resolvedMainDrop.y);
+  updateBucketPosition();
   broadcastBucketState(true);
   saveBucketState();
   syncWorldState(true);
@@ -11402,6 +11463,23 @@ function isPointerBlockedForWorldInteract(event) {
   return false;
 }
 
+function isPointerOnWell(clientX, clientY) {
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  if (!pxy) return false;
+  const wellSize = getWellSize();
+  const pad = 10;
+  return isWorldPointInsideRect(
+    pxy.x,
+    pxy.y,
+    worldRectFromXYWH(
+      getWorldItems().wellX - pad,
+      getWorldItems().wellY - pad,
+      wellSize.width + pad * 2,
+      wellSize.height + pad * 2
+    )
+  );
+}
+
 function isPointerOnHeldBucket(clientX, clientY) {
   if (getInventory().heldItem !== HELD_ITEM_BUCKET) return false;
   const pad = 6;
@@ -11874,6 +11952,14 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
     return true;
   }
 
+  if (
+    getInventory().heldItem === HELD_ITEM_BUCKET &&
+    !getInventory().isBucketFull &&
+    (isPointerOnWell(clientX, clientY) || isNearWellForCard())
+  ) {
+    return tryScoopWellWaterByPointerClick(clientX, clientY);
+  }
+
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return false;
 
@@ -11892,6 +11978,30 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
 
   if (tryPerformTargetedWorldInteract(target, pxy.x, pxy.y)) return true;
   performInteractActionCore();
+  return true;
+}
+
+function tryScoopWellWaterByPointerClick(clientX, clientY) {
+  if (isWorldFloorBagAwaitingPickup()) return false;
+  if (getInventory().heldItem !== HELD_ITEM_BUCKET || getInventory().isBucketFull) return false;
+  if (isPlayerHealthGameplayBlocked()) return false;
+  if (isPlayerTimedActionBusy() || isPlayerGameplayBlockedByNpcDialogue()) {
+    return false;
+  }
+  if (isTradeExchangeOpen()) return false;
+  if (isOnboardingLinearGateActive() && !onboardingAllowsBucketQUse()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
+
+  const onWell = isPointerOnWell(clientX, clientY);
+  const nearWell =
+    isNearWellIncludingBucketReach() ||
+    isBucketOverlappingWellForInteraction(10) ||
+    isNearWellForCard();
+  if (!onWell && !nearWell) return false;
+
+  useBucket();
   return true;
 }
 
@@ -12600,6 +12710,11 @@ function useBucket() {
       onboardingHookFilledBucketAtWell();
     } else if (wellReachForScoop && getWell().water <= 0) {
       flashPlantProximityWarning("\uC6B0\uBB3C\uC5D0 \uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      updatePlayerStatus();
+    } else if (isNearWellForCard() || isPlayerOverlappingWellBucketZone()) {
+      flashPlantProximityWarning(
+        "\uC6B0\uBB3C\uC5D0 \uB354 \uAC00\uAE4C\uC774 \uAC00\uC838 \uC8FC\uC138\uC694. Q\uD0A4 \uB610\uB294 \uC6B0\uBB3C \uD074\uB9AD."
+      );
       updatePlayerStatus();
     }
     return;
