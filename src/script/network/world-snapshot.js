@@ -329,6 +329,9 @@ export function createModule(d) {
             resolvedHeldBy = "";
           }
         }
+        if (resolvedHeldBy === d.currentSessionId && !d.isHoldingMainBucket()) {
+          resolvedHeldBy = "";
+        }
         window.OVC_SHARED_BUCKET_HELD_BY = resolvedHeldBy;
         if (resolvedHeldBy !== d.currentSessionId) {
           d.applyRemoteSharedMainBucketGround(

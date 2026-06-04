@@ -134,7 +134,22 @@ export function createModule(d) {
   d.updateWorldRocks();
   }
 
+  function getBucketSizeSafe() {
+  const sz = d.getBucketSize && d.getBucketSize();
+  if (sz && Number.isFinite(sz.width) && Number.isFinite(sz.height)) {
+    return sz;
+  }
+  return { width: d.BUCKET_SIZE, height: d.BUCKET_SIZE };
+  }
+
   function updateBucketPosition() {
+  if (typeof d.reconcileStaleSelfBucketOwnership === "function") {
+    d.reconcileStaleSelfBucketOwnership();
+  }
+  if (typeof d.ensureMainBucketWorldCoords === "function") {
+    d.ensureMainBucketWorldCoords();
+  }
+  if (!d.bucket) return;
   d.bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
   d.playerBucketOverlay.style.backgroundImage =
     'url("' + (d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY) + '")';
@@ -164,7 +179,7 @@ export function createModule(d) {
   });
 
   if (d.getInventory().heldItem === d.HELD_ITEM_BUCKET) {
-    const bucketSize = d.getBucketSize();
+    const bucketSize = getBucketSizeSafe();
     const handPosition = d.getHandPosition(bucketSize.width, bucketSize.height);
 
     d.getWorldItems().bucketX = handPosition.x;
@@ -189,11 +204,16 @@ export function createModule(d) {
     }
     d.playerBucketOverlay.style.display = "block";
   } else if (isBucketHeldByRemotePlayer) {
-    const bucketSize = d.getBucketSize();
+    const bucketSize = getBucketSizeSafe();
     if (!d.syncMainBucketToRemoteHolderHand()) {
-      if (!Number.isFinite(d.getWorldItems().bucketX) || !Number.isFinite(d.getWorldItems().bucketY)) {
-        d.getWorldItems().bucketX = d.getWorldItems().wellX - bucketSize.width - 8;
-        d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - bucketSize.height;
+      if (typeof d.ensureMainBucketWorldCoords === "function") {
+        d.ensureMainBucketWorldCoords();
+      } else if (
+        !Number.isFinite(d.getWorldItems().bucketX) ||
+        !Number.isFinite(d.getWorldItems().bucketY)
+      ) {
+        d.getWorldItems().bucketX = d.getWorldItems().wellX - d.BUCKET_SIZE - 8;
+        d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - d.BUCKET_SIZE;
       }
     }
     d.bucket.src = d.getInventory().isBucketFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
@@ -212,12 +232,21 @@ export function createModule(d) {
     !d.isHoldingExtraBucket() &&
     (!Number.isFinite(d.getWorldItems().bucketX) || !Number.isFinite(d.getWorldItems().bucketY))
   ) {
-    const bucketSize = d.getBucketSize();
-    d.getWorldItems().bucketX = d.getWorldItems().wellX - bucketSize.width - 8;
-    d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - bucketSize.height;
+    d.getWorldItems().bucketX = d.getWorldItems().wellX - d.BUCKET_SIZE - 8;
+    d.getWorldItems().bucketY = d.getWorldItems().wellY + d.WELL_SIZE - d.BUCKET_SIZE;
   }
 
-  if (d.bucket.style.display === "block" && !d.isHoldingExtraBucket()) {
+  const localHoldingMain =
+    d.getInventory().heldItem === d.HELD_ITEM_BUCKET && d.isHoldingMainBucket();
+  const localHoldingExtra = d.isHoldingExtraBucket();
+  if (!localHoldingMain && !localHoldingExtra && !isBucketHeldByRemotePlayer) {
+    d.bucket.style.display = "block";
+    d.playerBucketOverlay.style.display = "none";
+    const mainGround = d.getMainBucketGroundState();
+    d.bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
+    d.setWorldPosition(d.bucket, mainGround.x, mainGround.y);
+    d.bucket.style.zIndex = String(d.getGroundBucketZIndex(mainGround.y));
+  } else if (d.bucket.style.display === "block" && !d.isHoldingExtraBucket()) {
     const mainGround = d.getMainBucketGroundState();
     d.bucket.src = mainGround.isFull ? d.IMG_BUCKET_FULL : d.IMG_BUCKET_EMPTY;
     d.setWorldPosition(d.bucket, mainGround.x, mainGround.y);
@@ -277,10 +306,18 @@ export function createModule(d) {
   d.updateBagInventorySlots();
   }
 
+  function playerHasSeedInInventory() {
+  const bagSeeds =
+    typeof d.getBagInventorySeedCount === "function" ? Number(d.getBagInventorySeedCount()) || 0 : 0;
+  const legacyCount = Number(d.getApple().seedCount) || 0;
+  return bagSeeds > 0 || legacyCount > 0;
+  }
+
   function updateSeedPosition() {
   d.tickTutorialMainSeedRespawnDue();
   updateSeedDryState();
   d.recoverWorldMainSeedIfOnboardingStuck();
+  const hasSeedInInventory = playerHasSeedInInventory();
   if (!d.getPlant().isSeedPlanted && !d.getPlant().isPlanting) {
     if (
       d.getSeedWorld().hasHandledDryMainSeed &&
@@ -305,9 +342,12 @@ export function createModule(d) {
     !d.getStoredFlag(d.onboardingFlowDoneKey) &&
     d.getOnboarding().flowStep >= d.ONBOARDING_STEP_PLANT &&
     !d.getPlant().isSeedPlanted &&
-    d.getInventory().heldItem !== d.HELD_ITEM_SEED;
+    d.getInventory().heldItem !== d.HELD_ITEM_SEED &&
+    !d.hasPickedMainSeedInCurrentRoom() &&
+    !hasSeedInInventory;
   const shouldShowMainSeedOnGround =
     !d.usesWorldLooseSeedMode() &&
+    !hasSeedInInventory &&
     (baseShouldShowMainSeedOnGround || tutorialDecorMainSeedOnGround);
   // Auto-clear dry main seed after grace period even when the world sprite is hidden
   // (e.g. room already marked main-seed picked) so shared state and UI stay consistent.
@@ -334,24 +374,31 @@ export function createModule(d) {
     d.getWorldItems().seedX = d.SEED_START_X;
     d.getWorldItems().seedY = d.SEED_START_Y;
   }
-  const showMainSeedSprite =
-    shouldShowMainSeedOnGround || d.getInventory().heldItem === d.HELD_ITEM_SEED;
+  const holdingMainSeed = d.getInventory().heldItem === d.HELD_ITEM_SEED;
+  const showMainSeedSprite = shouldShowMainSeedOnGround || holdingMainSeed;
   d.seed.style.display = showMainSeedSprite ? "block" : "none";
   if (!showMainSeedSprite) {
     d.getSeedWorld().isHoveringMainSeed = false;
+    return;
   }
   d.seed.src = d.getPlant().isSeedDry ? d.IMG_SEED_DRY : d.IMG_SEED;
 
-  if (d.getInventory().heldItem === d.HELD_ITEM_SEED && d.getPlant().isSeedDry) {
+  if (holdingMainSeed && d.getPlant().isSeedDry) {
     d.getInventory().heldItem = null;
+    d.seed.style.display = "none";
+    d.getSeedWorld().isHoveringMainSeed = false;
+    return;
   }
 
-  if (d.getInventory().heldItem === d.HELD_ITEM_SEED) {
+  if (holdingMainSeed) {
     const seedSize = d.getSeedSize();
     const handPosition = d.getHandPosition(seedSize.width, seedSize.height);
 
     d.getWorldItems().seedX = handPosition.x;
     d.getWorldItems().seedY = handPosition.y + 5;
+  } else if (shouldShowMainSeedOnGround) {
+    d.getWorldItems().seedX = d.SEED_START_X;
+    d.getWorldItems().seedY = d.SEED_START_Y;
   }
 
   d.setWorldPosition(d.seed, d.getWorldItems().seedX, d.getWorldItems().seedY);

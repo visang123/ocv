@@ -73,6 +73,7 @@ export function createModule(d) {
     d.closeTradeExchangePanel();
     return;
   }
+  clearBagInventoryDragVisual();
   setBagInventoryPanelOpen(false);
   d.updateOnboardingFlowUI();
   }
@@ -324,7 +325,7 @@ export function createModule(d) {
   if (!d.bagInventoryDragState) return;
   const dx = event.clientX - d.bagInventoryDragState.startX;
   const dy = event.clientY - d.bagInventoryDragState.startY;
-  if (!d.bagInventoryDragState.dragging && dx * dx + dy * dy < 36) return;
+  if (!d.bagInventoryDragState.dragging && dx * dx + dy * dy < 144) return;
   d.bagInventoryDragState.dragging = true;
   const descriptor = d.getBagItemDescriptorCore(d.bagInventoryDragState.itemKey);
   ensureBagInventoryDragGhost(descriptor.iconHtml);
@@ -337,7 +338,11 @@ export function createModule(d) {
   function onBagInventorySlotPointerUp(event) {
   if (!d.bagInventoryDragState) return;
   const wasDragging = d.bagInventoryDragState.dragging;
-  finishBagInventoryDrag(event);
+  if (typeof d.finishBagInventoryDrag === "function") {
+    d.finishBagInventoryDrag(event);
+  } else {
+    clearBagInventoryDragVisual();
+  }
   if (wasDragging) {
     event.preventDefault();
   }
@@ -357,6 +362,7 @@ export function createModule(d) {
   }
 
   function plantInventorySeed(seedId) {
+  clearBagInventoryDragVisual();
   const inventorySeed = d.getApple().extraSeeds.find(function (extraSeed) {
     return extraSeed.id === seedId;
   });
@@ -500,6 +506,7 @@ export function createModule(d) {
     maybeAdvanceOnboardingAfterInventoryOpened();
     maybeAdvanceOnboardingAfterBookInventoryOpened();
   } else if (!d.bagInventoryPanelOpen && wasOpen) {
+    clearBagInventoryDragVisual();
     maybeAdvanceOnboardingAfterInventoryClosed();
   }
   }

@@ -340,12 +340,12 @@ export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = 300;
 export const pickupDistance = 28;
-/** 양동이 줍기 — 씨앗·가방보다 약간 짧게(우물 근처 정밀 배치) */
-export const bucketPickupDistance = 24;
+/** 양동이 줍기 — 플레이어 중심↔양동이 중심 거리(px) */
+export const bucketPickupDistance = 16;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 42;
-/** 우물에서 물 퍼오기·되붓기 판정 거리(짧을수록 우물에 더 붙어야 함) */
-export const wellUseDistance = 17;
+/** 우물에서 물 퍼오기·되붓기 판정 거리 */
+export const wellUseDistance = 28;
 export const wellPourDistance = wellUseDistance;
 /** 우물 물량 카드(#well-card) 표시 거리 — 상호작용보다 넓게 */
 export const wellCardDistance = 45;

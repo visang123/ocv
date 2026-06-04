@@ -7,10 +7,13 @@ import { createStoryIntro } from "./game/storyIntro.js";
 
 const STORY_INTRO_COMPLETE_KEY = "storyIntroCompleteV1";
 const CURRENT_USER_ID_KEY = "ovcCurrentUserIdV1";
+const SESSION_USER_ID_KEY = "ovcSessionUserIdV1";
 const CACHE_BUST = "20260524k";
 
 function getCurrentUserId() {
   try {
+    const fromSession = (sessionStorage.getItem(SESSION_USER_ID_KEY) || "").trim();
+    if (fromSession) return fromSession;
     return (localStorage.getItem(CURRENT_USER_ID_KEY) || "").trim();
   } catch (e) {
     return "";
@@ -24,15 +27,29 @@ function getScopedStorageKey(logicalKey) {
 
 function getStoredFlag(logicalKey) {
   try {
-    return localStorage.getItem(getScopedStorageKey(logicalKey)) === "true";
-  } catch (e) {
-    return false;
-  }
+    const scoped = getScopedStorageKey(logicalKey);
+    if (localStorage.getItem(scoped) === "true") return true;
+    if (localStorage.getItem(logicalKey) === "true") {
+      localStorage.setItem(scoped, "true");
+      return true;
+    }
+  } catch (e) {}
+  return false;
 }
 
 function setStoredFlag(logicalKey) {
   try {
     localStorage.setItem(getScopedStorageKey(logicalKey), "true");
+  } catch (e) {}
+}
+
+function persistStoryIntroComplete() {
+  setStoredFlag(STORY_INTRO_COMPLETE_KEY);
+  try {
+    const unscoped = localStorage.getItem(STORY_INTRO_COMPLETE_KEY);
+    if (unscoped !== "true") {
+      localStorage.setItem(STORY_INTRO_COMPLETE_KEY, "true");
+    }
   } catch (e) {}
 }
 
@@ -73,7 +90,10 @@ function redirectToGame() {
 const userId = getCurrentUserId();
 if (!userId) {
   location.replace("./ovc-login.html?v=" + CACHE_BUST);
-} else if (getStoredFlag(STORY_INTRO_COMPLETE_KEY)) {
+} else if (getStoredFlag(STORY_INTRO_COMPLETE_KEY) || isTutorialOnboardingDoneForUser()) {
+  if (isTutorialOnboardingDoneForUser()) {
+    persistStoryIntroComplete();
+  }
   redirectToGame();
 } else {
   const overlay = document.getElementById("story-intro-overlay");

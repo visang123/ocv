@@ -34,7 +34,8 @@ function ovcMigrateUnscopedTutorialFlagsToUserScope(userId) {
   const keys = [
     ovcOnboardingFlowDoneStorageKey,
     ovcOnboardingFlowStepStorageKey,
-    ovcEverBeenToWorldStorageKey
+    ovcEverBeenToWorldStorageKey,
+    ovcStoryIntroCompleteStorageKey
   ];
   try {
     keys.forEach(function (key) {
@@ -49,18 +50,33 @@ function ovcMigrateUnscopedTutorialFlagsToUserScope(userId) {
   } catch (e) {}
 }
 
-function ovcIsStoryIntroDoneForUserId(userId) {
+function hydrateScopedStoryIntroProgressForUser(userId) {
+  const uid = String(userId == null ? "" : userId).trim();
+  if (!uid) return;
+  try {
+    const scoped = ovcScopedUserStorageKey(uid, ovcStoryIntroCompleteStorageKey);
+    if (!scoped) return;
+    if (localStorage.getItem(scoped) === "true") return;
+    localStorage.setItem(scoped, "true");
+  } catch (e) {}
+}
+
+function ovcIsStoryIntroDoneForUserId(userId, account) {
   const uid = String(userId == null ? "" : userId).trim();
   if (!uid) return true;
   try {
-    return (
-      localStorage.getItem(
-        ovcScopedUserStorageKey(uid, ovcStoryIntroCompleteStorageKey)
-      ) === "true"
-    );
+    const scopedKey = ovcScopedUserStorageKey(uid, ovcStoryIntroCompleteStorageKey);
+    if (localStorage.getItem(scopedKey) === "true") return true;
+    if (localStorage.getItem(ovcStoryIntroCompleteStorageKey) === "true") {
+      if (scopedKey) localStorage.setItem(scopedKey, "true");
+      return true;
+    }
+    if (account && accountTutorialDoneTruthy(account)) return true;
+    if (ovcIsOnboardingDoneForUserId(uid)) return true;
   } catch (e) {
     return true;
   }
+  return false;
 }
 
 function ovcIsOnboardingDoneForUserId(userId) {
@@ -260,6 +276,12 @@ function goToGame(account) {
   }
   if (
     accountId &&
+    (serverTutorialDone || sessionHint || ovcIsOnboardingDoneForUserId(accountId))
+  ) {
+    hydrateScopedStoryIntroProgressForUser(accountId);
+  }
+  if (
+    accountId &&
     sessionHint &&
     !serverTutorialDone &&
     account &&
@@ -278,7 +300,7 @@ function goToGame(account) {
 
   const htmlFile = onboarded ? "index.html" : "tutorial.html";
 
-  if (accountId && !ovcIsStoryIntroDoneForUserId(accountId)) {
+  if (accountId && !ovcIsStoryIntroDoneForUserId(accountId, account)) {
     const storyUrl = new URL("./story-intro.html", window.location.href);
     storyUrl.searchParams.set("next", htmlFile);
     storyUrl.searchParams.set("v", APP_VERSION);

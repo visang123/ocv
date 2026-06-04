@@ -440,6 +440,7 @@ export function createStoryIntro(options) {
 
   function endStoryTextThenWormhole() {
     primeStoryVideos();
+    setStoredFlag(storyIntroCompleteKey, true);
     fadeOutThen(function () {
       playWormholeSequence(finishIntro);
     });

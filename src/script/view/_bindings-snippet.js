@@ -104,6 +104,7 @@
     canPlantAt,
     canPlantWiltFromEmptyWater,
     canStartBagPanelCraftTradeDrag,
+    finishBagInventoryDrag,
     canWaterPlantByClick,
     cancelBagDiscardQuantityModal,
     cancelPlantPowderUpgrade,
