@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260528d";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260528d";
-import { initScriptView } from "./src/script/view/index.js?v=20260528d";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260528e";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260528e";
+import { initScriptView } from "./src/script/view/index.js?v=20260528e";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -3242,11 +3242,13 @@ function getHandPositionFromPlayerPose(playerWorldX, playerWorldY, itemWidth, it
 }
 
 function getHandPosition(itemWidth, itemHeight) {
+  const w = Number.isFinite(Number(itemWidth)) ? Number(itemWidth) : BUCKET_SIZE;
+  const h = Number.isFinite(Number(itemHeight)) ? Number(itemHeight) : BUCKET_SIZE;
   return getHandPositionFromPlayerPose(
     getPlayer().x,
     getLocalPlayerWorldYForInteract(),
-    itemWidth,
-    itemHeight
+    w,
+    h
   );
 }
 
@@ -3320,13 +3322,32 @@ function getLocalDropMainBucketCoords() {
   };
 }
 
+function isMainBucketWorldCoordPlausible(x, y) {
+  const bx = Number(x);
+  const by = Number(y);
+  if (!Number.isFinite(bx) || !Number.isFinite(by)) return false;
+  if (bx <= 0 && by <= 0) return false;
+  if (bx < 8 || by < 8) return false;
+  if (bx > WORLD_WIDTH - 8 || by > GROUND_WORLD_HEIGHT - 8) return false;
+  return true;
+}
+
 function sanitizeMainBucketGroundCoords(x, y) {
   const bx = Number(x);
   const by = Number(y);
-  if (Number.isFinite(bx) && Number.isFinite(by)) {
+  if (isMainBucketWorldCoordPlausible(bx, by)) {
     return { x: bx, y: by };
   }
-  return getLocalDropMainBucketCoords();
+  if (Number.isFinite(bx) && Number.isFinite(by) && (bx > 0 || by > 0)) {
+    return { x: bx, y: by };
+  }
+  return getDefaultMainBucketWellCoords();
+}
+
+function setBucketWorldPositionDirect(element, x, y) {
+  if (!element || !ground) return;
+  const coords = sanitizeMainBucketGroundCoords(x, y);
+  setWorldPositionUtil(element, coords.x, coords.y, ground, WORLD_WIDTH, GROUND_WORLD_HEIGHT);
 }
 
 function showMainBucketOnGroundAt(x, y) {
@@ -3337,11 +3358,22 @@ function showMainBucketOnGroundAt(x, y) {
   const img = getInventory().isBucketFull ? IMG_BUCKET_FULL : IMG_BUCKET_EMPTY;
   bucket.src = img;
   bucket.style.display = "block";
-  setWorldPosition(bucket, coords.x, coords.y);
+  setBucketWorldPositionDirect(bucket, coords.x, coords.y);
   bucket.style.zIndex = String(getGroundBucketZIndex(coords.y));
   if (playerBucketOverlay) {
     playerBucketOverlay.style.display = "none";
   }
+}
+
+/** 땅에 둔 메인 양동이 좌표·표시 복구 (매 프레임 updateBucketPosition 전에 호출) */
+function ensureMainBucketWorldCoords() {
+  if (isHoldingMainBucket() || isHoldingExtraBucket()) return;
+  const coords = sanitizeMainBucketGroundCoords(
+    getWorldItems().bucketX,
+    getWorldItems().bucketY
+  );
+  getWorldItems().bucketX = coords.x;
+  getWorldItems().bucketY = coords.y;
 }
 
 function isNearSeed() {
@@ -3610,6 +3642,16 @@ function isPlayerOverlappingWellBucketZone() {
 function reconcileStaleSelfBucketOwnership() {
   const heldBy = String(window.OVC_SHARED_BUCKET_HELD_BY || "");
   if (heldBy && heldBy === currentSessionId && !isHoldingMainBucket()) {
+    window.OVC_SHARED_BUCKET_HELD_BY = "";
+    markWorldDirty();
+    return;
+  }
+  if (
+    heldBy &&
+    heldBy !== currentSessionId &&
+    !isHoldingMainBucket() &&
+    !remotePlayers[heldBy]
+  ) {
     window.OVC_SHARED_BUCKET_HELD_BY = "";
     markWorldDirty();
   }
@@ -7162,8 +7204,9 @@ function loadBucketState() {
       getWorldItems().bucketX = getWorldItems().wellX - bucketSize.width - 8;
       getWorldItems().bucketY = getWorldItems().wellY + WELL_SIZE - bucketSize.height;
     } else {
-      getWorldItems().bucketX = Number.isFinite(Number(saved.bucketX)) ? Number(saved.bucketX) : getWorldItems().bucketX;
-      getWorldItems().bucketY = Number.isFinite(Number(saved.bucketY)) ? Number(saved.bucketY) : getWorldItems().bucketY;
+      const loaded = sanitizeMainBucketGroundCoords(saved.bucketX, saved.bucketY);
+      getWorldItems().bucketX = loaded.x;
+      getWorldItems().bucketY = loaded.y;
     }
     getInventory().heldItem = null;
     getInventory().heldBucketId = "";
@@ -7915,6 +7958,8 @@ function buildLayerDeps() {
     isMagicPowderBagTypeUsableNow,
     isMainBucketHeldByRemotePlayer,
     reconcileStaleSelfBucketOwnership,
+    ensureMainBucketWorldCoords,
+    BUCKET_SIZE,
     isNearPlantMaster,
     isNearSignBoard,
     isNearWorldBagPickup,
@@ -8261,7 +8306,11 @@ function toggleBagInventoryPanelFromBagClick() { return _viewApi ? _viewApi.togg
 function togglePlayerHealthGaugeVisible() { return _viewApi ? _viewApi.togglePlayerHealthGaugeVisible() : undefined; }
 function updateApples() { return _viewApi ? _viewApi.updateApples() : undefined; }
 function updateBagInventorySlots() { return _viewApi ? _viewApi.updateBagInventorySlots() : undefined; }
-function updateBucketPosition() { return _viewApi ? _viewApi.updateBucketPosition() : undefined; }
+function updateBucketPosition() {
+  reconcileStaleSelfBucketOwnership();
+  ensureMainBucketWorldCoords();
+  return _viewApi ? _viewApi.updateBucketPosition() : undefined;
+}
 function updateCamera() { return _viewApi ? _viewApi.updateCamera() : undefined; }
 function updateGuideCard() { return _viewApi ? _viewApi.updateGuideCard() : undefined; }
 function updateGuidePages() { return _viewApi ? _viewApi.updateGuidePages() : undefined; }
@@ -15877,8 +15926,8 @@ function setup() {
     getWorldItems().seedY = SEED_START_Y;
     getWorldItems().wellX = WELL_START_X;
     getWorldItems().wellY = WELL_START_Y;
-    getWorldItems().bucketX = getWorldItems().wellX - bucketSize.width - 8;
-    getWorldItems().bucketY = getWorldItems().wellY + wellSize.height - bucketSize.height;
+    getWorldItems().bucketX = getWorldItems().wellX - BUCKET_SIZE - 8;
+    getWorldItems().bucketY = getWorldItems().wellY + WELL_SIZE - BUCKET_SIZE;
     isSetupComplete = true;
   }
 
