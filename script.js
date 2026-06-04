@@ -412,9 +412,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260528e";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260528e";
-import { initScriptView } from "./src/script/view/index.js?v=20260528e";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260528f";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260528f";
+import { initScriptView } from "./src/script/view/index.js?v=20260528f";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1608,6 +1608,10 @@ function getWorldLooseSeedClockNow() {
 
 function isWorldLooseSeedVisibleAt() {
   if (!usesWorldLooseSeedMode()) return false;
+  if (Number(getApple().seedCount) > 0) return false;
+  if (typeof getBagInventorySeedCount === "function" && getBagInventorySeedCount() > 0) {
+    return false;
+  }
   ensureWorldLooseSeedShape();
   return isWorldLooseSpawnReady(
     getWorldLooseSeedClockNow(),
@@ -2162,7 +2166,7 @@ document.addEventListener("keydown", function (event) {
       if (pickUpMainBucketDirect()) {
         return;
       }
-      if (isPlayerOverlappingWellBucketZone() || isNearWellForCard()) {
+      if (isNearBucket()) {
         flashPlantProximityWarning("\uC591\uB3D9\uC774\uB97C \uB4E4 \uC218 \uC5C6\uC5B4\uC694. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.");
         return;
       }
@@ -3657,14 +3661,26 @@ function reconcileStaleSelfBucketOwnership() {
   }
 }
 
-/** 우물·양동이 근처 — 발/몸통이 우물·양동이 영역과 겹치면 집기 허용 */
+/** 메인 양동이 실제 위치 근처에서만 집기 허용 (우물 넓은 판정 제외) */
+function getMainBucketPickupOverlapRect() {
+  const coords = getMainBucketGroundPickCoords();
+  if (!coords) return null;
+  const pad = 4;
+  return {
+    left: coords.x - pad,
+    top: coords.y - pad,
+    right: coords.x + BUCKET_SIZE + pad,
+    bottom: coords.y + BUCKET_SIZE + pad
+  };
+}
+
 function isPlayerNearMainBucketPickupZone() {
-  if (isNearBucket()) return true;
-  if (!isMainBucketNearDefaultWellSpot()) return false;
-  if (isPlayerOverlappingWellBucketZone()) return true;
-  if (isLocalNearWellForBucketPickup()) return true;
-  if (typeof isNearWellForCard === "function" && isNearWellForCard()) return true;
-  return isNearWellIncludingBucketReach();
+  if (!isMainBucketOnGroundForPickup()) return false;
+  const bucketRect = getMainBucketPickupOverlapRect();
+  if (bucketRect && isOverlappingRect(getLocalPlayerBoxForInteract(), bucketRect)) {
+    return true;
+  }
+  return isNearBucket();
 }
 
 /** 우물/양동이 근처 — 거리·pickInfo 없이 메인 양동이를 바로 든다 */
@@ -3846,9 +3862,9 @@ function getNearestGroundBucketPickInfo() {
 function isNearBucket() {
   const info = getNearestGroundBucketPickInfo();
   if (!info) return false;
-  const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
-  const allowedDistance = info.type === "main" ? mainBucketPickupDistance : bucketPickupDistance;
-  return info.distance < allowedDistance;
+  const allowedDistance =
+    info.type === "main" ? bucketPickupDistance : Math.max(bucketPickupDistance, pickupDistance + 8);
+  return info.distance <= allowedDistance;
 }
 
 function isNearWell() {
