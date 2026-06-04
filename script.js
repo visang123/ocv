@@ -2507,6 +2507,7 @@ if (bagInventoryPanel) {
       if (getBagInventorySeedCount() <= 0) return;
       event.preventDefault();
       event.stopPropagation();
+      clearBagInventoryDragVisual();
       if (usesWorldLooseSeedMode()) {
         plantWorldSeedCount();
         return;
@@ -2526,6 +2527,7 @@ if (bagInventoryPanel) {
       if ((Number(getApple().overgrowthSeedCount) || 0) <= 0) return;
       event.preventDefault();
       event.stopPropagation();
+      clearBagInventoryDragVisual();
       plantWorldOvergrowthSeedCount();
       return;
     }
@@ -3665,7 +3667,7 @@ function reconcileStaleSelfBucketOwnership() {
 function getMainBucketPickupOverlapRect() {
   const coords = getMainBucketGroundPickCoords();
   if (!coords) return null;
-  const pad = 4;
+  const pad = 2;
   return {
     left: coords.x - pad,
     top: coords.y - pad,
@@ -3863,7 +3865,7 @@ function isNearBucket() {
   const info = getNearestGroundBucketPickInfo();
   if (!info) return false;
   const allowedDistance =
-    info.type === "main" ? bucketPickupDistance : Math.max(bucketPickupDistance, pickupDistance + 8);
+    info.type === "main" ? bucketPickupDistance : bucketPickupDistance + 4;
   return info.distance <= allowedDistance;
 }
 
@@ -5793,11 +5795,10 @@ function tryPickSharedBucket(bucketDistance, forcedPickInfo) {
       markWorldDirty();
     }
   }
-  const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
   const allowedDistance =
     pickInfo && pickInfo.type === "main"
-      ? mainBucketPickupDistance
-      : bucketPickupDistance;
+      ? bucketPickupDistance
+      : bucketPickupDistance + 4;
   if (dist > allowedDistance) {
     return false;
   }
@@ -7880,6 +7881,7 @@ function buildLayerDeps() {
     canPlantAt,
     canPlantWiltFromEmptyWater,
     canStartBagPanelCraftTradeDrag,
+    finishBagInventoryDrag,
     canWaterPlantByClick,
     cancelBagDiscardQuantityModal,
     cancelPlantPowderUpgrade,
@@ -10818,6 +10820,7 @@ function startPlantingExtraSeed() {
 }
 
 function plantWorldSeedCount() {
+  clearBagInventoryDragVisual();
   if (!usesWorldLooseSeedMode() || getApple().seedCount <= 0) {
     updateSeedInventory();
     return;
@@ -10926,6 +10929,7 @@ function plantWorldSeedCount() {
 }
 
 function plantWorldOvergrowthSeedCount() {
+  clearBagInventoryDragVisual();
   if ((Number(getApple().overgrowthSeedCount) || 0) <= 0) {
     updateSeedInventory();
     return;
@@ -11870,11 +11874,10 @@ function isPlayerNearWorldInteractTarget(target) {
     }
     case "bucket":
       {
-        const mainBucketPickupDistance = Math.max(bucketPickupDistance, pickupDistance + 8);
         const allowedDistance =
           target.data && target.data.type === "main"
-            ? mainBucketPickupDistance
-            : bucketPickupDistance;
+            ? bucketPickupDistance
+            : bucketPickupDistance + 4;
       return Boolean(
         target.data &&
             target.data.distance < allowedDistance &&
