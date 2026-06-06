@@ -100,6 +100,10 @@ import {
   SPAWN_PORTAL_HEIGHT,
   SPAWN_PORTAL_X,
   SPAWN_PORTAL_Y,
+  ALIEN_PUZZLE_SHRINE_WIDTH,
+  ALIEN_PUZZLE_SHRINE_HEIGHT,
+  ALIEN_PUZZLE_SHRINE_X,
+  ALIEN_PUZZLE_SHRINE_Y,
   SEED_START_X,
   SEED_START_Y,
   GUIDE_BOOK_START_X,
@@ -258,6 +262,7 @@ import {
   bagInventoryPanel,
   bagInventoryClose,
   bagBookStorageSlot,
+  bagPlayerMoney,
   guideCard,
   guideCloseButton,
   guidePages,
@@ -496,6 +501,13 @@ import {
   tryDropBagItemOnTradeCounter,
   returnTradeCounterStackToInventory
 } from "./src/game/trade-master-ui.js?v=20260517y";
+import {
+  playerMoneyKrwKey,
+  formatPlayerMoneyKrw,
+  loadPlayerMoneyKrw as loadPlayerMoneyKrwFromStorage,
+  savePlayerMoneyKrw as savePlayerMoneyKrwToStorage,
+  normalizePlayerMoneyKrw
+} from "./src/game/player-money.js";
 import {
   bindAlchemyMaster,
   closeAlchemyCraftPanel,
@@ -1418,6 +1430,7 @@ const rockInventoryCountKey = "rockInventoryCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
 let rockInventoryCount = 0;
+let playerMoneyKrw = 0;
 /** @type {Record<string, number>} */
 let craftFurnitureCounts = {
   craftDesk: 0,
@@ -1653,6 +1666,10 @@ const spawnPortalWidth = SPAWN_PORTAL_WIDTH;
 const spawnPortalHeight = SPAWN_PORTAL_HEIGHT;
 const spawnPortalX = SPAWN_PORTAL_X;
 const spawnPortalY = SPAWN_PORTAL_Y;
+const alienPuzzleShrineWidth = ALIEN_PUZZLE_SHRINE_WIDTH;
+const alienPuzzleShrineHeight = ALIEN_PUZZLE_SHRINE_HEIGHT;
+const alienPuzzleShrineX = ALIEN_PUZZLE_SHRINE_X;
+const alienPuzzleShrineY = ALIEN_PUZZLE_SHRINE_Y;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = 0;
 /** ??? ???? ???? ???????????? ??????????? ???? ???????????? ????? ?????) */
@@ -2595,6 +2612,8 @@ bindTradeMaster({
   setStoredFlag: setStoredFlag,
   setBagInventoryPanelOpen: setBagInventoryPanelOpen,
   updateBagInventorySlots: updateBagInventorySlots,
+  getPlayerMoneyKrw: getPlayerMoneyKrw,
+  applyPlayerMoneyDeltaKrw: applyPlayerMoneyDeltaKrw,
   updateNpcPosition: updateNpcPosition,
   removeOneBagItem: removeOneBagItemForTrade,
   removeBagItems: removeBagItemsFromInventory,
@@ -2800,6 +2819,7 @@ const adminRefreshButton = document.getElementById("admin-refresh-button");
 const adminMessage = document.getElementById("admin-message");
 const adminAccountList = document.getElementById("admin-account-list");
 const spawnPortal = document.getElementById("spawn-portal");
+const alienPuzzleShrine = document.getElementById("alien-puzzle-shrine");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 const localPlayerRoot = document.createElement("div");
@@ -5503,6 +5523,7 @@ function applyDefaultState(options) {
   hasSeededInitialButterflies = false;
   magicPowderCount = 0;
   rockInventoryCount = 0;
+  playerMoneyKrw = 0;
   craftFurnitureCounts.craftDesk = 0;
   craftFurnitureCounts.craftFence = 0;
   craftFurnitureCounts.craftChair = 0;
@@ -5517,6 +5538,7 @@ function applyDefaultState(options) {
   saveButterflyCaughtCounts();
   saveMagicPowderCount();
   saveRockInventoryCount();
+  savePlayerMoneyKrw();
   saveCraftFurnitureCounts();
   saveColoredMagicPowderCounts();
   updateBagInventorySlots();
@@ -7735,6 +7757,10 @@ function buildLayerDeps() {
     simulateButterflyAuthorityStep,
     snapPlayerToCraftChair,
     sortWorldBagDropsForRender,
+    alienPuzzleShrineHeight,
+    alienPuzzleShrineWidth,
+    alienPuzzleShrineX,
+    alienPuzzleShrineY,
     spawnPortalHeight,
     spawnPortalWidth,
     spawnPortalX,
@@ -7866,6 +7892,7 @@ function buildLayerDeps() {
     appendPlantHoverWaterDetail,
     assignSproutIdentityToNewPlant,
     bagBookStorageSlot,
+    bagPlayerMoney,
     bagInventoryCountsPrev,
     bagInventoryDragGhostEl,
     get bagInventoryDragState() { return bagInventoryDragState; },
@@ -8091,6 +8118,12 @@ function buildLayerDeps() {
     get rockInventoryCount() { return rockInventoryCount; },
     set rockInventoryCount(v) { rockInventoryCount = v; },
     rockInventoryCountKey,
+    get playerMoneyKrw() { return playerMoneyKrw; },
+    set playerMoneyKrw(v) { playerMoneyKrw = v; },
+    playerMoneyKrwKey,
+    formatPlayerMoneyKrw,
+    loadPlayerMoneyKrwFromStorage,
+    savePlayerMoneyKrwToStorage,
     sanitizeWorldChatText,
     saveBagInventoryOrderCore,
     scheduleOnboardingNpcGuideEscHint,
@@ -8141,6 +8174,7 @@ function buildLayerDeps() {
     treeStage5Image,
     updateAlchemyNpcPrompt,
     updateBagInventorySlots,
+    updateBagPlayerMoneyDisplay,
     updateBookStorageSlot,
     updateExtraSeedsAndPlants,
     updateGuideCard,
@@ -8252,6 +8286,21 @@ function layoutPlantHoverRing(plant, urgentWater) { return _viewApi ? _viewApi.l
 function layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) { return _viewApi ? _viewApi.layoutWorldChatBubbleOnScreen(el, rect, nowMs, sessionIdForWobble) : undefined; }
 function loadBagInventoryOrder() { return _viewApi ? _viewApi.loadBagInventoryOrder() : undefined; }
 function loadRockInventoryCount() { return _viewApi ? _viewApi.loadRockInventoryCount() : undefined; }
+function loadPlayerMoneyKrw() { return _viewApi ? _viewApi.loadPlayerMoneyKrw() : undefined; }
+function savePlayerMoneyKrw() { return _viewApi ? _viewApi.savePlayerMoneyKrw() : undefined; }
+function updateBagPlayerMoneyDisplay() {
+  return _viewApi ? _viewApi.updateBagPlayerMoneyDisplay() : undefined;
+}
+function getPlayerMoneyKrw() {
+  return normalizePlayerMoneyKrw(playerMoneyKrw);
+}
+function applyPlayerMoneyDeltaKrw(delta) {
+  const next = normalizePlayerMoneyKrw(playerMoneyKrw + Number(delta || 0));
+  if (next === playerMoneyKrw) return;
+  playerMoneyKrw = next;
+  savePlayerMoneyKrw();
+  updateBagPlayerMoneyDisplay();
+}
 function maybeAdvanceOnboardingAfterBookInventoryOpened() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterBookInventoryOpened() : undefined; }
 function maybeAdvanceOnboardingAfterInventoryClosed() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterInventoryClosed() : undefined; }
 function maybeAdvanceOnboardingAfterInventoryOpened() { return _viewApi ? _viewApi.maybeAdvanceOnboardingAfterInventoryOpened() : undefined; }
@@ -12213,6 +12262,22 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
 
+  const shrinePad = 2;
+  if (
+    alienPuzzleShrine &&
+    plantSpotOverlapsExpandedRect(
+      plantX,
+      plantY,
+      alienPuzzleShrineX,
+      alienPuzzleShrineY,
+      alienPuzzleShrineWidth,
+      alienPuzzleShrineHeight,
+      shrinePad
+    )
+  ) {
+    return plantProximityPhraseForNoun("\uC7AC\uB2E8");
+  }
+
   const bagPad = 0;
   if (
     worldBag &&
@@ -15916,6 +15981,9 @@ function setup() {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
   });
   setWorldSize(spawnPortal, spawnPortalWidth, spawnPortalHeight);
+  if (alienPuzzleShrine) {
+    setWorldSize(alienPuzzleShrine, alienPuzzleShrineWidth, alienPuzzleShrineHeight);
+  }
   setWorldSize(seed, SEED_SIZE);
   getApple().extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.element) setWorldSize(extraSeed.element, SEED_SIZE);
@@ -15953,6 +16021,9 @@ function setup() {
   initializeZoom();
   setWorldPosition(bigTree, BIG_TREE_X, BIG_TREE_Y);
   setWorldPosition(spawnPortal, spawnPortalX, spawnPortalY);
+  if (alienPuzzleShrine) {
+    setWorldPosition(alienPuzzleShrine, alienPuzzleShrineX, alienPuzzleShrineY);
+  }
   setWorldPosition(well, getWorldItems().wellX, getWorldItems().wellY);
   setWorldPosition(signBoard, getWorldItems().signX, getWorldItems().signY);
   setWorldPosition(guideBook, getWorldItems().guideBookX, getWorldItems().guideBookY);
@@ -16044,6 +16115,7 @@ try {
     loadButterflyCaughtCounts();
     loadMagicPowderCount();
     loadRockInventoryCount();
+    loadPlayerMoneyKrw();
     updateBagInventorySlots();
     updateMagicPowderInventoryUi();
     addNetworkDebugLog(

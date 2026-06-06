@@ -57,6 +57,19 @@
           <div id="growth-fill"></div>
         </div>
         <div id="spawn-portal" aria-hidden="true"></div>
+        <div
+          id="alien-puzzle-shrine"
+          class="alien-puzzle-shrine"
+          aria-hidden="true"
+          title="부서진 외계인 퍼즐 재단"
+        >
+          <img
+            class="alien-puzzle-shrine__img"
+            src="이미지/alien-puzzle-shrine-broken-world.png?v=20260531a"
+            alt=""
+            draggable="false"
+          >
+        </div>
         <div id="big-tree" aria-hidden="true">
           <div class="big-tree-leaves">
             <div class="big-tree-branch branch-left"></div>
@@ -370,15 +383,31 @@
     </button>
   </div>
   <div id="bag-inventory-panel" class="bag-inventory-panel" style="display: none" aria-hidden="true">
-    <section class="bag-book-storage" aria-label="책 보관">
-      <p class="bag-book-storage-label">책 보관</p>
-      <div
-        id="bag-book-storage-slot"
-        class="bag-book-storage-slot bag-inventory-slot bag-inventory-slot--empty is-empty"
-        data-slot="book"
-        data-bag-type="empty"
-      ></div>
-    </section>
+    <div class="bag-inventory-top-row">
+      <section class="bag-book-storage" aria-label="책 보관">
+        <p class="bag-book-storage-label">책 보관</p>
+        <div
+          id="bag-book-storage-slot"
+          class="bag-book-storage-slot bag-inventory-slot bag-inventory-slot--empty is-empty"
+          data-slot="book"
+          data-bag-type="empty"
+        ></div>
+      </section>
+      <section class="bag-player-assets" aria-label="보유 자산">
+        <p class="bag-player-assets-label">자산</p>
+        <p id="bag-player-money" class="bag-player-money" aria-live="polite">
+          <img
+            class="bag-player-money__icon"
+            src="이미지/money-banknote-icon.svg?v=20260531b"
+            alt=""
+            width="22"
+            height="22"
+            draggable="false"
+          >
+          <span id="bag-player-money-amount" class="bag-player-money__amount">0원</span>
+        </p>
+      </section>
+    </div>
     <div class="bag-inventory-slots" role="group" aria-label="가방 칸 9">
       <button type="button" id="bag-inventory-close" class="bag-inventory-close" aria-label="닫기">
         &#215;
