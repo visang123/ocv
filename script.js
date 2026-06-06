@@ -417,9 +417,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260528f";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260528f";
-import { initScriptView } from "./src/script/view/index.js?v=20260528f";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260531a";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260531a";
+import { initScriptView } from "./src/script/view/index.js?v=20260531a";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -507,7 +507,7 @@ import {
   loadPlayerMoneyKrw as loadPlayerMoneyKrwFromStorage,
   savePlayerMoneyKrw as savePlayerMoneyKrwToStorage,
   normalizePlayerMoneyKrw
-} from "./src/game/player-money.js";
+} from "./src/game/player-money.js?v=20260531a";
 import {
   bindAlchemyMaster,
   closeAlchemyCraftPanel,

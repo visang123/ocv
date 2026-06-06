@@ -476,12 +476,12 @@ body::-webkit-scrollbar {
 
 .world-bag-drop__count {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
-  min-width: 0;
-  max-width: 12px;
-  padding: 0 1px;
-  border-radius: 1px;
+  right: -3px;
+  bottom: -3px;
+  min-width: 10px;
+  max-width: none;
+  padding: 0 2px;
+  border-radius: 2px;
   background: rgba(8, 12, 18, 0.92);
   border: 0.5px solid #000;
   color: #fff;
@@ -489,10 +489,11 @@ body::-webkit-scrollbar {
   font-size: 10px;
   font-weight: 800;
   line-height: 10px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
   text-align: center;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
+  box-sizing: border-box;
   pointer-events: none;
   z-index: 2;
   transform: scale(0.38);
@@ -1806,6 +1807,29 @@ body::-webkit-scrollbar {
     inset 0 0 14px rgba(255, 255, 255, 0.5);
   z-index: 3;
   pointer-events: none;
+}
+
+/* 부서진 외계인 퍼즐 재단 — 포탈 왼쪽 위, 상호작용 없음 */
+.alien-puzzle-shrine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 75px;
+  height: 110px;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+  filter: saturate(0.72) brightness(0.88);
+}
+
+.alien-puzzle-shrine__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  display: block;
+  image-rendering: auto;
+  opacity: 0.94;
 }
 
 #character-select-overlay {
@@ -3906,12 +3930,21 @@ body #world-bag-inventory {
   outline-offset: 2px;
 }
 
+.bag-inventory-top-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 15px 0;
+  box-sizing: border-box;
+}
+
 .bag-book-storage {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  padding: 10px 15px 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -3920,6 +3953,55 @@ body #world-bag-inventory {
   font: 700 13px/1.2 Arial, sans-serif;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: -0.02em;
+}
+
+.bag-player-assets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 72px;
+  box-sizing: border-box;
+}
+
+.bag-player-assets-label {
+  margin: 0;
+  font: 700 13px/1.2 Arial, sans-serif;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.02em;
+}
+
+.bag-player-money {
+  margin: 0;
+  min-height: 60px;
+  padding: 0 10px;
+  gap: 6px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(8, 12, 24, 0.38);
+  font: 700 14px/1.2 Arial, sans-serif;
+  color: #ffe08a;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.bag-player-money__icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.bag-player-money__amount {
+  line-height: 1.2;
 }
 
 .bag-book-storage-slot {

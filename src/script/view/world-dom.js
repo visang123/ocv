@@ -28,6 +28,14 @@ export function createModule(d) {
   d.rockInventoryCount = Math.max(0, Math.floor(raw));
   }
 
+  function loadPlayerMoneyKrw() {
+  d.playerMoneyKrw = d.loadPlayerMoneyKrwFromStorage(d.getStoredValue);
+  }
+
+  function savePlayerMoneyKrw() {
+  d.savePlayerMoneyKrwToStorage(d.setStoredValue, d.playerMoneyKrw);
+  }
+
   function rebuildPlacedCraftFurnitureDom() {
   if (!d.ground) return;
   d.ground.querySelectorAll(".world-craft-furniture").forEach(function (node) {
@@ -423,6 +431,8 @@ export function createModule(d) {
     createRandomApples,
     createRandomWorldRocks,
     loadRockInventoryCount,
+    loadPlayerMoneyKrw,
+    savePlayerMoneyKrw,
     rebuildPlacedCraftFurnitureDom,
     rebuildWorldBagDropDom,
     rebuildWorldRockDom,

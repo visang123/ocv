@@ -564,8 +564,16 @@ export function createModule(d) {
   d.updateOnboardingFlowUI();
   }
 
+  function updateBagPlayerMoneyDisplay() {
+  if (!d.bagPlayerMoney) return;
+  const amountEl =
+    d.bagPlayerMoney.querySelector(".bag-player-money__amount") || d.bagPlayerMoney;
+  amountEl.textContent = d.formatPlayerMoneyKrw(d.playerMoneyKrw);
+  }
+
   function updateBagInventorySlots() {
   if (!d.bagInventoryPanel) return;
+  updateBagPlayerMoneyDisplay();
   d.updateBookStorageSlot();
   const counts = getBagInventoryCountsByKey();
   const seedCount = Number(counts.seed || 0);
@@ -681,6 +689,7 @@ export function createModule(d) {
     showBagInventoryFullFailMessage,
     showBagRequiredForGameplayMessage,
     toggleBagInventoryPanelFromBagClick,
+    updateBagPlayerMoneyDisplay,
     updateBagInventorySlots,
   };
 }

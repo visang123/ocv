@@ -135,6 +135,14 @@ export const SPAWN_PORTAL_HEIGHT = 44;
 export const SPAWN_PORTAL_X = SIGN_START_X - SPAWN_PORTAL_WIDTH - 24;
 export const SPAWN_PORTAL_Y = SIGN_START_Y + SIGN_HEIGHT - SPAWN_PORTAL_HEIGHT;
 
+/** 부서진 외계인 퍼즐 재단 — 스폰 포탈 대비 약 2.5배, 포탈 왼쪽 위(장식·기능 없음) */
+export const ALIEN_PUZZLE_SHRINE_WIDTH = Math.round(SPAWN_PORTAL_WIDTH * 2.5);
+export const ALIEN_PUZZLE_SHRINE_HEIGHT = Math.round(SPAWN_PORTAL_HEIGHT * 2.5);
+export const ALIEN_PUZZLE_SHRINE_X = SPAWN_PORTAL_X - ALIEN_PUZZLE_SHRINE_WIDTH + 14;
+export const ALIEN_PUZZLE_SHRINE_Y = SPAWN_PORTAL_Y - ALIEN_PUZZLE_SHRINE_HEIGHT + 18;
+export const ALIEN_PUZZLE_SHRINE_IMG =
+  "\uC774\uBBF8\uC9C0/alien-puzzle-shrine-broken-world.png?v=20260531a";
+
 export const GUIDE_BOOK_WIDTH = 23;
 export const GUIDE_BOOK_HEIGHT = 15;
 /** 땅의 책·씨앗·NPC를 한 덩어리로 왼쪽 이동(World px) */
@@ -498,7 +506,8 @@ export const appStorageKeys = [
   "magicPowderCountV1",
   "craftFurnitureCountsV1",
   "coloredMagicPowderCountsV1",
-  "ovcBagInventoryOrderV1"
+  "ovcBagInventoryOrderV1",
+  "playerMoneyKrwV1"
 ];
 
 /**

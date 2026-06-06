@@ -3,7 +3,7 @@
  */
 (async function ovcBootMain() {
   try {
-    await import("../script.js?v=20260528f");
+    await import("../script.js?v=20260531a");
   } catch (err) {
     if (err && err.message === "OVC login required") {
       return;

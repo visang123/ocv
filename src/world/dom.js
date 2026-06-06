@@ -44,6 +44,7 @@ const worldBagInventory = document.getElementById("world-bag-inventory");
 const bagInventoryPanel = document.getElementById("bag-inventory-panel");
 const bagInventoryClose = document.getElementById("bag-inventory-close");
 const bagBookStorageSlot = document.getElementById("bag-book-storage-slot");
+const bagPlayerMoney = document.getElementById("bag-player-money");
 const bagInventorySlots = Array.from(
   document.querySelectorAll(".bag-inventory-slots .bag-inventory-slot")
 );
@@ -125,6 +126,7 @@ export {
   bagInventoryPanel,
   bagInventoryClose,
   bagBookStorageSlot,
+  bagPlayerMoney,
   bagInventorySlots,
   guideCard,
   guideCloseButton,

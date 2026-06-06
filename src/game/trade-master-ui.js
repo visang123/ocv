@@ -14,6 +14,7 @@ import {
   TRADE_BUTTERFLY_ITEM_KEYS,
   TRADE_INPUT_ANY_BUTTERFLY
 } from "./trade-exchange.js";
+import { computeTradeMoneyDeltaKrw } from "./player-money.js";
 
 const TRADEABLE_ITEM_KEYS = [
   "rock",
@@ -944,9 +945,27 @@ function confirmSelectedTrade() {
   const recipe = getTradeRecipeById(selectedRecipeId);
   const batchCount = recipe ? getRecipeTradeBatchCount(counterByKey, recipe) : 0;
   if (!recipe || batchCount < 1) return;
+  const scaledInputs = scaleTradeItemCounts(recipe.inputs, batchCount);
+  const expandedInputs = expandTradeItemCounts(scaledInputs);
   const expandedOutputs = expandTradeItemCounts(
     scaleTradeItemCounts(recipe.outputs, batchCount)
   );
+  const moneyDelta = computeTradeMoneyDeltaKrw(expandedInputs, expandedOutputs);
+  if (moneyDelta < 0) {
+    const balance =
+      typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
+    if (balance + moneyDelta < 0) {
+      if (host.showPlayerAlert) {
+        host.showPlayerAlert({
+          message: "\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4.",
+          durationMs: 2200
+        });
+      } else if (host.showInventoryFullFail) {
+        host.showInventoryFullFail();
+      }
+      return;
+    }
+  }
   if (host.canAddBagItems && !host.canAddBagItems(expandedOutputs)) {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
@@ -955,6 +974,9 @@ function confirmSelectedTrade() {
   Object.keys(expandedOutputs).forEach(function (key) {
     host.addBagItems(key, Number(expandedOutputs[key] || 0));
   });
+  if (moneyDelta !== 0 && typeof host.applyPlayerMoneyDeltaKrw === "function") {
+    host.applyPlayerMoneyDeltaKrw(moneyDelta);
+  }
   selectedRecipeId = null;
   renderTradeCounter();
   refreshTradeExchangeUi();

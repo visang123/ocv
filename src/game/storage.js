@@ -55,7 +55,11 @@ export function migrateUnscopedUserPickupFlagsToUserScope(userId) {
         localStorage.setItem(destG, "true");
       }
     }
-    const plainKeysToScope = ["ovcBagInventoryOrderV1", "rockInventoryCountV1"];
+    const plainKeysToScope = [
+      "ovcBagInventoryOrderV1",
+      "rockInventoryCountV1",
+      "playerMoneyKrwV1"
+    ];
     for (let p = 0; p < plainKeysToScope.length; p++) {
       const pk = plainKeysToScope[p];
       const destP = userPrefix + pk;
