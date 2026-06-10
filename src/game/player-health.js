@@ -69,7 +69,7 @@ export function isPlayerIdleForHealth(opts) {
   if (isPlayerEnteredCraftHouse(opts)) return true;
   if (opts.isSittingOnChair) return false;
   if (opts.isPlanting || opts.isEating) return false;
-  if (opts.isTradeExchangeOpen || opts.isAlchemyCraftOpen) return false;
+  if (opts.isTradeExchangeOpen || opts.isAlchemyCraftOpen || opts.isPlantMasterSeedShopOpen) return false;
   if (opts.isGameplayBlockedByNpcDialogue) return false;
   if (isPlayerMovementKeyActive(opts.keys)) return false;
   if (!isPlayerPoseUnchanged(opts.previousPose, opts.currentPose)) return false;

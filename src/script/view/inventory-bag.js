@@ -40,7 +40,7 @@ export function createModule(d) {
 
   function canDiscardBagItemNow(itemKey) {
   if (!d.canDiscardBagItemKey(itemKey)) return false;
-  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen() || d.isBagDiscardModalOpen()) return false;
+  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen() || (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) || d.isBagDiscardModalOpen()) return false;
   if (!d.bagInventoryPanelOpen) return false;
   return bagDiscardInventoryEligible(itemKey);
   }
@@ -71,6 +71,10 @@ export function createModule(d) {
   }
   if (d.isTradeExchangeOpen()) {
     d.closeTradeExchangePanel();
+    return;
+  }
+  if (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) {
+    d.closePlantMasterSeedShop();
     return;
   }
   clearBagInventoryDragVisual();
@@ -284,7 +288,10 @@ export function createModule(d) {
   if (!slot || !d.bagInventoryPanel.contains(slot)) return;
   if (slot === d.bagBookStorageSlot) return;
   const itemKey = getBagItemKeyFromInventorySlot(slot);
-  const craftTradeOpen = d.isTradeExchangeOpen() || d.isAlchemyCraftOpen();
+  const craftTradeOpen =
+    d.isTradeExchangeOpen() ||
+    d.isAlchemyCraftOpen() ||
+    (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen());
   if (craftTradeOpen) {
     if (!itemKey || slot.classList.contains("is-empty")) return;
     const canPlaceOnTarget = d.canStartBagPanelCraftTradeDrag(itemKey);
@@ -538,7 +545,11 @@ export function createModule(d) {
   }
 
   function toggleBagInventoryPanelFromBagClick() {
-  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen()) {
+  if (
+    d.isTradeExchangeOpen() ||
+    d.isAlchemyCraftOpen() ||
+    (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen())
+  ) {
     return;
   }
   if (d.worldSocialUiReady && d.worldChatPanelOpen) {

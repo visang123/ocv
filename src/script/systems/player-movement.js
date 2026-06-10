@@ -198,6 +198,7 @@ export function createModule(d) {
   function isPlayerGameplayBlockedByNpcDialogue() {
   if (d.getNpc().isDialogueRunning) return true;
   if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen()) return false;
+  if (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) return false;
   return d.isTradeMasterDialogueRunning() || d.isAlchemyMasterDialogueRunning();
   }
 

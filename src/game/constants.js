@@ -135,13 +135,16 @@ export const SPAWN_PORTAL_HEIGHT = 44;
 export const SPAWN_PORTAL_X = SIGN_START_X - SPAWN_PORTAL_WIDTH - 24;
 export const SPAWN_PORTAL_Y = SIGN_START_Y + SIGN_HEIGHT - SPAWN_PORTAL_HEIGHT;
 
-/** 부서진 외계인 퍼즐 재단 — 스폰 포탈 대비 약 2.5배, 포탈 왼쪽 위(장식·기능 없음) */
-export const ALIEN_PUZZLE_SHRINE_WIDTH = Math.round(SPAWN_PORTAL_WIDTH * 2.5);
-export const ALIEN_PUZZLE_SHRINE_HEIGHT = Math.round(SPAWN_PORTAL_HEIGHT * 2.5);
-export const ALIEN_PUZZLE_SHRINE_X = SPAWN_PORTAL_X - ALIEN_PUZZLE_SHRINE_WIDTH + 14;
-export const ALIEN_PUZZLE_SHRINE_Y = SPAWN_PORTAL_Y - ALIEN_PUZZLE_SHRINE_HEIGHT + 18;
+/** 부서진 외계인 퍼즐 재단 — 포탈 왼쪽 위(장식·기능 없음). 표시 4배 */
+export const ALIEN_PUZZLE_SHRINE_SCALE = 4;
+export const ALIEN_PUZZLE_SHRINE_WIDTH = Math.round(SPAWN_PORTAL_WIDTH * ALIEN_PUZZLE_SHRINE_SCALE);
+export const ALIEN_PUZZLE_SHRINE_HEIGHT = Math.round(SPAWN_PORTAL_HEIGHT * ALIEN_PUZZLE_SHRINE_SCALE);
+export const ALIEN_PUZZLE_SHRINE_X =
+  SPAWN_PORTAL_X - Math.round(ALIEN_PUZZLE_SHRINE_WIDTH * 0.48) + 8;
+export const ALIEN_PUZZLE_SHRINE_Y =
+  SPAWN_PORTAL_Y - Math.round(ALIEN_PUZZLE_SHRINE_HEIGHT * 0.5) + 12;
 export const ALIEN_PUZZLE_SHRINE_IMG =
-  "\uC774\uBBF8\uC9C0/alien-puzzle-shrine-broken-world.png?v=20260531a";
+  "\uC774\uBBF8\uC9C0/alien-puzzle-shrine-broken-world.png?v=20260531d";
 
 export const GUIDE_BOOK_WIDTH = 23;
 export const GUIDE_BOOK_HEIGHT = 15;

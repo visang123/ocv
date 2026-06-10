@@ -1814,12 +1814,12 @@ body::-webkit-scrollbar {
   position: absolute;
   left: 0;
   top: 0;
-  width: 75px;
-  height: 110px;
-  z-index: 2;
+  width: 120px;
+  height: 176px;
+  z-index: 4;
   pointer-events: none;
   user-select: none;
-  filter: saturate(0.72) brightness(0.88);
+  overflow: visible;
 }
 
 .alien-puzzle-shrine__img {
@@ -1829,7 +1829,8 @@ body::-webkit-scrollbar {
   object-position: center bottom;
   display: block;
   image-rendering: auto;
-  opacity: 0.94;
+  opacity: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
 #character-select-overlay {
@@ -3960,7 +3961,8 @@ body #world-bag-inventory {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  min-width: 72px;
+  min-width: 60px;
+  flex: 1;
   box-sizing: border-box;
 }
 
@@ -3973,27 +3975,28 @@ body #world-bag-inventory {
 
 .bag-player-money {
   margin: 0;
+  min-width: 60px;
   min-height: 60px;
-  padding: 0 10px;
-  gap: 6px;
+  width: 100%;
+  padding: 6px 8px 8px;
+  gap: 4px;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 12px;
   background: rgba(8, 12, 24, 0.38);
-  font: 700 14px/1.2 Arial, sans-serif;
+  font: 700 13px/1.2 Arial, sans-serif;
   color: #ffe08a;
   letter-spacing: -0.02em;
-  white-space: nowrap;
 }
 
 .bag-player-money__icon {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: block;
   object-fit: contain;
   pointer-events: none;
@@ -4001,7 +4004,12 @@ body #world-bag-inventory {
 }
 
 .bag-player-money__amount {
+  width: 100%;
   line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .bag-book-storage-slot {
@@ -4391,6 +4399,164 @@ body #world-bag-inventory {
   box-sizing: border-box;
 }
 
+.trade-shop-panel {
+  width: 320px;
+  max-height: min(640px, calc(100vh - 24px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 10px;
+}
+
+.trade-shop-money {
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  font: 700 12px/1.3 Arial, sans-serif;
+  color: #bbf7d0;
+}
+
+.trade-shop-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.trade-shop-section--buy {
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.trade-shop-section--sell {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.trade-shop-section-title {
+  margin: 0;
+  font: 800 13px/1.2 Arial, sans-serif;
+  color: #f8fafc;
+}
+
+.trade-shop-hint {
+  margin: 0;
+  font: 600 10px/1.35 Arial, sans-serif;
+  color: rgba(248, 250, 252, 0.82);
+}
+
+.trade-buy-catalog {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.trade-buy-catalog-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trade-buy-catalog-item:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(147, 197, 253, 0.45);
+}
+
+.trade-buy-catalog-item.is-unaffordable {
+  opacity: 0.55;
+}
+
+.trade-buy-catalog-item-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trade-buy-catalog-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trade-buy-catalog-item-label {
+  font: 700 10px/1.2 Arial, sans-serif;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trade-buy-catalog-item-price {
+  font: 700 10px/1.2 Arial, sans-serif;
+  color: #93c5fd;
+}
+
+.trade-buy-cart {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px dashed rgba(147, 197, 253, 0.35);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.trade-buy-cart.is-empty::before {
+  content: "장바구니";
+  font: 600 11px/1.2 Arial, sans-serif;
+  color: rgba(248, 250, 252, 0.45);
+  align-self: center;
+  margin: auto;
+}
+
+.trade-shop-total {
+  margin: 0;
+  font: 700 11px/1.35 Arial, sans-serif;
+  color: rgba(253, 230, 138, 0.95);
+}
+
+.trade-shop-confirm {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  font: 800 13px/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.trade-shop-confirm--buy {
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  color: #fff;
+}
+
+.trade-shop-confirm--sell {
+  background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+  color: #111;
+}
+
+.trade-shop-confirm:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: grayscale(0.35);
+}
+
 .trade-exchange-header {
   display: flex;
   align-items: center;
@@ -4630,7 +4796,7 @@ button.trade-tradeable-recipe.is-selected {
 }
 
 .trade-counter-slot.is-empty::before {
-  content: "교환대";
+  content: "판매대";
   width: 100%;
   text-align: center;
   font: 600 11px/1.3 Arial, sans-serif;
@@ -4815,11 +4981,101 @@ button.trade-tradeable-recipe.is-selected {
   }
 }
 
+#npc-bubble.is-seed-shop-prompt {
+  max-width: 118px;
+  white-space: pre-line;
+  line-height: 1.28;
+}
+
 .alchemy-craft-overlay {
   position: fixed;
   inset: 0;
   z-index: 72;
   pointer-events: none;
+}
+
+.plant-master-seed-shop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 72;
+  pointer-events: none;
+}
+
+.plant-master-seed-shop-panel {
+  position: fixed;
+  left: var(--ovc-npc-side-panel-left);
+  bottom: 18px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 16px;
+  background: rgba(8, 12, 24, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.plant-master-seed-shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plant-master-seed-shop-header h2 {
+  margin: 0;
+  font: 800 16px/1.2 Arial, sans-serif;
+  color: #f8fafc;
+}
+
+.plant-master-seed-shop-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(20, 28, 48, 0.55);
+  color: #fff;
+  font: 700 18px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.plant-master-seed-shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.plant-master-seed-shop-item img {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.plant-master-seed-shop-price {
+  margin: 0;
+  font: 800 18px/1.2 Arial, sans-serif;
+  color: #fbbf24;
+}
+
+.plant-master-seed-shop-buy {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 222, 128, 0.65);
+  border-radius: 10px;
+  background: rgba(22, 101, 52, 0.72);
+  color: #ecfdf5;
+  font: 800 14px/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.plant-master-seed-shop-buy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .alchemy-craft-panel {

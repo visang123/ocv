@@ -233,13 +233,23 @@ export function createModule(d) {
   if (d.getNpc().isDialogueRunning || d.isAlchemyMasterDialogueRunning()) return;
 
   if (d.isNearPlantMaster()) {
+    if (d.getNpc().isDialogueComplete) {
+      d.npcBubble.dataset.speaker = "npc";
+      d.npcBubble.classList.add("is-seed-shop-prompt");
+      d.npcBubble.textContent =
+        "\uC528\uC557\uC774 \uD544\uC694\uD55C\uAC00?\n(q\uB97C \uB20C\uB7EC \uC528\uC557 \uAD6C\uB9E4)";
+      d.npcBubble.style.display = "block";
+      layoutNpcSpeechBubble();
+      window.clearTimeout(d.getNpc().promptHideTimeout);
+      return;
+    }
+
+    d.npcBubble.classList.remove("is-seed-shop-prompt");
     if (d.npcBubble.dataset.promptShown === "true") return;
 
     d.npcBubble.dataset.speaker = "npc";
     d.npcBubble.dataset.promptShown = "true";
-    d.npcBubble.textContent = d.getNpc().isDialogueComplete
-      ? "\uB2E4\uC74C\uC5D0 \uB610 \uC624\uC2DC\uAC8C"
-      : "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
+    d.npcBubble.textContent = "\uC790\uB124 \uC2DD\uBB3C\uC758 \uB2EC\uC778\uC774 \uB418\uC5B4 \uBCF4\uC9C0 \uC54A\uACA0\uB098?";
     d.npcBubble.style.display = "block";
     layoutNpcSpeechBubble();
 
@@ -250,6 +260,7 @@ export function createModule(d) {
       }
     }, 5000);
   } else if (d.npcBubble.dataset.speaker !== "player") {
+    d.npcBubble.classList.remove("is-seed-shop-prompt");
     d.npcBubble.style.display = "none";
     d.npcBubble.dataset.promptShown = "false";
     window.clearTimeout(d.getNpc().promptHideTimeout);

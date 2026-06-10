@@ -104,7 +104,11 @@ export function createModule(d) {
   }
 
   function onGuideInventoryToggleClick() {
-  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen()) {
+  if (
+    d.isTradeExchangeOpen() ||
+    d.isAlchemyCraftOpen() ||
+    (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen())
+  ) {
     return;
   }
   if (d.isOnboardingLinearGateActive() && !d.onboardingAllowsGuideBookButtonToggle()) {

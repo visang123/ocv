@@ -1,6 +1,10 @@
 import { TRADE_INPUT_ANY_BUTTERFLY } from "./trade-exchange.js";
 
 export const playerMoneyKrwKey = "playerMoneyKrwV1";
+export const DEFAULT_PLAYER_MONEY_KRW = 100;
+
+/** 식물의 달인 씨앗 구매 단가(원) */
+export const PLANT_MASTER_SEED_BUY_PRICE_KRW = 10;
 
 /** @type {Record<string, number>} NPC가 아이템을 살 때 지급하는 단가(원) */
 export const TRADE_ITEM_SELL_PRICE_KRW = {
@@ -44,7 +48,11 @@ export function normalizePlayerMoneyKrw(amount) {
 
 /** @param {(key: string) => string | null} getStoredValue */
 export function loadPlayerMoneyKrw(getStoredValue) {
-  return normalizePlayerMoneyKrw(getStoredValue(playerMoneyKrwKey) || 0);
+  const raw = getStoredValue(playerMoneyKrwKey);
+  if (raw == null || raw === "") {
+    return DEFAULT_PLAYER_MONEY_KRW;
+  }
+  return normalizePlayerMoneyKrw(raw);
 }
 
 /** @param {(key: string, value: string) => void} setStoredValue */

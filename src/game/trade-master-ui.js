@@ -1,26 +1,22 @@
 import { getBagItemDescriptor } from "./bag-inventory.js";
 import { isBagDiscardOverlayInteractionTarget } from "./bag-discard-ui.js";
 import {
-  cloneTradeCounter,
-  expandTradeItemCounts,
-  formatTradeRecipePseudoLabel,
-  getMatchingRecipesForCatalogEntry,
-  getTradeCatalogEntries,
-  getTradeRecipeById,
-  getRecipeTradeBatchCount,
-  recipeMatchesCounter,
-  scaleTradeItemCounts,
-  subtractRecipeInputsFromCounter,
-  TRADE_BUTTERFLY_ITEM_KEYS,
-  TRADE_INPUT_ANY_BUTTERFLY
-} from "./trade-exchange.js";
-import { computeTradeMoneyDeltaKrw } from "./player-money.js";
+  TRADE_ITEM_BUY_PRICE_KRW,
+  TRADE_ITEM_SELL_PRICE_KRW,
+  formatPlayerMoneyKrw,
+  getTradeItemUnitPriceKrw,
+  sumTradeItemCountsValueKrw
+} from "./player-money.js";
 
-const TRADEABLE_ITEM_KEYS = [
-  "rock",
+const SELLABLE_ITEM_KEYS = Object.keys(TRADE_ITEM_SELL_PRICE_KRW);
+const SELLABLE_KEYS = new Set(SELLABLE_ITEM_KEYS);
+
+const TRADE_BUY_CATALOG_ORDER = [
   "seed",
-  "overgrowthSeed",
+  "worldBucket",
   "apple",
+  "rock",
+  "overgrowthSeed",
   "magicPowder",
   "magicPowderYellow",
   "magicPowderWhite",
@@ -28,16 +24,9 @@ const TRADEABLE_ITEM_KEYS = [
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"
-];
-
-const TRADEABLE_KEYS = new Set(TRADEABLE_ITEM_KEYS);
-
-/** Catalog preview order for butterfly:any alternatives (white → yellow → brown). */
-const TRADE_BUTTERFLY_OR_DISPLAY_KEYS = [
-  "butterfly:white",
-  "butterfly:yellow",
-  "butterfly:brown"
-];
+].filter(function (key) {
+  return TRADE_ITEM_BUY_PRICE_KRW[key] != null;
+});
 
 /** @type {Record<string, any>} */
 let host = null;
@@ -50,9 +39,9 @@ let exchangeOpen = false;
 let dialogueTimeoutIds = [];
 let dialogueStartedAt = 0;
 /** @type {Record<string, number>} */
-let counterByKey = {};
-let selectedRecipeId = null;
-let pendingTradeRecipeReveal = false;
+let sellCounterByKey = {};
+/** @type {Record<string, number>} */
+let buyCartByKey = {};
 
 let outsideDismissBound = false;
 
@@ -106,10 +95,10 @@ function isTradeExchangeOverlayVisible() {
 function reconcileTradeExchangeOpenState() {
   if (!exchangeOpen) return;
   if (!isTradeExchangeOverlayVisible()) {
-    returnCounterItemsToInventory();
+    returnSellCounterItemsToInventory();
     exchangeOpen = false;
-    selectedRecipeId = null;
-    counterByKey = {};
+    sellCounterByKey = {};
+    buyCartByKey = {};
     if (host) {
       if (host.worldBagInventory) {
         host.worldBagInventory.classList.remove("is-trade-exchange-focus");
@@ -132,7 +121,7 @@ function abortTradeMasterDialogue() {
   window.clearTimeout(promptHideTimeout);
 }
 
-/** 체력 0 — 진행 중인 거래 대화·교환 패널 중도 취소(교환대 아이템은 가방으로 반환) */
+/** 체력 0 — 진행 중인 거래 대화·상점 패널 중도 취소(판매대 아이템은 가방으로 반환) */
 export function cancelTradeOnPlayerHealthDepleted() {
   abortTradeMasterDialogue();
   if (exchangeOpen) {
@@ -166,23 +155,38 @@ export function bindTradeMaster(h) {
       closeTradeExchangePanel();
     });
   }
-  if (host.tradeExchangeConfirm) {
-    host.tradeExchangeConfirm.addEventListener("click", function (event) {
+  if (host.tradeBuyConfirm) {
+    host.tradeBuyConfirm.addEventListener("click", function (event) {
       event.preventDefault();
       event.stopPropagation();
-      confirmSelectedTrade();
+      confirmTradeBuy();
     });
   }
-  if (host.tradeTradeableList) {
-    host.tradeTradeableList.addEventListener("click", function (event) {
-      const btn = event.target.closest(".trade-tradeable-recipe.is-available");
-      if (!btn || btn.disabled) return;
-      const recipeId = btn.dataset.recipeId || "";
-      if (!recipeId) return;
+  if (host.tradeSellConfirm) {
+    host.tradeSellConfirm.addEventListener("click", function (event) {
       event.preventDefault();
       event.stopPropagation();
-      selectedRecipeId = recipeId;
-      refreshTradeExchangeUi();
+      confirmTradeSell();
+    });
+  }
+  if (host.tradeBuyCatalog) {
+    host.tradeBuyCatalog.addEventListener("click", function (event) {
+      const btn = event.target.closest(".trade-buy-catalog-item");
+      if (!btn || btn.disabled) return;
+      const itemKey = btn.dataset.itemKey || "";
+      if (!itemKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      addOneItemToBuyCart(itemKey);
+    });
+  }
+  if (host.tradeBuyCart) {
+    host.tradeBuyCart.addEventListener("click", function (event) {
+      const chip = event.target.closest(".trade-counter-chip");
+      if (!chip || !exchangeOpen) return;
+      event.preventDefault();
+      event.stopPropagation();
+      removeOneItemFromBuyCart(chip.dataset.itemKey || "");
     });
   }
   if (host.tradeCounterSlot) {
@@ -194,7 +198,7 @@ export function bindTradeMaster(h) {
       }
       event.preventDefault();
       event.stopPropagation();
-      returnOneTradeCounterItemToInventory(chip.dataset.itemKey || "");
+      returnOneSellCounterItemToInventory(chip.dataset.itemKey || "");
     });
   }
 }
@@ -284,7 +288,7 @@ export function updateTradeNpcPrompt() {
 
   if (isNearTradeMaster()) {
     const promptText = complete
-      ? "\uBB3C\uAC74\uC740 \uAC00\uC838\uC654\uB098?!\n(q\uB97C \uB20C\uB7EC \uAC70\uB798)"
+      ? "\uBB3C\uAC74\uC740 \uAC00\uC838\uC654\uB098?!\n(q\uB97C \uB20C\uB7EC \uAD6C\uB9E4\u00B7\uD310\uB9E4)"
       : "\uBC18\uAC11\uB124 \uC774\uBC29\uC778\uC774\uC5EC";
     if (!complete) {
       if (host.tradeMasterBubble.dataset.promptShown === "true") return;
@@ -316,7 +320,6 @@ let stickyWorldNpcHover = null;
 
 const NPC_HOVER_PICK_PAD_X = 14;
 const NPC_HOVER_PICK_PAD_BOTTOM = 10;
-/** 이름 라벨이 NPC 위에 뜨므로, 위쪽으로 넓혀 마우스를 올려도 호버가 끊기지 않게 */
 const NPC_HOVER_PICK_PAD_TOP = 52;
 
 function getNpcHoverPickRect(el) {
@@ -374,30 +377,26 @@ export function handleBagSlotClickWhileTradeOpen(slotEl) {
   if (slotEl.classList.contains("is-empty")) return true;
   const key = bagSlotToItemKey(slotEl);
   if (!key) return true;
-  if (!TRADEABLE_KEYS.has(key)) return true;
-  addOneInventoryItemToTradeCounter(key);
+  if (!SELLABLE_KEYS.has(key)) return true;
+  addOneInventoryItemToSellCounter(key);
   return true;
 }
 
-function addOneInventoryItemToTradeCounter(itemKey) {
-  const before = cloneTradeCounter(counterByKey);
+function addOneInventoryItemToSellCounter(itemKey) {
   if (!host.removeOneBagItem(itemKey)) return false;
-  counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + 1;
-  pendingTradeRecipeReveal = didCounterGainCatalogMatch(before, counterByKey);
-  renderTradeCounter();
-  refreshTradeExchangeUi();
+  sellCounterByKey[itemKey] = Number(sellCounterByKey[itemKey] || 0) + 1;
+  refreshTradeShopUi();
   return true;
 }
 
 /** @param {string} itemKey */
 export function addFullInventoryStackToTradeCounter(itemKey) {
   if (!host || !exchangeOpen || !itemKey) return false;
-  if (!TRADEABLE_KEYS.has(itemKey)) return false;
+  if (!SELLABLE_KEYS.has(itemKey)) return false;
   const available = host.getBagItemCount
     ? Math.max(0, Math.floor(Number(host.getBagItemCount(itemKey)) || 0))
     : 0;
   if (available <= 0) return false;
-  const before = cloneTradeCounter(counterByKey);
   if (host.removeBagItems) {
     if (!host.removeBagItems(itemKey, available)) return false;
   } else {
@@ -405,39 +404,10 @@ export function addFullInventoryStackToTradeCounter(itemKey) {
       if (!host.removeOneBagItem(itemKey)) return false;
     }
   }
-  counterByKey[itemKey] = Number(counterByKey[itemKey] || 0) + available;
-  pendingTradeRecipeReveal = didCounterGainCatalogMatch(before, counterByKey);
-  renderTradeCounter();
-  refreshTradeExchangeUi();
+  sellCounterByKey[itemKey] = Number(sellCounterByKey[itemKey] || 0) + available;
+  refreshTradeShopUi();
   host.updateBagInventorySlots();
   return true;
-}
-
-/** @param {Record<string, number>} counter */
-function countMatchedCatalogEntries(counter) {
-  let count = 0;
-  getTradeCatalogEntries().forEach(function (entry) {
-    if (getMatchingRecipesForCatalogEntry(entry, counter).length > 0) count += 1;
-  });
-  return count;
-}
-
-/** @param {Record<string, number>} before @param {Record<string, number>} after */
-function didCounterGainCatalogMatch(before, after) {
-  return countMatchedCatalogEntries(after) > countMatchedCatalogEntries(before);
-}
-
-function revealTradeExchangeAfterRecipeMatched() {
-  if (!host) return;
-  window.requestAnimationFrame(function () {
-    const list = host.tradeTradeableList;
-    if (!list) return;
-    list.scrollTop = 0;
-    const firstAvailable = list.querySelector(".trade-tradeable-recipe.is-available");
-    if (firstAvailable && typeof firstAvailable.scrollIntoView === "function") {
-      firstAvailable.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  });
 }
 
 function getTradeExchangePanelEl() {
@@ -449,17 +419,25 @@ function getTradeExchangePanelEl() {
 export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
   if (!itemKey || !exchangeOpen || !host) return false;
   if (!(targetEl instanceof Element)) return false;
-  if (!TRADEABLE_KEYS.has(itemKey)) return false;
+  if (!SELLABLE_KEYS.has(itemKey)) return false;
   const panel = getTradeExchangePanelEl();
-  if (panel && panel.contains(targetEl)) {
+  if (!panel) return false;
+  const sellSlot = host.tradeCounterSlot;
+  if (sellSlot && (sellSlot.contains(targetEl) || targetEl === sellSlot)) {
     return addFullInventoryStackToTradeCounter(itemKey);
+  }
+  if (panel.contains(targetEl)) {
+    const sellSection = panel.querySelector(".trade-shop-section--sell");
+    if (sellSection && sellSection.contains(targetEl)) {
+      return addFullInventoryStackToTradeCounter(itemKey);
+    }
   }
   return false;
 }
 
 export function canDragBagItemToTradeCounter(itemKey) {
   if (!exchangeOpen || !itemKey) return false;
-  return TRADEABLE_KEYS.has(itemKey);
+  return SELLABLE_KEYS.has(itemKey);
 }
 
 function bagSlotToItemKey(slotEl) {
@@ -505,7 +483,7 @@ function startTradeMasterDialogue() {
   const lines = [
     { text: "\uB098\uB294 \uAC70\uB798\uB97C \uC88B\uC544\uD55C\uB2E4\uB124.", delayAfterMs: 2000 },
     {
-      text: "\uBB3C\uAC74\uC744 \uC900\uB2E4\uBA74 \uD569\uB2F9\uD55C \uAD50\uD658\uC744 \uD558\uACA0\uB124",
+      text: "\uD544\uC694\uD55C \uBB3C\uAC74\uC740 \uC0AC\uACE0, \uC548 \uC4F0\uB294 \uAC74 \uD310\uBA74 \uB418\uB124",
       delayAfterMs: 2000
     }
   ];
@@ -562,8 +540,8 @@ export function openTradeExchangePanel() {
     if (host.closeAlchemyCraftPanel) host.closeAlchemyCraftPanel();
   }
   exchangeOpen = true;
-  selectedRecipeId = null;
-  counterByKey = {};
+  sellCounterByKey = {};
+  buyCartByKey = {};
   if (host.tradeExchangeOverlay) {
     host.tradeExchangeOverlay.style.display = "block";
     host.tradeExchangeOverlay.setAttribute("aria-hidden", "false");
@@ -572,17 +550,16 @@ export function openTradeExchangePanel() {
   host.updateBagInventorySlots();
   if (host.worldBagInventory) host.worldBagInventory.classList.add("is-trade-exchange-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.add("is-trade-exchange-focus");
-  renderTradeCounter();
-  refreshTradeExchangeUi();
+  refreshTradeShopUi();
 }
 
 export function closeTradeExchangePanel(options) {
   if (!host) return;
   const keepInventory = Boolean(options && options.keepInventory);
-  returnCounterItemsToInventory();
+  returnSellCounterItemsToInventory();
   exchangeOpen = false;
-  selectedRecipeId = null;
-  counterByKey = {};
+  sellCounterByKey = {};
+  buyCartByKey = {};
   if (host.tradeExchangeOverlay) {
     host.tradeExchangeOverlay.style.display = "none";
     host.tradeExchangeOverlay.setAttribute("aria-hidden", "true");
@@ -590,78 +567,65 @@ export function closeTradeExchangePanel(options) {
   if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-trade-exchange-focus");
   if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
   if (!keepInventory) host.setBagInventoryPanelOpen(false);
-  renderTradeTradeableList();
-  renderTradeCounter();
-  renderTradeOffers();
+  renderSellCounter();
+  renderBuyCatalog();
+  renderBuyCart();
 }
 
-function returnCounterItemsToInventory() {
+function returnSellCounterItemsToInventory() {
   if (!host) return;
-  Object.keys(counterByKey).forEach(function (key) {
-    const n = Math.max(0, Math.floor(Number(counterByKey[key]) || 0));
+  Object.keys(sellCounterByKey).forEach(function (key) {
+    const n = Math.max(0, Math.floor(Number(sellCounterByKey[key]) || 0));
     if (n > 0) host.addBagItems(key, n);
   });
   if (host.updateBagInventorySlots) host.updateBagInventorySlots();
   if (host.saveAppleState) host.saveAppleState();
 }
 
-
-function returnOneTradeCounterItemToInventory(itemKey) {
+function returnOneSellCounterItemToInventory(itemKey) {
   if (!itemKey) return;
-  const n = Math.max(0, Math.floor(Number(counterByKey[itemKey]) || 0));
+  const n = Math.max(0, Math.floor(Number(sellCounterByKey[itemKey]) || 0));
   if (n <= 0) return;
-  counterByKey[itemKey] = n - 1;
-  if (counterByKey[itemKey] <= 0) delete counterByKey[itemKey];
+  sellCounterByKey[itemKey] = n - 1;
+  if (sellCounterByKey[itemKey] <= 0) delete sellCounterByKey[itemKey];
   host.addBagItems(itemKey, 1);
-  afterTradeCounterInventoryChanged();
+  afterSellCounterChanged();
 }
 
-function afterTradeCounterInventoryChanged() {
-  renderTradeCounter();
-  refreshTradeExchangeUi();
+function afterSellCounterChanged() {
+  refreshTradeShopUi();
   host.updateBagInventorySlots();
 }
 
 /** @param {string} itemKey */
 export function returnTradeCounterStackToInventory(itemKey) {
   if (!host || !exchangeOpen || !itemKey) return false;
-  const n = Math.max(0, Math.floor(Number(counterByKey[itemKey]) || 0));
+  const n = Math.max(0, Math.floor(Number(sellCounterByKey[itemKey]) || 0));
   if (n <= 0) return false;
   if (host.canAddBagItems && !host.canAddBagItems({ [itemKey]: n })) {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return false;
   }
-  delete counterByKey[itemKey];
+  delete sellCounterByKey[itemKey];
   host.addBagItems(itemKey, n);
-  afterTradeCounterInventoryChanged();
+  afterSellCounterChanged();
   if (host.saveAppleState) host.saveAppleState();
   return true;
 }
 
-/** Replace butterfly:any with colors actually on the trade counter for display. */
-function resolveTradeRecipeDisplaySide(side, counter) {
-  const resolved = Object.assign({}, side || {});
-  const need = Math.max(0, Math.floor(Number(resolved[TRADE_INPUT_ANY_BUTTERFLY]) || 0));
-  if (need <= 0) {
-    delete resolved[TRADE_INPUT_ANY_BUTTERFLY];
-    return resolved;
-  }
-  const hasOnCounter = TRADE_BUTTERFLY_ITEM_KEYS.some(function (bfKey) {
-    return Math.max(0, Math.floor(Number(counter[bfKey]) || 0)) > 0;
-  });
-  if (!hasOnCounter) return resolved;
-  delete resolved[TRADE_INPUT_ANY_BUTTERFLY];
-  let remaining = need;
-  TRADE_BUTTERFLY_ITEM_KEYS.forEach(function (bfKey) {
-    if (remaining <= 0) return;
-    const have = Math.max(0, Math.floor(Number(counter[bfKey]) || 0));
-    if (have <= 0) return;
-    const show = Math.min(have, remaining);
-    resolved[bfKey] = (Number(resolved[bfKey]) || 0) + show;
-    remaining -= show;
-  });
-  if (remaining > 0) resolved[TRADE_INPUT_ANY_BUTTERFLY] = remaining;
-  return resolved;
+function addOneItemToBuyCart(itemKey) {
+  if (!itemKey || TRADE_ITEM_BUY_PRICE_KRW[itemKey] == null) return;
+  buyCartByKey[itemKey] = Number(buyCartByKey[itemKey] || 0) + 1;
+  refreshTradeShopUi();
+}
+
+function removeOneItemFromBuyCart(itemKey) {
+  if (!itemKey) return;
+  const n = Math.max(0, Math.floor(Number(buyCartByKey[itemKey]) || 0));
+  if (n <= 0) return;
+  buyCartByKey[itemKey] = n - 1;
+  if (buyCartByKey[itemKey] <= 0) delete buyCartByKey[itemKey];
+  refreshTradeShopUi();
 }
 
 function escapeTradeHtml(text) {
@@ -672,250 +636,68 @@ function escapeTradeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-/** @param {string} itemKey @param {number} count */
-function getTradeRecipeItemLabel(itemKey, count) {
-  const pseudo = formatTradeRecipePseudoLabel(itemKey, count);
-  if (pseudo) return pseudo;
-  return getBagItemDescriptor(itemKey).label;
+function getPlayerMoneyKrw() {
+  return typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
 }
 
-/** @param {string} itemKey @param {number} count */
-function formatTradeRecipeItemPhrase(itemKey, count) {
-  const n = Math.max(0, Math.floor(Number(count) || 0));
-  if (n <= 0) return "";
-  const pseudo = formatTradeRecipePseudoLabel(itemKey, n);
-  if (pseudo) return pseudo;
-  const label = getBagItemDescriptor(itemKey).label;
-  return n > 1 ? label + " \u00D7" + n : label;
+function refreshTradeShopUi() {
+  renderBuyCatalog();
+  renderBuyCart();
+  renderSellCounter();
+  updateTradeShopMoney();
+  updateTradeBuySummary();
+  updateTradeSellSummary();
 }
 
-/** @param {number} countPerColor */
-function formatTradeButterflyAnyOrPhrase(countPerColor) {
-  const n = Math.max(0, Math.floor(Number(countPerColor) || 0));
-  if (n <= 0) return "";
-  return formatTradeRecipePseudoLabel(TRADE_INPUT_ANY_BUTTERFLY, n) || "";
+function updateTradeShopMoney() {
+  if (!host.tradeShopMoney) return;
+  host.tradeShopMoney.textContent =
+    "\uBCF4\uC720 \uB3D8: " + formatPlayerMoneyKrw(getPlayerMoneyKrw());
 }
 
-/** @param {Record<string, number>} side @param {Record<string, number>} counter @param {boolean} expandButterflyAny */
-function formatTradeRecipeSideText(side, counter, expandButterflyAny) {
-  const displaySide = expandButterflyAny
-    ? expandTradeItemCounts(side || {})
-    : resolveTradeRecipeDisplaySide(side || {}, counter || {});
-  const keys = sortTradeRecipeDisplayKeys(Object.keys(displaySide));
-  const parts = [];
-  keys.forEach(function (itemKey) {
-    const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
-    if (count <= 0) return;
-    if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
-      parts.push(formatTradeButterflyAnyOrPhrase(count));
-      return;
-    }
-    parts.push(formatTradeRecipeItemPhrase(itemKey, count));
+function renderBuyCatalog() {
+  if (!host.tradeBuyCatalog) return;
+  const money = getPlayerMoneyKrw();
+  host.tradeBuyCatalog.innerHTML = TRADE_BUY_CATALOG_ORDER.map(function (itemKey) {
+    const price = getTradeItemUnitPriceKrw(itemKey, "buy");
+    const desc = getBagItemDescriptor(itemKey);
+    const canAffordOne = money >= price;
+    return (
+      '<button type="button" class="trade-buy-catalog-item' +
+      (canAffordOne ? "" : " is-unaffordable") +
+      '" data-item-key="' +
+      escapeTradeHtml(itemKey) +
+      '" title="' +
+      escapeTradeHtml(desc.label + " " + formatPlayerMoneyKrw(price)) +
+      '">' +
+      '<span class="trade-buy-catalog-item-icon">' +
+      desc.iconHtml +
+      "</span>" +
+      '<span class="trade-buy-catalog-item-meta">' +
+      '<span class="trade-buy-catalog-item-label">' +
+      escapeTradeHtml(desc.label) +
+      "</span>" +
+      '<span class="trade-buy-catalog-item-price">' +
+      escapeTradeHtml(formatPlayerMoneyKrw(price)) +
+      "</span>" +
+      "</span>" +
+      "</button>"
+    );
+  }).join("");
+}
+
+function renderItemChipList(counter, emptyClass) {
+  const keys = Object.keys(counter).filter(function (k) {
+    return Number(counter[k] || 0) > 0;
   });
-  return parts.join(" + ");
-}
-
-/** @param {string} itemKey @param {number} count */
-function buildTradeRecipeIoChipHtml(itemKey, count) {
-  const n = Math.max(0, Math.floor(Number(count) || 0));
-  if (n <= 0) return "";
-  const desc = getBagItemDescriptor(itemKey);
-  const label = getTradeRecipeItemLabel(itemKey, n);
-  return (
-    '<span class="trade-recipe-io" title="' +
-    escapeTradeHtml(label) +
-    '">' +
-    desc.iconHtml +
-    (n > 1 ? '<span class="trade-recipe-io-count">×' + n + "</span>" : "") +
-    "</span>"
-  );
-}
-
-/** @param {number} countPerColor */
-function buildTradeButterflyAnyOrOptionsHtml(countPerColor) {
-  const n = Math.max(0, Math.floor(Number(countPerColor) || 0));
-  if (n <= 0) return "";
-  const title = TRADE_BUTTERFLY_OR_DISPLAY_KEYS.map(function (bfKey) {
-    const desc = getBagItemDescriptor(bfKey);
-    return desc.label + " \u00D7" + n;
-  }).join(" or ");
-  const parts = [];
-  TRADE_BUTTERFLY_OR_DISPLAY_KEYS.forEach(function (bfKey, index) {
-    if (index > 0) {
-      parts.push('<span class="trade-recipe-or-sep" aria-hidden="true">or</span>');
-    }
-    parts.push(buildTradeRecipeIoChipHtml(bfKey, n));
-  });
-  return (
-    '<span class="trade-recipe-or-options" title="' +
-    title +
-    '">' +
-    parts.join("") +
-    "</span>"
-  );
-}
-
-/** @param {Record<string, number>} side @param {{ expandButterflyAny?: boolean }} [options] */
-function buildTradeRecipeSideIconsHtml(side, options) {
-  const expandButterflyAny = Boolean(options && options.expandButterflyAny);
-  const displaySide = expandButterflyAny ? expandTradeItemCounts(side || {}) : side || {};
-  const keys = sortTradeRecipeDisplayKeys(Object.keys(displaySide));
-  if (!keys.length) return "";
-  return keys
-    .map(function (itemKey) {
-      const count = Math.max(0, Math.floor(Number(displaySide[itemKey]) || 0));
-      if (count <= 0) return "";
-      if (itemKey === TRADE_INPUT_ANY_BUTTERFLY) {
-        const label = formatTradeRecipePseudoLabel(itemKey, count);
-        const desc = getBagItemDescriptor("butterfly:yellow");
-        return (
-          '<span class="trade-recipe-io" title="' +
-          escapeTradeHtml(label) +
-          '">' +
-          desc.iconHtml +
-          (count > 1 ? '<span class="trade-recipe-io-count">×' + count + "</span>" : "") +
-          "</span>"
-        );
-      }
-      return buildTradeRecipeIoChipHtml(itemKey, count);
-    })
-    .join("");
-}
-
-/** @param {string[]} keys */
-function sortTradeRecipeDisplayKeys(keys) {
-  return keys.slice().sort(function (a, b) {
-    const aBf = TRADE_BUTTERFLY_ITEM_KEYS.indexOf(a);
-    const bBf = TRADE_BUTTERFLY_ITEM_KEYS.indexOf(b);
-    if (aBf >= 0 && bBf >= 0) return aBf - bBf;
-    if (aBf >= 0) return 1;
-    if (bBf >= 0) return -1;
-    return a.localeCompare(b);
-  });
-}
-
-function buildTradeRecipeFlowHtml(inputs, outputs, arrowSymbol, counter) {
-  const c = counter || {};
-  const inputText = formatTradeRecipeSideText(inputs, c, false);
-  const outputText = formatTradeRecipeSideText(outputs, c, true);
-  const formulaText = [inputText, outputText].filter(Boolean).join(" " + arrowSymbol + " ");
-  const displayInputs = resolveTradeRecipeDisplaySide(inputs, c);
-  return (
-    '<div class="trade-recipe-entry">' +
-    '<p class="trade-recipe-formula-text">' +
-    escapeTradeHtml(formulaText) +
-    "</p>" +
-    '<div class="trade-recipe-flow">' +
-    buildTradeRecipeSideIconsHtml(displayInputs, { expandButterflyAny: false }) +
-    '<span class="trade-recipe-arrow">' +
-    arrowSymbol +
-    "</span>" +
-    buildTradeRecipeSideIconsHtml(outputs, { expandButterflyAny: true }) +
-    "</div>" +
-    "</div>"
-  );
-}
-
-/** @param {{ oneWay?: boolean }} entry @param {{ oneWay?: boolean } | null | undefined} activeRecipe @param {number} batchCount */
-function getTradePreviewArrow(entry, activeRecipe, batchCount) {
-  if (activeRecipe && batchCount > 0) return "→";
-  if (entry.oneWay || (activeRecipe && activeRecipe.oneWay)) return "→";
-  return "↔";
-}
-
-function pruneInvalidTradeSelection() {
-  if (!selectedRecipeId) return;
-  const recipe = getTradeRecipeById(selectedRecipeId);
-  if (!recipe || !recipeMatchesCounter(counterByKey, recipe)) {
-    selectedRecipeId = null;
-  }
-}
-
-function refreshTradeExchangeUi() {
-  pruneInvalidTradeSelection();
-  renderTradeTradeableList();
-  renderTradeOffers();
-  updateTradeConfirmButton();
-  if (pendingTradeRecipeReveal) {
-    pendingTradeRecipeReveal = false;
-    revealTradeExchangeAfterRecipeMatched();
-  }
-}
-
-function renderTradeTradeableList() {
-  if (!host.tradeTradeableList) return;
-  const catalog = getTradeCatalogEntries().slice().sort(function (a, b) {
-    const aAvailable =
-      getMatchingRecipesForCatalogEntry(a, counterByKey).length > 0;
-    const bAvailable =
-      getMatchingRecipesForCatalogEntry(b, counterByKey).length > 0;
-    if (aAvailable === bAvailable) return 0;
-    return aAvailable ? -1 : 1;
-  });
-  host.tradeTradeableList.innerHTML = catalog
-    .map(function (entry) {
-      const entryMatches = getMatchingRecipesForCatalogEntry(entry, counterByKey);
-      const isAvailable = entryMatches.length > 0;
-      const activeRecipe = isAvailable
-        ? entryMatches.find(function (r) {
-            return r.id === selectedRecipeId;
-          }) || entryMatches[0]
-        : null;
-      const recipeId = activeRecipe ? activeRecipe.id : "";
-      const isSelected = Boolean(recipeId && selectedRecipeId === recipeId);
-      const classNames = ["trade-tradeable-recipe"];
-      if (isAvailable) classNames.push("is-available");
-      if (isSelected) classNames.push("is-selected");
-      const batchCount = activeRecipe
-        ? getRecipeTradeBatchCount(counterByKey, activeRecipe)
-        : 0;
-      const previewArrow = getTradePreviewArrow(entry, activeRecipe, batchCount);
-      const flow =
-        activeRecipe && batchCount > 0
-          ? buildTradeRecipeFlowHtml(
-              scaleTradeItemCounts(activeRecipe.inputs, batchCount),
-              scaleTradeItemCounts(activeRecipe.outputs, batchCount),
-              "→",
-              counterByKey
-            )
-          : buildTradeRecipeFlowHtml(entry.inputs, entry.outputs, previewArrow, counterByKey);
-      if (isAvailable) {
-        return (
-          '<button type="button" class="' +
-          classNames.join(" ") +
-          '" data-recipe-id="' +
-          recipeId +
-          '" aria-pressed="' +
-          (isSelected ? "true" : "false") +
-          '" aria-label="' +
-          escapeTradeHtml(entry.label) +
-          '">' +
-          flow +
-          "</button>"
-        );
-      }
-      return '<div class="' + classNames.join(" ") + '">' + flow + "</div>";
-    })
-    .join("");
-}
-
-function renderTradeCounter() {
-  if (!host.tradeCounterSlot) return;
-  const keys = Object.keys(counterByKey).filter(function (k) {
-    return Number(counterByKey[k] || 0) > 0;
-  });
-  host.tradeCounterSlot.classList.toggle("is-empty", keys.length === 0);
-  if (!keys.length) {
-    host.tradeCounterSlot.innerHTML = "";
-    return;
-  }
-  host.tradeCounterSlot.innerHTML = keys
+  if (!keys.length) return { html: "", isEmpty: true };
+  const html = keys
     .map(function (key) {
       const desc = getBagItemDescriptor(key);
-      const count = Number(counterByKey[key] || 0);
+      const count = Number(counter[key] || 0);
       return (
         '<div class="trade-counter-chip" data-item-key="' +
-        key +
+        escapeTradeHtml(key) +
         '">' +
         desc.iconHtml +
         '<span class="trade-counter-chip-count">' +
@@ -924,63 +706,111 @@ function renderTradeCounter() {
       );
     })
     .join("");
+  return { html: html, isEmpty: false };
 }
 
-function renderTradeOffers() {
-  if (!host.tradeOfferList) return;
-  host.tradeOfferList.innerHTML = "";
+function renderBuyCart() {
+  if (!host.tradeBuyCart) return;
+  const rendered = renderItemChipList(buyCartByKey, "trade-buy-cart");
+  host.tradeBuyCart.classList.toggle("is-empty", rendered.isEmpty);
+  host.tradeBuyCart.innerHTML = rendered.html;
 }
 
-function updateTradeConfirmButton() {
-  if (!host.tradeExchangeConfirm) return;
-  const recipe = getTradeRecipeById(selectedRecipeId);
-  const batchCount = recipe ? getRecipeTradeBatchCount(counterByKey, recipe) : 0;
-  const ok = batchCount >= 1;
-  host.tradeExchangeConfirm.disabled = !ok;
-  host.tradeExchangeConfirm.textContent =
-    batchCount > 1 ? "\uAD50\uD658 \u00D7" + batchCount : "\uAD50\uD658";
+function renderSellCounter() {
+  if (!host.tradeCounterSlot) return;
+  const rendered = renderItemChipList(sellCounterByKey, "trade-counter-slot");
+  host.tradeCounterSlot.classList.toggle("is-empty", rendered.isEmpty);
+  host.tradeCounterSlot.innerHTML = rendered.html;
 }
 
-function confirmSelectedTrade() {
-  const recipe = getTradeRecipeById(selectedRecipeId);
-  const batchCount = recipe ? getRecipeTradeBatchCount(counterByKey, recipe) : 0;
-  if (!recipe || batchCount < 1) return;
-  const scaledInputs = scaleTradeItemCounts(recipe.inputs, batchCount);
-  const expandedInputs = expandTradeItemCounts(scaledInputs);
-  const expandedOutputs = expandTradeItemCounts(
-    scaleTradeItemCounts(recipe.outputs, batchCount)
-  );
-  const moneyDelta = computeTradeMoneyDeltaKrw(expandedInputs, expandedOutputs);
-  if (moneyDelta < 0) {
-    const balance =
-      typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
-    if (balance + moneyDelta < 0) {
-      if (host.showPlayerAlert) {
-        host.showPlayerAlert({
-          message: "\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4.",
-          durationMs: 2200
-        });
-      } else if (host.showInventoryFullFail) {
-        host.showInventoryFullFail();
-      }
-      return;
-    }
+function updateTradeBuySummary() {
+  const total = sumTradeItemCountsValueKrw(buyCartByKey, "buy");
+  const hasItems = Object.keys(buyCartByKey).some(function (key) {
+    return Number(buyCartByKey[key] || 0) > 0;
+  });
+  if (host.tradeBuyTotal) {
+    host.tradeBuyTotal.textContent = hasItems
+      ? "\uAD6C\uB9E4 \uD569\uACC4: " + formatPlayerMoneyKrw(total)
+      : "\uAD6C\uB9E4 \uD488\uBAA9\uC744 \uACE0\uB974\uC138\uC694.";
   }
-  if (host.canAddBagItems && !host.canAddBagItems(expandedOutputs)) {
+  if (host.tradeBuyConfirm) {
+    host.tradeBuyConfirm.disabled = !hasItems || getPlayerMoneyKrw() < total;
+    host.tradeBuyConfirm.textContent = hasItems ? "\uAD6C\uB9E4" : "\uAD6C\uB9E4";
+  }
+}
+
+function updateTradeSellSummary() {
+  const total = sumTradeItemCountsValueKrw(sellCounterByKey, "sell");
+  const hasItems = Object.keys(sellCounterByKey).some(function (key) {
+    return Number(sellCounterByKey[key] || 0) > 0;
+  });
+  if (host.tradeSellTotal) {
+    host.tradeSellTotal.textContent = hasItems
+      ? "\uD310\uB9E4 \uD569\uACC4: " + formatPlayerMoneyKrw(total)
+      : "\uD310\uB9E4\uD560 \uBB3C\uAC74\uC744 \uC62C\uB824 \uC8FC\uC138\uC694.";
+  }
+  if (host.tradeSellConfirm) {
+    host.tradeSellConfirm.disabled = !hasItems;
+    host.tradeSellConfirm.textContent = hasItems ? "\uD310\uB9E4" : "\uD310\uB9E4";
+  }
+}
+
+function confirmTradeBuy() {
+  const total = sumTradeItemCountsValueKrw(buyCartByKey, "buy");
+  const hasItems = Object.keys(buyCartByKey).some(function (key) {
+    return Number(buyCartByKey[key] || 0) > 0;
+  });
+  if (!hasItems || total <= 0) return;
+  if (getPlayerMoneyKrw() < total) {
+    if (host.showPlayerAlert) {
+      host.showPlayerAlert({ message: "\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4.", durationMs: 2200 });
+    }
+    refreshTradeShopUi();
+    return;
+  }
+  const purchaseCounts = {};
+  Object.keys(buyCartByKey).forEach(function (key) {
+    const n = Math.max(0, Math.floor(Number(buyCartByKey[key]) || 0));
+    if (n > 0) purchaseCounts[key] = n;
+  });
+  if (host.canAddBagItems && !host.canAddBagItems(purchaseCounts)) {
     if (host.showInventoryFullFail) host.showInventoryFullFail();
     return;
   }
-  counterByKey = subtractRecipeInputsFromCounter(counterByKey, recipe, batchCount);
-  Object.keys(expandedOutputs).forEach(function (key) {
-    host.addBagItems(key, Number(expandedOutputs[key] || 0));
-  });
-  if (moneyDelta !== 0 && typeof host.applyPlayerMoneyDeltaKrw === "function") {
-    host.applyPlayerMoneyDeltaKrw(moneyDelta);
+  if (typeof host.applyPlayerMoneyDeltaKrw === "function") {
+    host.applyPlayerMoneyDeltaKrw(-total);
   }
-  selectedRecipeId = null;
-  renderTradeCounter();
-  refreshTradeExchangeUi();
+  Object.keys(purchaseCounts).forEach(function (key) {
+    host.addBagItems(key, Number(purchaseCounts[key] || 0));
+  });
+  buyCartByKey = {};
+  refreshTradeShopUi();
   host.updateBagInventorySlots();
+  if (typeof host.updateBagPlayerMoneyDisplay === "function") {
+    host.updateBagPlayerMoneyDisplay();
+  }
+  host.saveAppleState();
+  host.markWorldDirty();
+  if (typeof host.syncWorldState === "function") {
+    host.syncWorldState(true);
+  }
+}
+
+function confirmTradeSell() {
+  const total = sumTradeItemCountsValueKrw(sellCounterByKey, "sell");
+  const hasItems = Object.keys(sellCounterByKey).some(function (key) {
+    return Number(sellCounterByKey[key] || 0) > 0;
+  });
+  if (!hasItems || total <= 0) return;
+  if (typeof host.applyPlayerMoneyDeltaKrw === "function") {
+    host.applyPlayerMoneyDeltaKrw(total);
+  }
+  sellCounterByKey = {};
+  refreshTradeShopUi();
+  host.updateBagInventorySlots();
+  if (typeof host.updateBagPlayerMoneyDisplay === "function") {
+    host.updateBagPlayerMoneyDisplay();
+  }
   host.saveAppleState();
   host.markWorldDirty();
   if (typeof host.syncWorldState === "function") {

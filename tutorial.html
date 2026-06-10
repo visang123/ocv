@@ -35,7 +35,7 @@
   </script>
   <script src="src/app/dev-world-reset-shortcut-head.js?v=20260524a"></script>
   <title>온라인 비상 커뮤니티 – 튜토리얼</title>
-  <link rel="stylesheet" href="style.css?v=20260531a">
+  <link rel="stylesheet" href="style.css?v=20260604b">
 </head>
 <body class="ovc-page-tutorial">
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -448,22 +448,33 @@
   </div>
 
   <div id="trade-exchange-overlay" class="trade-exchange-overlay" style="display: none" aria-hidden="true">
-    <div class="trade-exchange-panel" role="dialog" aria-labelledby="trade-exchange-title">
+    <div class="trade-exchange-panel trade-shop-panel" role="dialog" aria-labelledby="trade-exchange-title">
       <div class="trade-exchange-header">
-        <h2 id="trade-exchange-title">교환</h2>
+        <h2 id="trade-exchange-title">구매 · 판매</h2>
         <button type="button" id="trade-exchange-close" class="trade-exchange-close" aria-label="닫기">
           &#215;
         </button>
       </div>
-      <p class="trade-exchange-hint">가방에서 교환대로 끌어 올리거나 클릭하세요. 가방·교환대 밖에 놓으면 버려집니다.</p>
-      <p class="trade-tradeable-label">거래 가능</p>
-      <div id="trade-tradeable-list" class="trade-tradeable-list" aria-label="거래 가능 아이템"></div>
-      <p class="trade-tradeable-step-hint">거래가능 목록 클릭 후, 교환 버튼을 클릭하세요.</p>
-      <div id="trade-counter-slot" class="trade-counter-slot" aria-label="교환대"></div>
-      <ul id="trade-offer-list" class="trade-offer-list" aria-label="교환 가능 목록"></ul>
-      <button type="button" id="trade-exchange-confirm" class="trade-exchange-confirm" disabled>
-        교환
-      </button>
+      <p id="trade-shop-money" class="trade-shop-money" aria-live="polite">보유 돈: 100원</p>
+      <section class="trade-shop-section trade-shop-section--buy" aria-label="구매">
+        <h3 class="trade-shop-section-title">구매</h3>
+        <p class="trade-shop-hint">품목을 클릭해 담고, 장바구니에서 다시 뺄 수 있습니다.</p>
+        <div id="trade-buy-catalog" class="trade-buy-catalog" aria-label="구매 품목"></div>
+        <div id="trade-buy-cart" class="trade-buy-cart is-empty" aria-label="구매 장바구니"></div>
+        <p id="trade-buy-total" class="trade-shop-total">구매 품목을 고르세요.</p>
+        <button type="button" id="trade-buy-confirm" class="trade-shop-confirm trade-shop-confirm--buy" disabled>
+          구매
+        </button>
+      </section>
+      <section class="trade-shop-section trade-shop-section--sell" aria-label="판매">
+        <h3 class="trade-shop-section-title">판매</h3>
+        <p class="trade-shop-hint">가방에서 판매대로 끌거나 클릭하세요. 가방·판매대 밖에 놓으면 버려집니다.</p>
+        <div id="trade-counter-slot" class="trade-counter-slot is-empty" aria-label="판매대"></div>
+        <p id="trade-sell-total" class="trade-shop-total">판매할 물건을 올려 주세요.</p>
+        <button type="button" id="trade-sell-confirm" class="trade-shop-confirm trade-shop-confirm--sell" disabled>
+          판매
+        </button>
+      </section>
     </div>
   </div>
   <div id="plant-master-seed-shop-overlay" class="plant-master-seed-shop-overlay" style="display: none" aria-hidden="true">
@@ -621,7 +632,7 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "tutorial";</script>
-  <script type="module" src="src/tutorial-main.js?v=20260531a"></script>
+  <script type="module" src="src/tutorial-main.js?v=20260604b"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {

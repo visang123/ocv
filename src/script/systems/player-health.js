@@ -27,6 +27,8 @@ export function createModule(d) {
     isEating: Boolean(d.getApple().isEating),
     isTradeExchangeOpen: d.isTradeExchangeOpen(),
     isAlchemyCraftOpen: d.isAlchemyCraftOpen(),
+    isPlantMasterSeedShopOpen:
+      d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen(),
     isGameplayBlockedByNpcDialogue: d.isPlayerGameplayBlockedByNpcDialogue(),
     velocityY: d.getPlayer().velocityY,
     previousPose: healthPosePrev,
@@ -40,6 +42,7 @@ export function createModule(d) {
   function isPlayerGameplayBlockedByNpcDialogue() {
   if (d.getNpc().isDialogueRunning) return true;
   if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen()) return false;
+  if (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) return false;
   return d.isTradeMasterDialogueRunning() || d.isAlchemyMasterDialogueRunning();
   }
 
@@ -107,6 +110,9 @@ export function createModule(d) {
     !d.isPlayerHealthDepleted(healthBefore)
   ) {
     d.cancelTradeOnPlayerHealthDepleted();
+    if (typeof d.cancelPlantMasterSeedShopOnPlayerHealthDepleted === "function") {
+      d.cancelPlantMasterSeedShopOnPlayerHealthDepleted();
+    }
   }
   }
 

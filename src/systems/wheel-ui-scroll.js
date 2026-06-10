@@ -7,6 +7,7 @@ const OPEN_UI_ROOT_IDS = [
   "admin-overlay",
   "character-select-overlay",
   "trade-exchange-overlay",
+  "plant-master-seed-shop-overlay",
   "guide-card"
 ];
 
@@ -108,7 +109,9 @@ function findOpenTradeExchangeRoot(openRoots) {
 }
 
 function getTradeExchangeScrollable(tradeRoot) {
-  const list = tradeRoot.querySelector(".trade-tradeable-list");
+  const list =
+    tradeRoot.querySelector(".trade-buy-catalog") ||
+    tradeRoot.querySelector(".trade-shop-panel");
   if (list) return list;
   return tradeRoot.querySelector(".trade-exchange-panel");
 }
