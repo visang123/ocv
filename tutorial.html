@@ -71,7 +71,7 @@
         >
           <img
             class="alien-puzzle-shrine__img"
-            src="이미지/alien-puzzle-shrine-broken-world.png?v=20260531a"
+            src="이미지/alien-puzzle-shrine-broken-world.png?v=20260531d"
             alt=""
             draggable="false"
           >
@@ -406,17 +406,17 @@
       </section>
       <section class="bag-player-assets" aria-label="보유 자산">
         <p class="bag-player-assets-label">자산</p>
-        <p id="bag-player-money" class="bag-player-money" aria-live="polite">
+        <div id="bag-player-money" class="bag-player-money" aria-live="polite">
           <img
             class="bag-player-money__icon"
-            src="이미지/money-banknote-icon.svg?v=20260531b"
+            src="이미지/money-banknote-icon.png?v=20260604a"
             alt=""
-            width="22"
-            height="22"
+            width="28"
+            height="28"
             draggable="false"
           >
-          <span id="bag-player-money-amount" class="bag-player-money__amount">0원</span>
-        </p>
+          <span id="bag-player-money-amount" class="bag-player-money__amount">100원</span>
+        </div>
       </section>
     </div>
     <div class="bag-inventory-slots" role="group" aria-label="가방 칸 9">
@@ -464,6 +464,21 @@
       <button type="button" id="trade-exchange-confirm" class="trade-exchange-confirm" disabled>
         교환
       </button>
+    </div>
+  </div>
+  <div id="plant-master-seed-shop-overlay" class="plant-master-seed-shop-overlay" style="display: none" aria-hidden="true">
+    <div class="plant-master-seed-shop-panel" role="dialog" aria-labelledby="plant-master-seed-shop-title">
+      <div class="plant-master-seed-shop-header">
+        <h2 id="plant-master-seed-shop-title">씨앗 구매</h2>
+        <button type="button" id="plant-master-seed-shop-close" class="plant-master-seed-shop-close" aria-label="닫기">
+          &#215;
+        </button>
+      </div>
+      <div class="plant-master-seed-shop-item">
+        <img src="이미지/seed.png" alt="" width="64" height="64" draggable="false">
+        <p id="plant-master-seed-shop-price" class="plant-master-seed-shop-price">10원</p>
+      </div>
+      <button type="button" id="plant-master-seed-shop-buy" class="plant-master-seed-shop-buy">구매</button>
     </div>
   </div>
   <div id="alchemy-craft-overlay" class="alchemy-craft-overlay" style="display: none" aria-hidden="true">

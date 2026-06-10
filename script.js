@@ -237,6 +237,10 @@ import {
   tradeOfferList,
   tradeExchangeConfirm,
   tradeExchangeClose,
+  plantMasterSeedShopOverlay,
+  plantMasterSeedShopClose,
+  plantMasterSeedShopPrice,
+  plantMasterSeedShopBuy,
   alchemyCraftOverlay,
   alchemyCraftProductList,
   alchemyCraftRequirementsBlock,
@@ -502,11 +506,19 @@ import {
   returnTradeCounterStackToInventory
 } from "./src/game/trade-master-ui.js?v=20260517y";
 import {
+  bindPlantMasterSeedShop,
+  cancelPlantMasterSeedShopOnPlayerHealthDepleted,
+  closePlantMasterSeedShop,
+  isPlantMasterSeedShopOpen,
+  openPlantMasterSeedShop
+} from "./src/game/plant-master-seed-shop.js?v=20260531b";
+import {
   playerMoneyKrwKey,
   formatPlayerMoneyKrw,
   loadPlayerMoneyKrw as loadPlayerMoneyKrwFromStorage,
   savePlayerMoneyKrw as savePlayerMoneyKrwToStorage,
-  normalizePlayerMoneyKrw
+  normalizePlayerMoneyKrw,
+  DEFAULT_PLAYER_MONEY_KRW
 } from "./src/game/player-money.js?v=20260531a";
 import {
   bindAlchemyMaster,
@@ -1430,7 +1442,7 @@ const rockInventoryCountKey = "rockInventoryCountV1";
 const MAGIC_POWDER_USE_DISTANCE = Math.max(plantWaterDistance, 72);
 let magicPowderCount = 0;
 let rockInventoryCount = 0;
-let playerMoneyKrw = 0;
+let playerMoneyKrw = DEFAULT_PLAYER_MONEY_KRW;
 /** @type {Record<string, number>} */
 let craftFurnitureCounts = {
   craftDesk: 0,
@@ -2221,6 +2233,10 @@ document.addEventListener("keydown", function (event) {
       return;
     }
     if (isNearPlantMaster()) {
+      if (getNpc().isDialogueComplete) {
+        openPlantMasterSeedShop();
+        return;
+      }
       tryTalkToPlantMaster();
       return;
     }
@@ -2263,6 +2279,13 @@ document.addEventListener("keydown", function (event) {
     if (isTradeExchangeOpen()) {
       event.preventDefault();
       closeTradeExchangePanel({ keepInventory: true });
+      resetInputKeys(keys);
+      isInteractKeyLatched = false;
+      return;
+    }
+    if (isPlantMasterSeedShopOpen()) {
+      event.preventDefault();
+      closePlantMasterSeedShop({ keepInventory: true });
       resetInputKeys(keys);
       isInteractKeyLatched = false;
       return;
@@ -2329,6 +2352,7 @@ window.addEventListener("blur", function () {
 });
 window.addEventListener("pagehide", function () {
   if (isTradeExchangeOpen()) closeTradeExchangePanel();
+  if (isPlantMasterSeedShopOpen()) closePlantMasterSeedShop();
   if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
   sendMultiplayerLeave();
   saveGameSnapshot();
@@ -2336,6 +2360,7 @@ window.addEventListener("pagehide", function () {
 });
 window.addEventListener("beforeunload", function () {
   if (isTradeExchangeOpen()) closeTradeExchangePanel();
+  if (isPlantMasterSeedShopOpen()) closePlantMasterSeedShop();
   if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
   sendMultiplayerLeave();
   saveGameSnapshot();
@@ -2347,6 +2372,7 @@ window.addEventListener("pageshow", function () {
 document.addEventListener("visibilitychange", function () {
   if (document.hidden) {
     if (isTradeExchangeOpen()) closeTradeExchangePanel();
+    if (isPlantMasterSeedShopOpen()) closePlantMasterSeedShop();
     if (isAlchemyCraftOpen()) closeAlchemyCraftPanel();
     settlePlayerBeforeBackground();
     sendMultiplayerPresence(true);
@@ -2634,6 +2660,30 @@ bindTradeMaster({
   isAlchemyCraftOpen: isAlchemyCraftOpen,
   closeAlchemyCraftPanel: closeAlchemyCraftPanel,
   onFirstDialogueComplete: advanceOnboardingAfterTradeMasterDialogue
+});
+
+bindPlantMasterSeedShop({
+  seedShopOverlay: plantMasterSeedShopOverlay,
+  seedShopCloseBtn: plantMasterSeedShopClose,
+  seedShopPriceEl: plantMasterSeedShopPrice,
+  seedShopBuyBtn: plantMasterSeedShopBuy,
+  setBagInventoryPanelOpen: setBagInventoryPanelOpen,
+  updateBagInventorySlots: updateBagInventorySlots,
+  updateBagPlayerMoneyDisplay: updateBagPlayerMoneyDisplay,
+  getPlayerMoneyKrw: getPlayerMoneyKrw,
+  applyPlayerMoneyDeltaKrw: applyPlayerMoneyDeltaKrw,
+  addBagItems: addBagItemsForTrade,
+  canAddBagItems: canAddBagItemsForTrade,
+  showInventoryFullFail: showBagInventoryFullFailMessage,
+  showPlayerAlert: showPlayerAlert,
+  canUseBagInventoryGameplay: canUseBagInventoryGameplay,
+  isPlantMasterDialogueComplete: function () {
+    return getNpc().isDialogueComplete;
+  },
+  isTradeExchangeOpen: isTradeExchangeOpen,
+  closeTradeExchangePanel: closeTradeExchangePanel,
+  isAlchemyCraftOpen: isAlchemyCraftOpen,
+  closeAlchemyCraftPanel: closeAlchemyCraftPanel
 });
 
 bindAlchemyMaster({
@@ -5523,7 +5573,7 @@ function applyDefaultState(options) {
   hasSeededInitialButterflies = false;
   magicPowderCount = 0;
   rockInventoryCount = 0;
-  playerMoneyKrw = 0;
+  playerMoneyKrw = DEFAULT_PLAYER_MONEY_KRW;
   craftFurnitureCounts.craftDesk = 0;
   craftFurnitureCounts.craftFence = 0;
   craftFurnitureCounts.craftChair = 0;
@@ -5676,6 +5726,11 @@ function tryTalkToPlantMaster() {
   }
   if (isOnboardingLinearGateActive() && getOnboarding().flowStep < ONBOARDING_STEP_PLANT_MASTER_TALK) {
     flashOnboardingOrderHint("");
+    return true;
+  }
+
+  if (getNpc().isDialogueComplete) {
+    openPlantMasterSeedShop();
     return true;
   }
 
@@ -6174,7 +6229,7 @@ function tryPickupWorldRock(rock) {
   const counts = getBagInventoryCountsByKey();
   if (
     !canBagInventoryFitItems(
-      bagInventoryItemOrder,
+      getBagInventoryItemOrderForChecks(),
       counts,
       { rock: 1 },
       BAG_INVENTORY_SLOT_COUNT
@@ -7544,6 +7599,7 @@ function buildLayerDeps() {
     canDiscardBagItemKey,
     canPlayerMoveByHealth,
     cancelTradeOnPlayerHealthDepleted,
+    cancelPlantMasterSeedShopOnPlayerHealthDepleted,
     clampButterflyPointToActiveBounds,
     clampPlayerToTreeOutline,
     clearLiveButterfliesForPlantFogLock,
@@ -7690,6 +7746,7 @@ function buildLayerDeps() {
     get isTabSessionSuperseded() { return isTabSessionSuperseded; },
     set isTabSessionSuperseded(v) { isTabSessionSuperseded = v; },
     isTradeExchangeOpen,
+    isPlantMasterSeedShopOpen,
     isTradeMasterDialogueRunning,
     isWorldBagDropExpired,
     isWorldChatBlockingGameInput,
@@ -7894,11 +7951,13 @@ function buildLayerDeps() {
     assignSproutIdentityToNewPlant,
     bagBookStorageSlot,
     bagPlayerMoney,
-    bagInventoryCountsPrev,
+    get bagInventoryCountsPrev() { return bagInventoryCountsPrev; },
+    set bagInventoryCountsPrev(v) { bagInventoryCountsPrev = v; },
     bagInventoryDragGhostEl,
     get bagInventoryDragState() { return bagInventoryDragState; },
     set bagInventoryDragState(v) { bagInventoryDragState = v; },
-    bagInventoryItemOrder,
+    get bagInventoryItemOrder() { return bagInventoryItemOrder; },
+    set bagInventoryItemOrder(v) { bagInventoryItemOrder = v; },
     bagInventoryPanel,
     get bagInventoryPanelOpen() { return bagInventoryPanelOpen; },
     set bagInventoryPanelOpen(v) { bagInventoryPanelOpen = v; },
@@ -7921,6 +7980,7 @@ function buildLayerDeps() {
     clearPlantOccluderFade,
     clearWorldNpcHoverSticky,
     closeAlchemyCraftPanel,
+    closePlantMasterSeedShop,
     closeTradeExchangePanel,
     closeWorldChatUserPicker,
     coloredMagicPowderCounts,
@@ -8040,7 +8100,8 @@ function buildLayerDeps() {
     set localChatBubbleText(v) { localChatBubbleText = v; },
     localChatBubbleTimer,
     logout,
-    magicPowderCount,
+    get magicPowderCount() { return magicPowderCount; },
+    set magicPowderCount(v) { magicPowderCount = v; },
     magicPowderCountText,
     magicPowderInventory,
     mainDrySeedHandledKey,
@@ -10167,6 +10228,12 @@ function removeOneBagItemForTrade(itemKey) {
   return false;
 }
 
+function getBagInventoryItemOrderForChecks() {
+  return bagInventoryItemOrder.filter(function (key) {
+    return key !== "book";
+  });
+}
+
 function canAddBagItemsForTrade(itemsToAdd) {
   const normalized = {};
   Object.keys(itemsToAdd || {}).forEach(function (key) {
@@ -10175,11 +10242,8 @@ function canAddBagItemsForTrade(itemsToAdd) {
       (Number(normalized[nk]) || 0) + Math.max(0, Math.floor(Number(itemsToAdd[key]) || 0));
   });
   const counts = getBagInventoryCountsByKey();
-  const orderWithoutBook = bagInventoryItemOrder.filter(function (key) {
-    return key !== "book";
-  });
   return canBagInventoryFitItems(
-    orderWithoutBook,
+    getBagInventoryItemOrderForChecks(),
     counts,
     normalized,
     BAG_INVENTORY_SLOT_COUNT
@@ -11563,10 +11627,10 @@ function isPointerBlockedForWorldInteract(event) {
   if (isTabSessionSuperseded || isCharacterSelecting || !hasSpawnedCharacter) return true;
   if (isPlayerTimedActionBusy() || isWorldChatBlockingGameInput()) return true;
   if (isPlayerGameplayBlockedByNpcDialogue()) return true;
-  if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isBagDiscardModalOpen()) return true;
+  if (isTradeExchangeOpen() || isAlchemyCraftOpen() || isPlantMasterSeedShopOpen() || isBagDiscardModalOpen()) return true;
   if (
     target.closest(
-      "#bag-inventory-panel, #settings-overlay, #controls-overlay, #admin-overlay, #guide-card, #logout-confirm-overlay, #world-chat-panel, .trade-exchange-panel, .alchemy-craft-panel, #character-select, #guide-book-button"
+      "#bag-inventory-panel, #settings-overlay, #controls-overlay, #admin-overlay, #guide-card, #logout-confirm-overlay, #world-chat-panel, .trade-exchange-panel, .alchemy-craft-panel, .plant-master-seed-shop-panel, #character-select, #guide-book-button"
     )
   ) {
     return true;
