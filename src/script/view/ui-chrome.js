@@ -706,7 +706,7 @@ export function createModule(d) {
     }
     case d.ONBOARDING_STEP_PLANT_INDEX: {
       const plantGauge = document.getElementById("plant-progress-gauge");
-      const sproutToggle = document.getElementById("plant-progress-d.sprout-toggle");
+      const sproutToggle = document.getElementById("plant-progress-sprout-toggle");
       let calloutText = "";
       if (d.getOnboarding().plantIndexIntroPhase === 0) {
         calloutText = "식물을 키우면 식물지수가 올라갑니다.";
