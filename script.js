@@ -403,7 +403,8 @@ import {
   worldRectsOverlap,
   collectPlantsUnderWorldPoint as collectPlantsUnderWorldPointCore,
   pickPlantHoverFromUnderPointer as pickPlantHoverFromUnderPointerCore,
-  getPlantsToFadeForHoverTarget as getPlantsToFadeForHoverTargetCore
+  getPlantsToFadeForHoverTarget as getPlantsToFadeForHoverTargetCore,
+  plantsVisuallyOverlap as plantsVisuallyOverlapCore
 } from "./src/game/plantHover.js";
 import {
   HELD_ITEM_SEED,
@@ -509,7 +510,7 @@ import {
   isPlantMasterSeedShopOpen,
   openPlantMasterSeedShop,
   updatePlantMasterSeedShopProximity
-} from "./src/game/plant-master-seed-shop.js?v=20260604a";
+} from "./src/game/plant-master-seed-shop.js?v=20260613a";
 import {
   playerMoneyKrwKey,
   formatPlayerMoneyKrw,
@@ -8251,6 +8252,7 @@ function buildLayerDeps() {
     updateNpcPosition,
     updateOnboardingFlowUI,
     updatePlantProgressGauge,
+    updatePlantMasterSeedShopProximity,
     updatePlantState,
     updatePlantWaterLevel,
     updatePlayerAlert,
@@ -9756,17 +9758,67 @@ function pickPlantHoverTarget(clientX, clientY) {
   return pickPlantForProximityHover();
 }
 
+function isPlantOccluderFadedForHover(plant) {
+  const els = getPlantHoverDomElements(plant);
+  if (!els.length) return false;
+  return els.some(function (el) {
+    return el && el.isConnected && el.classList.contains("is-plant-occluding-hover");
+  });
+}
+
+/** 투명 처리된 앞 식물은 호버 히트에서 빼고, 겹친 뒤 식물을 후보에 넣는다 */
+function resolvePlantsUnderPointerForHover(px, py) {
+  const all = listEligiblePlantsForHover();
+  const opts = getPlantHoverGeometryOptions();
+  const under = collectPlantsUnderWorldPointCore(
+    px,
+    py,
+    all,
+    opts,
+    isPlantEligibleForWorldHover
+  );
+  if (!under.length) return under;
+
+  const hasFadedHit = under.some(isPlantOccluderFadedForHover);
+  if (!hasFadedHit) return under;
+
+  const resolved = [];
+  const seen = new Set();
+  function addPlant(plant) {
+    if (!plant || seen.has(plant)) return;
+    seen.add(plant);
+    resolved.push(plant);
+  }
+
+  under.forEach(function (plant) {
+    if (!isPlantOccluderFadedForHover(plant)) {
+      addPlant(plant);
+      return;
+    }
+    for (let i = 0; i < all.length; i += 1) {
+      const back = all[i];
+      if (back === plant || !isPlantEligibleForWorldHover(back)) continue;
+      if (getPlantDepthSortYCore(back, opts) >= getPlantDepthSortYCore(plant, opts)) {
+        continue;
+      }
+      if (!plantsVisuallyOverlapCore(plant, back, opts)) continue;
+      addPlant(back);
+    }
+  });
+
+  if (!resolved.length) return under;
+
+  resolved.sort(function (a, b) {
+    return getPlantDepthSortYCore(a, opts) - getPlantDepthSortYCore(b, opts);
+  });
+  return resolved;
+}
+
 /** 포인터 아래 식물 — 겹침 시 뒤(가려진) 식물 우선, 완전 가림이면 앞 식물 */
 function pickPlantForHoverFromPointerClient(clientX, clientY) {
   const pxy = groundClientToWorldXY(clientX, clientY);
   if (!pxy) return null;
-  const under = collectPlantsUnderWorldPointCore(
-    pxy.x,
-    pxy.y,
-    listEligiblePlantsForHover(),
-    getPlantHoverGeometryOptions(),
-    isPlantEligibleForWorldHover
-  );
+  const under = resolvePlantsUnderPointerForHover(pxy.x, pxy.y);
   return pickPlantHoverFromUnderPointerCore(under, getPlantHoverGeometryOptions());
 }
 
