@@ -100,10 +100,6 @@ import {
   SPAWN_PORTAL_HEIGHT,
   SPAWN_PORTAL_X,
   SPAWN_PORTAL_Y,
-  ALIEN_PUZZLE_SHRINE_WIDTH,
-  ALIEN_PUZZLE_SHRINE_HEIGHT,
-  ALIEN_PUZZLE_SHRINE_X,
-  ALIEN_PUZZLE_SHRINE_Y,
   SEED_START_X,
   SEED_START_Y,
   GUIDE_BOOK_START_X,
@@ -239,12 +235,9 @@ import {
   tradeBuyConfirm,
   tradeSellTotal,
   tradeSellConfirm,
-  tradeShopMoney,
   tradeExchangeClose,
   plantMasterSeedShopOverlay,
   plantMasterSeedShopClose,
-  plantMasterSeedShopPrice,
-  plantMasterSeedShopBuy,
   alchemyCraftOverlay,
   alchemyCraftProductList,
   alchemyCraftRequirementsBlock,
@@ -1682,10 +1675,6 @@ const spawnPortalWidth = SPAWN_PORTAL_WIDTH;
 const spawnPortalHeight = SPAWN_PORTAL_HEIGHT;
 const spawnPortalX = SPAWN_PORTAL_X;
 const spawnPortalY = SPAWN_PORTAL_Y;
-const alienPuzzleShrineWidth = ALIEN_PUZZLE_SHRINE_WIDTH;
-const alienPuzzleShrineHeight = ALIEN_PUZZLE_SHRINE_HEIGHT;
-const alienPuzzleShrineX = ALIEN_PUZZLE_SHRINE_X;
-const alienPuzzleShrineY = ALIEN_PUZZLE_SHRINE_Y;
 const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
 const spawnPlayerDepth = 0;
 /** ??? ???? ???? ???????????? ??????????? ???? ???????????? ????? ?????) */
@@ -2623,7 +2612,6 @@ bindTradeMaster({
   tradeBuyConfirm: tradeBuyConfirm,
   tradeSellTotal: tradeSellTotal,
   tradeSellConfirm: tradeSellConfirm,
-  tradeShopMoney: tradeShopMoney,
   tradeExchangeClose: tradeExchangeClose,
   bagInventoryPanel: bagInventoryPanel,
   worldBagInventory: worldBagInventory,
@@ -2674,8 +2662,6 @@ bindTradeMaster({
 bindPlantMasterSeedShop({
   seedShopOverlay: plantMasterSeedShopOverlay,
   seedShopCloseBtn: plantMasterSeedShopClose,
-  seedShopPriceEl: plantMasterSeedShopPrice,
-  seedShopBuyBtn: plantMasterSeedShopBuy,
   setBagInventoryPanelOpen: setBagInventoryPanelOpen,
   updateBagInventorySlots: updateBagInventorySlots,
   updateBagPlayerMoneyDisplay: updateBagPlayerMoneyDisplay,
@@ -2878,7 +2864,6 @@ const adminRefreshButton = document.getElementById("admin-refresh-button");
 const adminMessage = document.getElementById("admin-message");
 const adminAccountList = document.getElementById("admin-account-list");
 const spawnPortal = document.getElementById("spawn-portal");
-const alienPuzzleShrine = document.getElementById("alien-puzzle-shrine");
 const playerColorBody = document.createElement("div");
 playerColorBody.id = "player-color-body";
 const localPlayerRoot = document.createElement("div");
@@ -7823,10 +7808,6 @@ function buildLayerDeps() {
     simulateButterflyAuthorityStep,
     snapPlayerToCraftChair,
     sortWorldBagDropsForRender,
-    alienPuzzleShrineHeight,
-    alienPuzzleShrineWidth,
-    alienPuzzleShrineX,
-    alienPuzzleShrineY,
     spawnPortalHeight,
     spawnPortalWidth,
     spawnPortalX,
@@ -7836,7 +7817,8 @@ function buildLayerDeps() {
     sproutStage2GrowMs,
     standUpFromChair,
     sumPlantIndexScoreForPlants,
-    suppressPlantWaterDecayUntilSim,
+    get suppressPlantWaterDecayUntilSim() { return suppressPlantWaterDecayUntilSim; },
+    set suppressPlantWaterDecayUntilSim(v) { suppressPlantWaterDecayUntilSim = v; },
     syncWorldState,
     teardownWorldBagDropDom,
     treeClimbSpeed,
@@ -7916,6 +7898,7 @@ function buildLayerDeps() {
     ONBOARDING_STEP_ZOOM_INTRO,
     ONBOARDING_STEP_ZOOM_MIN,
     PLANT_INDEX_SCORE_CAP,
+    PLANT_FOG_BUTTERFLY_MIN_SCORE,
     PLANT_SPOT_HEIGHT,
     PLANT_SPOT_WIDTH,
     PLAYER_BASE_IMAGE_SRC,
@@ -8025,6 +8008,7 @@ function buildLayerDeps() {
     getLocalExtraSeedOwnerSessionId,
     getLocalExtraSeedOwnerUserId,
     getMagicPowderBagCount,
+    getMagicPowderInventoryHoverTip,
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
     getNpcHeadTopWorldY,
@@ -8348,7 +8332,10 @@ function getSproutImageForPlant(plant, stage) { return _viewApi ? _viewApi.getSp
 function getWorldNpcPromptBubbleEl(npcEl) { return _viewApi ? _viewApi.getWorldNpcPromptBubbleEl(npcEl) : undefined; }
 function groundScreenPxToWorldX(px) { return _viewApi ? _viewApi.groundScreenPxToWorldX(px) : undefined; }
 function groundScreenPxToWorldY(px) { return _viewApi ? _viewApi.groundScreenPxToWorldY(px) : undefined; }
-function hidePlantHoverLabel() { return _viewApi ? _viewApi.hidePlantHoverLabel() : undefined; }
+function hidePlantHoverLabel() {
+  currentPlantHoverTarget = null;
+  return _viewApi ? _viewApi.hidePlantHoverLabel() : undefined;
+}
 function isOnboardingInventoryTutorialActive() { return _viewApi ? _viewApi.isOnboardingInventoryTutorialActive() : undefined; }
 function isPointerInsideBagInventoryPanel(clientX, clientY) { return _viewApi ? _viewApi.isPointerInsideBagInventoryPanel(clientX, clientY) : undefined; }
 function isPointerOutsideBagInventoryPanel(clientX, clientY) { return _viewApi ? _viewApi.isPointerOutsideBagInventoryPanel(clientX, clientY) : undefined; }
@@ -9275,11 +9262,11 @@ function normalizeExtraPlantState(plant) {
 
 function updateExtraPlantState(plant, now) {
   updateExtraPlantWaterLevel(plant, now);
-  ensureGrassAuto5EligibleForTier4Plant(plant, now);
   if (tickPowderUpgrade(plant, now)) {
     saveAppleState();
     syncWorldState(true);
   }
+  ensureGrassAuto5EligibleForTier4Plant(plant, now);
   if (tickGrassAutoAdvanceToTier5(plant, now)) {
     saveAppleState();
     syncWorldState(true);
@@ -9460,6 +9447,8 @@ function tickPowderUpgrade(plant, now) {
     syncPlantWaterCapacityField(plant);
     const cap = getPlantWaterCapacity(plant);
     plant.waterLevel = Math.min(cap, Math.max(1, Number(plant.waterLevel) || 1));
+    plant.needsFirstWater = false;
+    plant.becameEmptyAt = null;
   }
   if (Math.max(0, Number(plant.growthTier) || 0) === 4) {
     plant.grassAuto5EligibleAt = now;
@@ -9876,7 +9865,11 @@ function refreshPlantHoverAfterPlayerMove() {
   }
   const plant = pickPlantForProximityHover();
   if (plant) {
-    if (plant !== currentPlantHoverTarget) showPlantHoverSignForPlant(plant);
+    if (plant !== currentPlantHoverTarget) {
+      currentPlantHoverTarget = plant;
+      showPlantHoverSignForPlant(plant);
+    }
+    refreshPlantOccluderFade();
   } else if (currentPlantHoverTarget) {
     hidePlantHoverLabel();
   }
@@ -9947,10 +9940,10 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   const plant = pickPlantHoverTarget(clientX, clientY);
   if (plant) {
     if (plant !== currentPlantHoverTarget) {
+      currentPlantHoverTarget = plant;
       showPlantHoverSignForPlant(plant);
-    } else {
-      refreshPlantOccluderFade();
     }
+    refreshPlantOccluderFade();
   } else hidePlantHoverLabel();
 }
 
@@ -10060,9 +10053,6 @@ function isFinalMaturePlantNoWaterCare(plant, now) {
     return false;
   }
   if (getSproutStageFromPlant(plant) !== 5) return false;
-  if (!isFlowerMaturePlant(plant) && !isTreeMaturePlant(plant) && !isCactusMaturePlant(plant)) {
-    return false;
-  }
   const tNow = now != null ? now : getSharedPlantSimulationNow();
   if (hasActiveGreenGrowthProgress(plant, tNow)) return false;
   if (isPowderUpgradeInProgress(plant)) return false;
@@ -11544,7 +11534,7 @@ function tryConsumePlantWaterPourCooldown() {
 function markSuppressPlantWaterDecayBriefly(simNow) {
   const t = Number(simNow);
   if (!Number.isFinite(t) || t <= 0) return;
-  suppressPlantWaterDecayUntilSim = Math.max(suppressPlantWaterDecayUntilSim, t + 120);
+  suppressPlantWaterDecayUntilSim = Math.max(suppressPlantWaterDecayUntilSim, t + 450);
 }
 
 
@@ -12337,22 +12327,6 @@ function getPlantProximityBlockMessage(plantX, plantY) {
     return plantProximityPhraseForNoun("\uD3EC\uD0C8");
   }
 
-  const shrinePad = 2;
-  if (
-    alienPuzzleShrine &&
-    plantSpotOverlapsExpandedRect(
-      plantX,
-      plantY,
-      alienPuzzleShrineX,
-      alienPuzzleShrineY,
-      alienPuzzleShrineWidth,
-      alienPuzzleShrineHeight,
-      shrinePad
-    )
-  ) {
-    return plantProximityPhraseForNoun("\uC7AC\uB2E8");
-  }
-
   const bagPad = 0;
   if (
     worldBag &&
@@ -13084,6 +13058,21 @@ function isMagicPowderBagTypeUsableNow(bagType) {
   return true;
 }
 
+function getMagicPowderInventoryHoverTip(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
+  const baseTip = getBagItemDescriptorCore(bagType).label || "";
+  if (!isMagicPowderBagTypeUsableNow(bagType)) {
+    return baseTip;
+  }
+  const target = getNearestPlantForMagicPowder();
+  const plantLabel =
+    target && target.plant ? String(getPlantWorldLabel(target.plant) || "").trim() : "";
+  if (!plantLabel) {
+    return baseTip ? baseTip + " \u00B7 \uC0AC\uC6A9 click" : "\uC0AC\uC6A9 click";
+  }
+  return baseTip + " \u00B7 " + plantLabel + "\uC5D0 \uC0AC\uC6A9 (click)";
+}
+
 /** ????? ???? ????????? ?????????????????? ??????) */
 function isMagicPowderUsableNow() {
   return isMagicPowderBagTypeUsableNow("magicPowder");
@@ -13229,8 +13218,6 @@ function waterPlant(target) {
   const now = getSharedPlantSimulationNow();
   markSuppressPlantWaterDecayBriefly(now);
 
-  updatePlantWaterLevel();
-
   const waterCapacity = getPlantWaterCapacity(getPlant());
 
   const isFirstWater = getPlant().needsFirstWater || getPlant().growthStartedAt === null;
@@ -13305,7 +13292,6 @@ function waterExtraPlant(plant) {
   const now = getSharedPlantSimulationNow();
   markSuppressPlantWaterDecayBriefly(now);
   normalizeExtraPlantState(plant);
-  updateExtraPlantWaterLevel(plant, now);
   const waterCapacity = getPlantWaterCapacity(plant);
 
   const isFirstWater = plant.needsFirstWater || plant.growthStartedAt === null;
@@ -16056,9 +16042,6 @@ function setup() {
     setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
   });
   setWorldSize(spawnPortal, spawnPortalWidth, spawnPortalHeight);
-  if (alienPuzzleShrine) {
-    setWorldSize(alienPuzzleShrine, alienPuzzleShrineWidth, alienPuzzleShrineHeight);
-  }
   setWorldSize(seed, SEED_SIZE);
   getApple().extraSeeds.forEach(function (extraSeed) {
     if (extraSeed.element) setWorldSize(extraSeed.element, SEED_SIZE);
@@ -16096,9 +16079,6 @@ function setup() {
   initializeZoom();
   setWorldPosition(bigTree, BIG_TREE_X, BIG_TREE_Y);
   setWorldPosition(spawnPortal, spawnPortalX, spawnPortalY);
-  if (alienPuzzleShrine) {
-    setWorldPosition(alienPuzzleShrine, alienPuzzleShrineX, alienPuzzleShrineY);
-  }
   setWorldPosition(well, getWorldItems().wellX, getWorldItems().wellY);
   setWorldPosition(signBoard, getWorldItems().signX, getWorldItems().signY);
   setWorldPosition(guideBook, getWorldItems().guideBookX, getWorldItems().guideBookY);

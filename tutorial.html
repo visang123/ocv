@@ -63,19 +63,6 @@
           <div id="growth-fill"></div>
         </div>
         <div id="spawn-portal" aria-hidden="true"></div>
-        <div
-          id="alien-puzzle-shrine"
-          class="alien-puzzle-shrine"
-          aria-hidden="true"
-          title="부서진 외계인 퍼즐 재단"
-        >
-          <img
-            class="alien-puzzle-shrine__img"
-            src="이미지/alien-puzzle-shrine-broken-world.png?v=20260531d"
-            alt=""
-            draggable="false"
-          >
-        </div>
         <div id="big-tree" aria-hidden="true">
           <div class="big-tree-leaves">
             <div class="big-tree-branch branch-left"></div>
@@ -455,7 +442,6 @@
           &#215;
         </button>
       </div>
-      <p id="trade-shop-money" class="trade-shop-money" aria-live="polite">보유 돈: 100원</p>
       <section class="trade-shop-section trade-shop-section--buy" aria-label="구매">
         <h3 class="trade-shop-section-title">구매</h3>
         <p class="trade-shop-hint">품목을 클릭해 담고, 장바구니에서 다시 뺄 수 있습니다.</p>
@@ -485,11 +471,24 @@
           &#215;
         </button>
       </div>
-      <div class="plant-master-seed-shop-item">
-        <img src="이미지/seed.png" alt="" width="64" height="64" draggable="false">
-        <p id="plant-master-seed-shop-price" class="plant-master-seed-shop-price">10원</p>
+      <div class="plant-master-seed-shop-items">
+        <div class="plant-master-seed-shop-item">
+          <img src="이미지/seed.png" alt="" width="64" height="64" draggable="false">
+          <p class="plant-master-seed-shop-price" data-price-for="seed">10원</p>
+          <button type="button" class="plant-master-seed-shop-buy" data-item-key="seed">구매</button>
+        </div>
+        <div class="plant-master-seed-shop-item">
+          <img
+            src="이미지/overgrowth-seed-inventory.png?v=20260517a"
+            alt=""
+            width="64"
+            height="64"
+            draggable="false"
+          >
+          <p class="plant-master-seed-shop-price" data-price-for="overgrowthSeed">100원</p>
+          <button type="button" class="plant-master-seed-shop-buy" data-item-key="overgrowthSeed">구매</button>
+        </div>
       </div>
-      <button type="button" id="plant-master-seed-shop-buy" class="plant-master-seed-shop-buy">구매</button>
     </div>
   </div>
   <div id="alchemy-craft-overlay" class="alchemy-craft-overlay" style="display: none" aria-hidden="true">
