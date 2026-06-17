@@ -1773,6 +1773,34 @@ body::-webkit-scrollbar {
   background: url("이미지/rock-ground.svg?v=20260512a") center bottom / contain no-repeat;
 }
 
+.world-rock-mine-gauge {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 3px;
+  width: 72%;
+  max-width: 44px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.world-rock-mine-gauge__track {
+  height: 5px;
+  background: rgba(0, 0, 0, 0.38);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.world-rock-mine-gauge__fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #8a8a8a, #e2e2e2);
+  border-radius: 2px;
+}
+
 .world-craft-furniture {
   position: absolute;
   left: 0;

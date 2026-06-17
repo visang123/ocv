@@ -774,6 +774,85 @@ export function createModule(d) {
   });
   }
 
+  function ensureRockMineGaugeEl(rock) {
+    if (!rock || !rock._el) return null;
+    if (rock._mineGaugeEl && rock._mineGaugeEl.isConnected) return rock._mineGaugeEl;
+    const gauge = document.createElement("div");
+    gauge.className = "world-rock-mine-gauge";
+    gauge.setAttribute("aria-hidden", "true");
+    const track = document.createElement("div");
+    track.className = "world-rock-mine-gauge__track";
+    const fill = document.createElement("div");
+    fill.className = "world-rock-mine-gauge__fill";
+    track.appendChild(fill);
+    gauge.appendChild(track);
+    rock._el.appendChild(gauge);
+    rock._mineGaugeEl = gauge;
+    rock._mineGaugeFillEl = fill;
+    return gauge;
+  }
+
+  function collectRockMiningSessionsByRock(now) {
+    const byRock = Object.create(null);
+    const durationMs = d.WORLD_ROCK_MINE_MS;
+    const local = d.getLocalRockMining && d.getLocalRockMining();
+    if (local && local.rockId && local.startedAt) {
+      const elapsed = now - local.startedAt;
+      if (elapsed < durationMs) {
+        byRock[String(local.rockId)] = { startedAt: local.startedAt, durationMs: durationMs };
+      }
+    }
+    const remotePlayers = d.remotePlayers || {};
+    Object.keys(remotePlayers).forEach(function (remoteId) {
+      const rp = remotePlayers[remoteId];
+      if (!rp) return;
+      const rockId = String(rp.rockMiningRockId || "");
+      const startedAt = Number(rp.rockMiningStartedAt) || 0;
+      if (!rockId || !startedAt) return;
+      if (now - startedAt >= durationMs) return;
+      const prev = byRock[rockId];
+      if (!prev || startedAt < prev.startedAt) {
+        byRock[rockId] = { startedAt: startedAt, durationMs: durationMs };
+      }
+    });
+    return byRock;
+  }
+
+  function updateWorldRockMineGauges() {
+    const tutorialRockDom =
+      d.isMainGameTutorialInProgress() &&
+      Array.isArray(d.getApple().worldRocks) &&
+      d.getApple().worldRocks.some(function (rock) {
+        return rock && String(rock.id) === d.TUTORIAL_ONBOARDING_ROCK_ID && rock._el;
+      });
+    if ((!d.isWorldDocumentEntry() && !tutorialRockDom) || !Array.isArray(d.getApple().worldRocks)) return;
+    const now = Date.now();
+    const sessionsByRock = collectRockMiningSessionsByRock(now);
+    d.getApple().worldRocks.forEach(function (rock) {
+      if (!rock || !rock._el) return;
+      const rockId = String(rock.id);
+      const picked = d.getApple().worldRockPickedIds.includes(rock.id);
+      if (picked) {
+        if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+        return;
+      }
+      const session = sessionsByRock[rockId];
+      if (!session) {
+        if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+        return;
+      }
+      const gauge = ensureRockMineGaugeEl(rock);
+      const fill = rock._mineGaugeFillEl;
+      if (!gauge || !fill) return;
+      gauge.style.display = "block";
+      const progress = Math.max(
+        0,
+        Math.min(1, (now - session.startedAt) / session.durationMs)
+      );
+      fill.style.width = Math.round(progress * 100) + "%";
+    });
+  }
+
   function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
   for (let i = 0; i < zones.length; i += 1) {
     if (d.isOverlappingRect(rockRect, zones[i])) {
@@ -831,6 +910,7 @@ export function createModule(d) {
     updateWellCard,
     updateWellImage,
     updateWorldBagDropDom,
+    updateWorldRockMineGauges,
     updateWorldRocks,
     worldRockOverlapsAnyAvoidRect,
     worldRockRect,

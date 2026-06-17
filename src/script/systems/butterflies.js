@@ -43,7 +43,10 @@ export function createModule(d) {
     d.butterflyState.list.push(d.createButterfly(now));
     added = true;
   }
-  if (added) d.butterflyState.lastSpawnAt = now;
+  if (added) {
+    d.butterflyState.lastSpawnAt = now;
+    d.spreadButterfliesWithinActiveBounds();
+  }
   return added;
   }
 
@@ -123,7 +126,9 @@ export function createModule(d) {
   }
 
   function createButterfly(now, options) {
-  return d.butterflyMotion.create(now, options);
+  const butterfly = d.butterflyMotion.create(now, options);
+  resetButterflyPathFields(butterfly, butterfly.x, butterfly.y);
+  return butterfly;
   }
 
   function ensureButterflyRenderEntry(butterfly) {
@@ -161,14 +166,57 @@ export function createModule(d) {
   const stage = d.getPlantFogWorldStageFromScore(d.getTotalPlantIndexScore());
   if (stage < 3 || stage >= 5) return base;
   const clearRect = d.getPlantFogClearRectWorldPx(stage);
+  const pad = Math.max(8, Math.ceil(d.BUTTERFLY_SIZE * 0.75));
   const bounds = {
-    left: Math.max(base.left, clearRect.left),
-    right: Math.min(base.right, clearRect.right),
-    top: Math.max(base.top, clearRect.top),
-    bottom: Math.min(base.bottom, clearRect.bottom)
+    left: clearRect.left + pad,
+    right: clearRect.right - pad,
+    top: clearRect.top + pad,
+    bottom: clearRect.bottom - pad
   };
-  if (bounds.right < bounds.left || bounds.bottom < bounds.top) return base;
+  if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return base;
   return bounds;
+  }
+
+  function resetButterflyPathFields(butterfly, x, y) {
+  if (!butterfly) return;
+  butterfly.x = x;
+  butterfly.y = y;
+  butterfly.lastPathX = x;
+  butterfly.lastPathY = y;
+  butterfly._renderX = x;
+  butterfly._renderY = y;
+  }
+
+  function spreadButterfliesWithinActiveBounds() {
+  const list = d.butterflyState.list;
+  if (!list.length) return false;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let validCount = 0;
+  list.forEach(function (butterfly) {
+    if (!butterfly) return;
+    const x = Number(butterfly.x);
+    const y = Number(butterfly.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    validCount += 1;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  });
+  if (validCount < 2) return false;
+  if (maxX - minX > 56 && maxY - minY > 56) return false;
+  let changed = false;
+  list.forEach(function (butterfly) {
+    if (!butterfly) return;
+    const spawn = d.butterflyMotion.pickSpawnPoint();
+    resetButterflyPathFields(butterfly, spawn.x, spawn.y);
+    delete d.butterflyAuthorityWaypointById[String(butterfly.id || "")];
+    changed = true;
+  });
+  return changed;
   }
 
   function getButterflyAnimationFrame(now, butterfly) {
@@ -338,6 +386,8 @@ export function createModule(d) {
       delete d.butterflyAuthorityWaypointById[String(butterfly.id || "")];
       butterfly._renderX = next.x;
       butterfly._renderY = next.y;
+      butterfly.lastPathX = next.x;
+      butterfly.lastPathY = next.y;
       changed = true;
     }
   });
@@ -459,9 +509,17 @@ export function createModule(d) {
   }
   // ???? ???? ?????? ????? ????????????????? sessionId)???????. ??????????
   // ??? ????????????? ????2?????????????????
-  if (sharedHydrated && d.butterflyState.list.length > 0) {
+  // Motion: run for authority/offline always; non-authority only interpolates network samples.
+  const canRunButterflyMotion =
+    d.butterflyState.list.length > 0 &&
+    (sharedHydrated || !onlineAvailable);
+  if (canRunButterflyMotion) {
     const runAuthorityButterflyMotion = d.shouldRunButterflyMotionSimulation(now, onlineAvailable);
     if (runAuthorityButterflyMotion) {
+      if (d.isButterflyAuthority() && d.spreadButterfliesWithinActiveBounds()) {
+        d.lastButterflyStateChangeAt = now;
+        d.markWorldDirty();
+      }
       const motionStepCount =
         wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
       const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
@@ -645,11 +703,13 @@ export function createModule(d) {
     pruneButterflyAuthorityWaypointsToList,
     pruneStaleMultiplayerRoomSessions,
     removeButterflyRenderEntry,
+    resetButterflyPathFields,
     setInstantHoverTip,
     setWorldPosition,
     setWorldSize,
     shouldRunButterflyMotionSimulation,
     simulateButterflyAuthorityStep,
+    spreadButterfliesWithinActiveBounds,
     updateButterflies,
   };
 }
