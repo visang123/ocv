@@ -8497,7 +8497,27 @@ function getPlantHoverDomElements(plant) { return _viewApi ? _viewApi.getPlantHo
 function getPlantPrimaryVisualRectWorld(plant) { return _viewApi ? _viewApi.getPlantPrimaryVisualRectWorld(plant) : undefined; }
 function getPlayerRenderedHeight() { return _viewApi ? _viewApi.getPlayerRenderedHeight() : undefined; }
 function getRenderedAdminAccounts() { return _viewApi ? _viewApi.getRenderedAdminAccounts() : undefined; }
-function getSproutImageForPlant(plant, stage) { return _viewApi ? _viewApi.getSproutImageForPlant(plant, stage) : undefined; }
+function getSproutImageForPlant(plant, stage) {
+  if (_viewApi) {
+    const fromView = _viewApi.getSproutImageForPlant(plant, stage);
+    if (fromView) return fromView;
+  }
+  if (stage >= 5) {
+    if (isFlowerMaturePlant(plant)) return flowerStage5Image;
+    if (isTreeMaturePlant(plant)) return treeStage5Image;
+    if (isCactusMaturePlant(plant)) return cactusStage5Image;
+    return sproutStage5Image;
+  }
+  if (stage >= 4) {
+    if (isFlowerMaturePlant(plant)) return flowerStage4Image;
+    if (isTreeMaturePlant(plant)) return treeStage4Image;
+    if (isCactusMaturePlant(plant)) return cactusStage4Image;
+    return sproutStage4Image;
+  }
+  if (stage >= 3) return sproutStage3Image;
+  if (stage === 2) return sproutStage2Image;
+  return sproutStage1Image;
+}
 function getWorldNpcPromptBubbleEl(npcEl) { return _viewApi ? _viewApi.getWorldNpcPromptBubbleEl(npcEl) : undefined; }
 function groundScreenPxToWorldX(px) { return _viewApi ? _viewApi.groundScreenPxToWorldX(px) : undefined; }
 function groundScreenPxToWorldY(px) { return _viewApi ? _viewApi.groundScreenPxToWorldY(px) : undefined; }
@@ -8732,6 +8752,7 @@ function markWorldDirty() { return _systemsApi ? _systemsApi.markWorldDirty() : 
 function movePlayerVerticallyInTree(deltaDepth) { return _systemsApi ? _systemsApi.movePlayerVerticallyInTree(deltaDepth) : undefined; }
 function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) { return _systemsApi ? _systemsApi.pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) : undefined; }
 function spreadButterfliesWithinActiveBounds() { return _systemsApi ? _systemsApi.spreadButterfliesWithinActiveBounds() : false; }
+function pruneButterflyAuthorityWaypointsToList() { return _systemsApi ? _systemsApi.pruneButterflyAuthorityWaypointsToList() : undefined; }
 function pruneStaleMultiplayerRoomSessions(now) { return _systemsApi ? _systemsApi.pruneStaleMultiplayerRoomSessions(now) : undefined; }
 function pruneStaleRemotePlayers() { return _systemsApi ? _systemsApi.pruneStaleRemotePlayers() : undefined; }
 function refillWellIfNeeded() { return _systemsApi ? _systemsApi.refillWellIfNeeded() : undefined; }
@@ -9322,7 +9343,8 @@ function updateExtraSeedsAndPlants() {
       );
     }
     if (!isSproutGrown) return;
-    plant.sproutElement.src = getSproutImageForPlant(plant, stage);
+    const sproutSrc = getSproutImageForPlant(plant, stage);
+    if (sproutSrc) plant.sproutElement.src = sproutSrc;
     setWorldSize(plant.sproutElement, sproutSize.width, sproutSize.height);
     const sproutPos = getSproutWorldPositionForPlant(plant.x, plant.y, sproutSize, stage, plant);
     setWorldPosition(plant.sproutElement, sproutPos.x, sproutPos.y);
@@ -13712,7 +13734,8 @@ function updateSproutPosition() {
   const sproutSize = getSproutSizeForStage(stage, getPlant());
   sprout.style.display = "block";
   sprout.classList.toggle("is-big", stage >= 2);
-  sprout.src = getSproutImageForPlant(getPlant(), stage);
+  const sproutSrc = getSproutImageForPlant(getPlant(), stage);
+  if (sproutSrc) sprout.src = sproutSrc;
   setWorldSize(sprout, sproutSize.width, sproutSize.height);
   const sproutPos = getSproutWorldPositionForPlant(
     getPlant().spotX,
