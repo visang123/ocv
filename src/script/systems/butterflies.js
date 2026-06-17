@@ -49,9 +49,10 @@ export function createModule(d) {
 
   function authoritySpawnButterfliesIfNeeded(now) {
   if (d.butterflyState.list.length >= d.butterflyMaxAlive) return false;
+  if (d.butterflyState.list.length === 0) {
+    return d.authorityFillToCapInstantly(now);
+  }
   if (!d.butterflyState.lastSpawnAt) {
-    // ???? ?????????????? ??????????? cap?? ??. ?? ????? ?????
-    // lastSpawnAt??0???(????????????????) ?????5????????????? ????? ?????????? ??????
     if (d.hasSeededInitialButterflies) {
       d.butterflyState.lastSpawnAt = now;
       return false;
@@ -442,18 +443,15 @@ export function createModule(d) {
         d.markWorldDirty();
       }
       if (
-        !d.hasSeededInitialButterflies &&
         d.butterflyState.list.length === 0 &&
-        !d.butterflyState.lastSpawnAt
+        (!d.hasSeededInitialButterflies || !d.butterflyState.lastSpawnAt)
       ) {
-        // First time this world has had a butterfly authority - fill the cap so
-        // the player always sees the requested 5 butterflies on arrival.
+        // First unlock or repopulate after the population was cleared while locked.
         d.authorityFillToCapInstantly(now);
         d.hasSeededInitialButterflies = true;
         d.lastButterflyStateChangeAt = now;
         d.markWorldDirty();
-      }
-      if (d.authoritySpawnButterfliesIfNeeded(now)) {
+      } else if (d.authoritySpawnButterfliesIfNeeded(now)) {
         d.lastButterflyStateChangeAt = now;
         d.markWorldDirty();
       }

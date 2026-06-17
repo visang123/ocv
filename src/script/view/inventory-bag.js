@@ -40,7 +40,7 @@ export function createModule(d) {
 
   function canDiscardBagItemNow(itemKey) {
   if (!d.canDiscardBagItemKey(itemKey)) return false;
-  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen() || (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) || d.isBagDiscardModalOpen()) return false;
+  if (d.isTradeExchangeOpen() || d.isAlchemyCraftOpen() || d.isBagDiscardModalOpen()) return false;
   if (!d.bagInventoryPanelOpen) return false;
   return bagDiscardInventoryEligible(itemKey);
   }
@@ -288,10 +288,7 @@ export function createModule(d) {
   if (!slot || !d.bagInventoryPanel.contains(slot)) return;
   if (slot === d.bagBookStorageSlot) return;
   const itemKey = getBagItemKeyFromInventorySlot(slot);
-  const craftTradeOpen =
-    d.isTradeExchangeOpen() ||
-    d.isAlchemyCraftOpen() ||
-    (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen());
+  const craftTradeOpen = d.isTradeExchangeOpen() || d.isAlchemyCraftOpen();
   if (craftTradeOpen) {
     if (!itemKey || slot.classList.contains("is-empty")) return;
     const canPlaceOnTarget = d.canStartBagPanelCraftTradeDrag(itemKey);
@@ -648,13 +645,16 @@ export function createModule(d) {
       const count = d.getMagicPowderBagCount(bagType);
       const powderUsable = count > 0 && d.isMagicPowderBagTypeUsableNow(bagType);
       slot.classList.toggle("is-magic-powder-usable", powderUsable);
-      const baseTip = d.getBagItemDescriptorCore(bagType).label || "";
-      if (powderUsable) {
-        slot.setAttribute("data-ovc-tip", baseTip + " \u00B7 \uC0AC\uC6A9 click");
-        slot.setAttribute("aria-label", baseTip + " \u00B7 \uC0AC\uC6A9 click");
-      } else if (baseTip) {
-        slot.setAttribute("data-ovc-tip", baseTip);
-        slot.setAttribute("aria-label", baseTip);
+      const tip =
+        typeof d.getMagicPowderInventoryHoverTip === "function"
+          ? d.getMagicPowderInventoryHoverTip(bagType)
+          : d.getBagItemDescriptorCore(bagType).label || "";
+      if (tip) {
+        slot.setAttribute("data-ovc-tip", tip);
+        slot.setAttribute("aria-label", tip);
+      } else {
+        slot.removeAttribute("data-ovc-tip");
+        slot.removeAttribute("aria-label");
       }
     });
   }

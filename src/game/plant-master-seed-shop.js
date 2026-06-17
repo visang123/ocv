@@ -1,11 +1,59 @@
 import {
   PLANT_MASTER_SEED_BUY_PRICE_KRW,
+  PLANT_MASTER_OVERGROWTH_SEED_BUY_PRICE_KRW,
   formatPlayerMoneyKrw
 } from "./player-money.js";
+import { isBagDiscardOverlayInteractionTarget } from "./bag-discard-ui.js";
 
 /** @type {Record<string, unknown> | null} */
 let host = null;
 let shopOpen = false;
+let outsideDismissBound = false;
+
+/** @type {Record<string, number>} */
+const SHOP_ITEM_PRICES_KRW = {
+  seed: PLANT_MASTER_SEED_BUY_PRICE_KRW,
+  overgrowthSeed: PLANT_MASTER_OVERGROWTH_SEED_BUY_PRICE_KRW
+};
+
+function isPlantMasterSeedShopKeepOpenTarget(target) {
+  if (!(target instanceof Element) || !host) return false;
+  if (isBagDiscardOverlayInteractionTarget(target)) return true;
+  const panel = host.seedShopOverlay
+    ? host.seedShopOverlay.querySelector(".plant-master-seed-shop-panel")
+    : null;
+  if (panel && panel.contains(target)) return true;
+  if (host.bagInventoryPanel && host.bagInventoryPanel.contains(target)) return true;
+  if (host.worldBagInventory && host.worldBagInventory.contains(target)) return true;
+  return false;
+}
+
+function onPlantMasterSeedShopOutsidePointer(event) {
+  if (!shopOpen) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (isPlantMasterSeedShopKeepOpenTarget(target)) return;
+  closePlantMasterSeedShop();
+}
+
+function bindPlantMasterSeedShopOutsideDismiss() {
+  if (outsideDismissBound) return;
+  outsideDismissBound = true;
+  document.addEventListener("pointerdown", onPlantMasterSeedShopOutsidePointer, true);
+}
+
+function isPlantMasterSeedShopOverlayVisible() {
+  return Boolean(
+    host && host.seedShopOverlay && host.seedShopOverlay.style.display === "block"
+  );
+}
+
+function reconcilePlantMasterSeedShopOpenState() {
+  if (!shopOpen) return;
+  if (!isPlantMasterSeedShopOverlayVisible()) {
+    shopOpen = false;
+  }
+}
 
 function isBagInventoryGameplayBlocked() {
   if (!host || typeof host.canUseBagInventoryGameplay !== "function") return false;
@@ -19,32 +67,43 @@ function showBagInventoryGameplayRequiredAlert() {
   });
 }
 
-function refreshSeedShopUi() {
-  if (!host) return;
-  const price = PLANT_MASTER_SEED_BUY_PRICE_KRW;
-  if (host.seedShopPriceEl) {
-    host.seedShopPriceEl.textContent = formatPlayerMoneyKrw(price);
-  }
-  if (host.seedShopBuyBtn) {
-    const money =
-      typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
-    host.seedShopBuyBtn.disabled = money < price;
-  }
+function getPlayerMoneyKrw() {
+  return typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
 }
 
-function onSeedShopBuyClick() {
+function refreshSeedShopUi() {
+  if (!host || !host.seedShopOverlay) return;
+  const money = getPlayerMoneyKrw();
+  host.seedShopOverlay.querySelectorAll(".plant-master-seed-shop-price").forEach(function (el) {
+    const itemKey = el.dataset.priceFor;
+    const price = SHOP_ITEM_PRICES_KRW[itemKey];
+    if (price != null) {
+      el.textContent = formatPlayerMoneyKrw(price);
+    }
+  });
+  host.seedShopOverlay.querySelectorAll(".plant-master-seed-shop-buy").forEach(function (btn) {
+    const itemKey = btn.dataset.itemKey;
+    const price = SHOP_ITEM_PRICES_KRW[itemKey];
+    btn.disabled = price == null || money < price;
+  });
+}
+
+function onSeedShopBuyClick(event) {
   if (!host || !shopOpen) return;
-  const price = PLANT_MASTER_SEED_BUY_PRICE_KRW;
-  const money =
-    typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
-  if (money < price) {
+  const btn =
+    event.target instanceof Element ? event.target.closest(".plant-master-seed-shop-buy") : null;
+  if (!btn || btn.disabled) return;
+  const itemKey = btn.dataset.itemKey;
+  const price = SHOP_ITEM_PRICES_KRW[itemKey];
+  if (!itemKey || price == null) return;
+  if (getPlayerMoneyKrw() < price) {
     if (typeof host.showPlayerAlert === "function") {
       host.showPlayerAlert({ message: "\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4." });
     }
     refreshSeedShopUi();
     return;
   }
-  if (typeof host.canAddBagItems === "function" && !host.canAddBagItems({ seed: 1 })) {
+  if (typeof host.canAddBagItems === "function" && !host.canAddBagItems({ [itemKey]: 1 })) {
     if (typeof host.showInventoryFullFail === "function") {
       host.showInventoryFullFail();
     }
@@ -54,7 +113,7 @@ function onSeedShopBuyClick() {
     host.applyPlayerMoneyDeltaKrw(-price);
   }
   if (typeof host.addBagItems === "function") {
-    host.addBagItems("seed", 1);
+    host.addBagItems(itemKey, 1);
   }
   refreshSeedShopUi();
 }
@@ -62,8 +121,15 @@ function onSeedShopBuyClick() {
 /** @param {Record<string, unknown>} h */
 export function bindPlantMasterSeedShop(h) {
   host = h;
-  if (host.seedShopBuyBtn) {
-    host.seedShopBuyBtn.addEventListener("click", onSeedShopBuyClick);
+  bindPlantMasterSeedShopOutsideDismiss();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) return;
+      reconcilePlantMasterSeedShopOpenState();
+    });
+  }
+  if (host.seedShopOverlay) {
+    host.seedShopOverlay.addEventListener("click", onSeedShopBuyClick);
   }
   if (host.seedShopCloseBtn) {
     host.seedShopCloseBtn.addEventListener("click", function () {
@@ -75,6 +141,14 @@ export function bindPlantMasterSeedShop(h) {
 
 export function isPlantMasterSeedShopOpen() {
   return shopOpen;
+}
+
+/** 상점이 열린 채 NPC에서 멀어지면 닫기 (거래·연금술 상점과 동일) */
+export function updatePlantMasterSeedShopProximity() {
+  if (!shopOpen) return;
+  if (typeof host.isNearPlantMaster === "function" && !host.isNearPlantMaster()) {
+    closePlantMasterSeedShop();
+  }
 }
 
 export function openPlantMasterSeedShop() {

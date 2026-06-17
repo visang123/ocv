@@ -170,7 +170,6 @@ export function createModule(d) {
   }
   d.plantHoverLabel.style.display = "block";
   d.plantHoverLabel.style.position = "fixed";
-  d.plantHoverLabel.style.zIndex = "225";
   d.plantHoverLabel.style.transform = "none";
   d.plantHoverLabel.style.height = "";
   d.plantHoverLabel.style.width = "";
@@ -190,6 +189,9 @@ export function createModule(d) {
   if (!d.isPlantMasterVisible()) {
     if (d.plantMaster) d.plantMaster.style.display = "none";
     d.npcBubble.style.display = "none";
+    if (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) {
+      d.closePlantMasterSeedShop();
+    }
   } else {
     d.plantMaster.style.display = "block";
     d.setWorldPosition(d.plantMaster, d.getNpc().x, d.getNpc().y);
@@ -227,9 +229,19 @@ export function createModule(d) {
   } else {
     d.playerBubble.classList.remove("is-in-front-of-name");
   }
+
+  if (d.worldNpcHoverAnchorEl) {
+    d.syncWorldNpcHoverLabelPosition(d.worldNpcHoverAnchorEl);
+  }
   }
 
   function updateNpcPrompt() {
+  if (d.isPlantMasterSeedShopOpen && d.isPlantMasterSeedShopOpen()) {
+    if (typeof d.updatePlantMasterSeedShopProximity === "function") {
+      d.updatePlantMasterSeedShopProximity();
+    }
+    return;
+  }
   if (d.getNpc().isDialogueRunning || d.isAlchemyMasterDialogueRunning()) return;
 
   if (d.isNearPlantMaster()) {

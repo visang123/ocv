@@ -103,17 +103,6 @@ export function createModule(d) {
   zones.push(
     d.expandWorldRockAvoidRect(d.spawnPortalX, d.spawnPortalY, d.spawnPortalWidth, d.spawnPortalHeight, p)
   );
-  if (d.alienPuzzleShrineWidth && d.alienPuzzleShrineHeight) {
-    zones.push(
-      d.expandWorldRockAvoidRect(
-        d.alienPuzzleShrineX,
-        d.alienPuzzleShrineY,
-        d.alienPuzzleShrineWidth,
-        d.alienPuzzleShrineHeight,
-        p + 2
-      )
-    );
-  }
   zones.push(d.expandWorldRockAvoidRect(d.getWorldItems().signX, d.getWorldItems().signY, d.SIGN_WIDTH, d.SIGN_HEIGHT, p));
   zones.push(d.expandWorldRockAvoidRect(d.getWorldItems().guideBookX, d.getWorldItems().guideBookY, d.GUIDE_BOOK_WIDTH, d.GUIDE_BOOK_HEIGHT, p));
   zones.push(d.expandWorldRockAvoidRect(d.getWorldItems().worldBagX, d.getWorldItems().worldBagY, d.WORLD_BAG_WIDTH, d.WORLD_BAG_HEIGHT, p));
@@ -624,6 +613,10 @@ export function createModule(d) {
   function tickWorldRockRespawn(now) {
   if (!d.isWorldDocumentEntry() || !d.isWorldRockPickupUnlocked()) return;
   const t = now != null ? now : Date.now();
+  const lastPickupAt = Number(d.getSeedWorld().lastWorldRockPickupAt || 0);
+  if (lastPickupAt > 0 && t - lastPickupAt < d.WORLD_ROCK_RESPAWN_INTERVAL_MS) {
+    return;
+  }
   if (d.getSeedWorld().lastWorldRockRespawnAt <= 0) {
     d.getSeedWorld().lastWorldRockRespawnAt = t;
     return;

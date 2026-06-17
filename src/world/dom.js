@@ -23,8 +23,6 @@ const tradeShopMoney = document.getElementById("trade-shop-money");
 const tradeExchangeClose = document.getElementById("trade-exchange-close");
 const plantMasterSeedShopOverlay = document.getElementById("plant-master-seed-shop-overlay");
 const plantMasterSeedShopClose = document.getElementById("plant-master-seed-shop-close");
-const plantMasterSeedShopPrice = document.getElementById("plant-master-seed-shop-price");
-const plantMasterSeedShopBuy = document.getElementById("plant-master-seed-shop-buy");
 const alchemyCraftOverlay = document.getElementById("alchemy-craft-overlay");
 const alchemyCraftProductList = document.getElementById("alchemy-craft-product-list");
 const alchemyCraftRequirementsBlock = document.getElementById("alchemy-craft-requirements-block");
@@ -115,8 +113,6 @@ export {
   tradeExchangeClose,
   plantMasterSeedShopOverlay,
   plantMasterSeedShopClose,
-  plantMasterSeedShopPrice,
-  plantMasterSeedShopBuy,
   alchemyCraftOverlay,
   alchemyCraftProductList,
   alchemyCraftRequirementsBlock,

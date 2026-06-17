@@ -249,6 +249,10 @@ export function createModule(d) {
     syncPlantCardWaterReadoutVisibility(false);
     return;
   }
+  if (shouldSuppressPlantWaterCardForSelfSustaining(plant)) {
+    syncPlantCardWaterReadoutVisibility(false);
+    return;
+  }
   const waterCapacity = d.getPlantWaterCapacity(plant);
   d.plantWaterText.textContent = "\uC218\uBD84\uD83D\uDCA7: " + plant.waterLevel + "/" + waterCapacity;
   d.plantWaterSegments.forEach(function (segment, index) {
@@ -578,11 +582,11 @@ export function createModule(d) {
 
   d.normalizePlantSproutFieldsWhenSoilDry(d.getPlant());
   d.updatePlantWaterLevel();
-  d.ensureGrassAuto5EligibleForTier4Plant(d.getPlant(), now);
   if (d.tickPowderUpgrade(d.getPlant(), now)) {
     d.saveSeedState();
     d.syncWorldState(true);
   }
+  d.ensureGrassAuto5EligibleForTier4Plant(d.getPlant(), now);
   if (d.tickGrassAutoAdvanceToTier5(d.getPlant(), now)) {
     d.saveSeedState();
     d.syncWorldState(true);

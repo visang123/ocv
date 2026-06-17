@@ -5,10 +5,12 @@ export const DEFAULT_PLAYER_MONEY_KRW = 100;
 
 /** 식물의 달인 씨앗 구매 단가(원) */
 export const PLANT_MASTER_SEED_BUY_PRICE_KRW = 10;
+/** 식물의 달인 과성장 씨앗 구매 단가(원) */
+export const PLANT_MASTER_OVERGROWTH_SEED_BUY_PRICE_KRW = 100;
 
 /** @type {Record<string, number>} NPC가 아이템을 살 때 지급하는 단가(원) */
 export const TRADE_ITEM_SELL_PRICE_KRW = {
-  rock: 40,
+  rock: 15,
   seed: 60,
   overgrowthSeed: 200,
   apple: 120,
@@ -16,25 +18,18 @@ export const TRADE_ITEM_SELL_PRICE_KRW = {
   magicPowderYellow: 100,
   magicPowderWhite: 100,
   magicPowderBrown: 100,
-  "butterfly:brown": 35,
-  "butterfly:yellow": 40,
-  "butterfly:white": 45
+  "butterfly:brown": 30,
+  "butterfly:yellow": 30,
+  "butterfly:white": 30
 };
 
 /** @type {Record<string, number>} NPC에게 아이템을 살 때 지불하는 단가(원) */
 export const TRADE_ITEM_BUY_PRICE_KRW = {
-  rock: 60,
-  seed: 90,
-  overgrowthSeed: 280,
-  apple: 180,
-  magicPowder: 120,
-  magicPowderYellow: 150,
-  magicPowderWhite: 150,
-  magicPowderBrown: 150,
-  "butterfly:brown": 50,
-  "butterfly:yellow": 58,
-  "butterfly:white": 65,
-  worldBucket: 350
+  apple: 25,
+  "butterfly:brown": 30,
+  "butterfly:yellow": 30,
+  "butterfly:white": 30,
+  worldBucket: 150
 };
 
 export function formatPlayerMoneyKrw(amount) {

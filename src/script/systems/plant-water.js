@@ -39,8 +39,11 @@ export function createModule(d) {
   if (!plant.isSproutGrown || plant.status === "dry" || plant.status === "rotten" || plant.isOverwatered) {
     return null;
   }
-  const t0 = plant.grassAuto5EligibleAt;
-  if (t0 == null || !Number.isFinite(Number(t0))) return null;
+  let t0 = plant.grassAuto5EligibleAt;
+  if (t0 == null || !Number.isFinite(Number(t0))) {
+    plant.grassAuto5EligibleAt = now;
+    t0 = now;
+  }
   const elapsed = now - Number(t0);
   if (elapsed <= 0) return 0;
   return Math.min(1, elapsed / d.getAutoTier5GrowMsForPlant(plant));
@@ -217,7 +220,14 @@ export function createModule(d) {
   }
 
   function shouldPauseWaterDecayForPlant(plant, now) {
-  return d.isSproutStage3Or5IdleNoGrowth(plant, now);
+  if (d.isSproutStage3Or5IdleNoGrowth(plant, now)) return true;
+  if (d.isPowderUpgradeInProgress(plant)) return true;
+  const autoTier5Ratio = d.getGrassAutoTier5GrowthRatio(plant, now);
+  if (autoTier5Ratio !== null && autoTier5Ratio < 1) {
+    if (d.isCactusMaturePlant(plant)) return false;
+    return true;
+  }
+  return false;
   }
 
   function shouldSkipPlantWaterDecayNow(simNow) {
