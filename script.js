@@ -431,6 +431,7 @@ import { initScriptView } from "./src/script/view/index.js?v=20260531a";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
+  forceDismissLoadingOverlay,
   dismissAppLoadingScreenAfterDevReset,
   LOADING_TEXT_DEFAULT,
   LOADING_TEXT_WORLD
@@ -8535,7 +8536,12 @@ function onWorldBagInventoryClick(event) { return _viewApi ? _viewApi.onWorldBag
 function onboardingClearInventoryCloseHintTimer() { return _viewApi ? _viewApi.onboardingClearInventoryCloseHintTimer() : undefined; }
 function onboardingScheduleTutorialCompleteHide() { return _viewApi ? _viewApi.onboardingScheduleTutorialCompleteHide() : undefined; }
 function openSettingsOverlay() { return _viewApi ? _viewApi.openSettingsOverlay() : undefined; }
-function ovcTryDismissLoadingScreen(force) { return _viewApi ? _viewApi.ovcTryDismissLoadingScreen(force) : undefined; }
+function ovcTryDismissLoadingScreen(force) {
+  if (_viewApi) return _viewApi.ovcTryDismissLoadingScreen(force);
+  if (force || ovcBootstrapFinished) {
+    hideAppLoadingScreen({ force: Boolean(force) });
+  }
+}
 function pickRandomButterflyColor() { return _viewApi ? _viewApi.pickRandomButterflyColor() : undefined; }
 function pickRandomButterflySpawnPoint() { return _viewApi ? _viewApi.pickRandomButterflySpawnPoint() : undefined; }
 function plantInventorySeed(seedId) { return _viewApi ? _viewApi.plantInventorySeed(seedId) : undefined; }

@@ -30,11 +30,11 @@ export function createModule(d) {
       ep.becameEmptyAt = ep.waterLevelUpdatedAt;
     }
   });
-  if (d.getPlant().isSeedPlanted) {
+  if (d.getPlant().isSeedPlanted && typeof d.tickPlantGold === "function") {
     d.tickPlantGold(d.getPlant(), now);
   }
   d.getApple().extraPlants.forEach(function (ep) {
-    if (!ep) return;
+    if (!ep || typeof d.tickPlantGold !== "function") return;
     d.tickPlantGold(ep, now);
   });
   }

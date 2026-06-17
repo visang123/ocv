@@ -165,6 +165,12 @@ export function createWorldPollSync(d) {
       typeof window.OVCOnline.loadWorldState !== "function" ||
       (!forcePoll && now - d.lastWorldPollAt < d.getMultiplayerWorldPollMinMs())
     ) {
+      if (forcePoll) {
+        if (!d.isWorldServerSyncAvailable()) {
+          d.hasHydratedSharedWorldFromServer = true;
+        }
+        d.ovcTryDismissLoadingScreen(false);
+      }
       return;
     }
 

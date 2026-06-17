@@ -172,8 +172,13 @@ export function createModule(d) {
   d.updateSettingsTutorialButtons();
   }
 
+  function readTabSessionSuperseded() {
+  if (typeof d.isTabSessionSuperseded === "function") return d.isTabSessionSuperseded();
+  return Boolean(d.isTabSessionSuperseded);
+  }
+
   function ovcTryDismissLoadingScreen(force) {
-  if (d.isTabSessionSuperseded && !force) return;
+  if (readTabSessionSuperseded() && !force) return;
   if (force || d.isCharacterSelecting) {
     d.hideAppLoadingScreen();
     worldSyncLoadingWaitStartedAt = 0;
