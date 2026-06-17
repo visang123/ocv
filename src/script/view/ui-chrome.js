@@ -199,11 +199,11 @@ export function createModule(d) {
   }
 
   function pickRandomButterflyColor() {
-  return butterflyMotion.pickColor();
+  return d.butterflyMotion.pickColor();
   }
 
   function pickRandomButterflySpawnPoint() {
-  return butterflyMotion.pickSpawnPoint();
+  return d.butterflyMotion.pickSpawnPoint();
   }
 
   function rebuildWorldExtraBucketDom() {

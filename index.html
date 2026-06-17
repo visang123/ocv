@@ -29,7 +29,7 @@
   </script>
   <script src="src/app/dev-world-reset-shortcut-head.js?v=20260524a"></script>
   <title>온라인 비상 커뮤니티</title>
-  <link rel="stylesheet" href="style.css?v=20260613b">
+  <link rel="stylesheet" href="style.css?v=20260613d">
 </head>
 <body>
   <div id="app-loading-screen" class="app-loading-screen" aria-live="polite">
@@ -562,13 +562,14 @@
   <script src="online-config.js?v=20260509a"></script>
   <script src="ovc-online.js?v=20260512ac"></script>
   <script>window.OVC_ENTRY = "world";</script>
-  <script type="module" src="src/main.js?v=20260613c"></script>
+  <script type="module" src="src/main.js?v=20260613d"></script>
   <script>
     (function () {
       function ovcDismissLoadingFailsafe() {
         var el = document.getElementById("app-loading-screen");
         var loadingVisible = el && !el.hidden;
         if (!loadingVisible) return;
+        if (!window.__OVC_BOOT_FINISHED__) return;
         try {
           if (typeof window.ovcForceDismissLoadingOverlay === "function") {
             window.ovcForceDismissLoadingOverlay();
@@ -581,8 +582,21 @@
           }
         } catch (e) {}
       }
-      window.setTimeout(ovcDismissLoadingFailsafe, 5000);
-      window.setTimeout(ovcDismissLoadingFailsafe, 15000);
+      function ovcDismissLoadingHardFailsafe() {
+        var el = document.getElementById("app-loading-screen");
+        if (!el || el.hidden) return;
+        try {
+          if (typeof window.ovcForceDismissLoadingOverlay === "function") {
+            window.ovcForceDismissLoadingOverlay();
+            return;
+          }
+          document.body.classList.add("is-game-ready");
+          el.hidden = true;
+          el.setAttribute("aria-hidden", "true");
+        } catch (e) {}
+      }
+      window.setTimeout(ovcDismissLoadingFailsafe, 8000);
+      window.setTimeout(ovcDismissLoadingHardFailsafe, 25000);
     })();
   </script>
 </body>

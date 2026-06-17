@@ -8454,7 +8454,13 @@ function ovcInitScriptLayers() {
     initOvcScriptSystemsLayer();
     initOvcScriptViewLayer();
     runOvcLayersPostInitBootstrap();
+    window.__OVC_LAYERS_READY__ = true;
   } catch (layerInitError) {
+    window.__OVC_LAYERS_READY__ = false;
+    window.__OVC_LAYER_INIT_ERROR__ =
+      layerInitError && layerInitError.message
+        ? String(layerInitError.message)
+        : String(layerInitError);
     console.error("[OVC] layer init failed:", layerInitError);
   }
 }
@@ -16359,7 +16365,7 @@ const gameLoopHost = {
 };
 
 const gameLoop = createGameLoop(gameLoopHost, function () {
-  return isTabSessionSuperseded;
+  return isTabSessionSuperseded || !ovcBootstrapFinished;
 });
 
 function savePlayerPosition(forceSave) {
