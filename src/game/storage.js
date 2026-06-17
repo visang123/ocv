@@ -229,6 +229,8 @@ export function loadSeedStateFromStorage(config) {
     cactusOrdinal: null,
     blockSproutRegrowthAfterDry: false,
     drySoilAt: null,
+    plantGoldKrw: 0,
+    plantGoldUpdatedAt: null,
     plantSeedKind: "",
     npcX: config.defaultNpcX,
     npcY: config.defaultNpcY
@@ -343,6 +345,16 @@ export function loadSeedStateFromStorage(config) {
         planted.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
       } else {
         planted.drySoilAt = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(savedPlantedState, "plantGoldKrw")) {
+        planted.plantGoldKrw = Math.max(0, Math.floor(Number(savedPlantedState.plantGoldKrw) || 0));
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(savedPlantedState, "plantGoldUpdatedAt") &&
+        savedPlantedState.plantGoldUpdatedAt != null &&
+        Number.isFinite(Number(savedPlantedState.plantGoldUpdatedAt))
+      ) {
+        planted.plantGoldUpdatedAt = Number(savedPlantedState.plantGoldUpdatedAt);
       }
       if (Object.prototype.hasOwnProperty.call(savedPlantedState, "plantSeedKind")) {
         planted.plantSeedKind = String(savedPlantedState.plantSeedKind || "");
@@ -599,7 +611,13 @@ export function loadAppleStateFromStorage(config) {
                   return Number.isFinite(da) && da > 0 ? da : null;
                 }
                 return null;
-              })()
+              })(),
+              plantGoldKrw: Math.max(0, Math.floor(Number(plantData.plantGoldKrw) || 0)),
+              plantGoldUpdatedAt:
+                plantData.plantGoldUpdatedAt != null &&
+                Number.isFinite(Number(plantData.plantGoldUpdatedAt))
+                  ? Number(plantData.plantGoldUpdatedAt)
+                  : null
             };
           })
         : [],
@@ -732,6 +750,12 @@ export function saveAppleStateToStorage(config) {
           drySoilAt:
             plant.drySoilAt != null && Number.isFinite(Number(plant.drySoilAt))
               ? Number(plant.drySoilAt)
+              : null,
+          plantGoldKrw: Math.max(0, Math.floor(Number(plant.plantGoldKrw) || 0)),
+          plantGoldUpdatedAt:
+            plant.plantGoldUpdatedAt != null &&
+            Number.isFinite(Number(plant.plantGoldUpdatedAt))
+              ? Number(plant.plantGoldUpdatedAt)
               : null
         };
       }),

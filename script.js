@@ -7682,6 +7682,7 @@ function buildNetworkDeps() {
     showThrottledWorldSyncToast,
     stabilizeFirstWaterHintFlags,
     syncWorldLoosePickupLock,
+    tickPlantGold,
     teardownExtraPlantDom,
     teardownMultiplayerForTutorial,
     updateMultiplayerStatus,
@@ -9371,7 +9372,7 @@ function normalizeExtraPlantState(plant) {
   if (!Number.isFinite(plant.powderUpgradeDurationMs)) plant.powderUpgradeDurationMs = 0;
   if (!Number.isFinite(plant.powderUpgradeStartedAt)) plant.powderUpgradeStartedAt = null;
   if (plant.plantGoldKrw == null) plant.plantGoldKrw = 0;
-  if (!plant.plantGoldUpdatedAt || !Number.isFinite(Number(plant.plantGoldUpdatedAt))) {
+  if (plant.plantGoldUpdatedAt == null || !Number.isFinite(Number(plant.plantGoldUpdatedAt))) {
     plant.plantGoldUpdatedAt = now;
   }
   if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {

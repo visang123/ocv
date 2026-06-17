@@ -30,6 +30,13 @@ export function createModule(d) {
       ep.becameEmptyAt = ep.waterLevelUpdatedAt;
     }
   });
+  if (d.getPlant().isSeedPlanted) {
+    d.tickPlantGold(d.getPlant(), now);
+  }
+  d.getApple().extraPlants.forEach(function (ep) {
+    if (!ep) return;
+    d.tickPlantGold(ep, now);
+  });
   }
 
   function getSharedWorldSnapshot() {
@@ -178,6 +185,12 @@ export function createModule(d) {
           drySoilAt:
             plant.drySoilAt != null && Number.isFinite(Number(plant.drySoilAt))
               ? Number(plant.drySoilAt)
+              : null,
+          plantGoldKrw: Math.max(0, Math.floor(Number(plant.plantGoldKrw) || 0)),
+          plantGoldUpdatedAt:
+            plant.plantGoldUpdatedAt != null &&
+            Number.isFinite(Number(plant.plantGoldUpdatedAt))
+              ? Number(plant.plantGoldUpdatedAt)
               : null
         };
       }),
@@ -730,7 +743,7 @@ export function createModule(d) {
         const snapApples = snapshot.apples;
         const sr = snapApples.worldRocks;
         const sp = snapApples.worldRockPickedIds;
-        if (Array.isArray(sr) && sr.length === d.WORLD_LOOSE_ROCK_COUNT) {
+        if (!shouldDeferRemoteAppleApply && Array.isArray(sr) && sr.length === d.WORLD_LOOSE_ROCK_COUNT) {
           const m = d.WORLD_ROCK_SPAWN_X_MARGIN;
           const xMax = d.WORLD_WIDTH - m - d.WORLD_ROCK_SIZE;
           const rocksOk = sr.every(function (r) {
@@ -749,13 +762,25 @@ export function createModule(d) {
             );
           });
           if (rocksOk) {
+            const priorRockById = {};
+            d.getApple().worldRocks.forEach(function (rock) {
+              if (rock && rock.id != null) {
+                priorRockById[String(rock.id)] = rock;
+              }
+            });
             d.getApple().worldRocks = sr.map(function (r) {
-              return {
-                id: String(r.id),
+              const id = String(r.id);
+              const prev = priorRockById[id];
+              const next = {
+                id: id,
                 x: Number(r.x),
                 y: Number(r.y),
                 size: d.WORLD_ROCK_SIZE
               };
+              if (prev && prev._el) {
+                next._el = prev._el;
+              }
+              return next;
             });
           }
         }

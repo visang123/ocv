@@ -198,6 +198,16 @@ export function parseMainPlantFromSnapshot(mp) {
   } else {
     plantedFromSnapshot.drySoilAt = null;
   }
+  if (Object.prototype.hasOwnProperty.call(mp, "plantGoldKrw")) {
+    plantedFromSnapshot.plantGoldKrw = Math.max(0, Math.floor(Number(mp.plantGoldKrw) || 0));
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(mp, "plantGoldUpdatedAt") &&
+    mp.plantGoldUpdatedAt != null &&
+    Number.isFinite(Number(mp.plantGoldUpdatedAt))
+  ) {
+    plantedFromSnapshot.plantGoldUpdatedAt = Number(mp.plantGoldUpdatedAt);
+  }
   // 마른 땅은 UI·스냅샷 불일치로 싹이 잠깐 살아나는 것을 막음
   if (Object.prototype.hasOwnProperty.call(mp, "blockSproutRegrowthAfterDry")) {
     plantedFromSnapshot.blockSproutRegrowthAfterDry = Boolean(mp.blockSproutRegrowthAfterDry);
@@ -356,6 +366,20 @@ export function parseExtraPlantFromSnapshot(plant) {
     out.drySoilAt = Number.isFinite(da) && da > 0 ? da : null;
   } else {
     out.drySoilAt = null;
+  }
+  if (Object.prototype.hasOwnProperty.call(plant, "plantGoldKrw")) {
+    out.plantGoldKrw = Math.max(0, Math.floor(Number(plant.plantGoldKrw) || 0));
+  } else {
+    out.plantGoldKrw = 0;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(plant, "plantGoldUpdatedAt") &&
+    plant.plantGoldUpdatedAt != null &&
+    Number.isFinite(Number(plant.plantGoldUpdatedAt))
+  ) {
+    out.plantGoldUpdatedAt = Number(plant.plantGoldUpdatedAt);
+  } else {
+    out.plantGoldUpdatedAt = null;
   }
   if (Object.prototype.hasOwnProperty.call(plant, "blockSproutRegrowthAfterDry")) {
     out.blockSproutRegrowthAfterDry = Boolean(plant.blockSproutRegrowthAfterDry);
