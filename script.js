@@ -214,6 +214,12 @@ import {
   appStorageKeysSharedWorldReset
 } from "./src/game/constants.js";
 import {
+  tickPlantGold,
+  getPlantGoldKrw,
+  collectPlantGoldKrw,
+  canPlantProduceGold
+} from "./src/game/plant-gold.js";
+import {
   player,
   seed,
   bucket,
@@ -1566,6 +1572,7 @@ function startRockMining(rock) {
   }
   localRockMining = { rockId: rockId, startedAt: Date.now() };
   resetInputKeys(keys);
+  plantProximityWarnUntil = localRockMining.startedAt + WORLD_ROCK_MINE_MS + 200;
   playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";
   updatePlayerStatus();
   sendMultiplayerPresence(true);
@@ -1578,6 +1585,19 @@ function startRockMining(rock) {
   }, WORLD_ROCK_MINE_MS);
   updateWorldRockMineGauges();
   return true;
+}
+
+function tickLocalRockMining(nowMs) {
+  if (!localRockMining || !localRockMining.rockId) return;
+  const now = Number(nowMs) || Date.now();
+  const elapsed = now - Number(localRockMining.startedAt) || 0;
+  plantProximityWarnUntil = localRockMining.startedAt + WORLD_ROCK_MINE_MS + 200;
+  if (playerStatus && !playerStatus.textContent) {
+    playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";
+  }
+  if (elapsed >= WORLD_ROCK_MINE_MS) {
+    finishLocalRockMining();
+  }
 }
 
 /** @type {{ yellow: number, white: number, brown: number, mixed: number }} */
@@ -7918,6 +7938,7 @@ function buildLayerDeps() {
     get remotePlayers() { return remotePlayers; },
     removeButterflyRenderEntry,
     removeExpiredWorldBagDrops,
+    resetInputKeys,
     resetPlayerChairSitState,
     saveAppleState,
     saveAppleStateToStorage,
@@ -8075,7 +8096,9 @@ function buildLayerDeps() {
     advanceOnboardingTutorialSproutForPlantIndex,
     alchemyMaster,
     alchemyMasterBubble,
+    appendPlantHoverGoldDetail,
     appendPlantHoverWaterDetail,
+    collectPlantGoldFromPlant,
     assignSproutIdentityToNewPlant,
     bagBookStorageSlot,
     bagPlayerMoney,
@@ -8351,6 +8374,7 @@ function buildLayerDeps() {
     syncWorldNpcHoverLabelPosition,
     syncWorldPlantFogVisuals,
     tickGrassAutoAdvanceToTier5,
+    tickPlantGold,
     tickPowderUpgrade,
     tickSproutEvolution,
     tickTutorialMainSeedRespawnDue,
@@ -8694,7 +8718,7 @@ function keepButterfliesInsideActiveBounds() { return _systemsApi ? _systemsApi.
 function markWorldDirty() { return _systemsApi ? _systemsApi.markWorldDirty() : undefined; }
 function movePlayerVerticallyInTree(deltaDepth) { return _systemsApi ? _systemsApi.movePlayerVerticallyInTree(deltaDepth) : undefined; }
 function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) { return _systemsApi ? _systemsApi.pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) : undefined; }
-function pruneButterflyAuthorityWaypointsToList() { return _systemsApi ? _systemsApi.pruneButterflyAuthorityWaypointsToList() : undefined; }
+function spreadButterfliesWithinActiveBounds() { return _systemsApi ? _systemsApi.spreadButterfliesWithinActiveBounds() : false; }
 function pruneStaleMultiplayerRoomSessions(now) { return _systemsApi ? _systemsApi.pruneStaleMultiplayerRoomSessions(now) : undefined; }
 function pruneStaleRemotePlayers() { return _systemsApi ? _systemsApi.pruneStaleRemotePlayers() : undefined; }
 function refillWellIfNeeded() { return _systemsApi ? _systemsApi.refillWellIfNeeded() : undefined; }
@@ -9235,6 +9259,9 @@ function updateExtraSeedsAndPlants() {
     ensureExtraPlantElements(plant);
     normalizeExtraPlantState(plant);
     updateExtraPlantState(plant, now);
+    if (tickPlantGold(plant, now)) {
+      refreshPlantWaterHoverIfShown(plant);
+    }
     if (
       plant.status === "dry" &&
       plant.drySoilAt != null &&
@@ -9343,6 +9370,10 @@ function normalizeExtraPlantState(plant) {
   if (!Number.isFinite(plant.powderUpgradeTargetTier)) plant.powderUpgradeTargetTier = 0;
   if (!Number.isFinite(plant.powderUpgradeDurationMs)) plant.powderUpgradeDurationMs = 0;
   if (!Number.isFinite(plant.powderUpgradeStartedAt)) plant.powderUpgradeStartedAt = null;
+  if (plant.plantGoldKrw == null) plant.plantGoldKrw = 0;
+  if (!plant.plantGoldUpdatedAt || !Number.isFinite(Number(plant.plantGoldUpdatedAt))) {
+    plant.plantGoldUpdatedAt = now;
+  }
   if (plant.sproutEvolutionLastTickAt != null && !Number.isFinite(plant.sproutEvolutionLastTickAt)) {
     plant.sproutEvolutionLastTickAt = null;
   }
@@ -10301,6 +10332,56 @@ function appendPlantHoverWaterDetail(parentEl, plant) {
   parentEl.appendChild(detailEl);
 }
 
+function appendPlantHoverGoldDetail(parentEl, plant) {
+  if (!parentEl || !plant) return;
+  const goldKrw = getPlantGoldKrw(plant);
+  if (!canPlantProduceGold(plant) && goldKrw <= 0) return;
+
+  const goldEl = document.createElement("div");
+  goldEl.className = "plant-world-sign-gold";
+
+  const textEl = document.createElement("div");
+  textEl.className = "plant-world-sign-gold-text";
+  textEl.textContent = "\uACE8\uB4DC: " + goldKrw + "\uC6D0";
+  goldEl.appendChild(textEl);
+
+  if (plantOwnerMatches(plant, getPlanterOwnerId(), getPlanterDisplayName())) {
+    const collectBtn = document.createElement("button");
+    collectBtn.type = "button";
+    collectBtn.className = "plant-world-sign-gold-collect";
+    collectBtn.textContent = "\uD68C\uC218";
+    collectBtn.disabled = goldKrw <= 0;
+    collectBtn.addEventListener("click", function (event) {
+      event.stopPropagation();
+      event.preventDefault();
+      if (collectPlantGoldFromPlant(plant)) {
+        showPlantHoverSignForPlant(plant);
+      }
+    });
+    goldEl.appendChild(collectBtn);
+  }
+
+  parentEl.appendChild(goldEl);
+}
+
+function collectPlantGoldFromPlant(plant) {
+  if (!plant || !plantOwnerMatches(plant, getPlanterOwnerId(), getPlanterDisplayName())) {
+    return false;
+  }
+  const now = getSharedPlantSimulationNow();
+  tickPlantGold(plant, now);
+  const amount = collectPlantGoldKrw(plant, now);
+  if (amount <= 0) return false;
+  applyPlayerMoneyDeltaKrw(amount);
+  if (plant === getPlant()) {
+    saveSeedState({ bumpMergeGuard: false });
+  } else {
+    saveAppleState();
+    markWorldDirty();
+  }
+  return true;
+}
+
 
 
 
@@ -11071,6 +11152,8 @@ function startPlanting() {
     ensureGrassOrdinalIfNeeded(getPlant());
     getPlant().blockSproutRegrowthAfterDry = false;
     getPlant().drySoilAt = null;
+    getPlant().plantGoldKrw = 0;
+    getPlant().plantGoldUpdatedAt = plantedAt;
     playerStatus.textContent = "";
     seedCard.style.display = "none";
     plantSpot.style.display = "block";
@@ -11387,7 +11470,9 @@ function createExtraPlant(id, x, y) {
     treeOrdinal: null,
     cactusOrdinal: null,
     blockSproutRegrowthAfterDry: false,
-    drySoilAt: null
+    drySoilAt: null,
+    plantGoldKrw: 0,
+    plantGoldUpdatedAt: now
   };
 }
 
@@ -13827,6 +13912,20 @@ function applyLoadedPlantState(loadedPlant) {
   } else if (Object.prototype.hasOwnProperty.call(loadedPlant, "seedKind")) {
     getPlant().seedKind = String(loadedPlant.seedKind || "");
   }
+  if (Object.prototype.hasOwnProperty.call(loadedPlant, "plantGoldKrw")) {
+    getPlant().plantGoldKrw = Math.max(0, Math.floor(Number(loadedPlant.plantGoldKrw) || 0));
+  } else {
+    getPlant().plantGoldKrw = 0;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(loadedPlant, "plantGoldUpdatedAt") &&
+    loadedPlant.plantGoldUpdatedAt != null &&
+    Number.isFinite(Number(loadedPlant.plantGoldUpdatedAt))
+  ) {
+    getPlant().plantGoldUpdatedAt = Number(loadedPlant.plantGoldUpdatedAt);
+  } else {
+    getPlant().plantGoldUpdatedAt = Date.now();
+  }
   const plantLoadNow = Date.now();
   if (shouldFinalizeOvergrowthGroundToStage3(getPlant(), plantLoadNow)) {
     makePlantStableStage3FromOvergrowthSeed(getPlant(), plantLoadNow);
@@ -13841,6 +13940,9 @@ function applyLoadedPlantState(loadedPlant) {
   ensureGrassAuto5EligibleForTier4Plant(getPlant(), Date.now());
   if (isApplyingWorldState && getPlant().isSeedPlanted) {
     stabilizeFirstWaterHintFlags(getPlant());
+  }
+  if (getPlant().isSeedPlanted) {
+    tickPlantGold(getPlant(), plantLoadNow);
   }
 }
 
@@ -16134,10 +16236,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       const prevX = Number.isFinite(Number(butterfly.x)) ? butterfly.x : null;
       const prevY = Number.isFinite(Number(butterfly.y)) ? butterfly.y : null;
       const prevSampleAt = butterfly._netSampleAt;
-      const nextPoint = clampButterflyPointToActiveBounds(
-        getNumericButterflyValue(raw.x, prevX != null ? prevX : butterflyBoundsLeft),
-        getNumericButterflyValue(raw.y, prevY != null ? prevY : butterflyBoundsTop)
-      );
+      const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
       const newX = nextPoint.x;
       const newY = nextPoint.y;
       if (prevX != null && prevY != null && Number.isFinite(prevSampleAt) && prevSampleAt > 0) {
@@ -16157,6 +16256,8 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       butterfly._netRecvAt = recvAt;
       butterfly.x = newX;
       butterfly.y = newY;
+      butterfly.lastPathX = newX;
+      butterfly.lastPathY = newY;
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       nextList.push(butterfly);
     });
@@ -16198,6 +16299,9 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
     butterflyState.lastSpawnAt =
       Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
   }
+  if (spreadButterfliesWithinActiveBounds()) {
+    pruneButterflyAuthorityWaypointsToList();
+  }
 }
 
 const gameLoopHost = {
@@ -16212,6 +16316,7 @@ const gameLoopHost = {
   respawnApplesIfNeeded,
   tickWorldRockRespawn,
   tickWorldBagDropDespawn,
+  tickLocalRockMining,
   refillWellIfNeeded,
   movementTutorial,
   tickPlayerPosition,

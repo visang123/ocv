@@ -10,22 +10,23 @@ export const PLANT_MASTER_OVERGROWTH_SEED_BUY_PRICE_KRW = 100;
 
 /** @type {Record<string, number>} NPC가 아이템을 살 때 지급하는 단가(원) */
 export const TRADE_ITEM_SELL_PRICE_KRW = {
-  rock: 15,
-  seed: 60,
+  rock: 10,
+  seed: 7,
   overgrowthSeed: 200,
-  apple: 120,
+  apple: 15,
   magicPowder: 80,
   magicPowderYellow: 100,
   magicPowderWhite: 100,
   magicPowderBrown: 100,
-  "butterfly:brown": 30,
-  "butterfly:yellow": 30,
-  "butterfly:white": 30
+  "butterfly:brown": 20,
+  "butterfly:yellow": 20,
+  "butterfly:white": 20
 };
 
 /** @type {Record<string, number>} NPC에게 아이템을 살 때 지불하는 단가(원) */
 export const TRADE_ITEM_BUY_PRICE_KRW = {
   apple: 25,
+  rock: 15,
   "butterfly:brown": 30,
   "butterfly:yellow": 30,
   "butterfly:white": 30,

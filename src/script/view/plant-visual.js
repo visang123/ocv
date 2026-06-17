@@ -363,6 +363,7 @@ export function createModule(d) {
   }
 
   d.appendPlantHoverWaterDetail(d.plantHoverLabel, plant);
+  d.appendPlantHoverGoldDetail(d.plantHoverLabel, plant);
 
   d.plantHoverLabel.style.display = "flex";
   syncPlantHoverWellDockLayout();
@@ -582,6 +583,9 @@ export function createModule(d) {
 
   d.normalizePlantSproutFieldsWhenSoilDry(d.getPlant());
   d.updatePlantWaterLevel();
+  if (d.tickPlantGold(d.getPlant(), now)) {
+    d.refreshPlantWaterHoverIfShown(d.getPlant());
+  }
   if (d.tickPowderUpgrade(d.getPlant(), now)) {
     d.saveSeedState();
     d.syncWorldState(true);

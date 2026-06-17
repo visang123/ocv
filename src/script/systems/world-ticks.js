@@ -794,7 +794,7 @@ export function createModule(d) {
 
   function collectRockMiningSessionsByRock(now) {
     const byRock = Object.create(null);
-    const durationMs = d.WORLD_ROCK_MINE_MS;
+    const durationMs = Math.max(1, Number(d.WORLD_ROCK_MINE_MS) || 60000);
     const local = d.getLocalRockMining && d.getLocalRockMining();
     if (local && local.rockId && local.startedAt) {
       const elapsed = now - local.startedAt;
@@ -842,14 +842,22 @@ export function createModule(d) {
         return;
       }
       const gauge = ensureRockMineGaugeEl(rock);
-      const fill = rock._mineGaugeFillEl;
+      const fill =
+        (rock._mineGaugeFillEl && rock._mineGaugeFillEl.isConnected
+          ? rock._mineGaugeFillEl
+          : gauge
+            ? gauge.querySelector(".world-rock-mine-gauge__fill")
+            : null);
       if (!gauge || !fill) return;
+      rock._mineGaugeFillEl = fill;
       gauge.style.display = "block";
       const progress = Math.max(
         0,
         Math.min(1, (now - session.startedAt) / session.durationMs)
       );
-      fill.style.width = Math.round(progress * 100) + "%";
+      fill.style.width = "100%";
+      fill.style.transform = "scaleX(" + progress + ")";
+      fill.style.transformOrigin = "left center";
     });
   }
 

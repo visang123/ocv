@@ -97,11 +97,51 @@ export function createModule(d) {
   });
   }
 
+  function isUnsetButterflyCoord(x, y, bounds) {
+  const nx = Number(x);
+  const ny = Number(y);
+  if (!Number.isFinite(nx) || !Number.isFinite(ny)) return true;
+  if (nx === 0 && ny === 0) return true;
+  if (nx <= bounds.left + 2 && ny <= bounds.top + 2) return true;
+  return false;
+  }
+
+  function areButterfliesClusteredInActiveBounds() {
+  const list = d.butterflyState.list;
+  if (!list.length) return false;
+  const bounds = d.getActiveButterflyBounds();
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let validCount = 0;
+  let cornerPinned = 0;
+  list.forEach(function (butterfly) {
+    if (!butterfly) return;
+    const x = Number(butterfly.x);
+    const y = Number(butterfly.y);
+    if (d.isUnsetButterflyCoord(x, y, bounds)) return;
+    validCount += 1;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+    if (x <= bounds.left + 3 && y <= bounds.top + 3) cornerPinned += 1;
+  });
+  if (!validCount || validCount < list.length) return true;
+  if (cornerPinned === validCount) return true;
+  if (validCount >= 2 && maxX - minX < 48 && maxY - minY < 48) return true;
+  return false;
+  }
+
   function clampButterflyPointToActiveBounds(x, y) {
   const bounds = d.getActiveButterflyBounds();
+  if (d.isUnsetButterflyCoord(x, y, bounds)) {
+    return d.butterflyMotion.pickSpawnPoint();
+  }
   return {
-    x: Math.max(bounds.left, Math.min(bounds.right, d.getNumericButterflyValue(x, bounds.left))),
-    y: Math.max(bounds.top, Math.min(bounds.bottom, d.getNumericButterflyValue(y, bounds.top)))
+    x: Math.max(bounds.left, Math.min(bounds.right, Number(x))),
+    y: Math.max(bounds.top, Math.min(bounds.bottom, Number(y)))
   };
   }
 
@@ -188,26 +228,9 @@ export function createModule(d) {
   }
 
   function spreadButterfliesWithinActiveBounds() {
+  if (!d.areButterfliesClusteredInActiveBounds()) return false;
   const list = d.butterflyState.list;
   if (!list.length) return false;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  let validCount = 0;
-  list.forEach(function (butterfly) {
-    if (!butterfly) return;
-    const x = Number(butterfly.x);
-    const y = Number(butterfly.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    validCount += 1;
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  });
-  if (validCount < 2) return false;
-  if (maxX - minX > 56 && maxY - minY > 56) return false;
   let changed = false;
   list.forEach(function (butterfly) {
     if (!butterfly) return;
@@ -328,7 +351,9 @@ export function createModule(d) {
   }
 
   function isButterflyAuthority() {
-  if (!d.currentSessionId) return false;
+  if (!d.currentSessionId) {
+    return !d.isWorldServerSyncAvailable();
+  }
   if (document.hidden) return false;
   const now = Date.now();
   const stateFreshMs = Math.max(900, d.butterflyBroadcastMs * 16);
@@ -345,6 +370,7 @@ export function createModule(d) {
     }
     if (sid !== d.currentSessionId) ids.push(sid);
   });
+  if (ids.length === 1) return true;
   ids.sort();
   return ids[0] === d.currentSessionId;
   }
@@ -370,11 +396,14 @@ export function createModule(d) {
 
   function keepButterfliesInsideActiveBounds() {
   let changed = false;
+  const bounds = d.getActiveButterflyBounds();
   d.butterflyState.list.forEach(function (butterfly) {
     if (!butterfly) return;
     const beforeX = Number(butterfly.x);
     const beforeY = Number(butterfly.y);
-    const next = d.clampButterflyPointToActiveBounds(butterfly.x, butterfly.y);
+    const next = d.isUnsetButterflyCoord(butterfly.x, butterfly.y, bounds)
+      ? d.butterflyMotion.pickSpawnPoint()
+      : d.clampButterflyPointToActiveBounds(butterfly.x, butterfly.y);
     butterfly.x = next.x;
     butterfly.y = next.y;
     if (
@@ -384,10 +413,7 @@ export function createModule(d) {
       Math.abs(beforeY - next.y) > 0.001
     ) {
       delete d.butterflyAuthorityWaypointById[String(butterfly.id || "")];
-      butterfly._renderX = next.x;
-      butterfly._renderY = next.y;
-      butterfly.lastPathX = next.x;
-      butterfly.lastPathY = next.y;
+      resetButterflyPathFields(butterfly, next.x, next.y);
       changed = true;
     }
   });
@@ -461,6 +487,7 @@ export function createModule(d) {
   function shouldRunButterflyMotionSimulation(now, onlineAvailable) {
   if (!onlineAvailable) return true;
   if (d.isButterflyAuthority()) return true;
+  if (d.areButterfliesClusteredInActiveBounds()) return true;
   return !d.hasFreshButterflyAuthorityBroadcast(now);
   }
 
@@ -509,14 +536,18 @@ export function createModule(d) {
   }
   // ???? ???? ?????? ????? ????????????????? sessionId)???????. ??????????
   // ??? ????????????? ????2?????????????????
+  const butterfliesUnlocked = d.areButterfliesUnlockedForPlantFogWorld();
+  const butterfliesClustered = d.areButterfliesClusteredInActiveBounds();
   // Motion: run for authority/offline always; non-authority only interpolates network samples.
   const canRunButterflyMotion =
+    butterfliesUnlocked &&
     d.butterflyState.list.length > 0 &&
-    (sharedHydrated || !onlineAvailable);
+    (sharedHydrated || !onlineAvailable || butterfliesClustered);
   if (canRunButterflyMotion) {
-    const runAuthorityButterflyMotion = d.shouldRunButterflyMotionSimulation(now, onlineAvailable);
+    const runAuthorityButterflyMotion =
+      d.shouldRunButterflyMotionSimulation(now, onlineAvailable) || butterfliesClustered;
     if (runAuthorityButterflyMotion) {
-      if (d.isButterflyAuthority() && d.spreadButterfliesWithinActiveBounds()) {
+      if (d.spreadButterfliesWithinActiveBounds()) {
         d.lastButterflyStateChangeAt = now;
         d.markWorldDirty();
       }
@@ -670,6 +701,7 @@ export function createModule(d) {
     applyButterflyCatchable,
     applyButterflyFacing,
     applyButterflySpriteFrame,
+    areButterfliesClusteredInActiveBounds,
     areButterfliesUnlockedForPlantFogWorld,
     areButterfliesUnlockedForTutorialOnboarding,
     authorityFillToCapInstantly,
@@ -695,6 +727,7 @@ export function createModule(d) {
     getTotalPlantIndexScore,
     hasFreshButterflyAuthorityBroadcast,
     isButterflyAuthority,
+    isUnsetButterflyCoord,
     isMainGameTutorialInProgress,
     isSharedWorldMergeActive,
     isWorldServerSyncAvailable,

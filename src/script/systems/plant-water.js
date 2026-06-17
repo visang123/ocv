@@ -123,6 +123,12 @@ export function createModule(d) {
       d.getPlant().drySoilAt != null && Number.isFinite(Number(d.getPlant().drySoilAt))
         ? Number(d.getPlant().drySoilAt)
         : null,
+    plantGoldKrw: Math.max(0, Math.floor(Number(d.getPlant().plantGoldKrw) || 0)),
+    plantGoldUpdatedAt:
+      d.getPlant().plantGoldUpdatedAt != null &&
+      Number.isFinite(Number(d.getPlant().plantGoldUpdatedAt))
+        ? Number(d.getPlant().plantGoldUpdatedAt)
+        : null,
     npcX: d.getNpc().x,
     npcY: d.getNpc().y
   };

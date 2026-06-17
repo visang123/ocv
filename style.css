@@ -289,6 +289,44 @@ body::-webkit-scrollbar {
   word-break: keep-all;
 }
 
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  font: 800 6px/1.25 Arial, sans-serif;
+  color: #92400e;
+}
+
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold-text {
+  text-align: center;
+}
+
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect {
+  border: 1px solid rgba(146, 64, 14, 0.45);
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  font: 800 6px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-gold {
+  font-size: 7px;
+}
+
+#plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-gold-collect {
+  font-size: 7px;
+  padding: 3px 5px;
+}
+
 @keyframes plant-water-hover-ring-pulse {
   from {
     border-color: rgba(56, 189, 248, 0.72);
@@ -1796,7 +1834,9 @@ body::-webkit-scrollbar {
 
 .world-rock-mine-gauge__fill {
   height: 100%;
-  width: 0%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
   background: linear-gradient(90deg, #8a8a8a, #e2e2e2);
   border-radius: 2px;
 }
