@@ -136,6 +136,11 @@ body::-webkit-scrollbar {
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13);
 }
 
+/* JS setup·카메라 적용 전 unstyled 월드 DOM 노출 방지 */
+body:not(.is-game-ready) .viewport {
+  visibility: hidden;
+}
+
 .viewport {
   width: 100vw;
   height: 100vh;

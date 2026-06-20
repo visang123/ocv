@@ -429,9 +429,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260613j";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260613j";
-import { initScriptView } from "./src/script/view/index.js?v=20260613j";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620a";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620a";
+import { initScriptView } from "./src/script/view/index.js?v=20260620a";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1157,7 +1157,7 @@ function syncWorldPlantFogVisuals() {
   const rect = getPlantFogClearRectWorldPx(stage);
   const W = WORLD_WIDTH;
   const H = GROUND_WORLD_HEIGHT;
-  setWorldSize(worldPlantFog, W, H);
+  setWorldMapSize(worldPlantFog, W, H);
   setWorldPosition(worldPlantFog, 0, 0);
 
   const dim = worldPlantFog.querySelector(".world-plant-fog-dim");
@@ -1169,7 +1169,7 @@ function syncWorldPlantFogVisuals() {
 
   const dimAlpha = getPlantFogGlobalDimAlphaForStage(stage);
   if (dim) {
-    setWorldSize(dim, W, H);
+    setWorldMapSize(dim, W, H);
     setWorldPosition(dim, 0, 0);
     dim.style.opacity = String(dimAlpha);
   }
@@ -1187,11 +1187,11 @@ function syncWorldPlantFogVisuals() {
     lineEl.style.borderLeftWidth = "0";
     if (showLine) {
       if (stage === 4) {
-        setWorldSize(lineEl, W, 0);
+        setWorldMapSize(lineEl, W, 0);
         setWorldPosition(lineEl, 0, 0);
         lineEl.style.borderTopWidth = "6px";
       } else {
-        setWorldSize(lineEl, Math.max(0, rect.right - rect.left), Math.max(0, rect.bottom - rect.top));
+        setWorldMapSize(lineEl, Math.max(0, rect.right - rect.left), Math.max(0, rect.bottom - rect.top));
         setWorldPosition(lineEl, rect.left, rect.top);
         lineEl.style.borderTopWidth = "6px";
         lineEl.style.borderRightWidth = "6px";
@@ -1209,37 +1209,37 @@ function syncWorldPlantFogVisuals() {
 
   if (topEl) {
     if (T > 0) {
-      setWorldSize(topEl, W + o * 2, T + o);
+      setWorldMapSize(topEl, W + o * 2, T + o);
       setWorldPosition(topEl, -o, -o);
     } else {
-      setWorldSize(topEl, 0, 0);
+      setWorldMapSize(topEl, 0, 0);
       setWorldPosition(topEl, 0, 0);
     }
   }
   if (bottomEl) {
     if (B < H) {
-      setWorldSize(bottomEl, W + o * 2, H - B + o);
+      setWorldMapSize(bottomEl, W + o * 2, H - B + o);
       setWorldPosition(bottomEl, -o, B - o);
     } else {
-      setWorldSize(bottomEl, 0, 0);
+      setWorldMapSize(bottomEl, 0, 0);
       setWorldPosition(bottomEl, 0, 0);
     }
   }
   if (leftEl) {
     if (L > 0 && midH > 0) {
-      setWorldSize(leftEl, L + o, midH + o * 2);
+      setWorldMapSize(leftEl, L + o, midH + o * 2);
       setWorldPosition(leftEl, -o, T - o);
     } else {
-      setWorldSize(leftEl, 0, 0);
+      setWorldMapSize(leftEl, 0, 0);
       setWorldPosition(leftEl, 0, 0);
     }
   }
   if (rightEl) {
     if (R < W && midH > 0) {
-      setWorldSize(rightEl, W - R + o * 2, midH + o * 2);
+      setWorldMapSize(rightEl, W - R + o * 2, midH + o * 2);
       setWorldPosition(rightEl, R - o, T - o);
     } else {
-      setWorldSize(rightEl, 0, 0);
+      setWorldMapSize(rightEl, 0, 0);
       setWorldPosition(rightEl, 0, 0);
     }
   }
@@ -7905,6 +7905,9 @@ function buildLayerDeps() {
   return {
     PLAYER_WIDTH,
     WORLD_WIDTH,
+    MAP_VISUAL_SCALE,
+    VISUAL_WORLD_WIDTH,
+    VISUAL_WORLD_HEIGHT,
     addPlantWorldRockAvoidZone,
     get adminDebugPlantIndexBonus() { return adminDebugPlantIndexBonus; },
     set adminDebugPlantIndexBonus(v) { adminDebugPlantIndexBonus = v; },
@@ -8575,6 +8578,8 @@ function buildLayerDeps() {
     syncWorldBagGroundVisibility,
     syncWorldNpcHoverLabelPosition,
     syncWorldPlantFogVisuals,
+    setup,
+    updateCamera,
     tickGrassAutoAdvanceToTier5,
     tickPlantGold,
     tickPowderUpgrade,
@@ -8765,6 +8770,9 @@ function openSettingsOverlay() { return _viewApi ? _viewApi.openSettingsOverlay(
 function ovcTryDismissLoadingScreen(force) {
   if (_viewApi) return _viewApi.ovcTryDismissLoadingScreen(force);
   if (force || ovcBootstrapFinished) {
+    setup();
+    updateCamera();
+    syncWorldPlantFogVisuals();
     hideAppLoadingScreen({ force: Boolean(force) });
   }
 }
@@ -8967,8 +8975,18 @@ function saveAppleState() { return _systemsApi ? _systemsApi.saveAppleState() : 
 function savePlayerHealthState() { return _systemsApi ? _systemsApi.savePlayerHealthState() : undefined; }
 function saveSeedState(opts) { return _systemsApi ? _systemsApi.saveSeedState(opts) : undefined; }
 function setInstantHoverTip(el, text) { return _systemsApi ? _systemsApi.setInstantHoverTip(el, text) : undefined; }
-function setWorldPosition(element, x, y) { return _systemsApi ? _systemsApi.setWorldPosition(element, x, y) : undefined; }
-function setWorldSize(element, width, height) { return _systemsApi ? _systemsApi.setWorldSize(element, width, height) : undefined; }
+function setWorldPosition(element, x, y) {
+  if (_systemsApi) return _systemsApi.setWorldPosition(element, x, y);
+  if (element && ground) {
+    setWorldPositionUtil(element, x, y, ground, WORLD_WIDTH, GROUND_WORLD_HEIGHT);
+  }
+}
+function setWorldSize(element, width, height) {
+  if (_systemsApi) return _systemsApi.setWorldSize(element, width, height);
+  if (element && ground) {
+    setWorldSizeUtil(element, width, height, ground, WORLD_WIDTH, GROUND_WORLD_HEIGHT, MAP_VISUAL_SCALE);
+  }
+}
 function shouldPauseWaterDecayForPlant(plant, now) { return _systemsApi ? _systemsApi.shouldPauseWaterDecayForPlant(plant, now) : undefined; }
 function shouldRunButterflyMotionSimulation(now, onlineAvailable) { return _systemsApi ? _systemsApi.shouldRunButterflyMotionSimulation(now, onlineAvailable) : undefined; }
 function shouldSkipPlantWaterDecayNow(simNow) { return _systemsApi ? _systemsApi.shouldSkipPlantWaterDecayNow(simNow) : undefined; }
@@ -9195,6 +9213,9 @@ function refreshUiAfterSharedWorldApply() {
   rebuildWorldBagDropDom();
   updatePlantProgressGauge();
   updateNpcPosition();
+  setup();
+  updateCamera();
+  syncWorldPlantFogVisuals();
 }
 
 
@@ -14694,4 +14715,2201 @@ function fillWorldChatUserPickerFromServer() {
   if (!worldChatUserPickerEl) return;
   worldChatUserPickerEl.innerHTML = "";
   const room =
-    wi
+    window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom
+      ? window.OVC_ONLINE_CONFIG.multiplayerRoom
+      : "ovc-main-room";
+  if (!window.OVCOnline || typeof window.OVCOnline.listPresence !== "function") {
+    const err = document.createElement("div");
+    err.className = "world-chat-user-picker-empty";
+    err.textContent = "\uC5F0\uACB0 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC5B4\uC694.";
+    worldChatUserPickerEl.appendChild(err);
+    return;
+  }
+  const loading = document.createElement("div");
+  loading.className = "world-chat-user-picker-empty";
+  loading.textContent = "\uBD88\uB7EC\uC624\uB294 \uC911...";
+  worldChatUserPickerEl.appendChild(loading);
+  window.OVCOnline.listPresence(room).then(function (rows) {
+    if (!worldChatUserPickerEl) return;
+    worldChatUserPickerEl.innerHTML = "";
+    const list = (rows || []).filter(function (row) {
+      return row && row.id && String(row.id) !== String(currentSessionId || "");
+    });
+    list.sort(function (a, b) {
+      const na = nameForIngameUiDisplay((a && a.name) || "");
+      const nb = nameForIngameUiDisplay((b && b.name) || "");
+      return na.localeCompare(nb, "ko");
+    });
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "world-chat-user-picker-empty";
+      empty.textContent = "\uB2E4\uB978 \uC811\uC18D \uC720\uC800\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      worldChatUserPickerEl.appendChild(empty);
+      return;
+    }
+    list.forEach(function (row) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "world-chat-user-picker-item";
+      const label = nameForIngameUiDisplay(row.name || "OVC");
+      btn.textContent = label;
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        appendWhisperRecipientToWorldChatInput(label);
+        closeWorldChatUserPicker();
+        if (worldChatInputEl) worldChatInputEl.focus();
+      });
+      worldChatUserPickerEl.appendChild(btn);
+    });
+  }).catch(function () {
+    if (!worldChatUserPickerEl) return;
+    worldChatUserPickerEl.innerHTML = "";
+    const err = document.createElement("div");
+    err.className = "world-chat-user-picker-empty";
+    err.textContent = "\uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.";
+    worldChatUserPickerEl.appendChild(err);
+  });
+}
+
+function toggleWorldChatUserPicker() {
+  if (!worldChatUserPickerEl) return;
+  if (worldChatUsersPickerOpen) {
+    closeWorldChatUserPicker();
+    return;
+  }
+  setWorldChatUserPickerOpen(true);
+  fillWorldChatUserPickerFromServer();
+}
+
+/**
+ * "?????" ??"????? ???????" ????????????????????????. `???:` ?? ?????????? ????? ????????????.
+ */
+function appendWhisperRecipientToWorldChatInput(pickedName) {
+  if (!worldChatInputEl) return;
+  const pick = String(pickedName || "").trim();
+  if (!pick) return;
+  let v = normalizeWorldChatColonsForParsing(worldChatInputEl.value || "");
+  const lead = v.replace(/^\s+/, "");
+  if (lead.startsWith(WORLD_CHAT_GLOBAL_PREFIX)) {
+    v = lead.slice(WORLD_CHAT_GLOBAL_PREFIX.length).replace(/^\s+/, "");
+  }
+  const colonIdx = v.indexOf(":");
+  let recipients = [];
+  let rest = "";
+  if (colonIdx >= 0) {
+    rest = v.slice(colonIdx + 1);
+    recipients = v
+      .slice(0, colonIdx)
+      .split(",")
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  } else {
+    rest = "";
+    const t = v.trim();
+    if (t) recipients = [t];
+  }
+  const normPick = nameForIngameUiDisplay(pick);
+  const already = recipients.some(function (r) {
+    return nameForIngameUiDisplay(r) === normPick;
+  });
+  if (!already) recipients.push(pick);
+  worldChatInputEl.value = recipients.join(", ") + ": " + rest.replace(/^\s*/, "");
+  try {
+    const len = worldChatInputEl.value.length;
+    worldChatInputEl.setSelectionRange(len, len);
+  } catch (eSel) {}
+}
+
+function appendWorldChatLine(name, text, sessionId, sentAt, meta) {
+  const entry = {
+    name: name || "OVC",
+    text: text || "",
+    sid: sessionId || "",
+    t: Number(sentAt) || Date.now(),
+    chatKind: meta && meta.chatKind ? meta.chatKind : "world",
+    whisperToLabel: meta && meta.whisperToLabel ? meta.whisperToLabel : ""
+  };
+  worldChatLog.push(entry);
+  if (worldChatLog.length > WORLD_CHAT_LOG_CAP) worldChatLog.shift();
+  if (!worldChatLogEl) return;
+  const row = document.createElement("div");
+  row.className = "world-chat-line";
+  if (entry.chatKind === "whisper") {
+    row.classList.add("is-whisper");
+  }
+  const d = new Date(entry.t);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  let prefix = "[" + hh + ":" + mm + "] ";
+  if (entry.chatKind === "whisper") {
+    prefix +=
+      "[\uADD3\uB9D0" +
+      (entry.whisperToLabel ? " \u2192 " + entry.whisperToLabel : "") +
+      "] ";
+  } else {
+    prefix += "[\uC804\uCCB4] ";
+  }
+  row.textContent = prefix + entry.name + ": " + entry.text;
+  worldChatLogEl.appendChild(row);
+  worldChatLogEl.scrollTop = worldChatLogEl.scrollHeight;
+}
+
+
+function setRemoteChatBubble(sessionId, text, hideAt) {
+  if (!sessionId) return;
+  remoteChatBubbles[sessionId] = { text: text, hideAt: hideAt };
+  let el = remoteChatBubbleEls[sessionId];
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "world-player-chat-bubble world-remote-chat-bubble";
+    document.body.appendChild(el);
+    remoteChatBubbleEls[sessionId] = el;
+  }
+  el.textContent = text;
+  el.style.display = "block";
+}
+
+function removeRemoteChatBubbleEl(sessionId) {
+  const el = remoteChatBubbleEls[sessionId];
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  delete remoteChatBubbleEls[sessionId];
+  delete remoteChatBubbles[sessionId];
+}
+
+function broadcastWorldChat(payload) {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_chat",
+      payload: payload
+    })
+  ).catch(function () {});
+  return true;
+}
+
+function broadcastWorldHeart() {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_heart",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId || "",
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        x: getPlayer().x,
+        depth: getPlayer().depth,
+        jumpY: getPlayer().jumpY,
+        t: Date.now()
+      }
+    })
+  ).catch(function () {});
+  return true;
+}
+
+function broadcastWorldSad() {
+  if (!isWorldSocialRealtimeReady()) return false;
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_sad",
+      payload: {
+        id: currentSessionId,
+        userId: currentUserId || "",
+        name: nameForIngameUiDisplay(accountDisplayNameForUi()),
+        x: getPlayer().x,
+        depth: getPlayer().depth,
+        jumpY: getPlayer().jumpY,
+        t: Date.now()
+      }
+    })
+  ).catch(function () {});
+  return true;
+}
+
+
+function handleWorldChatBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  if (!shouldShowIncomingWorldChatPayload(payload)) return;
+  const text = sanitizeWorldChatText(payload.text);
+  if (!text) return;
+  const name = nameForIngameUiDisplay(payload.name || "OVC");
+  const t = Number(payload.t) || Date.now();
+  const isWhisper = payload.chatKind === "whisper";
+  const whisperLabel = isWhisper
+    ? (Array.isArray(payload.whisperToNames)
+      ? payload.whisperToNames.map(function (n) { return nameForIngameUiDisplay(n); }).join(", ")
+      : "")
+    : "";
+  appendWorldChatLine(name, text, sid, t, {
+    chatKind: isWhisper ? "whisper" : "world",
+    whisperToLabel: whisperLabel
+  });
+  setRemoteChatBubble(sid, text, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+}
+
+function handleWorldHeartBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  const rp = remotePlayers[sid];
+  if (!rp || !rp.bodyElement) return;
+  const px = Number(payload.x);
+  const depth = Number(payload.depth);
+  const jy = Number(payload.jumpY);
+  if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
+    setRemotePlayerVisualPosition(rp, px, -depth, jy);
+    rp.worldX = px;
+    rp.worldY = -depth + jy;
+    rp.depth = depth;
+    rp.jumpY = jy;
+  }
+  window.requestAnimationFrame(function () {
+    const rpp = remotePlayers[sid];
+    if (!rpp || !rpp.bodyElement) return;
+    spawnWorldHeartFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
+  });
+}
+
+function handleWorldSadBroadcast(payload) {
+  if (!payload || !payload.id) return;
+  const sid = String(payload.id);
+  if (sid === String(currentSessionId)) return;
+  const rp = remotePlayers[sid];
+  if (!rp || !rp.bodyElement) return;
+  const px = Number(payload.x);
+  const depth = Number(payload.depth);
+  const jy = Number(payload.jumpY);
+  if (Number.isFinite(px) && Number.isFinite(depth) && Number.isFinite(jy)) {
+    setRemotePlayerVisualPosition(rp, px, -depth, jy);
+    rp.worldX = px;
+    rp.worldY = -depth + jy;
+    rp.depth = depth;
+    rp.jumpY = jy;
+  }
+  window.requestAnimationFrame(function () {
+    const rpp = remotePlayers[sid];
+    if (!rpp || !rpp.bodyElement) return;
+    spawnWorldSadFxNearBodyRect(rpp.bodyElement.getBoundingClientRect());
+  });
+}
+
+function spawnWorldHeartFxNearBodyRect(rect) {
+  if (!rect || rect.width < 2 || rect.height < 2) return;
+  const root = document.createElement("div");
+  root.className = "ovc-heart-fx-root";
+  const inset = Math.max(1, 0.14 * rect.width);
+  const sx = rect.right - inset;
+  const sy = rect.top + Math.max(1, 0.12 * rect.height);
+  root.style.left = Math.round(sx) + "px";
+  root.style.top = Math.round(sy) + "px";
+  const spreadX = Math.max(18, rect.width * 0.95);
+  const rise = Math.max(14, rect.height * 0.28);
+  const spreadY = Math.max(20, rect.height * 0.72);
+  const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
+  const n = 9;
+  const hearts = ["\u2764", "\u2665", "\u2764\uFE0F"];
+  for (let i = 0; i < n; i++) {
+    const bit = document.createElement("span");
+    bit.className = "ovc-heart-fx-bit";
+    bit.textContent = hearts[i % hearts.length];
+    bit.style.fontSize = fontPx + "px";
+    const dx = (Math.random() - 0.35) * spreadX;
+    const dy = -rise - Math.random() * spreadY;
+    bit.style.setProperty("--ovc-hx", dx + "px");
+    bit.style.setProperty("--ovc-hy", dy + "px");
+    bit.style.animationDelay = i * 0.05 + "s";
+    root.appendChild(bit);
+  }
+  document.body.appendChild(root);
+  window.setTimeout(function () {
+    if (root.parentNode) root.parentNode.removeChild(root);
+  }, WORLD_HEART_FX_MS + 200);
+}
+
+function spawnWorldSadFxNearBodyRect(rect) {
+  if (!rect || rect.width < 2 || rect.height < 2) return;
+  const root = document.createElement("div");
+  root.className = "ovc-heart-fx-root";
+  const inset = Math.max(1, 0.14 * rect.width);
+  const sx = rect.right - inset;
+  const sy = rect.top + Math.max(1, 0.12 * rect.height);
+  root.style.left = Math.round(sx) + "px";
+  root.style.top = Math.round(sy) + "px";
+  const spreadX = Math.max(18, rect.width * 0.95);
+  const rise = Math.max(14, rect.height * 0.28);
+  const spreadY = Math.max(20, rect.height * 0.72);
+  const fontPx = Math.max(11, Math.min(44, rect.width * 0.62));
+  const n = 9;
+  const facesVariety = ["\uD83D\uDE2D", "\uD83D\uDE15", "\uD83E\uDD72", "\u2639\uFE0F"];
+  let sadLeadBit = null;
+  for (let i = 0; i < n; i++) {
+    const bit = document.createElement("span");
+    bit.className = "ovc-heart-fx-bit";
+    if (i === 0) {
+      bit.classList.add("ovc-heart-fx-bit--sad-lead");
+      bit.appendChild(createOvcSadFaceElement());
+      sadLeadBit = bit;
+    } else {
+      bit.textContent = facesVariety[(i - 1) % facesVariety.length];
+      root.appendChild(bit);
+    }
+    bit.style.fontSize = fontPx + "px";
+    const dx = (Math.random() - 0.35) * spreadX;
+    const dy = -rise - Math.random() * spreadY;
+    bit.style.setProperty("--ovc-hx", dx + "px");
+    bit.style.setProperty("--ovc-hy", dy + "px");
+    bit.style.animationDelay = i * 0.05 + "s";
+  }
+  if (sadLeadBit) root.appendChild(sadLeadBit);
+  document.body.appendChild(root);
+  window.setTimeout(function () {
+    if (root.parentNode) root.parentNode.removeChild(root);
+  }, WORLD_HEART_FX_MS + 200);
+}
+
+function pulseWorldHeartButton() {
+  if (!worldHeartBtn) return;
+  worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
+  void worldHeartBtn.offsetWidth;
+  worldHeartBtn.classList.add("ovc-heart-btn-pulse");
+  window.setTimeout(function () {
+    if (worldHeartBtn) worldHeartBtn.classList.remove("ovc-heart-btn-pulse");
+  }, 600);
+}
+
+function pulseWorldSadButton() {
+  if (!worldSadBtn) return;
+  worldSadBtn.classList.remove("ovc-sad-btn-pulse");
+  void worldSadBtn.offsetWidth;
+  worldSadBtn.classList.add("ovc-sad-btn-pulse");
+  window.setTimeout(function () {
+    if (worldSadBtn) worldSadBtn.classList.remove("ovc-sad-btn-pulse");
+  }, 600);
+}
+
+
+
+
+
+function updateRemoteChatBubbleOverlays() {
+  const now = Date.now();
+  Object.keys(remoteChatBubbleEls).forEach(function (sid) {
+    const el = remoteChatBubbleEls[sid];
+    const st = remoteChatBubbles[sid];
+    const rp = remotePlayers[sid];
+    if (!el) return;
+    if (!st || now >= st.hideAt) {
+      el.style.display = "none";
+      return;
+    }
+    if (!st.text) {
+      el.style.display = "none";
+      return;
+    }
+    if (!rp) {
+      el.style.display = "none";
+      return;
+    }
+    el.textContent = st.text;
+    const rect = rp.bodyElement.getBoundingClientRect();
+    if (!layoutWorldChatBubbleOnScreen(el, rect, now, sid)) {
+      el.style.display = "none";
+    }
+  });
+}
+
+function sendWorldChatFromUi() {
+  if (!worldChatInputEl) return;
+  const raw = worldChatInputEl.value;
+  const parsed = parseWorldChatComposition(raw);
+  worldChatInputEl.value = "";
+  if (!parsed) return;
+  const body = sanitizeWorldChatText(parsed.body);
+  if (!body) return;
+  if (isOnboardingSocialTutorialStep() && getOnboarding().flowStep === ONBOARDING_STEP_CHAT) {
+    showOnboardingSocialDemoChatBubble(body);
+    advanceOnboardingAfterSocialChatSent();
+    return;
+  }
+  if (!isWorldSocialRealtimeReady()) return;
+  const senderName = nameForIngameUiDisplay(accountDisplayNameForUi());
+  const basePayload = {
+    id: currentSessionId,
+    userId: currentUserId || "",
+    name: senderName,
+    text: body,
+    t: Date.now()
+  };
+  if (parsed.kind === "whisper") {
+    const displayNames = parsed.recipientNames.map(function (n) {
+      return nameForIngameUiDisplay(n);
+    });
+    const whisperToIds = resolveWhisperTargetSessionIds(parsed.recipientNames);
+    const whisperLabel = displayNames.join(", ");
+    appendWorldChatLine(senderName, body, currentSessionId, basePayload.t, {
+      chatKind: "whisper",
+      whisperToLabel: whisperLabel
+    });
+    setLocalChatBubble(body, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+    broadcastWorldChat(
+      Object.assign({}, basePayload, {
+        chatKind: "whisper",
+        whisperToIds: whisperToIds,
+        whisperToNames: displayNames
+      })
+    );
+    return;
+  }
+  appendWorldChatLine(senderName, body, currentSessionId, basePayload.t, { chatKind: "world" });
+  setLocalChatBubble(body, Date.now() + WORLD_CHAT_HEAD_BUBBLE_MS);
+  broadcastWorldChat(Object.assign({}, basePayload, { chatKind: "world" }));
+}
+
+function onWorldHeartClick() {
+  if (isOnboardingLinearGateActive() && getOnboarding().flowStep !== ONBOARDING_STEP_HEART) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+  if (!isOnboardingSocialDemoReady()) return;
+  if (isWorldSocialRealtimeReady()) {
+    broadcastWorldHeart();
+  }
+  pulseWorldHeartButton();
+  if (!player) return;
+  const rect = player.getBoundingClientRect();
+  spawnWorldHeartFxNearBodyRect(rect);
+  advanceOnboardingAfterSocialHeart();
+}
+
+function onWorldSadClick() {
+  if (isOnboardingLinearGateActive() && getOnboarding().flowStep !== ONBOARDING_STEP_SAD) {
+    flashOnboardingOrderHint("");
+    return;
+  }
+  if (!isOnboardingSocialDemoReady()) return;
+  if (isWorldSocialRealtimeReady()) {
+    broadcastWorldSad();
+  }
+  pulseWorldSadButton();
+  if (!player) return;
+  const rect = player.getBoundingClientRect();
+  spawnWorldSadFxNearBodyRect(rect);
+  advanceOnboardingAfterSocialSad();
+}
+
+function ensureWorldSocialUi() {
+  if (worldSocialUiReady) return;
+  worldSadBtn = document.createElement("button");
+  worldSadBtn.type = "button";
+  worldSadBtn.id = "world-sad-button";
+  worldSadBtn.className = "world-sad-button";
+  worldSadBtn.setAttribute("aria-label", "\uC2AC\uD37C\uC694");
+  worldSadBtn.innerHTML = WORLD_SAD_BUTTON_EMOJI;
+  document.body.appendChild(worldSadBtn);
+
+  worldHeartBtn = document.createElement("button");
+  worldHeartBtn.type = "button";
+  worldHeartBtn.id = "world-heart-button";
+  worldHeartBtn.className = "world-heart-button";
+  worldHeartBtn.setAttribute("aria-label", "\uD558\uD2B8");
+  worldHeartBtn.innerHTML = "\u2764\uFE0F";
+  document.body.appendChild(worldHeartBtn);
+
+  worldChatToggleBtn = document.createElement("button");
+  worldChatToggleBtn.type = "button";
+  worldChatToggleBtn.id = "world-chat-toggle";
+  worldChatToggleBtn.className = "world-chat-toggle";
+  worldChatToggleBtn.setAttribute("aria-label", "\uCC57");
+  worldChatToggleBtn.textContent = "\uD83D\uDCAC";
+  document.body.appendChild(worldChatToggleBtn);
+
+  worldChatPanelEl = document.createElement("div");
+  worldChatPanelEl.id = "world-chat-panel";
+  worldChatPanelEl.className = "world-chat-panel";
+  worldChatPanelEl.setAttribute("aria-hidden", "true");
+  worldChatLogEl = document.createElement("div");
+  worldChatLogEl.className = "world-chat-log";
+  const hint = document.createElement("div");
+  hint.className = "world-chat-hint";
+  hint.textContent =
+    '\uC804\uCCB4 \uCC57: "\uC804\uCCB4: "\uC785\uB825 \uD6C4 \uCC57\uC305 or \uADF8\uB0E5 \uC785\uB825\n' +
+    ' \uADD3\uB9D0: "(\uC774\uB984):", \uB2E4\uC218\uB294 "(\uC774\uB984),(\uC774\uB984):"\n' +
+    ' \uAC04\uD3B8\uD558\uAC8C \uC811\uC18D\uD55C \uC720\uC800 \uBC84\uD2BC \uD074\uB9AD \uD6C4, \uC774\uB984 \uD074\uB9AD\uD574\uC11C\uB3C4 \uAC00\uB2A5';
+  worldChatLogEl.appendChild(hint);
+  worldChatInputWrapEl = document.createElement("div");
+  worldChatInputWrapEl.className = "world-chat-input-wrap";
+  worldChatUserPickerEl = document.createElement("div");
+  worldChatUserPickerEl.className = "world-chat-user-picker";
+  worldChatUserPickerEl.setAttribute("aria-hidden", "true");
+  const inpRow = document.createElement("div");
+  inpRow.className = "world-chat-input-row";
+  worldChatInputEl = document.createElement("input");
+  worldChatInputEl.type = "text";
+  worldChatInputEl.className = "world-chat-input";
+  worldChatInputEl.maxLength = WORLD_CHAT_MAX_CHARS;
+  worldChatInputEl.autocomplete = "off";
+  worldChatUsersBtn = document.createElement("button");
+  worldChatUsersBtn.type = "button";
+  worldChatUsersBtn.className = "world-chat-users-btn";
+  worldChatUsersBtn.textContent = "\uC811\uC18D\uD55C \uC720\uC800";
+  worldChatUsersBtn.title = "\uC11C\uBC84 \uC811\uC18D \uC720\uC800 \uBAA9\uB85D";
+  worldChatSendBtn = document.createElement("button");
+  worldChatSendBtn.type = "button";
+  worldChatSendBtn.className = "world-chat-send";
+  worldChatSendBtn.textContent = "\uC804\uC1A1";
+  inpRow.appendChild(worldChatInputEl);
+  inpRow.appendChild(worldChatUsersBtn);
+  inpRow.appendChild(worldChatSendBtn);
+  worldChatInputWrapEl.appendChild(worldChatUserPickerEl);
+  worldChatInputWrapEl.appendChild(inpRow);
+  worldChatPanelEl.appendChild(worldChatLogEl);
+  worldChatPanelEl.appendChild(worldChatInputWrapEl);
+  document.body.appendChild(worldChatPanelEl);
+
+  playerChatBubbleEl = document.createElement("div");
+  playerChatBubbleEl.id = "player-chat-bubble";
+  playerChatBubbleEl.className = "world-player-chat-bubble world-local-chat-bubble";
+  playerChatBubbleEl.style.display = "none";
+  document.body.appendChild(playerChatBubbleEl);
+
+  worldSadBtn.addEventListener("click", function () {
+    onWorldSadClick();
+  });
+  worldHeartBtn.addEventListener("click", function () {
+    onWorldHeartClick();
+  });
+  worldChatToggleBtn.addEventListener("click", function () {
+    toggleWorldChatPanel();
+  });
+  worldChatSendBtn.addEventListener("click", function () {
+    sendWorldChatFromUi();
+  });
+  worldChatUsersBtn.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    toggleWorldChatUserPicker();
+  });
+  worldChatInputEl.addEventListener("focus", function () {
+    closeWorldChatUserPicker();
+  });
+  worldChatInputEl.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      sendWorldChatFromUi();
+    }
+  });
+
+  document.addEventListener("click", function (ev) {
+    if (!worldChatPanelOpen || !worldChatPanelEl) return;
+    const t = ev.target;
+    if (!(t instanceof Node)) return;
+    if (worldChatPanelEl.contains(t)) return;
+    if (worldChatToggleBtn && worldChatToggleBtn.contains(t)) return;
+    if (worldHeartBtn && worldHeartBtn.contains(t)) return;
+    if (worldSadBtn && worldSadBtn.contains(t)) return;
+    setWorldChatPanelOpen(false);
+  });
+
+  worldSocialUiReady = true;
+  updateWorldSocialChatUiEnabled();
+}
+
+function updateWorldSocialOverlaysInGameLoop() {
+  if (!worldSocialUiReady) return;
+  updateWorldSocialChatUiEnabled();
+  updatePlayerChatBubbleOverlay();
+  updateRemoteChatBubbleOverlays();
+}
+
+
+
+
+
+
+
+function removeRemotePlayer(remoteId) {
+  const remotePlayer = remotePlayers[remoteId];
+  if (!remotePlayer) return;
+  remotePlayer.element.remove();
+  delete remotePlayers[remoteId];
+  remotePlayerStateStore.remove(remoteId);
+  removeRemoteChatBubbleEl(remoteId);
+  updateRemotePlayerCount();
+}
+
+/** DOM/view sync from remotePlayerStateStore (network + state already applied). */
+function syncRemotePlayerViewFromState(remoteId) {
+  const state = remotePlayerStateStore.getPlayer(remoteId);
+  if (!state) return;
+
+  const remotePlayer = remotePlayers[remoteId] || createRemotePlayer(remoteId);
+  const remoteColor = state.color || "#7dd3fc";
+  const nextSittingChairId = String(state.sittingChairId || "");
+  const seatedChair = nextSittingChairId ? getCraftChairById(nextSittingChairId) : null;
+  const isRemoteSittingOnChair = Boolean(seatedChair);
+  let nextX = Number(state.x) || 0;
+  let nextBaseY = -(Number(state.depth) || 0);
+  let nextJumpY = Number(state.jumpY) || 0;
+  if (isRemoteSittingOnChair) {
+    const sitPose = getCraftChairSitPose(seatedChair, PLAYER_SIT_WIDTH, PLAYER_SIT_HEIGHT);
+    if (sitPose) {
+      nextX = sitPose.playerX;
+      nextBaseY = -(GROUND_WORLD_HEIGHT - sitPose.footY);
+      nextJumpY = 0;
+    }
+  }
+  const nextPositionKey =
+    Math.round(nextX * 10) +
+    "|" +
+    Math.round(nextBaseY * 10) +
+    "|" +
+    Math.round(nextJumpY * 10);
+  const statusAction = state.action || "";
+
+  remotePlayer.nameElement.textContent = nameForIngameUiDisplay(state.name || "OVC");
+  remotePlayer.lastActionAt = Number(state.lastActionAt) || 0;
+  remotePlayer.lastShownAction = String(state.lastShownAction) || "";
+  if (statusAction) {
+    const nextStatusText = getRemoteStatusText(statusAction);
+    if (nextStatusText) {
+      remotePlayer.statusElement.textContent = nextStatusText;
+      remotePlayer.statusElement.style.display = "block";
+    }
+  } else {
+    const holdAfter =
+      remotePlayer.lastShownAction === "rock_pickup"
+        ? WORLD_ROCK_REMOTE_STATUS_TAIL_MS
+        : remotePlayer.lastShownAction === "rock_mining"
+          ? WORLD_ROCK_MINE_MS
+          : REMOTE_ACTION_STATUS_HOLD_MS;
+    const keepUntil = Number(remotePlayer.lastActionAt || 0) + holdAfter;
+    if (Date.now() >= keepUntil) {
+      remotePlayer.statusElement.textContent = "";
+      remotePlayer.statusElement.style.display = "none";
+      remotePlayer.lastActionAt = 0;
+      remotePlayer.lastShownAction = "";
+    }
+  }
+  remotePlayer.sittingChairId = nextSittingChairId;
+  const nextInsideCraftHouseId = String(state.insideCraftHouseId || "");
+  const insideHouse = Boolean(nextInsideCraftHouseId && getCraftHouseById(nextInsideCraftHouseId));
+  remotePlayer.insideCraftHouseId = insideHouse ? nextInsideCraftHouseId : "";
+  syncRemotePlayerPoseVisual(remotePlayer, remoteColor);
+  remotePlayer.element.classList.toggle("needs-outline", needsDarkOutline(remoteColor));
+  setRemotePlayerMoveTarget(remotePlayer, nextX, nextBaseY, nextPositionKey, nextJumpY);
+  remotePlayer.worldX = nextX;
+  remotePlayer.worldY = nextBaseY + nextJumpY;
+  remotePlayer.depth = Number(state.depth) || 0;
+  remotePlayer.userId = state.userId != null ? String(state.userId) : "";
+  remotePlayer.name = state.name || "OVC";
+  remotePlayer.rockMiningRockId =
+    statusAction === "rock_mining" ? String(state.rockMiningRockId || "") : "";
+  remotePlayer.rockMiningStartedAt =
+    statusAction === "rock_mining" ? Number(state.rockMiningStartedAt) || 0 : 0;
+  remotePlayer.lastStateVersion = Number(state.lastStateVersion) || 0;
+  remotePlayer.lastStateSourceRank = Number(state.lastStateSourceRank) || 0;
+  addSyncDebugLog("remote_state_apply", {
+    remoteId: remoteId,
+    version: remotePlayer.lastStateVersion
+  });
+  const nextWaterSplashAt = Number(state.waterSplashAt || 0);
+  const splashClockNow = Date.now();
+  if (
+    nextWaterSplashAt > 0 &&
+    nextWaterSplashAt > Number(remotePlayer.lastWaterSplashAt || 0) &&
+    Math.abs(splashClockNow - nextWaterSplashAt) <= REMOTE_WATER_SPLASH_ACCEPT_MS
+  ) {
+    const nextSplashX = Number(state.waterSplashX);
+    const nextSplashY = Number(state.waterSplashY);
+    if (Number.isFinite(nextSplashX) && Number.isFinite(nextSplashY)) {
+      createWaterSplashAt(nextSplashX, nextSplashY);
+      remotePlayer.lastWaterSplashAt = nextWaterSplashAt;
+    }
+  }
+  remotePlayer.lastSeenAt = Number(state.lastSeenAt) || Date.now();
+}
+
+function getRemotePlayerBaseWorldY(remotePlayer) {
+  if (!remotePlayer) return 0;
+  const renderBaseY = Number(remotePlayer.renderBaseY);
+  if (Number.isFinite(renderBaseY)) return renderBaseY;
+  const targetBaseY = Number(remotePlayer.targetBaseY);
+  if (Number.isFinite(targetBaseY)) return targetBaseY;
+  return -(Number(remotePlayer.depth) || 0);
+}
+
+function getRemotePlayerRenderJumpY(remotePlayer) {
+  if (!remotePlayer) return 0;
+  const renderJumpY = Number(remotePlayer.renderJumpY);
+  if (Number.isFinite(renderJumpY)) return renderJumpY;
+  return Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
+}
+
+function getRemotePlayerWorldY(remotePlayer) {
+  return getRemotePlayerBaseWorldY(remotePlayer) + getRemotePlayerRenderJumpY(remotePlayer);
+}
+
+function applyRemotePlayerWorldPosition(remotePlayer) {
+  if (!remotePlayer || !remotePlayer.element) return;
+  const x = Number(remotePlayer.renderX ?? remotePlayer.targetX) || 0;
+  const y = getRemotePlayerWorldY(remotePlayer);
+  remotePlayer.element.classList.toggle(
+    "is-airborne",
+    getRemotePlayerRenderJumpY(remotePlayer) < -REMOTE_PLAYER_AIRBORNE_JUMP_Y
+  );
+  setWorldPosition(remotePlayer.element, x, y);
+}
+
+function createRemotePlayer(remoteId) {
+  const element = document.createElement("div");
+  const bodyElement = document.createElement("img");
+  const nameElement = document.createElement("div");
+  const statusElement = document.createElement("div");
+
+  element.className = "remote-player";
+  bodyElement.className = "remote-player-body";
+  bodyElement.alt = "";
+  bodyElement.decoding = "async";
+  bodyElement.draggable = false;
+  element.dataset.remoteId = remoteId;
+  nameElement.className = "remote-player-name";
+  statusElement.className = "remote-player-status";
+  element.appendChild(bodyElement);
+  element.appendChild(nameElement);
+  element.appendChild(statusElement);
+  ground.appendChild(element);
+  setWorldSize(element, PLAYER_WIDTH);
+
+  remotePlayers[remoteId] = {
+    element,
+    bodyElement,
+    nameElement,
+    statusElement,
+    positionKey: "",
+    renderX: 0,
+    renderBaseY: 0,
+    targetX: 0,
+    targetBaseY: 0,
+    targetJumpY: 0,
+    renderJumpY: 0,
+    hasRenderPosition: false,
+    lastSmoothAt: 0,
+    appliedTintColor: "",
+    worldX: 0,
+    worldY: 0,
+    depth: 0,
+    jumpY: 0,
+    lastStateVersion: 0,
+    lastStateSourceRank: 0,
+    lastWaterSplashAt: 0,
+    lastActionAt: 0,
+    lastShownAction: "",
+    lastSeenAt: Date.now(),
+    sittingChairId: "",
+    insideCraftHouseId: "",
+    appliedSitTintKey: ""
+  };
+  return remotePlayers[remoteId];
+}
+
+function setRemotePlayerMoveTarget(remotePlayer, x, baseY, positionKey, jumpOffsetY) {
+  const nextX = Number(x) || 0;
+  const nextBaseY = Number(baseY) || 0;
+  const nextJumpY =
+    jumpOffsetY != null && Number.isFinite(Number(jumpOffsetY))
+      ? Number(jumpOffsetY)
+      : Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
+  remotePlayer.targetX = nextX;
+  remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.targetJumpY = nextJumpY;
+  remotePlayer.jumpY = nextJumpY;
+  remotePlayer.positionKey =
+    positionKey ||
+    Math.round(nextX * 10) +
+      "|" +
+      Math.round(nextBaseY * 10) +
+      "|" +
+      Math.round(nextJumpY * 10);
+
+  if (!remotePlayer.hasRenderPosition) {
+    remotePlayer.renderX = nextX;
+    remotePlayer.renderBaseY = nextBaseY;
+    remotePlayer.renderJumpY = nextJumpY;
+    remotePlayer.hasRenderPosition = true;
+    remotePlayer.lastSmoothAt = performance.now();
+    applyRemotePlayerWorldPosition(remotePlayer);
+  }
+}
+
+function setRemotePlayerVisualPosition(remotePlayer, x, baseY, jumpOffsetY) {
+  const nextX = Number(x) || 0;
+  const nextBaseY = Number(baseY) || 0;
+  const nextJumpY = Number(jumpOffsetY) || 0;
+  remotePlayer.renderX = nextX;
+  remotePlayer.renderBaseY = nextBaseY;
+  remotePlayer.renderJumpY = nextJumpY;
+  remotePlayer.targetX = nextX;
+  remotePlayer.targetBaseY = nextBaseY;
+  remotePlayer.targetJumpY = nextJumpY;
+  remotePlayer.jumpY = nextJumpY;
+  remotePlayer.hasRenderPosition = true;
+  remotePlayer.lastSmoothAt = performance.now();
+  remotePlayer.positionKey =
+    Math.round(nextX * 10) +
+    "|" +
+    Math.round(nextBaseY * 10) +
+    "|" +
+    Math.round(nextJumpY * 10);
+  applyRemotePlayerWorldPosition(remotePlayer);
+}
+
+function updateRemotePlayerSmoothing() {
+  const now = performance.now();
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const remotePlayer = remotePlayers[remoteId];
+    if (!remotePlayer || !remotePlayer.element || !remotePlayer.hasRenderPosition) return;
+
+    const targetX = Number(remotePlayer.targetX) || 0;
+    const targetBaseY = Number(remotePlayer.targetBaseY) || 0;
+    const targetJumpY = Number(remotePlayer.targetJumpY ?? remotePlayer.jumpY) || 0;
+    const currentX = Number(remotePlayer.renderX) || 0;
+    const currentBaseY = Number(remotePlayer.renderBaseY) || 0;
+    const currentJumpY = Number(remotePlayer.renderJumpY);
+    const safeCurrentJumpY = Number.isFinite(currentJumpY)
+      ? currentJumpY
+      : targetJumpY;
+    const dx = targetX - currentX;
+    const dy = targetBaseY - currentBaseY;
+    const jumpDy = targetJumpY - safeCurrentJumpY;
+    const distance = Math.hypot(dx, dy);
+    const lastSmoothAt = Number(remotePlayer.lastSmoothAt || now);
+    const dt = Math.min(50, Math.max(0, now - lastSmoothAt));
+    let positionChanged = false;
+
+    if (distance <= REMOTE_PLAYER_SNAP_EPSILON) {
+      if (currentX !== targetX || currentBaseY !== targetBaseY) {
+        remotePlayer.renderX = targetX;
+        remotePlayer.renderBaseY = targetBaseY;
+        positionChanged = true;
+      }
+    } else if (distance >= REMOTE_PLAYER_SNAP_DISTANCE) {
+      remotePlayer.renderX = targetX;
+      remotePlayer.renderBaseY = targetBaseY;
+      positionChanged = true;
+    } else if (distance > 0) {
+      const alpha = 1 - Math.exp(-dt / REMOTE_PLAYER_SMOOTHING_MS);
+      remotePlayer.renderX = currentX + dx * alpha;
+      remotePlayer.renderBaseY = currentBaseY + dy * alpha;
+      positionChanged = true;
+    }
+
+    let jumpChanged = false;
+    if (Math.abs(jumpDy) <= REMOTE_PLAYER_SNAP_EPSILON) {
+      if (safeCurrentJumpY !== targetJumpY) {
+        remotePlayer.renderJumpY = targetJumpY;
+        jumpChanged = true;
+      }
+    } else if (Math.abs(jumpDy) >= REMOTE_PLAYER_JUMP_SNAP_DISTANCE) {
+      remotePlayer.renderJumpY = targetJumpY;
+      jumpChanged = true;
+    } else {
+      const jumpAlpha = 1 - Math.exp(-dt / REMOTE_PLAYER_JUMP_SMOOTHING_MS);
+      remotePlayer.renderJumpY = safeCurrentJumpY + jumpDy * jumpAlpha;
+      jumpChanged = true;
+    }
+
+    if (positionChanged || jumpChanged) {
+      remotePlayer.lastSmoothAt = now;
+      applyRemotePlayerWorldPosition(remotePlayer);
+    }
+  });
+}
+
+
+
+function updateMultiplayerStatus(statusText) {
+  multiplayerStatusText = statusText;
+  if (!multiplayerStatus) return;
+
+  const statusLabel =
+    multiplayerStatusText === "\uC5F0\uACB0\uB428" ||
+    multiplayerStatusText === "\uC5F0\uACB0\uC911" ||
+    multiplayerStatusText === "\uCE90\uB9AD\uD130 \uC120\uD0DD \uC804" ||
+    multiplayerStatusText === "\uCD08\uAE30\uD654 \uC911" ||
+    (typeof multiplayerStatusText === "string" &&
+      multiplayerStatusText.indexOf("\uD29C\uD1A0\uB9AC\uC5BC") !== -1)
+      ? multiplayerStatusText
+      : "\uC5F0\uACB0 \uC548\uB428";
+  multiplayerStatus.textContent =
+    "\uBA40\uD2F0 " + statusLabel + " / \uB85C\uADF8\uC778 " + getOnlinePlayerCount();
+
+  const showHud =
+    !isSharedWorldSyncPausedForTutorial() &&
+    multiplayerStatusText === "\uC5F0\uACB0\uB428";
+  multiplayerStatus.classList.toggle("is-online-hud-visible", showHud);
+  multiplayerStatus.hidden = !showHud;
+}
+
+function clearMultiplayerReconnectTimeout() {
+  if (multiplayerReconnectTimeout) {
+    clearTimeout(multiplayerReconnectTimeout);
+    multiplayerReconnectTimeout = null;
+  }
+}
+
+function scheduleMultiplayerReconnect(delayMs) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (multiplayerReconnectTimeout || !hasSpawnedCharacter || isLoggingOut || isTabSessionSuperseded) return;
+  const waitMs = Math.max(500, Number(delayMs) || 1500);
+  addNetworkDebugLog("schedule reconnect in " + waitMs + "ms");
+  multiplayerReconnectTimeout = setTimeout(function () {
+    multiplayerReconnectTimeout = null;
+    addNetworkDebugLog("reconnect attempt");
+    setupMultiplayer();
+  }, waitMs);
+}
+
+function syncPlayerColorToServer(forceSync) {
+  if (!hasSpawnedCharacter || !currentUserId) return;
+  if (!/^#[0-9a-fA-F]{6}$/.test(selectedPlayerColor || "")) return;
+  const colorToSync = selectedPlayerColor.toLowerCase();
+  if (!forceSync && colorToSync === lastSyncedPlayerColor) return;
+
+  if (window.OVCOnline && window.OVCOnline.isConfigured()) {
+    window.OVCOnline.savePlayerColor(currentUserId, colorToSync).then(function () {
+      lastSyncedPlayerColor = colorToSync;
+      addNetworkDebugLog("color synced online: " + colorToSync);
+    }).catch(function (error) {
+      showOnlineDebugMessage(
+        "\uC0C9 \uC800\uC7A5 \uC2E4\uD328: " +
+          (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
+      );
+    });
+    return;
+  }
+
+  if (!currentUserName) return;
+  postJson("/api/player/color", {
+    name: currentUserName,
+    color: colorToSync
+  }).then(function () {
+    lastSyncedPlayerColor = colorToSync;
+    addNetworkDebugLog("color synced local: " + colorToSync);
+  }).catch(function (error) {
+    showOnlineDebugMessage(
+      "\uC0C9 \uC800\uC7A5 \uC2E4\uD328: " +
+        (error && error.message ? error.message : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
+    );
+  });
+}
+
+function getOnlinePlayerCount() {
+  if (!currentUserId) return remotePlayerCount;
+  return remotePlayerCount + 1;
+}
+
+function openAdminPanel() {
+  adminOverlay.classList.add("is-open");
+  adminOverlay.setAttribute("aria-hidden", "false");
+  loadAdminAccounts();
+}
+
+function closeAdminPanel() {
+  adminOverlay.classList.remove("is-open");
+  adminOverlay.setAttribute("aria-hidden", "true");
+}
+
+async function loadAdminAccounts() {
+  adminMessage.textContent = "\uACC4\uC815 \uBD88\uB7EC\uC624\uB294 \uC911...";
+  adminAccountList.innerHTML = "";
+
+  try {
+    const accounts = await window.OVCOnline.listAccounts();
+    adminAccountList.dataset.accounts = JSON.stringify(accounts);
+    renderAdminAccounts(accounts);
+    adminMessage.textContent = accounts.length + "\uAC1C \uACC4\uC815";
+  } catch (error) {
+    adminMessage.textContent = error.message;
+  }
+}
+
+
+
+function formatAdminDate(value) {
+  if (!value) return "\uB0A0\uC9DC \uC5C6\uC74C";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "\uB0A0\uC9DC \uC5C6\uC74C";
+
+  return date.toLocaleString("ko-KR");
+}
+
+function openLogoutConfirm() {
+  setSettingsOverlayOpen(settingsOverlay, false);
+  logoutConfirmOverlay.classList.add("is-open");
+  logoutConfirmOverlay.setAttribute("aria-hidden", "false");
+}
+
+function closeLogoutConfirm() {
+  logoutConfirmOverlay.classList.remove("is-open");
+  logoutConfirmOverlay.setAttribute("aria-hidden", "true");
+}
+
+
+
+
+
+function addBucketTrace(key, message, minIntervalMs) {
+  if (!BUCKET_DEBUG_TRACE) return;
+  const now = Date.now();
+  const last = Number(lastBucketTraceAtByKey[key] || 0);
+  if (now - last < (minIntervalMs || 500)) return;
+  lastBucketTraceAtByKey[key] = now;
+  addNetworkDebugLog("[bucket:" + key + "] " + message);
+}
+
+const syncDebugHelpers = createSyncDebugHelpers({
+  enabled: SYNC_DEBUG_TRACE,
+  addNetworkDebugLog: addNetworkDebugLog
+});
+const addSyncDebugLog = syncDebugHelpers.addSyncDebugLog;
+syncDebugHelpers.publishSyncDebugChecklistTemplate(window);
+
+async function validateCurrentAccount() {
+  if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
+
+  try {
+    if (typeof window.OVCOnline.validateSession === "function") {
+      const storedToken = getEffectiveOvcSessionToken();
+      if (!storedToken) {
+        if (window.OVCOnline.isConfigured && window.OVCOnline.isConfigured()) {
+          showOnlineDebugMessage(
+            "\uC774 \uCC3D\uC758 \uB85C\uADF8\uC778 \uC815\uBCF4\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694."
+          );
+          setTimeout(logout, 800);
+          return;
+        }
+        if (typeof window.OVCOnline.getAccount === "function") {
+          const account = await window.OVCOnline.getAccount(currentUserId);
+          if (!account) {
+            showOnlineDebugMessage("\uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB85C\uADF8\uC544\uC6C3\uD569\uB2C8\uB2E4.");
+            setTimeout(logout, 800);
+            return;
+          }
+        }
+        return;
+      }
+      const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
+      if (!isValid) {
+        showOnlineDebugMessage(
+          "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uB85C\uADF8\uC778\uB418\uC5B4 \uC774 \uCC3D\uC758 \uC138\uC158\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694."
+        );
+        setTimeout(logout, 1200);
+        return;
+      }
+    } else {
+      const account = await window.OVCOnline.getAccount(currentUserId);
+      if (!account) {
+        logout();
+      }
+    }
+  } catch (error) {
+    // Temporary network errors should not kick the player out.
+  }
+}
+
+function logout() {
+  if (isLoggingOut) return;
+  isLoggingOut = true;
+  const loggingOutUserId = currentUserId ? String(currentUserId).trim() : "";
+  sendMultiplayerLeave();
+  isCharacterSelecting = true;
+  resetInputKeys(keys);
+  document.body.style.pointerEvents = "none";
+  saveGameSnapshot();
+  player.classList.add("is-hidden-before-spawn");
+  playerName.style.display = "none";
+
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    remotePlayers[remoteId].element.remove();
+    delete remotePlayers[remoteId];
+  });
+
+  const finishLogout = function () {
+    if (
+      loggingOutUserId &&
+      window.OVCOnline &&
+      typeof window.OVCOnline.clearAccountAuthSession === "function"
+    ) {
+      Promise.resolve(window.OVCOnline.clearAccountAuthSession(loggingOutUserId)).catch(function () {});
+    }
+    try {
+      sessionStorage.removeItem("ovcGameSessionId");
+      sessionStorage.removeItem("ovcTutorialWorldResetPending");
+      sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
+      sessionStorage.removeItem(ovcTutorialReplaySessionKey);
+      sessionStorage.removeItem("ovcAccountTutorialDoneSyncedV1");
+    } catch (e) {}
+    localStorage.removeItem(currentUserKey);
+    localStorage.removeItem(currentUserIdKey);
+    localStorage.removeItem(currentSessionTokenKey);
+    localStorage.removeItem(currentUserColorKey);
+    localStorage.removeItem(currentUserHasChosenColorKey);
+    localStorage.removeItem(lastSelectedColorKey);
+    if (loggingOutUserId) {
+      localStorage.removeItem("ovcAccountSessionLeaderV1:" + loggingOutUserId);
+      localStorage.removeItem("ovcUserColorV1:" + loggingOutUserId);
+      localStorage.removeItem("ovcUserHasChosenColorV1:" + loggingOutUserId);
+    }
+    sessionStorage.removeItem(currentSessionKey);
+    sessionStorage.removeItem(accountLeaderTokenSessionKey);
+    try {
+      sessionStorage.removeItem(ovcSessionUserIdKey);
+      sessionStorage.removeItem(ovcSessionUserNameKey);
+      sessionStorage.removeItem(ovcSessionTokenKey);
+    } catch (eSessOut) {}
+    window.location.href = "ovc-login.html?v=20260509a";
+  };
+
+  if (multiplayerChannel) {
+    clearMultiplayerReconnectTimeout();
+    isMultiplayerSubscribed = false;
+    const channel = multiplayerChannel;
+    const client =
+      window.OVCOnline && typeof window.OVCOnline.getClient === "function"
+        ? window.OVCOnline.getClient()
+        : null;
+    channel.untrack().finally(function () {
+      channel.unsubscribe();
+      if (client && typeof client.removeChannel === "function") {
+        Promise.resolve(client.removeChannel(channel)).catch(function () {
+          // Continue logout even if cleanup fails.
+        });
+      }
+      multiplayerChannel = null;
+      clearMultiplayerRoomSessionTracking();
+      finishLogout();
+    });
+    return;
+  }
+
+  finishLogout();
+}
+
+function getFitZoom() {
+  return Math.max(
+    window.innerWidth / VISUAL_WORLD_WIDTH,
+    window.innerHeight / VISUAL_WORLD_HEIGHT
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Butterflies
+//
+// Shared multiplayer entity. One "authority" tab simulates motion (lowest
+// sessionId among this client + `remotePlayerStateStore.sessionIdsLastSeen`; same-login
+// tabs are included via player_state / presence / butterfly_state so only one
+// tab runs `simulateButterflyAuthorityStep`). Authority broadcasts `butterfly_state`
+// every `butterflyBroadcastMs`. Others extrapolate snapshot positions and lerp
+// for display. Catch distance uses that same smoothed center on non-authority
+// clients so hitboxes match sprites.
+//
+// Catching: local remove + `butterfly_catch` broadcast (sync dedupe). Tombstones
+// in `butterflyLocalCatchTombstoneById` briefly block stale snapshot resurrections.
+// World DB merges always apply butterfly lists so catches persist across saves.
+// `butterflyCaughtCounts` is per-player localStorage. Tutorial gates catch until
+// onboarding step 18 (`tryCatchButterfly`).
+//
+// Respawn: authority only ??`authoritySpawnButterfliesIfNeeded` vs cap and
+// `butterflyRespawnMs` since `butterflyState.lastSpawnAt`.
+// ----------------------------------------------------------------------------
+
+function loadButterflyCaughtCounts() {
+  try {
+    const raw = getStoredValue(butterflyCaughtCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    butterflyColors.forEach(function (color) {
+      const count = Math.max(0, Math.floor(Number(parsed[color]) || 0));
+      butterflyState.caughtCounts[color] = count;
+    });
+  } catch (error) {
+    // Corrupt save - reset to zeros silently.
+    butterflyColors.forEach(function (color) {
+      butterflyState.caughtCounts[color] = 0;
+    });
+  }
+}
+
+function loadMagicPowderCount() {
+  const raw = Number(getStoredValue(magicPowderCountKey) || 0);
+  magicPowderCount = Math.max(0, Math.floor(raw));
+  migrateLegacyMixedMagicPowderIntoBase();
+}
+
+
+function saveButterflyCaughtCounts() {
+  setStoredValue(
+    butterflyCaughtCountsKey,
+    JSON.stringify(butterflyState.caughtCounts)
+  );
+}
+
+function saveMagicPowderCount() {
+  setStoredValue(magicPowderCountKey, String(Math.max(0, Math.floor(magicPowderCount))));
+}
+
+
+function loadCraftFurnitureCounts() {
+  try {
+    const raw = getStoredValue(craftFurnitureCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    craftFurnitureCounts.craftDesk = Math.max(0, Math.floor(Number(parsed.craftDesk) || 0));
+    craftFurnitureCounts.craftFence = Math.max(0, Math.floor(Number(parsed.craftFence) || 0));
+    craftFurnitureCounts.craftChair = Math.max(0, Math.floor(Number(parsed.craftChair) || 0));
+    craftFurnitureCounts.craftHouse = Math.max(0, Math.floor(Number(parsed.craftHouse) || 0));
+  } catch (e) {}
+}
+
+function saveCraftFurnitureCounts() {
+  setStoredValue(
+    craftFurnitureCountsKey,
+    JSON.stringify({
+      craftDesk: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftDesk) || 0)),
+      craftFence: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftFence) || 0)),
+      craftChair: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftChair) || 0)),
+      craftHouse: Math.max(0, Math.floor(Number(craftFurnitureCounts.craftHouse) || 0))
+    })
+  );
+}
+
+function loadColoredMagicPowderCounts() {
+  try {
+    const raw = getStoredValue(coloredMagicPowderCountsKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    coloredMagicPowderCounts.yellow = Math.max(0, Math.floor(Number(parsed.yellow) || 0));
+    coloredMagicPowderCounts.white = Math.max(0, Math.floor(Number(parsed.white) || 0));
+    coloredMagicPowderCounts.brown = Math.max(0, Math.floor(Number(parsed.brown) || 0));
+    coloredMagicPowderCounts.mixed = Math.max(0, Math.floor(Number(parsed.mixed) || 0));
+  } catch (e) {}
+  migrateLegacyMixedMagicPowderIntoBase();
+}
+
+function saveColoredMagicPowderCounts() {
+  setStoredValue(
+    coloredMagicPowderCountsKey,
+    JSON.stringify({
+      yellow: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.yellow) || 0)),
+      white: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.white) || 0)),
+      brown: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.brown) || 0)),
+      mixed: Math.max(0, Math.floor(Number(coloredMagicPowderCounts.mixed) || 0))
+    })
+  );
+}
+
+function getTotalCaughtButterflies() {
+  return butterflyColors.reduce(function (total, color) {
+    return total + Math.max(0, Number(butterflyState.caughtCounts[color]) || 0);
+  }, 0);
+}
+
+
+
+
+/** ????????????? id?? ???????????? ?? */
+function dedupeButterfliesByIdStable(list) {
+  return butterflyMotion.dedupe(list);
+}
+
+/** ???? ?????(butterflyMaxAlive) ??? ??????????????????? */
+function trimButterflyListToMaxCap(list) {
+  return butterflyMotion.trim(list);
+}
+
+
+
+function clearMultiplayerRoomSessionTracking() {
+  remotePlayerStateStore.clearSessionTracking();
+  multiplayerRoomSessionButterflyStateLastSeen = Object.create(null);
+  lastRemoteWaterSplashAppliedAtBySession = Object.create(null);
+  playerPositionNetwork.resetSendThrottle();
+}
+
+function ensureSyncEventDedupeStore() {
+  if (syncEventDedupeStore) return syncEventDedupeStore;
+  syncEventDedupeStore = createSyncEventDedupeStore({
+    ttlMs: SYNC_EVENT_DEDUPE_TTL_MS,
+    maxEntries: SYNC_EVENT_DEDUPE_MAX,
+    onReject: function (info) {
+      addSyncDebugLog("event_dedupe_reject", {
+        eventId: info.eventId,
+        ageMs: info.ageMs
+      }, true);
+    },
+    onAccept: function (info) {
+      addSyncDebugLog("event_dedupe_accept", {
+        eventId: info.eventId,
+        at: info.now
+      });
+    }
+  });
+  return syncEventDedupeStore;
+}
+
+function makeSyncEventId(kind, entityId, atMs) {
+  return makeSyncEventIdCore(currentSessionId, kind, entityId, atMs);
+}
+
+function consumeSyncEventId(eventId, nowMs) {
+  return ensureSyncEventDedupeStore().consume(eventId, nowMs);
+}
+
+function getRemoteStateSourceRank(source) {
+  return getRemoteStateSourceRankCore(source);
+}
+
+function getRemoteStateVersion(state) {
+  return getRemoteStateVersionCore(state);
+}
+
+function isValidRemotePlayerStatePayload(state) {
+  return isValidRemotePlayerStatePayloadCore(state);
+}
+
+function maybeApplyRemoteWaterSplashFromBroadcast(remoteId, state) {
+  if (!remoteId || !state) return;
+  const now = Date.now();
+  const nextWaterSplashAt = Number(state.waterSplashAt || 0);
+  if (!nextWaterSplashAt) return;
+  if (Math.abs(now - nextWaterSplashAt) > REMOTE_WATER_SPLASH_ACCEPT_MS) return;
+  if (nextWaterSplashAt <= Number(lastRemoteWaterSplashAppliedAtBySession[remoteId] || 0)) {
+    return;
+  }
+  const x = Number(state.waterSplashX);
+  const y = Number(state.waterSplashY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  createWaterSplashAt(x, y);
+  lastRemoteWaterSplashAppliedAtBySession[remoteId] = nextWaterSplashAt;
+}
+
+
+
+/** ????? ????? ???? ????. ????? ???????? ???????? ???(???? presence?????? ????? ????. */
+
+
+function ensureButterflyWaypoint(butterfly, now) {
+  return butterflyMotion.ensureWaypoint(butterfly, now, butterflyAuthorityWaypointById);
+/*
+  let waypoint = butterflyAuthorityWaypointById[butterfly.id];
+  if (!waypoint || now >= waypoint.endAt) {
+    const target = pickButterflyWaypoint(butterfly.x, butterfly.y);
+    const dx = target.x - butterfly.x;
+    const dy = target.y - butterfly.y;
+    const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    // Pixels-per-frame to ms @ ~60fps. ??? ??????? 2.4s????????? ??? ????????? ???? ?????????? ???? ???? + ??? ?????.
+    const msPerFrame = 1000 / 60;
+    const baseDuration = (distance / butterflySpeed) * msPerFrame;
+    const wander = 140 + Math.random() * 420;
+    const duration = Math.round(
+      Math.max(520, Math.min(butterflyLegMaxMs, baseDuration * (0.9 + Math.random() * 0.28) + wander))
+    );
+    waypoint = {
+      startX: butterfly.x,
+      startY: butterfly.y,
+      targetX: target.x,
+      targetY: target.y,
+      startAt: now,
+      endAt: now + duration
+    };
+    butterflyAuthorityWaypointById[butterfly.id] = waypoint;
+  }
+  return waypoint;
+*/
+}
+
+
+
+
+
+
+
+
+
+
+/** ????????(cx, cy) ?? ????????? */
+
+function findCatchableButterfly() {
+  let nearest = null;
+  butterflyState.list.forEach(function (butterfly) {
+    const cx =
+      typeof butterfly._catchProbeCx === "number" && Number.isFinite(butterfly._catchProbeCx)
+        ? butterfly._catchProbeCx
+        : butterfly.x;
+    const cy =
+      typeof butterfly._catchProbeCy === "number" && Number.isFinite(butterfly._catchProbeCy)
+        ? butterfly._catchProbeCy
+        : butterfly.y;
+    const distance = getButterflyCatchDistanceAtWorldCenter(cx, cy);
+    if (distance > butterflyCatchDistance) return;
+    if (!nearest || distance < nearest.distance) {
+      nearest = { butterfly: butterfly, distance: distance };
+    }
+  });
+  return nearest;
+}
+
+function stripButterflyFromSharedList(butterflyId, tombstoneAt) {
+  const id = String(butterflyId || "");
+  if (!id) return false;
+  const ts = Math.max(
+    Number(butterflyLocalCatchTombstoneById[id] || 0),
+    Math.max(0, Number(tombstoneAt) || Date.now())
+  );
+  butterflyLocalCatchTombstoneById[id] = ts;
+  const had = butterflyState.list.some(function (b) {
+    return b.id === id;
+  });
+  butterflyState.list = butterflyState.list.filter(function (other) {
+    return other.id !== id;
+  });
+  removeButterflyRenderEntry(id);
+  return had;
+}
+
+function finalizeButterflyRemovalEffects(now) {
+  const t = now || Date.now();
+  if (!butterflyState.lastSpawnAt || t < butterflyState.lastSpawnAt) {
+    butterflyState.lastSpawnAt = t;
+  }
+  lastButterflyStateChangeAt = t;
+  markWorldDirty();
+}
+
+function broadcastWorldLooseSeedPickup() {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!usesWorldLooseSeedMode()) return;
+  if (!multiplayerChannel || !currentSessionId) return;
+  ensureWorldLooseSeedShape();
+  const ws = getApple().worldLooseSeed;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_loose_seed_pickup", "world-loose-seed", at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_loose_seed_pickup",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        x: Number(ws.x) || WORLD_LOOSE_SEED_X,
+        y: Number(ws.y) || WORLD_LOOSE_SEED_Y,
+        nextSpawnAt: Math.max(0, Number(ws.nextSpawnAt) || 0)
+      }
+    })
+  ).catch(function () {
+    // syncWorldState still persists pickup for polling clients.
+  });
+}
+
+function handleRemoteWorldLooseSeedPickupBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!usesWorldLooseSeedMode()) return;
+  if (!payload || payload.from === currentSessionId) return;
+  if ((payload.x != null && !Number.isFinite(Number(payload.x))) || (payload.y != null && !Number.isFinite(Number(payload.y)))) {
+    addSyncDebugLog("world_loose_seed_reject", { reason: "invalid_position" }, true);
+    return;
+  }
+  const now = getSynchronizedNow();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const evtAt = Math.max(0, Number(payload.at) || 0);
+  if (evtAt > 0 && evtAt <= Number(lastWorldLooseSeedPickupAt || 0)) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "older_event",
+      eventAt: evtAt,
+      lastAppliedAt: lastWorldLooseSeedPickupAt
+    }, true);
+    return;
+  }
+  const nextAt = Math.max(0, Number(payload.nextSpawnAt) || 0);
+  if (nextAt <= now - 250) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "expired_next_spawn",
+      nextAt: nextAt,
+      now: now
+    }, true);
+    return;
+  }
+  ensureWorldLooseSeedShape();
+  const cur = Math.max(0, Number(getApple().worldLooseSeed.nextSpawnAt) || 0);
+  if (nextAt <= cur) {
+    addSyncDebugLog("world_loose_seed_reject", {
+      reason: "older_next_spawn",
+      nextAt: nextAt,
+      currentNextAt: cur
+    }, true);
+    return;
+  }
+  if (evtAt > 0) lastWorldLooseSeedPickupAt = Math.max(lastWorldLooseSeedPickupAt, evtAt);
+  getApple().worldLooseSeed.nextSpawnAt = nextAt;
+  worldLoosePickupLockUntil = Math.max(Number(worldLoosePickupLockUntil || 0), nextAt);
+  syncWorldLoosePickupLock(now);
+  const px = Number(payload.x);
+  const py = Number(payload.y);
+  if (Number.isFinite(px)) getApple().worldLooseSeed.x = px;
+  if (Number.isFinite(py)) getApple().worldLooseSeed.y = py;
+  saveAppleState();
+  markWorldDirty();
+  updateExtraSeedsAndPlants();
+  updateSeedInventory();
+  addSyncDebugLog("world_loose_seed_apply", {
+    eventId: payload.eventId || "",
+    eventAt: evtAt || 0,
+    nextSpawnAt: nextAt
+  });
+}
+
+function broadcastWorldRockPickup(rockId) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!isWorldDocumentEntry()) return;
+  if (!multiplayerChannel || !currentSessionId) return;
+  const rid = String(rockId || "");
+  if (!rid) return;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_rock_pickup", rid, at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_rock_pickup",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        rockId: rid
+      }
+    })
+  ).catch(function () {
+    // syncWorldState still persists pickup for polling clients.
+  });
+}
+
+function handleRemoteWorldRockPickupBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!isWorldDocumentEntry()) return;
+  if (!payload || payload.from === currentSessionId) return;
+  const rockId = String(payload.rockId || "");
+  if (!rockId) return;
+  const now = Date.now();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const evtAt = Math.max(0, Number(payload.at) || 0);
+  if (evtAt > 0 && Math.abs(now - evtAt) > SYNC_EVENT_DEDUPE_TTL_MS) {
+    return;
+  }
+  if (getApple().worldRockPickedIds.includes(rockId)) {
+    if (isLocalRockMining() && String(getPlayer().rockMiningRockId) === rockId) {
+      clearLocalRockMining();
+    }
+    return;
+  }
+  const exists = getApple().worldRocks.some(function (r) {
+    return r && String(r.id) === rockId;
+  });
+  if (!exists) {
+    return;
+  }
+  getApple().worldRockPickedIds.push(rockId);
+  if (isLocalRockMining() && String(getPlayer().rockMiningRockId) === rockId) {
+    clearLocalRockMining();
+  }
+  getSeedWorld().lastWorldRockPickupAt = now;
+  getSeedWorld().lastWorldRockRespawnAt = now;
+  saveAppleState();
+  markWorldDirty();
+  updateWorldRocks();
+  updateRockMineGaugeDom();
+  const remote = remotePlayers[payload.from];
+  if (remote && remote.statusElement) {
+    remote.statusElement.textContent = "\uB3CC \uC218\uC9D1";
+    remote.statusElement.style.display = "block";
+    remote.lastActionAt = Date.now();
+    remote.lastShownAction = "rock_pickup";
+  } else {
+    showPlayerAlert({ message: "\uB3CC \uC218\uC9D1", durationMs: WORLD_ROCK_PICKUP_ACTION_MS });
+  }
+}
+
+function broadcastButterflyCatch(butterflyId) {
+  if (!multiplayerChannel || !currentSessionId) return;
+  const at = Date.now();
+  const bid = String(butterflyId || "");
+  const eventId = makeSyncEventId("butterfly_catch", bid, at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "butterfly_catch",
+      payload: {
+        butterflyId: bid,
+        from: currentSessionId,
+        eventId: eventId,
+        at: at
+      }
+    })
+  ).catch(function () {
+    // World save still carries the removal if broadcast fails.
+  });
+}
+
+function handleRemoteButterflyCatchBroadcast(payload) {
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  if (!payload || !payload.butterflyId) return;
+  if (payload.from === currentSessionId) return;
+  const now = Date.now();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const butterflyId = String(payload.butterflyId || "");
+  if (!butterflyId) return;
+  const evtAt = Math.max(0, Number(payload.at) || now);
+  if (Math.abs(now - evtAt) > SYNC_EVENT_DEDUPE_TTL_MS) {
+    addSyncDebugLog("butterfly_catch_reject", {
+      reason: "clock_out_of_window",
+      butterflyId: butterflyId,
+      now: now,
+      eventAt: evtAt
+    }, true);
+    return;
+  }
+  const tombstoneAt = Number(butterflyLocalCatchTombstoneById[butterflyId] || 0);
+  if (evtAt <= tombstoneAt) {
+    addSyncDebugLog("butterfly_catch_reject", {
+      reason: "older_than_tombstone",
+      butterflyId: butterflyId,
+      eventAt: evtAt,
+      tombstoneAt: tombstoneAt
+    }, true);
+    return;
+  }
+  // Even if this client already dropped it, keep world-state clocks aligned.
+  stripButterflyFromSharedList(butterflyId, evtAt);
+  finalizeButterflyRemovalEffects(evtAt);
+  const remote = remotePlayers[payload.from];
+  if (remote && remote.statusElement) {
+    remote.statusElement.textContent = "\uB098\uBE44 catch";
+    remote.statusElement.style.display = "block";
+    remote.lastActionAt = now;
+    remote.lastShownAction = "butterfly_catch";
+  }
+  addSyncDebugLog("butterfly_catch_apply", {
+    eventId: payload.eventId || "",
+    butterflyId: butterflyId,
+    eventAt: evtAt
+  });
+}
+
+function catchButterflyInstance(butterfly) {
+  if (!butterfly || isPlayerGameplayBlockedByNpcDialogue()) return false;
+  if (shouldDeferButterflyCatchForNearbyRock()) return false;
+  if (isOnboardingLinearGateActive() && getOnboarding().flowStep < ONBOARDING_STEP_BUTTERFLY) {
+    return false;
+  }
+  const probe = getButterflyCatchProbeCenter(butterfly);
+  if (
+    getButterflyCatchDistanceAtWorldCenter(probe.cx, probe.cy) > butterflyCatchDistance
+  ) {
+    return false;
+  }
+  const now = Date.now();
+  if (now - lastLocalButterflyCatchAt < 200) return false;
+
+  lastLocalButterflyCatchAt = now;
+  lastLocalButterflyCatchActionAt = now;
+  const caught = butterfly;
+  stripButterflyFromSharedList(caught.id);
+  if (!butterflyState.caughtCounts[caught.color]) {
+    butterflyState.caughtCounts[caught.color] = 0;
+  }
+  butterflyState.caughtCounts[caught.color] += 1;
+  saveButterflyCaughtCounts();
+
+  broadcastButterflyCatch(caught.id);
+  finalizeButterflyRemovalEffects(now);
+  showPlayerAlert({
+    message: "\uB098\uBE44 catch",
+    durationMs: 2400,
+    butterflyCatch: true
+  });
+  sendMultiplayerPresence(true);
+  updateBagInventorySlots();
+  if (!getStoredFlag(onboardingFlowDoneKey) && getOnboarding().flowStep === ONBOARDING_STEP_BUTTERFLY) {
+    setStoredFlag(tradeMasterDialogueCompleteKey, false);
+    hydrateTradeMasterDialogueComplete(false);
+    getOnboarding().flowStep = ONBOARDING_STEP_TRADE_MASTER;
+    persistOnboardingStep();
+    updateOnboardingFlowUI();
+  }
+  return true;
+}
+
+function tryCatchButterfly() {
+  const target = findCatchableButterfly();
+  if (!target) return false;
+  return catchButterflyInstance(target.butterfly);
+}
+
+
+
+
+
+function handleRemoteButterflyStateBroadcast(payload) {
+  if (!payload || payload.id === currentSessionId) return;
+  if (isSharedWorldSyncPausedForTutorial()) return;
+  const sender = String(payload.id || "").trim();
+  if (sender) {
+    remotePlayerStateStore.sessionIdsLastSeen[sender] = Date.now();
+    remotePlayerStateStore.sessionButterflyActive[sender] = true;
+    multiplayerRoomSessionButterflyStateLastSeen[sender] = Date.now();
+  }
+  if (isButterflyAuthority()) return;
+  const snapshot = payload.butterflies || payload;
+  const sentAt = Number(payload.sentAt) || Date.now();
+  lastButterflyRealtimeStateAt = Math.max(lastButterflyRealtimeStateAt, sentAt);
+  applyButterflySnapshot(snapshot, sentAt);
+}
+
+function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
+  if (!snapshotButterflies || typeof snapshotButterflies !== "object") return;
+  if (!areButterfliesUnlockedForPlantFogWorld()) {
+    if (butterflyState.list.length > 0) {
+      butterflyState.list.forEach(function (b) {
+        if (b && b.id != null) removeButterflyRenderEntry(b.id);
+      });
+      butterflyState.list = [];
+      pruneButterflyAuthorityWaypointsToList();
+    }
+    return;
+  }
+  const now = Date.now();
+  const sampleAt =
+    Number.isFinite(Number(networkSampleAtMs)) && Number(networkSampleAtMs) > 0
+      ? Number(networkSampleAtMs)
+      : now;
+  const recvAt = now;
+  // Purge old tombstones so the map stays bounded.
+  Object.keys(butterflyLocalCatchTombstoneById).forEach(function (id) {
+    if (now - butterflyLocalCatchTombstoneById[id] > BUTTERFLY_LOCAL_CATCH_TOMBSTONE_MS) {
+      delete butterflyLocalCatchTombstoneById[id];
+    }
+  });
+  const incomingList = butterflyMotion.normalizeSnapshotList(snapshotButterflies.list);
+  if (incomingList.length > 0) {
+    hasSeededInitialButterflies = true;
+  }
+  const incomingById = {};
+  incomingList.forEach(function (raw) {
+    if (!raw || !raw.id) return;
+    if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
+    incomingById[String(raw.id)] = raw;
+  });
+
+  // If we are currently the authority we keep our locally-simulated positions
+  // (otherwise we would constantly snap our own broadcasts back onto
+  // ourselves) but still honor catches/spawns by reconciling membership.
+  const iAmAuthority = isButterflyAuthority();
+  const prevLastSpawnAt = butterflyState.lastSpawnAt;
+
+  const nextList = [];
+  if (iAmAuthority) {
+    butterflyState.list.forEach(function (butterfly) {
+      if (incomingById[butterfly.id]) {
+        nextList.push(butterfly);
+        delete incomingById[butterfly.id];
+      } else {
+        // Removed remotely (e.g. someone else caught it before our save
+        // landed). Drop it locally too.
+        removeButterflyRenderEntry(butterfly.id);
+      }
+    });
+    Object.keys(incomingById).forEach(function (id) {
+      const raw = incomingById[id];
+      const spawn = clampButterflyPointToActiveBounds(raw.x, raw.y);
+      const butterfly = createButterfly(Date.now(), {
+        id: raw.id,
+        color: raw.color,
+        spawn
+      });
+      butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
+      butterfly.spawnedAt = getNumericButterflyValue(raw.spawnedAt, Date.now());
+      nextList.push(butterfly);
+    });
+  } else {
+    const activeBounds = getActiveButterflyBounds();
+    incomingList.forEach(function (raw) {
+      if (!raw || !raw.id) return;
+      if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
+      const existing = butterflyState.list.find(function (b) {
+        return b.id === raw.id;
+      });
+      const butterfly = existing || {
+        id: String(raw.id),
+        color: raw.color || pickRandomButterflyColor(),
+        spawnedAt: getNumericButterflyValue(raw.spawnedAt, Date.now())
+      };
+      butterfly.color = raw.color || butterfly.color;
+      butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
+      const needsPosition =
+        !existing ||
+        isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds);
+      if (needsPosition) {
+        const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
+        butterfly.x = nextPoint.x;
+        butterfly.y = nextPoint.y;
+        butterfly.lastPathX = nextPoint.x;
+        butterfly.lastPathY = nextPoint.y;
+      }
+      nextList.push(butterfly);
+    });
+    // Drop any local butterflies the authority no longer reports.
+    butterflyState.list.forEach(function (butterfly) {
+      const stillExists = nextList.some(function (b) {
+        return b.id === butterfly.id;
+      });
+      if (!stillExists) removeButterflyRenderEntry(butterfly.id);
+    });
+  }
+
+  let merged = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(nextList));
+  butterflyState.list = merged;
+  pruneButterflyAuthorityWaypointsToList();
+
+  const rawLast = snapshotButterflies.lastSpawnAt;
+  const parsedLast = Number(rawLast);
+  const hasValidSnapshotSpawnAt =
+    Number.isFinite(parsedLast) && parsedLast > 0;
+
+  if (hasValidSnapshotSpawnAt) {
+    butterflyState.lastSpawnAt = parsedLast;
+  } else if (butterflyState.list.length === 0) {
+    butterflyState.lastSpawnAt = hasSeededInitialButterflies ? now : 0;
+  } else {
+    const prevN = Number(prevLastSpawnAt);
+    butterflyState.lastSpawnAt =
+      Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
+  }
+  if (butterflyState.list.length > 0) {
+    spreadButterfliesWithinActiveBounds();
+    pruneButterflyAuthorityWaypointsToList();
+  }
+}
+
+const gameLoopHost = {
+  get gameLoopCyclesForTutorialSync() {
+    return gameLoopCyclesForTutorialSync;
+  },
+  set gameLoopCyclesForTutorialSync(value) {
+    gameLoopCyclesForTutorialSync = value;
+  },
+  syncLocalPlayerVisibility,
+  requestAccountTutorialDoneSync,
+  respawnApplesIfNeeded,
+  tickWorldRockRespawn,
+  tickWorldBagDropDespawn,
+  tickLocalRockMining,
+  refillWellIfNeeded,
+  movementTutorial,
+  tickPlayerPosition,
+  onboardingCheckJumpFinish,
+  updateSeedPosition,
+  updateExtraSeedsAndPlants,
+  updateBucketPosition,
+  tickPlayerHealth,
+  refreshPlantIdentityOrdinals,
+  updatePlantState,
+  updateNpcPosition,
+  updateAlchemyCraftEffects,
+  tickOnboardingWaterDoneCongrats,
+  pruneStaleRemotePlayers,
+  updateButterflies,
+  updateRemotePlayerSmoothing,
+  sendMultiplayerPresence,
+  savePlayerPosition,
+  renderPlayerPosition,
+  updateSeedInventory,
+  updatePlayerStatus,
+  updatePlayerHealthUi,
+  updateSeedCard,
+  updateGuideCard,
+  updatePlantProgressGauge,
+  updateWorldRockMineGauges,
+  updateOnboardingFlowUI,
+  updatePlayerAlert,
+  updateMagicPowderInventoryUi,
+  updateCamera,
+  updatePlayerName,
+  updateWorldSocialOverlaysInGameLoop
+};
+
+const gameLoop = createGameLoop(gameLoopHost, function () {
+  return isTabSessionSuperseded || !ovcBootstrapFinished;
+});
+
+function savePlayerPosition(forceSave) {
+  const now = Date.now();
+  if (!forceSave && now - getPlayer().lastPositionSavedAt < 400) return;
+
+  setStoredValue(
+    playerPositionKey,
+    JSON.stringify({
+      x: getPlayer().x,
+      depth: getPlayer().depth,
+      savedAt: now
+    })
+  );
+  getPlayer().lastPositionSavedAt = now;
+}
+
+function loadPlayerPosition() {
+  getPlayer().x = spawnPlayerX;
+  getPlayer().depth = spawnPlayerDepth;
+  getPlayer().jumpY = 0;
+  getPlayer().velocityY = 0;
+  getPlayer().isOnGround = true;
+  setWorldPosition(localPlayerRoot, getPlayer().x, getPlayerWorldY());
+  updatePlayerColorBodyPosition();
+  updateCamera();
+  savePlayerPosition(true);
+}
+
+function setup() {
+  const seedSize = getSeedSize();
+  const bucketSize = getBucketSize();
+  const wellSize = getWellSize();
+
+  setWorldSize(localPlayerRoot, getLocalPlayerBodyWidth(), getPlayer().sittingChairId ? getLocalPlayerBodyHeight() : undefined);
+  setWorldSize(playerColorBody, getLocalPlayerBodyWidth(), getLocalPlayerBodyHeight());
+  if (getPlayer().sittingChairId || (player && player.classList.contains("is-sitting"))) {
+    syncLocalPlayerPoseVisual();
+  }
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    setWorldSize(remotePlayers[remoteId].element, PLAYER_WIDTH);
+  });
+  setWorldSize(spawnPortal, spawnPortalWidth, spawnPortalHeight);
+  setWorldSize(seed, SEED_SIZE);
+  getApple().extraSeeds.forEach(function (extraSeed) {
+    if (extraSeed.element) setWorldSize(extraSeed.element, SEED_SIZE);
+  });
+  getApple().extraPlants.forEach(function (plant) {
+    if (plant.spotElement) setWorldSize(plant.spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
+    if (plant.waterNeededElement) setWorldSize(plant.waterNeededElement, WATER_NEEDED_SIZE);
+    if (plant.sproutElement) setWorldSize(plant.sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
+  });
+  setWorldSize(bucket, BUCKET_SIZE);
+  setWorldSize(playerBucketOverlay, BUCKET_SIZE);
+  setWorldSize(well, WELL_SIZE);
+  setWorldSize(plantSpot, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
+  setWorldSize(waterNeeded, WATER_NEEDED_SIZE);
+  setWorldSize(sprout, SPROUT_WIDTH, SPROUT_HEIGHT);
+  setWorldSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
+  setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
+  if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
+  if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);
+  setWorldSize(signBoard, SIGN_WIDTH, SIGN_HEIGHT);
+  setWorldSize(guideBook, GUIDE_BOOK_WIDTH, GUIDE_BOOK_HEIGHT);
+  if (worldBag) setWorldSize(worldBag, WORLD_BAG_WIDTH, WORLD_BAG_HEIGHT);
+  applyGuideTexts();
+
+  if (!isSetupComplete) {
+    getWorldItems().seedX = SEED_START_X;
+    getWorldItems().seedY = SEED_START_Y;
+    getWorldItems().wellX = WELL_START_X;
+    getWorldItems().wellY = WELL_START_Y;
+    getWorldItems().bucketX = getWorldItems().wellX - BUCKET_SIZE - 8;
+    getWorldItems().bucketY = getWorldItems().wellY + WELL_SIZE - BUCKET_SIZE;
+    isSetupComplete = true;
+  }
+
+  initializeZoom();
+  setWorldPosition(bigTree, BIG_TREE_X, BIG_TREE_Y);
+  setWorldPosition(spawnPortal, spawnPortalX, spawnPortalY);
+  setWorldPosition(well, getWorldItems().wellX, getWorldItems().wellY);
+  setWorldPosition(signBoard, getWorldItems().signX, getWorldItems().signY);
+  setWorldPosition(guideBook, getWorldItems().guideBookX, getWorldItems().guideBookY);
+  if (worldBag) setWorldPosition(worldBag, getWorldItems().worldBagX, getWorldItems().worldBagY);
+  syncWorldBagGroundVisibility();
+  syncGuideInventoryBar();
+  setWorldPosition(plantSpot, getPlant().spotX, getPlant().spotY);
+  if (worldPlantFog) {
+    syncWorldPlantFogVisuals();
+  }
+  updateWellImage();
+  updateSeedPosition();
+  updateBucketPosition();
+  updatePlantState();
+  updateWorldRocks();
+  updateCamera();
+}
+
+ovcInitScriptLayers();
+
+(async function ovcRunBootstrap() {
+try {
+  if (currentUserId) {
+    ovcApplyForceWorldHubBypassLoggedIn();
+    repairOnboardingCompletionFromStoredStep();
+    restoreWorldHubIfVeteranWithoutActiveReplay();
+    await syncTutorialDoneFromServerIfNeeded();
+    if (getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
+  }
+  prepareTutorialWorldLoadBeforeSetup();
+  setup();
+  if (currentUserId) {
+    ovcApplyForceWorldHubBypassLoggedIn();
+    if (getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
+  }
+  let ovcAbortedPageInit = false;
+  if (
+    isTutorialDocumentEntry() &&
+    currentUserId &&
+    getStoredFlag(onboardingFlowDoneKey) &&
+    !ovcTutorialIntentionalEntryActive()
+  ) {
+    ovcAbortedPageInit = true;
+    ovcHardNavigateToWorldIndex();
+  } else if (
+    isWorldDocumentEntry() &&
+    currentUserId &&
+    !getStoredFlag(onboardingFlowDoneKey)
+  ) {
+    ovcAbortedPageInit = true;
+    try {
+      sessionStorage.setItem("ovcTutorialWorldResetPending", "1");
+    } catch (eTutRedirect) {}
+    window.location.replace(ovcTutorialPageUrl());
+  }
+  if (!ovcAbortedPageInit) {
+    if (
+      isTutorialDocumentEntry() &&
+      ovcForceWorldHubIsRequested() &&
+      !currentUserId
+    ) {
+      ovcHardNavigateToWorldIndex();
+    } else if (
+      isTutorialDocumentEntry() &&
+      currentUserId &&
+      ovcForceWorldHubIsRequested()
+    ) {
+      ovcApplyForceWorldHubBypassLoggedIn();
+      ovcHardNavigateToWorldIndex();
+    } else {
+    applyTutorialWorldResetIfPending();
+    loadWellState();
+    loadSeedState();
+    loadAppleState();
+    loadBucketState();
+    if (isTutorialDocumentEntry()) {
+      clearTutorialSessionWorldFloorPickupFlags();
+    }
+    loadGuideBookState();
+    if (currentUserId && getStoredFlag(onboardingFlowDoneKey)) {
+      setStoredFlag(everBeenToWorldKey, true);
+    }
+    loadPlayerPosition();
+    loadPlayerHealth();
+    loadButterflyCaughtCounts();
+    loadMagicPowderCount();
+    loadRockInventoryCount();
+    loadPlayerMoneyKrw();
+    updateBagInventorySlots();
+    updateMagicPowderInventoryUi();
+    addNetworkDebugLog(
+      "init: configured=" +
+      Boolean(window.OVCOnline && window.OVCOnline.isConfigured()) +
+      ", user=" +
+      (currentUserId || "-") +
+      ", color=" +
+      selectedPlayerColor
+    );
+    try {
+      if (sessionStorage.getItem("ovcPostTutorialMultiplayerReconnectV1") === "1") {
+        sessionStorage.removeItem("ovcPostTutorialMultiplayerReconnectV1");
+        if (
+          hasSpawnedCharacter &&
+          currentUserId &&
+          !isSharedWorldSyncPausedForTutorial() &&
+          isWorldServerSyncAvailable()
+        ) {
+          hasHydratedSharedWorldFromServer = false;
+          pollWorldState(true);
+        }
+      }
+    } catch (postTutorialReconnect) {}
+    if (isWorldServerSyncAvailable() && !isSharedWorldSyncPausedForTutorial()) {
+      showAppLoadingScreen(LOADING_TEXT_WORLD, { force: true });
+      pollWorldState(true);
+    } else {
+      hasHydratedSharedWorldFromServer = true;
+    }
+    openCharacterSelectIfNeeded();
+    }
+  }
+  ovcBootstrapFinished = true;
+  finishDevResetBoot(
+    resetGameForTesting,
+    resetTutorialForTesting,
+    isWorldDocumentEntry,
+    isTutorialDocumentEntry
+  );
+  window.__OVC_BOOT_FINISHED__ = true;
+  if (isSharedWorldSyncPausedForTutorial() || !isWorldServerSyncAvailable()) {
+    ovcTryDismissLoadingScreen(true);
+  } else {
+    ovcTryDismissLoadingScreen(false);
+  }
+} catch (initError) {
+  console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
+  ovcBootstrapFinished = true;
+  finishDevResetBoot(
+    resetGameForTesting,
+    resetTutorialForTesting,
+    isWorldDocumentEntry,
+    isTutorialDocumentEntry
+  );
+  window.__OVC_BOOT_FINISHED__ = true;
+  ovcTryDismissLoadingScreen(true);
+}
+})();
+attachCoreRuntimeTimers({
+  gameLoop: gameLoop,
+  isTabSessionSuperseded: function () {
+    return isTabSessionSuperseded;
+  },
+  pollWorldState: pollWorldState,
+  syncWorldState: syncWorldState,
+  sendMultiplayerPresence: sendMultiplayerPresence,
+  validateCurrentAccount: validateCurrentAccount,
+  updateCamera: updateCamera,
+  ovcTryDismissLoadingScreen: ovcTryDismissLoadingScreen,
+  getMultiplayerWorldSyncLoopMs: getMultiplayerWorldSyncLoopMs,
+  hasHydratedSharedWorldFromServer: function () {
+    return hasHydratedSharedWorldFromServer;
+  },
+  isWorldServerSyncAvailable: isWorldServerSyncAvailable,
+  onWindowResize: function () {
+    setup();
+    getCamera().zoom = clampZoom(getCamera().zoom);
+    updateCamera();
+  }
+});
