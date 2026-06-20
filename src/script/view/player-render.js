@@ -241,9 +241,8 @@ export function createModule(d) {
     Math.min(targetX, window.innerWidth - halfTextWidth)
   );
   const yWorld = d.toScreenY(playerBox.top + 26);
-  const rockMining =
-    typeof d.getLocalRockMining === "function" ? d.getLocalRockMining() : null;
-  const rockMiningActive = Boolean(rockMining && rockMining.rockId);
+  const rockMiningRockId = String(d.getPlayer().rockMiningRockId || "");
+  const rockMiningActive = rockMiningRockId !== "";
 
   if (rockMiningActive && d.playerStatus) {
     d.playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";

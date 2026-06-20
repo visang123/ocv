@@ -140,7 +140,9 @@ export function createPlayerState(initialX = 100) {
     wasInTree: false,
     isTreeFalling: false,
     lastPositionSavedAt: 0,
-    lastMovementTickMs: 0
+    lastMovementTickMs: 0,
+    rockMiningRockId: "",
+    rockMiningStartedAt: 0
   };
 }
 

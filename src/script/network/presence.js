@@ -184,6 +184,13 @@ export function createModule(d) {
   const shouldShowButterflyCatchAction =
     now - Number(d.lastLocalButterflyCatchActionAt || 0) <= d.REMOTE_BUTTERFLY_CATCH_ACTION_MS;
   const localRockMining = d.getLocalRockMining && d.getLocalRockMining();
+  const playerRockMiningId = String(d.getPlayer().rockMiningRockId || "");
+  const miningRockId = localRockMining
+    ? String(localRockMining.rockId || "")
+    : playerRockMiningId;
+  const miningStartedAt = localRockMining
+    ? Number(localRockMining.startedAt) || 0
+    : Number(d.getPlayer().rockMiningStartedAt) || 0;
   const state = {
     id: d.currentSessionId,
     userId: d.currentUserId,
@@ -194,15 +201,15 @@ export function createModule(d) {
         ? d.getCraftFurnitureInstallPresenceAction(d.craftFurnitureInstallingKind) || "state"
         : d.getApple().isEating
           ? "eating"
-          : localRockMining
+          : miningRockId
             ? "rock_mining"
             : shouldShowWorldRockPickupAction
               ? "rock_pickup"
               : shouldShowButterflyCatchAction
                 ? "butterfly_catch"
                 : "state",
-    rockMiningRockId: localRockMining ? String(localRockMining.rockId || "") : "",
-    rockMiningStartedAt: localRockMining ? Number(localRockMining.startedAt) || 0 : 0,
+    rockMiningRockId: miningRockId,
+    rockMiningStartedAt: miningStartedAt,
     room: window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom,
     color: d.selectedPlayerColor,
     x: d.getPlayer().x,

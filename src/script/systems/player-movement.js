@@ -282,9 +282,7 @@ export function createModule(d) {
   }
 
   function isPlayerTimedActionBusy() {
-  if (typeof d.isLocalRockMining === "function" && d.isLocalRockMining()) return true;
-  const rockMining = typeof d.getLocalRockMining === "function" ? d.getLocalRockMining() : null;
-  if (rockMining && rockMining.rockId) return true;
+  if (String(d.getPlayer().rockMiningRockId || "")) return true;
   return d.getPlant().isPlanting || d.getApple().isEating || d.isCraftFurnitureInstalling();
   }
 
@@ -376,9 +374,7 @@ export function createModule(d) {
     return;
   }
 
-  const activeRockMining =
-    typeof d.getLocalRockMining === "function" ? d.getLocalRockMining() : null;
-  if (activeRockMining && activeRockMining.rockId) {
+  if (String(d.getPlayer().rockMiningRockId || "")) {
     if (typeof d.resetInputKeys === "function" && d.keys) {
       d.resetInputKeys(d.keys);
     }

@@ -425,9 +425,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260531a";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260531a";
-import { initScriptView } from "./src/script/view/index.js?v=20260531a";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260613g";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260613g";
+import { initScriptView } from "./src/script/view/index.js?v=20260613g";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1480,23 +1480,109 @@ let localRockMining = null;
 let rockMiningFinishTimeoutId = 0;
 
 function getLocalRockMining() {
-  return localRockMining;
+  const player = getPlayer();
+  const rockId = String(player && player.rockMiningRockId || "");
+  if (!rockId) return null;
+  return {
+    rockId: rockId,
+    startedAt: Number(player.rockMiningStartedAt) || 0
+  };
 }
 
 function isLocalRockMining() {
-  return localRockMining != null && localRockMining.rockId != null && localRockMining.rockId !== "";
+  return Boolean(getPlayer().rockMiningRockId);
 }
 
 function clearLocalRockMining() {
-  if (!localRockMining && !rockMiningFinishTimeoutId) return;
+  if (!isLocalRockMining() && !rockMiningFinishTimeoutId) return;
+  getPlayer().rockMiningRockId = "";
+  getPlayer().rockMiningStartedAt = 0;
   localRockMining = null;
   if (rockMiningFinishTimeoutId) {
     window.clearTimeout(rockMiningFinishTimeoutId);
     rockMiningFinishTimeoutId = 0;
   }
-  playerStatus.textContent = "";
+  if (playerStatus) {
+    playerStatus.textContent = "";
+  }
   updatePlayerStatus();
   sendMultiplayerPresence(true);
+}
+
+function ensureRockMineGaugeElements(rock) {
+  if (!rock || !rock._el) return null;
+  if (rock._mineGaugeEl && rock._mineGaugeFillEl && rock._mineGaugeEl.isConnected) {
+    return rock._mineGaugeEl;
+  }
+  rock._el.querySelectorAll(".world-rock-mine-gauge").forEach(function (node) {
+    node.remove();
+  });
+  const gauge = document.createElement("div");
+  gauge.className = "world-rock-mine-gauge";
+  gauge.setAttribute("aria-hidden", "true");
+  const track = document.createElement("div");
+  track.className = "world-rock-mine-gauge__track";
+  const fill = document.createElement("div");
+  fill.className = "world-rock-mine-gauge__fill";
+  track.appendChild(fill);
+  gauge.appendChild(track);
+  rock._el.appendChild(gauge);
+  rock._mineGaugeEl = gauge;
+  rock._mineGaugeFillEl = fill;
+  return gauge;
+}
+
+function collectActiveRockMiningSessionsByRock(nowMs) {
+  const byRock = Object.create(null);
+  const durationMs = Math.max(1, Number(WORLD_ROCK_MINE_MS) || 60000);
+  const now = Number(nowMs) || Date.now();
+  const local = getLocalRockMining();
+  if (local && local.rockId && local.startedAt) {
+    if (now - local.startedAt < durationMs) {
+      byRock[String(local.rockId)] = { startedAt: local.startedAt, durationMs: durationMs };
+    }
+  }
+  Object.keys(remotePlayers).forEach(function (remoteId) {
+    const rp = remotePlayers[remoteId];
+    if (!rp) return;
+    const rockId = String(rp.rockMiningRockId || "");
+    const startedAt = Number(rp.rockMiningStartedAt) || 0;
+    if (!rockId || !startedAt || now - startedAt >= durationMs) return;
+    const prev = byRock[rockId];
+    if (!prev || startedAt < prev.startedAt) {
+      byRock[rockId] = { startedAt: startedAt, durationMs: durationMs };
+    }
+  });
+  return byRock;
+}
+
+function updateRockMineGaugeDom() {
+  if (!Array.isArray(getApple().worldRocks)) return;
+  const now = Date.now();
+  const sessionsByRock = collectActiveRockMiningSessionsByRock(now);
+  getApple().worldRocks.forEach(function (rock) {
+    if (!rock || !rock._el) return;
+    const rockId = String(rock.id);
+    const picked = getApple().worldRockPickedIds.includes(rock.id);
+    if (picked) {
+      if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+      return;
+    }
+    const session = sessionsByRock[rockId];
+    if (!session) {
+      if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+      return;
+    }
+    const gauge = ensureRockMineGaugeElements(rock);
+    const fill = rock._mineGaugeFillEl;
+    if (!gauge || !fill) return;
+    gauge.style.display = "block";
+    const progress = Math.max(
+      0,
+      Math.min(1, (now - session.startedAt) / session.durationMs)
+    );
+    fill.style.width = Math.round(progress * 100) + "%";
+  });
 }
 
 function isRockBeingMinedByOther(rockId, nowMs) {
@@ -1527,7 +1613,7 @@ function completeWorldRockPickup(rock) {
   saveAppleState();
   holdLocalAppleStateAgainstStaleSnapshot(1200);
   updateWorldRocks();
-  updateWorldRockMineGauges();
+  updateRockMineGaugeDom();
   updateBagInventorySlots();
   markWorldDirty();
   if (isWorldDocumentEntry()) {
@@ -1540,8 +1626,8 @@ function completeWorldRockPickup(rock) {
 }
 
 function finishLocalRockMining() {
-  if (!localRockMining) return;
-  const rockId = String(localRockMining.rockId || "");
+  if (!isLocalRockMining()) return;
+  const rockId = String(getPlayer().rockMiningRockId || "");
   clearLocalRockMining();
   if (!rockId) return;
   const rock = getApple().worldRocks.find(function (candidate) {
@@ -1572,9 +1658,11 @@ function startRockMining(rock) {
     return false;
   }
   localRockMining = { rockId: rockId, startedAt: Date.now() };
+  getPlayer().rockMiningRockId = rockId;
+  getPlayer().rockMiningStartedAt = localRockMining.startedAt;
   resetInputKeys(keys);
-  plantProximityWarnUntil = localRockMining.startedAt + WORLD_ROCK_MINE_MS + 200;
-  playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";
+  flashPlantProximityWarning("\uB3CC\uCE98\uB294 \uC911");
+  plantProximityWarnUntil = localRockMining.startedAt + WORLD_ROCK_MINE_MS + 500;
   updatePlayerStatus();
   sendMultiplayerPresence(true);
   if (rockMiningFinishTimeoutId) {
@@ -1584,18 +1672,22 @@ function startRockMining(rock) {
     rockMiningFinishTimeoutId = 0;
     finishLocalRockMining();
   }, WORLD_ROCK_MINE_MS);
-  updateWorldRockMineGauges();
+  updateRockMineGaugeDom();
   return true;
 }
 
 function tickLocalRockMining(nowMs) {
-  if (!localRockMining || !localRockMining.rockId) return;
+  if (!isLocalRockMining()) return;
   const now = Number(nowMs) || Date.now();
-  const elapsed = now - Number(localRockMining.startedAt) || 0;
-  plantProximityWarnUntil = localRockMining.startedAt + WORLD_ROCK_MINE_MS + 200;
-  if (playerStatus && !playerStatus.textContent) {
+  const startedAt = Number(getPlayer().rockMiningStartedAt) || 0;
+  const elapsed = now - startedAt;
+  plantProximityWarnUntil = startedAt + WORLD_ROCK_MINE_MS + 500;
+  if (playerStatus) {
     playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";
+    playerStatus.style.display = "block";
   }
+  resetInputKeys(keys);
+  updateRockMineGaugeDom();
   if (elapsed >= WORLD_ROCK_MINE_MS) {
     finishLocalRockMining();
   }
@@ -8741,7 +8833,10 @@ function isPlayerInWellWaterArea() { return _systemsApi ? _systemsApi.isPlayerIn
 function isPlayerInsideEnteredCraftHouse() { return _systemsApi ? _systemsApi.isPlayerInsideEnteredCraftHouse() : undefined; }
 function isPlayerNearTreeTrunk() { return _systemsApi ? _systemsApi.isPlayerNearTreeTrunk() : undefined; }
 function isPlayerSupportedByTree() { return _systemsApi ? _systemsApi.isPlayerSupportedByTree() : undefined; }
-function isPlayerTimedActionBusy() { return _systemsApi ? _systemsApi.isPlayerTimedActionBusy() : undefined; }
+function isPlayerTimedActionBusy() {
+  if (isLocalRockMining()) return true;
+  return _systemsApi ? _systemsApi.isPlayerTimedActionBusy() : false;
+}
 function isPowderUpgradeInProgress(plant) { return _systemsApi ? _systemsApi.isPowderUpgradeInProgress(plant) : undefined; }
 function isSharedWorldMergeActive() { return _systemsApi ? _systemsApi.isSharedWorldMergeActive() : undefined; }
 function isSproutStage3Or5IdleNoGrowth(plant, now) { return _systemsApi ? _systemsApi.isSproutStage3Or5IdleNoGrowth(plant, now) : undefined; }
@@ -8775,7 +8870,13 @@ function standUpFromChair() { return _systemsApi ? _systemsApi.standUpFromChair(
 function syncWorldState(forceSave, options) { return _systemsApi ? _systemsApi.syncWorldState(forceSave, options) : undefined; }
 function teardownWorldBagDropDom(drop) { return _systemsApi ? _systemsApi.teardownWorldBagDropDom(drop) : undefined; }
 function tickPlayerHealth(nowMs) { return _systemsApi ? _systemsApi.tickPlayerHealth(nowMs) : undefined; }
-function tickPlayerPosition() { return _systemsApi ? _systemsApi.tickPlayerPosition() : undefined; }
+function tickPlayerPosition() {
+  if (isLocalRockMining()) {
+    resetInputKeys(keys);
+    return;
+  }
+  return _systemsApi ? _systemsApi.tickPlayerPosition() : undefined;
+}
 function tickWorldBagDropDespawn(now) { return _systemsApi ? _systemsApi.tickWorldBagDropDespawn(now) : undefined; }
 function tickWorldRockRespawn(now) { return _systemsApi ? _systemsApi.tickWorldRockRespawn(now) : undefined; }
 function tryRespawnOneWorldRockIfBelowCap() { return _systemsApi ? _systemsApi.tryRespawnOneWorldRockIfBelowCap() : undefined; }
@@ -8786,7 +8887,12 @@ function updateWellCard() { return _systemsApi ? _systemsApi.updateWellCard() : 
 function updateWellImage() { return _systemsApi ? _systemsApi.updateWellImage() : undefined; }
 function updateWorldBagDropDom(forceRebuild) { return _systemsApi ? _systemsApi.updateWorldBagDropDom(forceRebuild) : undefined; }
 function updateWorldRocks() { return _systemsApi ? _systemsApi.updateWorldRocks() : undefined; }
-function updateWorldRockMineGauges() { return _systemsApi ? _systemsApi.updateWorldRockMineGauges() : undefined; }
+function updateWorldRockMineGauges() {
+  updateRockMineGaugeDom();
+  if (_systemsApi && _systemsApi.updateWorldRockMineGauges) {
+    return _systemsApi.updateWorldRockMineGauges();
+  }
+}
 function worldRockOverlapsAnyAvoidRect(rockRect, zones) { return _systemsApi ? _systemsApi.worldRockOverlapsAnyAvoidRect(rockRect, zones) : undefined; }
 function worldRockRect(x, y, size) { return _systemsApi ? _systemsApi.worldRockRect(x, y, size) : undefined; }
 
@@ -16037,7 +16143,7 @@ function handleRemoteWorldRockPickupBroadcast(payload) {
     return;
   }
   if (getApple().worldRockPickedIds.includes(rockId)) {
-    if (localRockMining && String(localRockMining.rockId) === rockId) {
+    if (isLocalRockMining() && String(getPlayer().rockMiningRockId) === rockId) {
       clearLocalRockMining();
     }
     return;
@@ -16049,7 +16155,7 @@ function handleRemoteWorldRockPickupBroadcast(payload) {
     return;
   }
   getApple().worldRockPickedIds.push(rockId);
-  if (localRockMining && String(localRockMining.rockId) === rockId) {
+  if (isLocalRockMining() && String(getPlayer().rockMiningRockId) === rockId) {
     clearLocalRockMining();
   }
   getSeedWorld().lastWorldRockPickupAt = now;
@@ -16057,7 +16163,7 @@ function handleRemoteWorldRockPickupBroadcast(payload) {
   saveAppleState();
   markWorldDirty();
   updateWorldRocks();
-  updateWorldRockMineGauges();
+  updateRockMineGaugeDom();
   const remote = remotePlayers[payload.from];
   if (remote && remote.statusElement) {
     remote.statusElement.textContent = "\uB3CC \uC218\uC9D1";
