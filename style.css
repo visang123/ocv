@@ -147,8 +147,8 @@ body::-webkit-scrollbar {
 }
 
 .world {
-  width: 960px;
-  height: 540px;
+  width: 1440px;
+  height: 810px;
   background: #9adbf5;
   position: absolute;
   left: 0;
@@ -162,7 +162,7 @@ body::-webkit-scrollbar {
   left: 0;
   bottom: 0;
   width: 100%;
-  height: 324px;
+  height: 486px;
   background: rgb(95, 206, 95);
   overflow: visible;
 }
@@ -1714,6 +1714,36 @@ body::-webkit-scrollbar {
   display: none;
   user-select: none;
   pointer-events: none;
+}
+
+#player-status.is-rock-mining {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+#player-status .player-status__label {
+  font: inherit;
+}
+
+#player-status .player-status__cancel {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 2px;
+  padding: 0 2px;
+  background: rgba(248, 250, 252, 0.98);
+  color: #111;
+  font: 700 3.8px/1.2 Arial, sans-serif;
+}
+
+#player-status .player-status__cancel:hover {
+  background: #fff;
 }
 
 #player-name {

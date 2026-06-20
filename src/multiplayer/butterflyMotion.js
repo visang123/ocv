@@ -266,7 +266,11 @@ export function createButterflyMotionController(config) {
           point = pickSpawnPoint();
         } else {
           point = clampPoint({ x: px, y: py }, bounds);
-          if (px <= bounds.left + 2 && py <= bounds.top + 2) {
+          const legacyTop = Math.max(bounds.top, config.bounds.top) + 36;
+          if (
+            (px <= bounds.left + 4 && py <= bounds.top + 4) ||
+            (px <= config.bounds.left + 4 && py <= legacyTop)
+          ) {
             point = pickSpawnPoint();
           }
         }

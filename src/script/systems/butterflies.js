@@ -97,13 +97,29 @@ export function createModule(d) {
   });
   }
 
-  function isUnsetButterflyCoord(x, y, bounds) {
+  function isLegacyCornerButterflyCoord(x, y, bounds) {
   const nx = Number(x);
   const ny = Number(y);
   if (!Number.isFinite(nx) || !Number.isFinite(ny)) return true;
   if (nx === 0 && ny === 0) return true;
-  if (nx <= bounds.left + 2 && ny <= bounds.top + 2) return true;
+  if (nx <= bounds.left + 4 && ny <= bounds.top + 4) return true;
+  const legacyTop = Math.max(bounds.top, d.butterflyBoundsTop) + 36;
+  if (nx <= d.butterflyBoundsLeft + 4 && ny <= legacyTop) return true;
   return false;
+  }
+
+  function isUnsetButterflyCoord(x, y, bounds) {
+  return isLegacyCornerButterflyCoord(x, y, bounds);
+  }
+
+  function shouldRelocateButterfliesInBounds() {
+  if (!d.butterflyState.list.length) return false;
+  if (d.areButterfliesClusteredInActiveBounds()) return true;
+  const bounds = d.getActiveButterflyBounds();
+  return d.butterflyState.list.some(function (butterfly) {
+    if (!butterfly) return false;
+    return d.isLegacyCornerButterflyCoord(butterfly.x, butterfly.y, bounds);
+  });
   }
 
   function areButterfliesClusteredInActiveBounds() {
@@ -228,7 +244,7 @@ export function createModule(d) {
   }
 
   function spreadButterfliesWithinActiveBounds() {
-  if (!d.areButterfliesClusteredInActiveBounds()) return false;
+  if (!d.shouldRelocateButterfliesInBounds()) return false;
   const list = d.butterflyState.list;
   if (!list.length) return false;
   let changed = false;
@@ -507,7 +523,6 @@ export function createModule(d) {
   // seed butterflies while another is still loading the existing population.
   const onlineAvailable = d.isWorldServerSyncAvailable();
   const sharedHydrated = d.hasHydratedSharedWorldFromServer || !onlineAvailable;
-  const butterfliesUnlocked = d.areButterfliesUnlockedForPlantFogWorld();
 
   if (sharedHydrated && d.isButterflyAuthority()) {
     if (!d.areButterfliesUnlockedForPlantFogWorld()) {
@@ -537,8 +552,8 @@ export function createModule(d) {
   }
   // ???? ???? ?????? ????? ????????????????? sessionId)???????. ??????????
   // ??? ????????????? ????2?????????????????
-  // Local flight sim — always when unlocked; multiplayer only syncs spawn/catch.
-  if (butterfliesUnlocked && d.butterflyState.list.length > 0) {
+  // Local flight sim — always run when butterflies exist on screen.
+  if (d.butterflyState.list.length > 0) {
     if (d.spreadButterfliesWithinActiveBounds()) {
       d.lastButterflyStateChangeAt = now;
       d.markWorldDirty();
@@ -660,6 +675,7 @@ export function createModule(d) {
     getTotalPlantIndexScore,
     hasFreshButterflyAuthorityBroadcast,
     isButterflyAuthority,
+    isLegacyCornerButterflyCoord,
     isUnsetButterflyCoord,
     isMainGameTutorialInProgress,
     isSharedWorldMergeActive,
@@ -674,6 +690,7 @@ export function createModule(d) {
     setWorldPosition,
     setWorldSize,
     shouldRunButterflyMotionSimulation,
+    shouldRelocateButterfliesInBounds,
     simulateButterflyAuthorityStep,
     spreadButterfliesWithinActiveBounds,
     updateButterflies,

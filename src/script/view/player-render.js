@@ -244,12 +244,19 @@ export function createModule(d) {
   const rockMiningRockId = String(d.getPlayer().rockMiningRockId || "");
   const rockMiningActive = rockMiningRockId !== "";
 
-  if (rockMiningActive && d.playerStatus) {
-    d.playerStatus.textContent = "\uB3CC\uCE98\uB294 \uC911";
+  if (rockMiningActive && typeof d.syncRockMiningStatusUi === "function") {
+    d.syncRockMiningStatusUi(true);
+  } else if (
+    !rockMiningActive &&
+    d.playerStatus &&
+    d.playerStatus.classList.contains("is-rock-mining") &&
+    typeof d.syncRockMiningStatusUi === "function"
+  ) {
+    d.syncRockMiningStatusUi(false);
   }
 
   if (d.isPlayerTimedActionBusy() || rockMiningActive) {
-    d.playerStatus.style.display = "block";
+    d.playerStatus.style.display = rockMiningActive ? "flex" : "block";
     d.playerStatus.style.transform =
       "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
     return;

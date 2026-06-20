@@ -103,6 +103,8 @@ export function createPlantState() {
     /** status가 dry로 바뀐 시각(ms). plantDrySoilClearMs 후 칸 제거 */
     drySoilAt: null,
     seedKind: "",
+    plantGoldKrw: 0,
+    plantGoldUpdatedAt: null,
     /** 로컬 식물 저장·스냅샷 병합 가드(ms) */
     lastMainPlantStateChangeAt: 0
   };
@@ -306,6 +308,8 @@ export function resetPlantRuntimeFields(plant, waterLevelUpdatedAt) {
   plant.blockSproutRegrowthAfterDry = false;
   plant.drySoilAt = null;
   plant.seedKind = "";
+  plant.plantGoldKrw = 0;
+  plant.plantGoldUpdatedAt = null;
 }
 
 export function resetInventoryRuntimeFields(inventory) {

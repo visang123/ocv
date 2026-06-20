@@ -2,6 +2,12 @@ export const WORLD_WIDTH = 960;
 export const WORLD_HEIGHT = 540;
 export const GROUND_WORLD_HEIGHT = WORLD_HEIGHT * 0.6;
 
+/** 하늘·땅 배경만 확대; 게임 로직 좌표(WORLD_*)는 그대로 */
+export const MAP_VISUAL_SCALE = 1.5;
+export const VISUAL_WORLD_WIDTH = WORLD_WIDTH * MAP_VISUAL_SCALE;
+export const VISUAL_WORLD_HEIGHT = WORLD_HEIGHT * MAP_VISUAL_SCALE;
+export const VISUAL_GROUND_WORLD_HEIGHT = GROUND_WORLD_HEIGHT * MAP_VISUAL_SCALE;
+
 /** 식물 지수 합산 상한 */
 export const PLANT_INDEX_SCORE_CAP = 500;
 /** 안개 월드 단계 — NPC 등장(식물지수 구간과 동일) */
