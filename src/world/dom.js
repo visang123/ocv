@@ -70,6 +70,15 @@ const wellCard = document.getElementById("well-card");
 const wellCardImage = document.getElementById("well-card-image");
 const wellWaterText = document.getElementById("well-water-text");
 const wellWaterFill = document.getElementById("well-water-fill");
+const wellDonationText = document.getElementById("well-donation-text");
+const wellDonationFill = document.getElementById("well-donation-fill");
+const wellDonationOpenBtn = document.getElementById("well-donation-open-btn");
+const wellDonationOverlay = document.getElementById("well-donation-overlay");
+const wellDonationGoalText = document.getElementById("well-donation-goal-text");
+const wellDonationBalanceText = document.getElementById("well-donation-balance-text");
+const wellDonationSelectedText = document.getElementById("well-donation-selected-text");
+const wellDonationConfirmBtn = document.getElementById("well-donation-confirm");
+const wellDonationCancelBtn = document.getElementById("well-donation-cancel");
 const seedCard = document.getElementById("seed-card");
 const seedDryGauge = document.getElementById("seed-dry-gauge");
 const seedDryText = document.getElementById("seed-dry-text");
@@ -156,6 +165,15 @@ export {
   wellCardImage,
   wellWaterText,
   wellWaterFill,
+  wellDonationText,
+  wellDonationFill,
+  wellDonationOpenBtn,
+  wellDonationOverlay,
+  wellDonationGoalText,
+  wellDonationBalanceText,
+  wellDonationSelectedText,
+  wellDonationConfirmBtn,
+  wellDonationCancelBtn,
   seedCard,
   seedDryGauge,
   seedDryText,
