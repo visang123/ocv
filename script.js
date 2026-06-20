@@ -2,9 +2,8 @@ import {
   toScreenX as toScreenXUtil,
   toScreenY as toScreenYUtil,
   setWorldSize as setWorldSizeUtil,
-  setWorldMapSize as setWorldMapSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js?v=20260620b";
+} from "./src/world/transform.js?v=20260620c";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -429,9 +428,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620b";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620b";
-import { initScriptView } from "./src/script/view/index.js?v=20260620b";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620c";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620c";
+import { initScriptView } from "./src/script/view/index.js?v=20260620c";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -1119,7 +1118,13 @@ function isAlchemyMasterVisible() {
 
 
 function setWorldMapSize(element, width, height) {
-  setWorldMapSizeUtil(element, width, height, ground, WORLD_WIDTH, GROUND_WORLD_HEIGHT);
+  if (!element || !ground) return;
+  element.style.width = toScreenXUtil(width, ground, WORLD_WIDTH) + "px";
+  if (height) {
+    element.style.height = toScreenYUtil(height, ground, GROUND_WORLD_HEIGHT) + "px";
+  } else {
+    element.style.height = "";
+  }
 }
 
 function syncWorldPlantFogVisuals() {
