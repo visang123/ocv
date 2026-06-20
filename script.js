@@ -4,7 +4,7 @@ import {
   setWorldSize as setWorldSizeUtil,
   setWorldMapSize as setWorldMapSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js";
+} from "./src/world/transform.js?v=20260620b";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -429,9 +429,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620a";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620a";
-import { initScriptView } from "./src/script/view/index.js?v=20260620a";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620b";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620b";
+import { initScriptView } from "./src/script/view/index.js?v=20260620b";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
