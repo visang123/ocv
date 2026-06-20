@@ -379,7 +379,8 @@ export function parseExtraPlantFromSnapshot(plant) {
   ) {
     out.plantGoldUpdatedAt = Number(plant.plantGoldUpdatedAt);
   } else {
-    out.plantGoldUpdatedAt = null;
+    const plantedAt = Number(out.plantedAt);
+    out.plantGoldUpdatedAt = Number.isFinite(plantedAt) && plantedAt > 0 ? plantedAt : null;
   }
   if (Object.prototype.hasOwnProperty.call(plant, "blockSproutRegrowthAfterDry")) {
     out.blockSproutRegrowthAfterDry = Boolean(plant.blockSproutRegrowthAfterDry);

@@ -1,6 +1,10 @@
 /** Shared world row serialize / apply (Supabase world_state) */
 import { parseMainPlantFromSnapshot, resolveSnapshotSavedAt, dedupeExtraSeedsPreferInventory } from "../../game/worldSnapshot.js";
 import { syncServerClockOffset as syncServerClockOffsetCore } from "../../game/timeSync.js";
+import {
+  applyPriorPlantGoldIfPreferred,
+  ensurePlantGoldFields
+} from "../../game/plant-gold.js";
 
 export function createModule(d) {
   function flushPassiveSimulationBeforeSharedSnapshot() {
@@ -451,6 +455,13 @@ export function createModule(d) {
             matureKind: d.getPlant().matureKind || ""
           });
         }
+        if (
+          d.getPlant().isSeedPlanted &&
+          typeof d.plantOwnerMatches === "function" &&
+          d.plantOwnerMatches(d.getPlant(), d.getPlanterOwnerId(), d.getPlanterDisplayName())
+        ) {
+          applyPriorPlantGoldIfPreferred(incomingPlant, d.getPlant());
+        }
         d.applyLoadedPlantState(incomingPlant);
         const localApplyNow = d.getSynchronizedNow();
         const snapshotRefTime =
@@ -694,6 +705,12 @@ export function createModule(d) {
         if (!p || p.id == null) return;
         const prev = priorPlantById[String(p.id)];
         if (!prev || prev === p) return;
+        if (
+          typeof d.plantOwnerMatches === "function" &&
+          d.plantOwnerMatches(p, d.getPlanterOwnerId(), d.getPlanterDisplayName())
+        ) {
+          applyPriorPlantGoldIfPreferred(p, prev);
+        }
         if (prev.spotElement && document.contains(prev.spotElement)) {
           p.spotElement = prev.spotElement;
           p.sproutElement = prev.sproutElement;
@@ -722,6 +739,10 @@ export function createModule(d) {
         if (!ep) return;
         if (snapRefPlants > 0) {
           d.rebasePlantModelTimestampsToLocalNow(ep, extraPlantClockNow, snapRefPlants);
+        }
+        ensurePlantGoldFields(ep, extraPlantClockNow);
+        if (typeof d.tickPlantGold === "function") {
+          d.tickPlantGold(ep, extraPlantClockNow);
         }
         d.sanitizePrematureRemotePlantDryState(ep, extraPlantClockNow, snapRefPlants);
         d.stabilizeFirstWaterHintFlags(ep);

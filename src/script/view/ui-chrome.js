@@ -177,15 +177,23 @@ export function createModule(d) {
   return Boolean(d.isTabSessionSuperseded);
   }
 
+  function finalizeLayoutBeforeGameReady() {
+  if (typeof d.setup === "function") d.setup();
+  if (typeof d.updateCamera === "function") d.updateCamera();
+  if (typeof d.syncWorldPlantFogVisuals === "function") d.syncWorldPlantFogVisuals();
+  }
+
   function ovcTryDismissLoadingScreen(force) {
   if (readTabSessionSuperseded() && !force) return;
   if (force || d.isCharacterSelecting) {
+    finalizeLayoutBeforeGameReady();
     d.hideAppLoadingScreen();
     worldSyncLoadingWaitStartedAt = 0;
     return;
   }
   if (!d.ovcBootstrapFinished) return;
   if (d.isSharedWorldSyncPausedForTutorial() || !d.isWorldServerSyncAvailable()) {
+    finalizeLayoutBeforeGameReady();
     d.hideAppLoadingScreen();
     worldSyncLoadingWaitStartedAt = 0;
     return;
@@ -195,6 +203,7 @@ export function createModule(d) {
     if (Date.now() - worldSyncLoadingWaitStartedAt < WORLD_SYNC_LOADING_MAX_WAIT_MS) return;
   }
   worldSyncLoadingWaitStartedAt = 0;
+  finalizeLayoutBeforeGameReady();
   d.hideAppLoadingScreen();
   }
 

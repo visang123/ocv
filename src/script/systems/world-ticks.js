@@ -580,7 +580,8 @@ export function createModule(d) {
     height,
     d.ground,
     d.WORLD_WIDTH,
-    d.GROUND_WORLD_HEIGHT
+    d.GROUND_WORLD_HEIGHT,
+    d.MAP_VISUAL_SCALE
   );
   }
 

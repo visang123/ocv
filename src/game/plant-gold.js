@@ -78,3 +78,25 @@ export function collectPlantGoldKrw(plant, now) {
   plant.plantGoldUpdatedAt = now;
   return amount;
 }
+
+/** 로컬 골드 상태가 스냅샷보다 최신일 때(회수 직후 등) per-plant 골드를 유지 */
+export function shouldPreferPriorPlantGold(prior, incoming) {
+  if (!prior || !incoming) return false;
+  const prevGold = getPlantGoldKrw(prior);
+  const snapGold = getPlantGoldKrw(incoming);
+  const prevAt = Number(prior.plantGoldUpdatedAt);
+  const snapAt = Number(incoming.plantGoldUpdatedAt);
+  if (!Number.isFinite(prevAt) || prevAt <= 0) return false;
+  if (!Number.isFinite(snapAt) || snapAt <= 0) return true;
+  if (prevAt > snapAt) return true;
+  if (prevAt === snapAt && prevGold !== snapGold) {
+    return prevGold < snapGold;
+  }
+  return false;
+}
+
+export function applyPriorPlantGoldIfPreferred(incoming, prior) {
+  if (!shouldPreferPriorPlantGold(prior, incoming)) return;
+  incoming.plantGoldKrw = getPlantGoldKrw(prior);
+  incoming.plantGoldUpdatedAt = prior.plantGoldUpdatedAt;
+}
