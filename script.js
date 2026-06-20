@@ -9210,6 +9210,7 @@ function markWorldDirty() { return _systemsApi ? _systemsApi.markWorldDirty() : 
 function movePlayerVerticallyInTree(deltaDepth) { return _systemsApi ? _systemsApi.movePlayerVerticallyInTree(deltaDepth) : undefined; }
 function pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) { return _systemsApi ? _systemsApi.pickRandomWorldRockSpawnPosition(size, ctx, existingRocks) : undefined; }
 function spreadButterfliesWithinActiveBounds() { return _systemsApi ? _systemsApi.spreadButterfliesWithinActiveBounds() : false; }
+function shouldRelocateButterfliesInBounds() { return _systemsApi ? _systemsApi.shouldRelocateButterfliesInBounds() : false; }
 function pruneButterflyAuthorityWaypointsToList() { return _systemsApi ? _systemsApi.pruneButterflyAuthorityWaypointsToList() : undefined; }
 function pruneStaleMultiplayerRoomSessions(now) { return _systemsApi ? _systemsApi.pruneStaleMultiplayerRoomSessions(now) : undefined; }
 function pruneStaleRemotePlayers() { return _systemsApi ? _systemsApi.pruneStaleRemotePlayers() : undefined; }
@@ -16939,7 +16940,11 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       });
       const butterfly = existing || {
         id: String(raw.id),
-        color: raw.color || pickRandomButterflyColor(),
+        color:
+          raw.color ||
+          (typeof butterflyMotion.pickColorForId === "function"
+            ? butterflyMotion.pickColorForId(String(raw.id))
+            : pickRandomButterflyColor()),
         spawnedAt: getNumericButterflyValue(raw.spawnedAt, Date.now())
       };
       butterfly.color = raw.color || butterfly.color;
@@ -16986,7 +16991,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
     butterflyState.lastSpawnAt =
       Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
   }
-  if (butterflyState.list.length > 0) {
+  if (butterflyState.list.length > 0 && shouldRelocateButterfliesInBounds()) {
     spreadButterfliesWithinActiveBounds();
     pruneButterflyAuthorityWaypointsToList();
   }

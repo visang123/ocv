@@ -24,6 +24,35 @@ function hashId(id) {
   return hash >>> 0;
 }
 
+export function createSeededRandom(seed) {
+  let state = hashId(seed) || 1;
+  return function next() {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function seededUnit(id, salt) {
+  return createSeededRandom(String(id) + ":" + String(salt))();
+}
+
+export function getSharedButterflyRoomSeed(fallbackSeed) {
+  try {
+    const room =
+      (window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom) ||
+      fallbackSeed ||
+      "ovc-default-room";
+    return String(room);
+  } catch (e) {
+    return String(fallbackSeed || "ovc-default-room");
+  }
+}
+
+export function makeButterflySlotId(roomSeed, slotIndex) {
+  const safeRoom = String(roomSeed || "ovc-default-room").replace(/[^a-zA-Z0-9_-]/g, "");
+  return "bf-" + safeRoom + "-" + Math.max(0, Math.floor(Number(slotIndex) || 0));
+}
+
 export function clampButterflyToBounds(butterfly, bounds) {
   butterfly.x = clamp(getNumericButterflyValue(butterfly.x, bounds.left), bounds.left, bounds.right);
   butterfly.y = clamp(getNumericButterflyValue(butterfly.y, bounds.top), bounds.top, bounds.bottom);
@@ -76,14 +105,19 @@ export function createButterflyMotionController(config) {
 
   function generateId(now) {
     return "butterfly-" + Number(now || Date.now()).toString(36) + "-" +
-      Math.random().toString(16).slice(2, 8);
+      Math.floor(seededUnit("fallback-id", now) * 16777215).toString(16);
+  }
+
+  function pickColorForId(id) {
+    const index = hashId(String(id) + ":color") % colors.length;
+    return colors[index] || colors[0];
   }
 
   function pickColor() {
-    return colors[Math.floor(Math.random() * colors.length)] || colors[0];
+    return colors[0];
   }
 
-  function pickSpawnPoint() {
+  function pickSpawnPointForId(id) {
     const bounds = getBounds();
     const width = bounds.right - bounds.left;
     const height = bounds.bottom - bounds.top;
@@ -94,12 +128,16 @@ export function createButterflyMotionController(config) {
       };
     }
     return {
-      x: bounds.left + Math.random() * width,
-      y: bounds.top + Math.random() * height
+      x: bounds.left + seededUnit(id, "spawn-x") * width,
+      y: bounds.top + seededUnit(id, "spawn-y") * height
     };
   }
 
-  function pickWaypoint(fromX, fromY) {
+  function pickSpawnPoint() {
+    return pickSpawnPointForId("spawn-fallback");
+  }
+
+  function pickWaypoint(fromX, fromY, butterflyId, salt) {
     const bounds = getBounds();
     const from = clampPoint({
       x: getNumericButterflyValue(fromX, bounds.left),
@@ -108,9 +146,11 @@ export function createButterflyMotionController(config) {
     const minDistSq = minLeg * minLeg * 0.64;
     let best = null;
     let bestDistSq = 0;
+    const id = String(butterflyId || "waypoint");
+    const saltKey = String(salt == null ? 0 : salt);
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const leg = minLeg + Math.random() * (maxLeg - minLeg);
+      const angle = seededUnit(id, "wp-a:" + saltKey + ":" + attempt) * Math.PI * 2;
+      const leg = minLeg + seededUnit(id, "wp-l:" + saltKey + ":" + attempt) * (maxLeg - minLeg);
       const target = clampPoint({
         x: from.x + Math.cos(angle) * leg,
         y: from.y + Math.sin(angle) * leg
@@ -148,15 +188,22 @@ export function createButterflyMotionController(config) {
   function create(now, options) {
     const opts = options || {};
     const bounds = getBounds();
-    const spawn = clampPoint(opts.spawn || pickSpawnPoint(), bounds);
+    const id = String(opts.id || generateId(now));
+    const spawn = clampPoint(
+      opts.spawn ||
+        (Number.isFinite(Number(opts.x)) && Number.isFinite(Number(opts.y))
+          ? { x: Number(opts.x), y: Number(opts.y) }
+          : pickSpawnPointForId(id)),
+      bounds
+    );
     return {
-      id: String(opts.id || generateId(now)),
-      color: colors.indexOf(opts.color) >= 0 ? opts.color : pickColor(),
+      id: id,
+      color: colors.indexOf(opts.color) >= 0 ? opts.color : pickColorForId(id),
       x: spawn.x,
       y: spawn.y,
       lastPathX: spawn.x,
       lastPathY: spawn.y,
-      dirX: Math.random() < 0.5 ? -1 : 1,
+      dirX: seededUnit(id, "dir") < 0.5 ? -1 : 1,
       spawnedAt: getNumericButterflyValue(opts.spawnedAt, now)
     };
   }
@@ -210,12 +257,14 @@ export function createButterflyMotionController(config) {
     if (waypoint && now < waypoint.endAt) return waypoint;
 
     const pathFrom = getButterflyPathPoint(butterfly, now);
-    const target = pickWaypoint(pathFrom.x, pathFrom.y);
+    const target = pickWaypoint(pathFrom.x, pathFrom.y, id, now);
     const dx = target.x - pathFrom.x;
     const dy = target.y - pathFrom.y;
     const distance = Math.max(1, Math.hypot(dx, dy));
     const baseDuration = (distance / speed) * (1000 / 60);
-    const duration = Math.round(clamp(baseDuration * (0.9 + Math.random() * 0.3), 520, legMaxMs));
+    const duration = Math.round(
+      clamp(baseDuration * (0.9 + seededUnit(id, "dur:" + now) * 0.3), 520, legMaxMs)
+    );
     waypoint = {
       startX: pathFrom.x,
       startY: pathFrom.y,
@@ -263,16 +312,16 @@ export function createButterflyMotionController(config) {
         const px = Number(raw.x);
         const py = Number(raw.y);
         if (px === 0 && py === 0 || (px < 2 && py < 2)) {
-          point = pickSpawnPoint();
+          point = pickSpawnPointForId(id);
         } else {
           point = clampPoint({ x: px, y: py }, bounds);
         }
       } else {
-        point = pickSpawnPoint();
+        point = pickSpawnPointForId(id);
       }
       out.push({
         id,
-        color: colors.indexOf(raw.color) >= 0 ? raw.color : pickColor(),
+        color: colors.indexOf(raw.color) >= 0 ? raw.color : pickColorForId(id),
         x: point.x,
         y: point.y,
         dirX: Number(raw.dirX) > 0 ? 1 : -1,
@@ -307,7 +356,10 @@ export function createButterflyMotionController(config) {
 
   return {
     pickColor,
+    pickColorForId,
     pickSpawnPoint,
+    pickSpawnPointForId,
+    makeButterflySlotId,
     pickWaypoint,
     create,
     dedupe,

@@ -37,14 +37,42 @@ export function createModule(d) {
   );
   }
 
+  function makeButterflySlotId(slotIndex) {
+    const room =
+      (window.OVC_ONLINE_CONFIG && window.OVC_ONLINE_CONFIG.multiplayerRoom) ||
+      "ovc-default-room";
+    if (typeof d.butterflyMotion.makeButterflySlotId === "function") {
+      return d.butterflyMotion.makeButterflySlotId(room, slotIndex);
+    }
+    return "bf-" + room + "-" + slotIndex;
+  }
+
+  function listMissingButterflySlotIds() {
+    const existing = Object.create(null);
+    d.butterflyState.list.forEach(function (butterfly) {
+      if (butterfly && butterfly.id != null) existing[String(butterfly.id)] = true;
+    });
+    const missing = [];
+    for (let slot = 0; slot < d.butterflyMaxAlive; slot += 1) {
+      const id = makeButterflySlotId(slot);
+      if (!existing[id]) missing.push(id);
+    }
+    return missing;
+  }
+
+  function createButterflyForSlot(now, slotId) {
+    return d.createButterfly(now, { id: slotId });
+  }
+
   function authorityFillToCapInstantly(now) {
   let added = false;
-  while (d.butterflyState.list.length < d.butterflyMaxAlive) {
-    const created = d.createButterfly(now);
-    if (!created) break;
+  listMissingButterflySlotIds().forEach(function (slotId) {
+    if (d.butterflyState.list.length >= d.butterflyMaxAlive) return;
+    const created = createButterflyForSlot(now, slotId);
+    if (!created) return;
     d.butterflyState.list.push(created);
     added = true;
-  }
+  });
   if (added) {
     d.butterflyState.lastSpawnAt = now;
     d.spreadButterfliesWithinActiveBounds();
@@ -71,8 +99,9 @@ export function createModule(d) {
 
   const slotsAvailable = d.butterflyMaxAlive - d.butterflyState.list.length;
   const toSpawn = Math.min(elapsedCycles, slotsAvailable);
-  for (let i = 0; i < toSpawn; i += 1) {
-    const created = d.createButterfly(now);
+  const missingSlots = listMissingButterflySlotIds();
+  for (let i = 0; i < toSpawn && i < missingSlots.length; i += 1) {
+    const created = createButterflyForSlot(now, missingSlots[i]);
     if (!created) break;
     d.butterflyState.list.push(created);
   }
@@ -304,15 +333,26 @@ export function createModule(d) {
   const count = list.length;
   const cols = Math.max(1, Math.ceil(Math.sqrt(count)));
   const rows = Math.max(1, Math.ceil(count / cols));
+  const sorted = list.slice().sort(function (a, b) {
+    return String(a && a.id).localeCompare(String(b && b.id));
+  });
   let changed = false;
-  list.forEach(function (butterfly, index) {
+  sorted.forEach(function (butterfly, index) {
     if (!butterfly) return;
     const col = index % cols;
     const row = Math.floor(index / cols);
     const cellW = width / cols;
     const cellH = height / rows;
-    const x = bounds.left + cellW * (col + 0.15 + Math.random() * 0.7);
-    const y = bounds.top + cellH * (row + 0.15 + Math.random() * 0.7);
+    const fracX =
+      typeof d.butterflyMotion.pickSpawnPointForId === "function"
+        ? (d.butterflyMotion.pickSpawnPointForId(butterfly.id).x - bounds.left) / Math.max(1, width)
+        : 0.5;
+    const fracY =
+      typeof d.butterflyMotion.pickSpawnPointForId === "function"
+        ? (d.butterflyMotion.pickSpawnPointForId(butterfly.id).y - bounds.top) / Math.max(1, height)
+        : 0.5;
+    const x = bounds.left + cellW * (col + 0.15 + fracX * 0.7);
+    const y = bounds.top + cellH * (row + 0.15 + fracY * 0.7);
     resetButterflyPathFields(butterfly, x, y);
     delete d.butterflyAuthorityWaypointById[String(butterfly.id || "")];
     changed = true;
@@ -571,10 +611,11 @@ export function createModule(d) {
   }
 
   function updateButterflies() {
-  const now = Date.now();
+  const wallNow = Date.now();
   const wallDelta =
-    d.lastButterflyWallClockMs > 0 ? Math.min(60000, now - d.lastButterflyWallClockMs) : 0;
-  d.lastButterflyWallClockMs = now;
+    d.lastButterflyWallClockMs > 0 ? Math.min(60000, wallNow - d.lastButterflyWallClockMs) : 0;
+  d.lastButterflyWallClockMs = wallNow;
+  const now = d.isSharedWorldMergeActive() ? d.getSynchronizedNow() : wallNow;
 
   // Wait until either (a) we know there's no online sync available so this
   // client is definitely authoritative on its own world, or (b) we have
@@ -639,9 +680,9 @@ export function createModule(d) {
     if (
       onlineAvailable &&
       d.isButterflyAuthority() &&
-      now - d.lastButterflyBroadcastAt >= d.butterflyBroadcastMs
+      wallNow - d.lastButterflyBroadcastAt >= d.butterflyBroadcastMs
     ) {
-      d.broadcastButterflyState(now);
+      d.broadcastButterflyState(wallNow);
     }
   }
 
@@ -758,8 +799,8 @@ export function createModule(d) {
     setInstantHoverTip,
     setWorldPosition,
     setWorldSize,
-    shouldRunButterflyMotionSimulation,
     shouldRelocateButterfliesInBounds,
+    shouldRunButterflyMotionSimulation,
     simulateButterflyAuthorityStep,
     spreadButterfliesWithinActiveBounds,
     updateButterflies,
