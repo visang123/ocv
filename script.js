@@ -3,7 +3,7 @@ import {
   toScreenY as toScreenYUtil,
   setWorldSize as setWorldSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js?v=20260620c";
+} from "./src/world/transform.js?v=20260620d";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -428,9 +428,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620c";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620c";
-import { initScriptView } from "./src/script/view/index.js?v=20260620c";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620d";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620d";
+import { initScriptView } from "./src/script/view/index.js?v=20260620d";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -2138,30 +2138,26 @@ showAppLoadingScreen(LOADING_TEXT_DEFAULT);
 
 
 const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
+const OVC_LOGIN_HANDOFF_GRACE_MS = 15000;
 
 function getAccountSessionLeaderStorageKey() {
   return "ovcAccountSessionLeaderV1:" + currentUserId;
 }
 
-function ovcIsForeignLiveAccountSession() {
-  if (!currentUserId) return false;
+function isOvcLoginHandoffGraceActive() {
   try {
-    const raw = localStorage.getItem(getAccountSessionLeaderStorageKey());
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    const at = Number(parsed && parsed.at) || 0;
-    if (!at || Date.now() - at > OVC_ACCOUNT_LEADER_STALE_MS) return false;
-    const myTok = sessionStorage.getItem(accountLeaderTokenSessionKey) || "";
-    if (myTok && parsed.token === myTok) return false;
-    return true;
+    const at = Number(sessionStorage.getItem(loginHandoffKey) || 0);
+    if (!Number.isFinite(at) || at <= 0) return false;
+    return Date.now() - at < OVC_LOGIN_HANDOFF_GRACE_MS;
   } catch (e) {
     return false;
   }
 }
 
-if (ovcIsForeignLiveAccountSession()) {
-  window.location.replace("ovc-login.html?v=20260509a&ovc_err=duplicate_session");
-  throw new Error("OVC login required");
+function clearOvcLoginHandoffGrace() {
+  try {
+    sessionStorage.removeItem(loginHandoffKey);
+  } catch (e) {}
 }
 
 function claimAccountSessionTabOwnership() {
@@ -2191,6 +2187,30 @@ function claimAccountSessionTabOwnership() {
       });
     }
   }
+}
+
+function ovcIsForeignLiveAccountSession() {
+  if (!currentUserId) return false;
+  if (isOvcLoginHandoffGraceActive()) return false;
+  try {
+    const raw = localStorage.getItem(getAccountSessionLeaderStorageKey());
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const at = Number(parsed && parsed.at) || 0;
+    if (!at || Date.now() - at > OVC_ACCOUNT_LEADER_STALE_MS) return false;
+    const myTok = sessionStorage.getItem(accountLeaderTokenSessionKey) || "";
+    if (myTok && parsed.token === myTok) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+claimAccountSessionTabOwnership();
+
+if (ovcIsForeignLiveAccountSession()) {
+  window.location.replace("ovc-login.html?v=20260509a&ovc_err=duplicate_session");
+  throw new Error("OVC login required");
 }
 
 function sendPendingPreviousSessionLeaveBroadcast() {
@@ -2292,7 +2312,6 @@ function touchAccountAuthSessionHeartbeat() {
   });
 }
 
-claimAccountSessionTabOwnership();
 touchAccountAuthSessionHeartbeat();
 window.addEventListener("storage", onAccountSessionLeaderStorageEvent);
 
@@ -14584,7 +14603,7 @@ function finishCharacterSelectAfterTutorialGate() {
   if (
     isWorldDocumentEntry() &&
     currentUserId &&
-    !getStoredFlag(onboardingFlowDoneKey)
+    ovcShouldRedirectWorldEntryToTutorial()
   ) {
     isReloadingForWorldReset = true;
     try {
@@ -15785,8 +15804,21 @@ const syncDebugHelpers = createSyncDebugHelpers({
 const addSyncDebugLog = syncDebugHelpers.addSyncDebugLog;
 syncDebugHelpers.publishSyncDebugChecklistTemplate(window);
 
+function ovcShouldRedirectWorldEntryToTutorial() {
+  if (!isWorldDocumentEntry() || !currentUserId) return false;
+  if (getStoredFlag(onboardingFlowDoneKey)) return false;
+  if (getStoredFlag(everBeenToWorldKey)) return false;
+  try {
+    if (sessionStorage.getItem(ovcTutorialDoneUserSessionKey) === String(currentUserId).trim()) {
+      return false;
+    }
+  } catch (eHint) {}
+  return true;
+}
+
 async function validateCurrentAccount() {
   if (isLoggingOut || isTabSessionSuperseded || !currentUserId || !window.OVCOnline) return;
+  if (!ovcBootstrapFinished || isOvcLoginHandoffGraceActive()) return;
 
   try {
     if (typeof window.OVCOnline.validateSession === "function") {
@@ -16796,7 +16828,7 @@ try {
   } else if (
     isWorldDocumentEntry() &&
     currentUserId &&
-    !getStoredFlag(onboardingFlowDoneKey)
+    ovcShouldRedirectWorldEntryToTutorial()
   ) {
     ovcAbortedPageInit = true;
     try {
@@ -16883,6 +16915,8 @@ try {
   } else {
     ovcTryDismissLoadingScreen(false);
   }
+  clearOvcLoginHandoffGrace();
+  validateCurrentAccount();
 } catch (initError) {
   console.error("[OVC] \uAC8C\uC784 \uCD08\uAE30\uD654 \uC624\uB958:", initError);
   ovcBootstrapFinished = true;
@@ -16894,6 +16928,8 @@ try {
   );
   window.__OVC_BOOT_FINISHED__ = true;
   ovcTryDismissLoadingScreen(true);
+  clearOvcLoginHandoffGrace();
+  validateCurrentAccount();
 }
 })();
 attachCoreRuntimeTimers({

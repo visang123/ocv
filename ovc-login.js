@@ -251,7 +251,22 @@ function completeLoginAndNavigate(account) {
     loginMessage.textContent = "게임으로 이동 중...";
   } catch (eMsg) {}
   finalizeSuccessfulLogin(account);
-  goToGame(account);
+  const navigate = function () {
+    goToGame(account);
+  };
+  if (
+    accountId &&
+    window.OVCOnline &&
+    typeof window.OVCOnline.claimAccountAuthSession === "function"
+  ) {
+    Promise.resolve(window.OVCOnline.claimAccountAuthSession(accountId, account.name))
+      .catch(function () {
+        // Presence claim failed — game boot will retry heartbeat.
+      })
+      .finally(navigate);
+    return;
+  }
+  navigate();
 }
 
 function goToGame(account) {
@@ -260,8 +275,8 @@ function goToGame(account) {
       "ovcGameSessionId",
       Date.now().toString(36) + "-" + Math.random().toString(16).slice(2)
     );
+    sessionStorage.setItem(loginHandoffKey, String(Date.now()));
   } catch (e) {}
-  sessionStorage.removeItem(loginHandoffKey);
   const accountId = account && account.id != null ? String(account.id).trim() : "";
   const serverTutorialDone = accountTutorialDoneTruthy(account);
   const sessionHint = sessionClaimsTutorialCompleteForUser(accountId);
@@ -336,6 +351,7 @@ function finalizeSuccessfulLogin(account) {
   try {
     if (userId) {
       sessionStorage.setItem(ovcSessionUserIdKey, userId);
+      localStorage.removeItem("ovcAccountSessionLeaderV1:" + userId);
     } else {
       sessionStorage.removeItem(ovcSessionUserIdKey);
     }
