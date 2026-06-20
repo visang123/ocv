@@ -1672,17 +1672,20 @@ function updateRockMineGaugeDom() {
     const picked = getApple().worldRockPickedIds.includes(rock.id);
     if (picked) {
       if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+      rock._el.classList.remove("is-rock-mining-gauge-active");
       return;
     }
     const session = sessionsByRock[rockId];
     if (!session) {
       if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
+      rock._el.classList.remove("is-rock-mining-gauge-active");
       return;
     }
     const gauge = ensureRockMineGaugeElements(rock);
     const fill = rock._mineGaugeFillEl;
     if (!gauge || !fill) return;
     gauge.style.display = "block";
+    rock._el.classList.add("is-rock-mining-gauge-active");
     const progress = Math.max(
       0,
       Math.min(1, (now - session.startedAt) / session.durationMs)

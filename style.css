@@ -1716,6 +1716,7 @@ body:not(.is-game-ready) .viewport {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 28;
   color: #000;
   font: 700 4.5px/1.2 Arial, sans-serif;
   text-shadow: none;
@@ -1735,6 +1736,7 @@ body:not(.is-game-ready) .viewport {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.92);
   color: #111;
+  z-index: 230;
 }
 
 #player-status .player-status__label {
@@ -1880,6 +1882,10 @@ body:not(.is-game-ready) .viewport {
   background: url("이미지/rock-ground.svg?v=20260512a") center bottom / contain no-repeat;
 }
 
+.world-ground-rock.is-rock-mining-gauge-active {
+  z-index: 27;
+}
+
 .world-rock-mine-gauge {
   position: absolute;
   left: 50%;
@@ -1889,7 +1895,7 @@ body:not(.is-game-ready) .viewport {
   width: 72%;
   max-width: 44px;
   pointer-events: none;
-  z-index: 3;
+  z-index: 2;
 }
 
 .world-rock-mine-gauge__track {
@@ -2266,6 +2272,7 @@ body:not(.is-game-ready) .viewport {
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
+  z-index: 28;
 }
 
 /* --- 월드 멀티: 슬퍼요(위) + 하트 + 채팅 (설정 왼쪽·위) --- */
@@ -3159,6 +3166,32 @@ body.ovc-page-tutorial #multiplayer-status {
 }
 
 #admin-dev-plant-index-plus-button:hover {
+  filter: brightness(1.08);
+}
+
+#admin-dev-bucket-spawn-button {
+  position: fixed;
+  left: 76px;
+  top: 4px;
+  z-index: 261;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(145deg, #93c5fd, #2563eb);
+  box-shadow: 0 0 0 1px rgba(30, 64, 175, 0.65);
+  cursor: pointer;
+  font-size: 5px;
+  font-weight: 900;
+  line-height: 1;
+  color: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#admin-dev-bucket-spawn-button:hover {
   filter: brightness(1.08);
 }
 
@@ -5067,7 +5100,9 @@ button.trade-tradeable-recipe.is-selected {
 }
 
 #world-bag-inventory.is-trade-exchange-focus,
-#bag-inventory-panel.is-trade-exchange-focus {
+#bag-inventory-panel.is-trade-exchange-focus,
+.trade-exchange-panel.is-trade-exchange-focus,
+.plant-master-seed-shop-panel.is-trade-exchange-focus {
   z-index: 73;
   animation: trade-bag-focus-glow 1.1s ease-in-out infinite;
 }
@@ -5465,7 +5500,8 @@ button.trade-tradeable-recipe.is-selected {
 }
 
 #world-bag-inventory.is-alchemy-craft-focus,
-#bag-inventory-panel.is-alchemy-craft-focus {
+#bag-inventory-panel.is-alchemy-craft-focus,
+.alchemy-craft-panel.is-alchemy-craft-focus {
   z-index: 73;
   animation: alchemy-bag-focus-glow 1.1s ease-in-out infinite;
 }

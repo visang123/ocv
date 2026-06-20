@@ -85,7 +85,7 @@ export function getRemoteStatusText(action) {
   if (action === "eating") return "사과먹는중...";
   if (action === "butterfly_catch") return "나비 catch";
   if (action === "rock_pickup") return "돌 수집";
-  if (action === "rock_mining") return "돌 캐는중...";
+  if (action === "rock_mining") return "돌 캐는중";
   const installKind = parseCraftFurnitureInstallPresenceAction(action);
   if (installKind) {
     const installText = getCraftFurnitureInstallStatusText(installKind);

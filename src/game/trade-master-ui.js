@@ -86,6 +86,21 @@ function isTradeExchangeOverlayVisible() {
   );
 }
 
+function getTradeExchangePanelEl() {
+  if (!host || !host.tradeExchangeOverlay) return null;
+  return host.tradeExchangeOverlay.querySelector(".trade-exchange-panel");
+}
+
+function setTradeExchangeFocus(active) {
+  if (!host) return;
+  [host.worldBagInventory, host.bagInventoryPanel, getTradeExchangePanelEl()].forEach(
+    function (el) {
+      if (!el) return;
+      el.classList.toggle("is-trade-exchange-focus", active);
+    }
+  );
+}
+
 function reconcileTradeExchangeOpenState() {
   if (!exchangeOpen) return;
   if (!isTradeExchangeOverlayVisible()) {
@@ -93,14 +108,7 @@ function reconcileTradeExchangeOpenState() {
     exchangeOpen = false;
     sellCounterByKey = {};
     buyCartByKey = {};
-    if (host) {
-      if (host.worldBagInventory) {
-        host.worldBagInventory.classList.remove("is-trade-exchange-focus");
-      }
-      if (host.bagInventoryPanel) {
-        host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
-      }
-    }
+    setTradeExchangeFocus(false);
   }
 }
 
@@ -277,6 +285,9 @@ export function updateTradeNpcPrompt() {
     (host.isAlchemyMasterDialogueRunning && host.isAlchemyMasterDialogueRunning()) ||
     (host.isAlchemyCraftOpen && host.isAlchemyCraftOpen())
   ) {
+    if (running && host.tradeMasterBubble.style.display === "block") {
+      layoutTradeSpeechBubble();
+    }
     return;
   }
 
@@ -404,11 +415,6 @@ export function addFullInventoryStackToTradeCounter(itemKey) {
   return true;
 }
 
-function getTradeExchangePanelEl() {
-  if (!host || !host.tradeExchangeOverlay) return null;
-  return host.tradeExchangeOverlay.querySelector(".trade-exchange-panel");
-}
-
 /** @param {Element | null | undefined} targetEl */
 export function tryDropBagItemOnTradeCounter(itemKey, targetEl) {
   if (!itemKey || !exchangeOpen || !host) return false;
@@ -477,7 +483,7 @@ function startTradeMasterDialogue() {
   const lines = [
     { text: "\uB098\uB294 \uAC70\uB798\uB97C \uC88B\uC544\uD55C\uB2E4\uB124.", delayAfterMs: 2000 },
     {
-      text: "\uD544\uC694\uD55C \uBB3C\uAC74\uC740 \uC0AC\uACE0, \uC548 \uC4F0\uB294 \uAC74 \uD310\uBA74 \uB418\uB124",
+      text: "\uD544\uC694\uD55C \uBB3C\uAC74\uC740 \uC0AC\uACE0, \uC544\uB2CC\uAC74 \uD310\uBA74 \uB418\uB124.",
       delayAfterMs: 2000
     }
   ];
@@ -492,6 +498,10 @@ function startTradeMasterDialogue() {
       host.tradeMasterBubble.textContent = line.text;
       host.tradeMasterBubble.style.display = "block";
       layoutTradeSpeechBubble();
+      window.requestAnimationFrame(function () {
+        if (!running || host.tradeMasterBubble.style.display !== "block") return;
+        layoutTradeSpeechBubble();
+      });
     }, timelineMs);
     timelineMs += Math.max(0, Number(line.delayAfterMs) || 650);
   });
@@ -542,8 +552,7 @@ export function openTradeExchangePanel() {
   }
   host.setBagInventoryPanelOpen(true);
   host.updateBagInventorySlots();
-  if (host.worldBagInventory) host.worldBagInventory.classList.add("is-trade-exchange-focus");
-  if (host.bagInventoryPanel) host.bagInventoryPanel.classList.add("is-trade-exchange-focus");
+  setTradeExchangeFocus(true);
   refreshTradeShopUi();
 }
 
@@ -558,8 +567,7 @@ export function closeTradeExchangePanel(options) {
     host.tradeExchangeOverlay.style.display = "none";
     host.tradeExchangeOverlay.setAttribute("aria-hidden", "true");
   }
-  if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-trade-exchange-focus");
-  if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-trade-exchange-focus");
+  setTradeExchangeFocus(false);
   if (!keepInventory) host.setBagInventoryPanelOpen(false);
   renderSellCounter();
   renderBuyCatalog();

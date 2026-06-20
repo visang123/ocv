@@ -246,9 +246,10 @@ export function createModule(d) {
     halfTextWidth,
     Math.min(targetX, window.innerWidth - halfTextWidth)
   );
-  const yWorld = d.toScreenY(playerBox.top + 26);
   const rockMiningRockId = String(d.getPlayer().rockMiningRockId || "");
   const rockMiningActive = rockMiningRockId !== "";
+  const statusAnchorY = rockMiningActive ? playerBox.top - 22 : playerBox.top + 26;
+  const yWorld = d.toScreenY(statusAnchorY);
 
   if (rockMiningActive && typeof d.syncRockMiningStatusUi === "function") {
     d.syncRockMiningStatusUi(true);
