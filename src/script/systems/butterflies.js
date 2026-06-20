@@ -507,6 +507,7 @@ export function createModule(d) {
   // seed butterflies while another is still loading the existing population.
   const onlineAvailable = d.isWorldServerSyncAvailable();
   const sharedHydrated = d.hasHydratedSharedWorldFromServer || !onlineAvailable;
+  const butterfliesUnlocked = d.areButterfliesUnlockedForPlantFogWorld();
 
   if (sharedHydrated && d.isButterflyAuthority()) {
     if (!d.areButterfliesUnlockedForPlantFogWorld()) {
@@ -536,115 +537,47 @@ export function createModule(d) {
   }
   // ???? ???? ?????? ????? ????????????????? sessionId)???????. ??????????
   // ??? ????????????? ????2?????????????????
-  const butterfliesUnlocked = d.areButterfliesUnlockedForPlantFogWorld();
-  const butterfliesClustered = d.areButterfliesClusteredInActiveBounds();
-  // Motion: run for authority/offline always; non-authority only interpolates network samples.
-  const canRunButterflyMotion =
-    butterfliesUnlocked &&
-    d.butterflyState.list.length > 0 &&
-    (sharedHydrated || !onlineAvailable || butterfliesClustered);
-  if (canRunButterflyMotion) {
-    const runAuthorityButterflyMotion =
-      d.shouldRunButterflyMotionSimulation(now, onlineAvailable) || butterfliesClustered;
-    if (runAuthorityButterflyMotion) {
-      if (d.spreadButterfliesWithinActiveBounds()) {
-        d.lastButterflyStateChangeAt = now;
-        d.markWorldDirty();
-      }
-      const motionStepCount =
-        wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
-      const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
-      for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
-        const stepNow =
-          motionStepCount > 1
-            ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
-            : now;
-        d.butterflyState.list.forEach(function (butterfly) {
-          d.simulateButterflyAuthorityStep(butterfly, stepNow);
-        });
-      }
-      if (onlineAvailable && now - d.lastButterflyBroadcastAt >= d.butterflyBroadcastMs) {
-        d.broadcastButterflyState(now);
-      }
+  // Local flight sim — always when unlocked; multiplayer only syncs spawn/catch.
+  if (butterfliesUnlocked && d.butterflyState.list.length > 0) {
+    if (d.spreadButterfliesWithinActiveBounds()) {
+      d.lastButterflyStateChangeAt = now;
+      d.markWorldDirty();
+    }
+    const motionStepCount =
+      wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
+    const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
+    for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
+      const stepNow =
+        motionStepCount > 1
+          ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
+          : now;
+      d.butterflyState.list.forEach(function (butterfly) {
+        d.simulateButterflyAuthorityStep(butterfly, stepNow);
+      });
+    }
+    if (
+      onlineAvailable &&
+      d.isButterflyAuthority() &&
+      now - d.lastButterflyBroadcastAt >= d.butterflyBroadcastMs
+    ) {
+      d.broadcastButterflyState(now);
     }
   }
-  // ?????? ????????? butterfly.x/y(??????????? ????+???????????????????????
-  const smoothRemoteButterflies =
-    sharedHydrated && onlineAvailable && !d.isButterflyAuthority();
-  /** ????????????? ???????(?? dt?????????????? ???. */
-  const butterflyRemoteLerpAlpha = (function () {
-    const dt = Math.max(1, wallDelta);
-    const a = 1 - Math.exp(-dt / 118);
-    return Math.min(0.34, Math.max(0.08, a));
-  })();
-  /** ???????????????(?????? ?? ?????????? ?????). */
-  const butterflyRemoteRenderMaxStepWorld = wallDelta > 120 ? 160 : 120;
 
-  if (wallDelta > 380 && sharedHydrated && d.isButterflyAuthority()) {
+  if (wallDelta > 380) {
     Object.keys(d.butterflyAuthorityWaypointById).forEach(function (wid) {
       delete d.butterflyAuthorityWaypointById[wid];
     });
   }
-  if (smoothRemoteButterflies && wallDelta > 380) {
-    d.butterflyState.list.forEach(function (b) {
-      if (typeof b._renderX !== "number" || typeof b._renderY !== "number") {
-        b._renderX = b.x;
-        b._renderY = b.y;
-      }
-    });
-  }
 
-  // Render (??? ?????? ?????????? `_catchProbe*`?? ??? ???????????????????????)
+  // Render from locally simulated butterfly.x/y.
   const aliveIds = {};
   let catchTarget = null;
-  const renderButterflyBounds = d.getActiveButterflyBounds();
   d.butterflyState.list.forEach(function (butterfly) {
     aliveIds[butterfly.id] = true;
     const entry = d.ensureButterflyRenderEntry(butterfly);
-    let targetX = butterfly.x;
-    let targetY = butterfly.y;
-    if (smoothRemoteButterflies) {
-      const sampleAge = Math.min(140, Math.max(0, now - (Number(butterfly._netRecvAt) || now)));
-      const maxVelocity = 0.09;
-      const vx = Math.max(-maxVelocity, Math.min(maxVelocity, Number(butterfly._netVx) || 0));
-      const vy = Math.max(-maxVelocity, Math.min(maxVelocity, Number(butterfly._netVy) || 0));
-      targetX += vx * sampleAge;
-      targetY += vy * sampleAge;
-      targetX = Math.max(renderButterflyBounds.left, Math.min(renderButterflyBounds.right, targetX));
-      targetY = Math.max(renderButterflyBounds.top, Math.min(renderButterflyBounds.bottom, targetY));
-    }
-    let drawX = targetX;
-    let drawY = targetY;
-    if (smoothRemoteButterflies) {
-      if (typeof butterfly._renderX !== "number" || typeof butterfly._renderY !== "number") {
-        butterfly._renderX = targetX;
-        butterfly._renderY = targetY;
-      }
-      const rdx = targetX - butterfly._renderX;
-      const rdy = targetY - butterfly._renderY;
-      const t = butterflyRemoteLerpAlpha;
-      let nx = butterfly._renderX + rdx * t;
-      let ny = butterfly._renderY + rdy * t;
-      let mx = nx - butterfly._renderX;
-      let my = ny - butterfly._renderY;
-      const mlen = Math.hypot(mx, my);
-      if (mlen > butterflyRemoteRenderMaxStepWorld && mlen > 0.0001) {
-        const s = butterflyRemoteRenderMaxStepWorld / mlen;
-        nx = butterfly._renderX + mx * s;
-        ny = butterfly._renderY + my * s;
-      }
-      butterfly._renderX = nx;
-      butterfly._renderY = ny;
-      drawX = nx;
-      drawY = ny;
-    } else {
-      // ????? ??????????? ?? ??????? ??????? ???????????????
-      // ???????????????????????????????? ????????????????(???????? ?????.
-      butterfly._renderX = butterfly.x;
-      butterfly._renderY = butterfly.y;
-      drawX = butterfly.x;
-      drawY = butterfly.y;
-    }
+    const drawX = butterfly.x;
+    const drawY = butterfly.y;
     butterfly._catchProbeCx = drawX;
     butterfly._catchProbeCy = drawY;
     const catchDist = d.getButterflyCatchDistanceAtWorldCenter(drawX, drawY);

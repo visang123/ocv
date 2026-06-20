@@ -135,17 +135,6 @@ export const SPAWN_PORTAL_HEIGHT = 44;
 export const SPAWN_PORTAL_X = SIGN_START_X - SPAWN_PORTAL_WIDTH - 24;
 export const SPAWN_PORTAL_Y = SIGN_START_Y + SIGN_HEIGHT - SPAWN_PORTAL_HEIGHT;
 
-/** 부서진 외계인 퍼즐 재단 — 포탈 왼쪽 위(장식·기능 없음). 표시 4배 */
-export const ALIEN_PUZZLE_SHRINE_SCALE = 4;
-export const ALIEN_PUZZLE_SHRINE_WIDTH = Math.round(SPAWN_PORTAL_WIDTH * ALIEN_PUZZLE_SHRINE_SCALE);
-export const ALIEN_PUZZLE_SHRINE_HEIGHT = Math.round(SPAWN_PORTAL_HEIGHT * ALIEN_PUZZLE_SHRINE_SCALE);
-export const ALIEN_PUZZLE_SHRINE_X =
-  SPAWN_PORTAL_X - Math.round(ALIEN_PUZZLE_SHRINE_WIDTH * 0.48) + 8;
-export const ALIEN_PUZZLE_SHRINE_Y =
-  SPAWN_PORTAL_Y - Math.round(ALIEN_PUZZLE_SHRINE_HEIGHT * 0.5) + 12;
-export const ALIEN_PUZZLE_SHRINE_IMG =
-  "\uC774\uBBF8\uC9C0/alien-puzzle-shrine-broken-world.png?v=20260531d";
-
 export const GUIDE_BOOK_WIDTH = 23;
 export const GUIDE_BOOK_HEIGHT = 15;
 /** 땅의 책·씨앗·NPC를 한 덩어리로 왼쪽 이동(World px) */
@@ -220,11 +209,15 @@ export const flowerStage5Image = "이미지/flower-stage5-front.png?v=20260516f"
 export const treeStage4Image = "이미지/tree-stage4-front.png?v=20260520a";
 export const treeStage5Image = "이미지/tree-stage5-front.png?v=20260520a";
 /** 하얀 마법 가루 4·5단계 선인장 */
-export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260520a";
-export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260520a";
+export const cactusStage4Image = "이미지/cactus-stage4-front.png?v=20260531c";
+export const cactusStage5Image = "이미지/cactus-stage5-front.png?v=20260531c";
 /** 4·5단계 선인장 — 풀·나무보다 작게 */
 export const cactusStage4WorldScale = 2.15;
 export const cactusStage5WorldScale = 2.55;
+/** 선인장 4·5단 수분 1칸 감소 간격 */
+export const cactusMatureWaterLevelTickMs = 20 * MINUTE_MS;
+/** 선인장 4·5단 수분 0 후 마름까지 */
+export const cactusMatureDryAfterEmptyMs = 35 * MINUTE_MS;
 /** Draw sizes per stage (world pixels). */
 /** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
 export const SPROUT_STAGE_WIDTHS = [7, 10, 15];
@@ -250,12 +243,12 @@ export const MATURE_SPRITE_ANCHORS = {
     5: { srcW: 500, srcH: 601, centerX: 217, footY: 553, scale: grassStage5WorldScale }
   },
   tree: {
-    4: { srcW: 220, srcH: 253, centerX: 110, footY: 245, scale: grassStage4WorldScale },
-    5: { srcW: 291, srcH: 253, centerX: 145.5, footY: 245, scale: grassStage5WorldScale }
+    4: { srcW: 270, srcH: 249, centerX: 135, footY: 241, scale: grassStage4WorldScale },
+    5: { srcW: 245, srcH: 253, centerX: 122.5, footY: 245, scale: grassStage5WorldScale }
   },
   cactus: {
-    4: { srcW: 220, srcH: 251, centerX: 110, footY: 243, scale: cactusStage4WorldScale },
-    5: { srcW: 291, srcH: 251, centerX: 145.5, footY: 243, scale: cactusStage5WorldScale }
+    4: { srcW: 265, srcH: 251, centerX: 132.5, footY: 243, scale: cactusStage4WorldScale },
+    5: { srcW: 269, srcH: 251, centerX: 134.5, footY: 243, scale: cactusStage5WorldScale }
   }
 };
 
@@ -349,10 +342,10 @@ export const butterflyBroadcastMs = 56;
 export const butterflyBoundsLeft = 24;
 export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
-export const butterflyBoundsBottom = 300;
+export const butterflyBoundsBottom = GROUND_WORLD_HEIGHT - 16;
 export const pickupDistance = 28;
-/** 양동이 줍기 — 플레이어 중심↔양동이 중심 거리(px) */
-export const bucketPickupDistance = 16;
+/** 양동이 줍기 — 플레이어 발↔양동이 중심 거리(px) */
+export const bucketPickupDistance = 12;
 export const guideInteractDistance = 60;
 export const npcInteractDistance = 42;
 /** 우물에서 물 퍼오기·되붓기 판정 거리 */
@@ -423,14 +416,14 @@ function isCactusMaturePlantPhase(plant) {
 export function getPlantWaterLevelTickMsForPlant(plant) {
   const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
   if (tier === 0) return firstSproutWaterLevelTickMs;
-  if (isCactusMaturePlantPhase(plant)) return HOUR_MS;
+  if (isCactusMaturePlantPhase(plant)) return cactusMatureWaterLevelTickMs;
   return getPlantWaterLevelTickMsForTier(tier);
 }
 
 export function getPlantDryAfterEmptyMsForPlantPhase(plant) {
   const tier = Math.max(0, Number(plant && plant.growthTier) || 0);
   if (tier === 0) return firstSproutDryAfterEmptyMs;
-  if (isCactusMaturePlantPhase(plant)) return HOUR_MS;
+  if (isCactusMaturePlantPhase(plant)) return cactusMatureDryAfterEmptyMs;
   return getPlantDryAfterEmptyMsForTier(tier);
 }
 
@@ -447,8 +440,8 @@ export const plantRotClearMs = plantDrySoilClearMs;
 export const level4GrowMs = 90 * SECOND_MS;
 /** 4단 풀·나무 생존 후 자동 5단 */
 export const level5GrowMs = 120 * SECOND_MS;
-/** 4단 선인장 → 5단 (수분 유지 시) */
-export const cactusLevel5GrowMs = 3 * HOUR_MS;
+/** 4단 선인장 → 5단 */
+export const cactusLevel5GrowMs = 1 * HOUR_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";

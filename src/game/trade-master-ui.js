@@ -12,15 +12,9 @@ const SELLABLE_ITEM_KEYS = Object.keys(TRADE_ITEM_SELL_PRICE_KRW);
 const SELLABLE_KEYS = new Set(SELLABLE_ITEM_KEYS);
 
 const TRADE_BUY_CATALOG_ORDER = [
-  "seed",
   "worldBucket",
   "apple",
   "rock",
-  "overgrowthSeed",
-  "magicPowder",
-  "magicPowderYellow",
-  "magicPowderWhite",
-  "magicPowderBrown",
   "butterfly:brown",
   "butterfly:yellow",
   "butterfly:white"
@@ -644,15 +638,8 @@ function refreshTradeShopUi() {
   renderBuyCatalog();
   renderBuyCart();
   renderSellCounter();
-  updateTradeShopMoney();
   updateTradeBuySummary();
   updateTradeSellSummary();
-}
-
-function updateTradeShopMoney() {
-  if (!host.tradeShopMoney) return;
-  host.tradeShopMoney.textContent =
-    "\uBCF4\uC720 \uB3D8: " + formatPlayerMoneyKrw(getPlayerMoneyKrw());
 }
 
 function renderBuyCatalog() {

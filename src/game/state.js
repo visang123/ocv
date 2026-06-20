@@ -190,6 +190,7 @@ export function createSeedWorldState() {
     isHoveringMainSeed: false,
     lastPickupToggleAt: 0,
     lastWorldRockRespawnAt: 0,
+    lastWorldRockPickupAt: 0,
     lastBucketPickupAt: 0,
     hasShownFirstSeedFocus: false,
     firstSeedFocusTimeout: null
@@ -486,6 +487,10 @@ export function createRemotePlayerStateStore() {
       sittingChairId: String(state.sittingChairId || ""),
       insideCraftHouseId: String(state.insideCraftHouseId || ""),
       action: statusAction,
+      rockMiningRockId:
+        statusAction === "rock_mining" ? String(state.rockMiningRockId || "") : "",
+      rockMiningStartedAt:
+        statusAction === "rock_mining" ? Number(state.rockMiningStartedAt) || 0 : 0,
       waterSplashAt: Number(state.waterSplashAt || 0),
       waterSplashX: Number(state.waterSplashX),
       waterSplashY: Number(state.waterSplashY),

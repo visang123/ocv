@@ -9,6 +9,7 @@ export function runGameLoopRender(host) {
   host.updateSeedCard();
   host.updateGuideCard();
   host.updatePlantProgressGauge();
+  host.updateWorldRockMineGauges();
   host.updateOnboardingFlowUI();
   host.updatePlayerAlert();
   host.updateMagicPowderInventoryUi();

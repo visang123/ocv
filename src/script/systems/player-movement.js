@@ -282,6 +282,9 @@ export function createModule(d) {
   }
 
   function isPlayerTimedActionBusy() {
+  if (typeof d.isLocalRockMining === "function" && d.isLocalRockMining()) return true;
+  const rockMining = typeof d.getLocalRockMining === "function" ? d.getLocalRockMining() : null;
+  if (rockMining && rockMining.rockId) return true;
   return d.getPlant().isPlanting || d.getApple().isEating || d.isCraftFurnitureInstalling();
   }
 
@@ -366,6 +369,18 @@ export function createModule(d) {
       d.snapPlayerToCraftChair(seatedChair);
     } else {
       d.standUpFromChair();
+    }
+    d.getPlayer().lastMovementTickMs = performance.now();
+    d.getPlayer().healthPosePrev = { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY };
+    d.getPlayer().healthPoseInitialized = true;
+    return;
+  }
+
+  const activeRockMining =
+    typeof d.getLocalRockMining === "function" ? d.getLocalRockMining() : null;
+  if (activeRockMining && activeRockMining.rockId) {
+    if (typeof d.resetInputKeys === "function" && d.keys) {
+      d.resetInputKeys(d.keys);
     }
     d.getPlayer().lastMovementTickMs = performance.now();
     d.getPlayer().healthPosePrev = { x: d.getPlayer().x, depth: d.getPlayer().depth, jumpY: d.getPlayer().jumpY };

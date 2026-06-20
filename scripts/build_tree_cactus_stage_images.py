@@ -35,7 +35,13 @@ def key_near_black(im: Image.Image) -> Image.Image:
     for y in range(h):
         for x in range(w):
             r, g, b, a = px[x, y]
-            if a > 0 and r + g + b < 28 and max(r, g, b) < 18:
+            if a == 0:
+                continue
+            lum = r + g + b
+            if lum < 52 and max(r, g, b) < 32:
+                px[x, y] = (0, 0, 0, 0)
+                continue
+            if lum < 72 and max(r, g, b) < 48 and abs(r - g) < 12 and abs(g - b) < 12:
                 px[x, y] = (0, 0, 0, 0)
     return im
 
@@ -103,8 +109,14 @@ def foot_center_x(im: Image.Image) -> float:
 
 
 def recenter_on_foot(im: Image.Image, pad: int = PAD) -> Image.Image:
+    im = trim_alpha(im)
     im = im.convert("RGBA")
     w, h = im.size
+    bb = alpha_bbox(im)
+    if bb:
+        l, t, r, b = bb
+        im = im.crop(bb)
+        w, h = im.size
     cx = foot_center_x(im)
     new_w = max(w, int(round(cx * 2)), int(round((w - cx) * 2))) + pad * 2
     out = Image.new("RGBA", (new_w, h + pad), (0, 0, 0, 0))

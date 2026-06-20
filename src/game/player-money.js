@@ -30,7 +30,7 @@ export const TRADE_ITEM_BUY_PRICE_KRW = {
   "butterfly:brown": 30,
   "butterfly:yellow": 30,
   "butterfly:white": 30,
-  worldBucket: 150
+  worldBucket: 100
 };
 
 export function formatPlayerMoneyKrw(amount) {

@@ -14,6 +14,7 @@ export function runGameLoopLogic(host) {
   host.respawnApplesIfNeeded();
   host.tickWorldRockRespawn(Date.now());
   host.tickWorldBagDropDespawn(Date.now());
+  host.tickLocalRockMining(Date.now());
   host.refillWellIfNeeded();
   host.movementTutorial.prepareBeforeMove();
   host.tickPlayerPosition();

@@ -293,24 +293,37 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
-  font: 800 6px/1.25 Arial, sans-serif;
+  font: 800 9px/1.25 Arial, sans-serif;
   color: #92400e;
+  pointer-events: auto;
 }
 
 #plant-hover-label.is-plant-world-sign .plant-world-sign-gold-text {
   text-align: center;
+  font-weight: 800;
 }
 
 #plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect {
   border: 1px solid rgba(146, 64, 14, 0.45);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #fef3c7;
   color: #92400e;
-  font: 800 6px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
-  padding: 2px 4px;
+  font: 800 9px/1.2 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  padding: 4px 8px;
+  min-height: 22px;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect:not(:disabled):hover {
+  background: #fde68a;
+}
+
+#plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect:not(:disabled):active {
+  background: #fcd34d;
 }
 
 #plant-hover-label.is-plant-world-sign .plant-world-sign-gold-collect:disabled {
@@ -319,12 +332,27 @@ body::-webkit-scrollbar {
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-gold {
-  font-size: 7px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 16px;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+#plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-gold-text {
+  font-size: 20px;
+  font-weight: 800;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign .plant-world-sign-gold-collect {
-  font-size: 7px;
-  padding: 3px 5px;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 10px 20px;
+  min-height: 44px;
+  min-width: 88px;
+  border-radius: 10px;
 }
 
 @keyframes plant-water-hover-ring-pulse {
@@ -386,13 +414,14 @@ body::-webkit-scrollbar {
   border-right: none;
   z-index: 11;
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  pointer-events: auto;
 }
 
 #plant-hover-label.is-well-dock.is-plant-world-sign {
-  gap: 8px;
-  min-height: 90px;
+  gap: 10px;
+  min-height: 140px;
   max-width: none;
-  padding: 14px 20px 16px;
+  padding: 16px 22px 18px;
   border: 1px solid rgba(0, 0, 0, 0.14);
   border-right: none;
   background: rgba(255, 255, 255, 0.96);

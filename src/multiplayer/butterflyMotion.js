@@ -48,7 +48,21 @@ export function getButterflyFlutterOffsetWorld(now, butterfly, config) {
 
 export function createButterflyMotionController(config) {
   function getBounds() {
-    return typeof config.getBounds === "function" ? config.getBounds() : config.bounds;
+    if (typeof config.getBounds === "function") {
+      const dynamic = config.getBounds();
+      if (
+        dynamic &&
+        Number.isFinite(Number(dynamic.left)) &&
+        Number.isFinite(Number(dynamic.right)) &&
+        Number.isFinite(Number(dynamic.top)) &&
+        Number.isFinite(Number(dynamic.bottom)) &&
+        dynamic.right > dynamic.left &&
+        dynamic.bottom > dynamic.top
+      ) {
+        return dynamic;
+      }
+    }
+    return config.bounds;
   }
   const colors = Array.isArray(config.colors) && config.colors.length
     ? config.colors.slice()
@@ -71,9 +85,17 @@ export function createButterflyMotionController(config) {
 
   function pickSpawnPoint() {
     const bounds = getBounds();
+    const width = bounds.right - bounds.left;
+    const height = bounds.bottom - bounds.top;
+    if (width <= 1 || height <= 1) {
+      return {
+        x: (bounds.left + bounds.right) * 0.5,
+        y: (bounds.top + bounds.bottom) * 0.5
+      };
+    }
     return {
-      x: bounds.left + Math.random() * (bounds.right - bounds.left),
-      y: bounds.top + Math.random() * (bounds.bottom - bounds.top)
+      x: bounds.left + Math.random() * width,
+      y: bounds.top + Math.random() * height
     };
   }
 
@@ -132,6 +154,8 @@ export function createButterflyMotionController(config) {
       color: colors.indexOf(opts.color) >= 0 ? opts.color : pickColor(),
       x: spawn.x,
       y: spawn.y,
+      lastPathX: spawn.x,
+      lastPathY: spawn.y,
       dirX: Math.random() < 0.5 ? -1 : 1,
       spawnedAt: getNumericButterflyValue(opts.spawnedAt, now)
     };
@@ -234,10 +258,21 @@ export function createButterflyMotionController(config) {
       const id = String(raw.id);
       if (seen[id]) return;
       seen[id] = true;
-      const point = clampPoint({
-        x: getNumericButterflyValue(raw.x, bounds.left),
-        y: getNumericButterflyValue(raw.y, bounds.top)
-      }, bounds);
+      let point;
+      if (Number.isFinite(Number(raw.x)) && Number.isFinite(Number(raw.y))) {
+        const px = Number(raw.x);
+        const py = Number(raw.y);
+        if (px === 0 && py === 0) {
+          point = pickSpawnPoint();
+        } else {
+          point = clampPoint({ x: px, y: py }, bounds);
+          if (px <= bounds.left + 2 && py <= bounds.top + 2) {
+            point = pickSpawnPoint();
+          }
+        }
+      } else {
+        point = pickSpawnPoint();
+      }
       out.push({
         id,
         color: colors.indexOf(raw.color) >= 0 ? raw.color : pickColor(),

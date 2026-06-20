@@ -8727,6 +8727,7 @@ function hasActiveGreenGrowthProgress(plant, now) { return _systemsApi ? _system
 function hasFreshButterflyAuthorityBroadcast(now) { return _systemsApi ? _systemsApi.hasFreshButterflyAuthorityBroadcast(now) : undefined; }
 function isAppleInTrunkArea(localX, localY, size) { return _systemsApi ? _systemsApi.isAppleInTrunkArea(localX, localY, size) : undefined; }
 function isButterflyAuthority() { return _systemsApi ? _systemsApi.isButterflyAuthority() : undefined; }
+function isUnsetButterflyCoord(x, y, bounds) { return _systemsApi ? _systemsApi.isUnsetButterflyCoord(x, y, bounds) : false; }
 function isCraftFurnitureInstalling() { return _systemsApi ? _systemsApi.isCraftFurnitureInstalling() : undefined; }
 function isMainGameTutorialInProgress() { return _systemsApi ? _systemsApi.isMainGameTutorialInProgress() : undefined; }
 function isNearWellForCard() { return _systemsApi ? _systemsApi.isNearWellForCard() : undefined; }
@@ -10367,8 +10368,20 @@ function appendPlantHoverWaterDetail(parentEl, plant) {
   parentEl.appendChild(detailEl);
 }
 
+function canCollectPlantGold(plant) {
+  if (!plant) return false;
+  if (plantOwnerMatches(plant, getPlanterOwnerId(), getPlanterDisplayName())) return true;
+  const pid = String(plant.ownerUserId || "").trim();
+  const pname = String(plant.ownerDisplayName || "").trim();
+  if (pid || pname) return false;
+  if (plant === getPlant()) return true;
+  return getApple().extraPlants.indexOf(plant) >= 0;
+}
+
 function appendPlantHoverGoldDetail(parentEl, plant) {
   if (!parentEl || !plant) return;
+  const now = getSharedPlantSimulationNow();
+  tickPlantGold(plant, now);
   const goldKrw = getPlantGoldKrw(plant);
   if (!canPlantProduceGold(plant) && goldKrw <= 0) return;
 
@@ -10380,7 +10393,7 @@ function appendPlantHoverGoldDetail(parentEl, plant) {
   textEl.textContent = "\uACE8\uB4DC: " + goldKrw + "\uC6D0";
   goldEl.appendChild(textEl);
 
-  if (plantOwnerMatches(plant, getPlanterOwnerId(), getPlanterDisplayName())) {
+  if (canCollectPlantGold(plant)) {
     const collectBtn = document.createElement("button");
     collectBtn.type = "button";
     collectBtn.className = "plant-world-sign-gold-collect";
@@ -10391,6 +10404,7 @@ function appendPlantHoverGoldDetail(parentEl, plant) {
       event.preventDefault();
       if (collectPlantGoldFromPlant(plant)) {
         showPlantHoverSignForPlant(plant);
+        updateBagPlayerMoneyDisplay();
       }
     });
     goldEl.appendChild(collectBtn);
@@ -10400,7 +10414,7 @@ function appendPlantHoverGoldDetail(parentEl, plant) {
 }
 
 function collectPlantGoldFromPlant(plant) {
-  if (!plant || !plantOwnerMatches(plant, getPlanterOwnerId(), getPlanterDisplayName())) {
+  if (!canCollectPlantGold(plant)) {
     return false;
   }
   const now = getSharedPlantSimulationNow();
@@ -10412,8 +10426,9 @@ function collectPlantGoldFromPlant(plant) {
     saveSeedState({ bumpMergeGuard: false });
   } else {
     saveAppleState();
-    markWorldDirty();
   }
+  markWorldDirty();
+  syncWorldState(true);
   return true;
 }
 
@@ -16257,6 +16272,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       nextList.push(butterfly);
     });
   } else {
+    const activeBounds = getActiveButterflyBounds();
     incomingList.forEach(function (raw) {
       if (!raw || !raw.id) return;
       if (butterflyLocalCatchTombstoneById[String(raw.id)]) return;
@@ -16269,32 +16285,17 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
         spawnedAt: getNumericButterflyValue(raw.spawnedAt, Date.now())
       };
       butterfly.color = raw.color || butterfly.color;
-      const prevX = Number.isFinite(Number(butterfly.x)) ? butterfly.x : null;
-      const prevY = Number.isFinite(Number(butterfly.y)) ? butterfly.y : null;
-      const prevSampleAt = butterfly._netSampleAt;
-      const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
-      const newX = nextPoint.x;
-      const newY = nextPoint.y;
-      if (prevX != null && prevY != null && Number.isFinite(prevSampleAt) && prevSampleAt > 0) {
-        const dtMs = Math.max(16, sampleAt - prevSampleAt);
-        const rawVx = (newX - prevX) / dtMs;
-        const rawVy = (newY - prevY) / dtMs;
-        const prevVx = Number(butterfly._netVx) || 0;
-        const prevVy = Number(butterfly._netVy) || 0;
-        const blend = 0.26;
-        butterfly._netVx = prevVx * (1 - blend) + rawVx * blend;
-        butterfly._netVy = prevVy * (1 - blend) + rawVy * blend;
-      } else {
-        butterfly._netVx = 0;
-        butterfly._netVy = 0;
-      }
-      butterfly._netSampleAt = sampleAt;
-      butterfly._netRecvAt = recvAt;
-      butterfly.x = newX;
-      butterfly.y = newY;
-      butterfly.lastPathX = newX;
-      butterfly.lastPathY = newY;
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
+      const needsPosition =
+        !existing ||
+        isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds);
+      if (needsPosition) {
+        const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
+        butterfly.x = nextPoint.x;
+        butterfly.y = nextPoint.y;
+        butterfly.lastPathX = nextPoint.x;
+        butterfly.lastPathY = nextPoint.y;
+      }
       nextList.push(butterfly);
     });
     // Drop any local butterflies the authority no longer reports.
@@ -16309,17 +16310,6 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
   let merged = trimButterflyListToMaxCap(dedupeButterfliesByIdStable(nextList));
   butterflyState.list = merged;
   pruneButterflyAuthorityWaypointsToList();
-  if (!iAmAuthority) {
-    butterflyState.list.forEach(function (b) {
-      if (b && b.id != null) {
-        delete butterflyAuthorityWaypointById[String(b.id)];
-      }
-      if (typeof b._renderX !== "number" || typeof b._renderY !== "number") {
-        b._renderX = b.x;
-        b._renderY = b.y;
-      }
-    });
-  }
 
   const rawLast = snapshotButterflies.lastSpawnAt;
   const parsedLast = Number(rawLast);

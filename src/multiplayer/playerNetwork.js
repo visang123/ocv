@@ -116,6 +116,8 @@ export function createPlayerPositionNetwork(options) {
       localState.action,
       localState.sittingChairId || "",
       localState.insideCraftHouseId || "",
+      localState.rockMiningRockId || "",
+      Math.round(localState.rockMiningStartedAt || 0),
       Math.round(localState.waterSplashAt || 0)
     ].join("|");
     const hasChanged = stateKey !== lastPresenceStateKey;
