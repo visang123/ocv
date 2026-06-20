@@ -123,6 +123,7 @@ import {
   WORLD_LOOSE_SEED_ID,
   WORLD_LOOSE_SEED_X,
   WORLD_LOOSE_SEED_Y,
+  WORLD_HUB_GROUND_SEED_ENABLED,
   WORLD_LOOSE_ROCK_COUNT,
   WORLD_ROCK_RESPAWN_INTERVAL_MS,
   WORLD_ROCK_SIZE,
@@ -1139,6 +1140,18 @@ function setWorldMapSize(element, width, height) {
   }
 }
 
+function syncBigTreeSceneScale() {
+  if (!bigTree || !ground) return;
+  const scene = bigTree.querySelector(".big-tree-scene");
+  if (!scene) return;
+  const cw = bigTree.clientWidth;
+  const ch = bigTree.clientHeight;
+  if (cw <= 0 || ch <= 0) return;
+  const sx = cw / BIG_TREE_WIDTH;
+  const sy = ch / BIG_TREE_HEIGHT;
+  scene.style.transform = "scale(" + sx + "," + sy + ")";
+}
+
 function syncWorldPlantFogVisuals() {
   const tutorialPlantIndexFog =
     isMainGameTutorialInProgress() &&
@@ -1981,6 +1994,7 @@ function getWorldLooseSeedClockNow() {
 }
 
 function isWorldLooseSeedVisibleAt() {
+  if (!WORLD_HUB_GROUND_SEED_ENABLED) return false;
   if (!usesWorldLooseSeedMode()) return false;
   if (Number(getApple().seedCount) > 0) return false;
   if (typeof getBagInventorySeedCount === "function" && getBagInventorySeedCount() > 0) {
@@ -9539,7 +9553,7 @@ function updateExtraSeedsAndPlants() {
     getInventory().heldItem = null;
   }
 
-  if (usesWorldLooseSeedMode()) {
+  if (usesWorldLooseSeedMode() && WORLD_HUB_GROUND_SEED_ENABLED) {
     ensureWorldLooseSeedShape();
     syncWorldLoosePickupLock();
     if (!worldLooseSeedElement) {
@@ -16944,6 +16958,7 @@ function setup() {
     );
   }
   setWorldMapSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
+  syncBigTreeSceneScale();
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
   if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);

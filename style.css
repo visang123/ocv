@@ -854,6 +854,16 @@ body:not(.is-game-ready) .viewport {
   user-select: none;
 }
 
+.big-tree-scene {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 142px;
+  height: 190px;
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+
 .big-tree-trunk {
   position: absolute;
   left: 58px;
@@ -3146,10 +3156,10 @@ body.ovc-page-tutorial #multiplayer-status {
 #admin-dev-plant-index-plus-button {
   position: fixed;
   left: 67px;
-  top: 4px;
+  top: 3px;
   z-index: 261;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   padding: 0;
   border: 0;
   border-radius: 2px;
@@ -3171,11 +3181,11 @@ body.ovc-page-tutorial #multiplayer-status {
 
 #admin-dev-bucket-spawn-button {
   position: fixed;
-  left: 76px;
-  top: 4px;
+  left: 78px;
+  top: 3px;
   z-index: 261;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   padding: 0;
   border: 0;
   border-radius: 2px;
@@ -3192,7 +3202,7 @@ body.ovc-page-tutorial #multiplayer-status {
 }
 
 #admin-dev-bucket-spawn-button:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
 }
 
 #admin-overlay {
