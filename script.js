@@ -49,6 +49,8 @@ import {
   getPlantFogWorldStageFromScore,
   getPlantFogClearRectWorldPx,
   getPlantFogGlobalDimAlphaForStage,
+  getDefaultButterflyFlyBoundsWorldPx,
+  getButterflyFlyBoundsWorldPx,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   PLAYER_SIT_WIDTH,
@@ -80,6 +82,8 @@ import {
   BIG_TREE_WIDTH,
   BIG_TREE_HEIGHT,
   BIG_TREE_CANOPY_DESIGN_HEIGHT,
+  TREE_APPLE_SIZE,
+  TREE_APPLE_COUNT,
   NPC_WIDTH,
   NPC_HEIGHT,
   BIG_TREE_X,
@@ -201,6 +205,8 @@ import {
   playerHealthKey,
   wellWaterKey,
   lastWellRefillKey,
+  wellUpgradeLevelKey,
+  wellDonationKrwKey,
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
@@ -303,6 +309,15 @@ import {
   wellCardImage,
   wellWaterText,
   wellWaterFill,
+  wellDonationText,
+  wellDonationFill,
+  wellDonationOpenBtn,
+  wellDonationOverlay,
+  wellDonationGoalText,
+  wellDonationBalanceText,
+  wellDonationSelectedText,
+  wellDonationConfirmBtn,
+  wellDonationCancelBtn,
   seedCard,
   seedDryGauge,
   seedDryText,
@@ -535,6 +550,14 @@ import {
   openPlantMasterSeedShop,
   updatePlantMasterSeedShopProximity
 } from "./src/game/plant-master-seed-shop.js?v=20260613a";
+import {
+  bindWellUpgradeUi,
+  refreshWellUpgradeCardUi
+} from "./src/game/well-upgrade-ui.js?v=20260620a";
+import {
+  getWellMaxWater,
+  getWellRefillMs
+} from "./src/game/well-upgrade.js?v=20260620a";
 import {
   playerMoneyKrwKey,
   formatPlayerMoneyKrw,
@@ -1446,12 +1469,7 @@ let lastButterflyWallClockMs = 0;
 let gameLoopCyclesForTutorialSync = 0;
 
 function resolveButterflyFlyBounds() {
-  const fallback = {
-    left: butterflyBoundsLeft,
-    right: butterflyBoundsRight,
-    top: butterflyBoundsTop,
-    bottom: butterflyBoundsBottom
-  };
+  const fallback = getDefaultButterflyFlyBoundsWorldPx();
   if (!_systemsApi || typeof _systemsApi.getActiveButterflyBounds !== "function") {
     return fallback;
   }
@@ -3072,6 +3090,27 @@ bindPlantMasterSeedShop({
   closeTradeExchangePanel: closeTradeExchangePanel,
   isAlchemyCraftOpen: isAlchemyCraftOpen,
   closeAlchemyCraftPanel: closeAlchemyCraftPanel
+});
+
+bindWellUpgradeUi({
+  wellCard: wellCard,
+  donationText: wellDonationText,
+  donationFill: wellDonationFill,
+  donationOpenBtn: wellDonationOpenBtn,
+  donationOverlay: wellDonationOverlay,
+  donationGoalText: wellDonationGoalText,
+  donationBalanceText: wellDonationBalanceText,
+  donationSelectedText: wellDonationSelectedText,
+  donationConfirmBtn: wellDonationConfirmBtn,
+  donationCancelBtn: wellDonationCancelBtn,
+  getWell: getWell,
+  getPlayerMoneyKrw: getPlayerMoneyKrw,
+  applyPlayerMoneyDeltaKrw: applyPlayerMoneyDeltaKrw,
+  saveWellState: saveWellState,
+  syncWorldState: syncWorldState,
+  updateWellImage: updateWellImage,
+  updateWellCard: updateWellCard,
+  showPlayerAlert: showPlayerAlert
 });
 
 bindAlchemyMaster({
@@ -5934,7 +5973,7 @@ function applyDefaultState(options) {
   getApple().pickedIds = [];
   getApple().isEating = false;
   getApple().nextSeedOffset = 0;
-  getApple().apples = createRandomApples(5);
+  getApple().apples = createRandomApples(TREE_APPLE_COUNT);
   getApple().lastSpawnAt = Date.now();
   clearExtraSeedAndPlantElements();
   getApple().extraSeeds = [];
@@ -5988,7 +6027,9 @@ function applyDefaultState(options) {
   updateBagInventorySlots();
   updateMagicPowderInventoryUi();
 
-  getWell().water = maxWellWater;
+  getWell().upgradeLevel = 0;
+  getWell().donationKrw = 0;
+  getWell().water = getWellMaxWater(getWell());
   getWell().lastRefillAt = Date.now();
   getInventory().isBucketFull = false;
   getInventory().heldBucketId = "";
@@ -7618,7 +7659,10 @@ function loadAppleState() {
     now: Date.now(),
     defaultSeedLabel: "\uC528\uC557",
     createRandomApples,
+    createRandomApple,
     createRandomWorldRocks,
+    treeAppleCount: TREE_APPLE_COUNT,
+    treeAppleSize: TREE_APPLE_SIZE,
     plantSpotForRocks:
       getPlant().isSeedPlanted &&
       Number.isFinite(getPlant().spotX) &&
@@ -7935,6 +7979,7 @@ function buildNetworkDeps() {
     mainDrySeedHandledKey,
     markWorldDirty,
     maxWellWater,
+    getWellMaxWater,
     mergeSharedRockRespawnTimestamps,
     mergeWorldBagDropsFromSnapshot,
     get multiplayerChannel() { return multiplayerChannel; },
@@ -7968,6 +8013,7 @@ function buildNetworkDeps() {
     rebuildPlacedCraftFurnitureDom,
     refillWellIfNeeded,
     refreshUiAfterSharedWorldApply,
+    refreshWellUpgradeCardUi,
     get remoteBucketUpdateAtById() { return remoteBucketUpdateAtById; },
     set remoteBucketUpdateAtById(v) { remoteBucketUpdateAtById = v; },
     get remotePlayerHeldBucketById() { return remotePlayerHeldBucketById; },
@@ -8100,6 +8146,8 @@ function buildLayerDeps() {
     getCraftChairById,
     getCraftChairSitPose,
     getDefaultButterflyBounds,
+    getDefaultButterflyFlyBoundsWorldPx,
+    getButterflyFlyBoundsWorldPx,
     getGrassAutoTier5GrowthRatio,
     getLocalPlayerBodyHeight,
     getLocalPlayerBodyWidth,
@@ -8160,6 +8208,8 @@ function buildLayerDeps() {
     BIG_TREE_WIDTH,
     BIG_TREE_HEIGHT,
     BIG_TREE_CANOPY_DESIGN_HEIGHT,
+    TREE_APPLE_SIZE,
+    TREE_APPLE_COUNT,
     TREE_CANOPY_LEFT,
     TREE_CANOPY_RIGHT,
     TREE_CANOPY_TOP,
@@ -8244,6 +8294,8 @@ function buildLayerDeps() {
     localPlayerRoot,
     markWorldDirty,
     maxWellWater,
+    getWellMaxWater,
+    getWellRefillMs,
     movePlayerVerticallyInTree,
     multiplayerChannel,
     multiplayerRoomSessionButterflyStateLastSeen,
@@ -8317,6 +8369,8 @@ function buildLayerDeps() {
     wellCardDistance,
     wellCardImage,
     wellRefillMs,
+    wellUpgradeLevelKey,
+    wellDonationKrwKey,
     wellWaterFill,
     wellWaterKey,
     wellWaterText,
@@ -8385,6 +8439,9 @@ function buildLayerDeps() {
     PLANT_SPOT_WIDTH,
     PLANT_GROWTH_METER_HEIGHT,
     PLANT_GROWTH_METER_WIDTH,
+    BIG_TREE_WIDTH,
+    BIG_TREE_CANOPY_DESIGN_HEIGHT,
+    TREE_APPLE_COUNT,
     PLAYER_BASE_IMAGE_SRC,
     PLAYER_HEIGHT,
     PLAYER_MAX_HEALTH,
@@ -9059,7 +9116,9 @@ function hasActiveGreenGrowthProgress(plant, now) { return _systemsApi ? _system
 function hasFreshButterflyAuthorityBroadcast(now) { return _systemsApi ? _systemsApi.hasFreshButterflyAuthorityBroadcast(now) : undefined; }
 function isAppleInTrunkArea(localX, localY, size) { return _systemsApi ? _systemsApi.isAppleInTrunkArea(localX, localY, size) : undefined; }
 function isButterflyAuthority() { return _systemsApi ? _systemsApi.isButterflyAuthority() : undefined; }
-function isUnsetButterflyCoord(x, y, bounds) { return _systemsApi ? _systemsApi.isUnsetButterflyCoord(x, y, bounds) : false; }
+function isUnsetButterflyCoord(x, y) {
+  return _systemsApi ? _systemsApi.isUnsetButterflyCoord(x, y) : false;
+}
 function isCraftFurnitureInstalling() { return _systemsApi ? _systemsApi.isCraftFurnitureInstalling() : undefined; }
 function isMainGameTutorialInProgress() { return _systemsApi ? _systemsApi.isMainGameTutorialInProgress() : undefined; }
 function isNearWellForCard() { return _systemsApi ? _systemsApi.isNearWellForCard() : undefined; }
@@ -9303,11 +9362,12 @@ function shouldIgnoreEmptyRemoteMainPlant(incomingPlant) {
 }
 
 function snapWellRefillToGrid(nowMs) {
+  const refillMs = getWellRefillMs(getWell());
   const t = Number(nowMs);
   if (!Number.isFinite(t) || t <= 0) {
-    return Math.floor(Date.now() / wellRefillMs) * wellRefillMs;
+    return Math.floor(Date.now() / refillMs) * refillMs;
   }
-  return Math.floor(t / wellRefillMs) * wellRefillMs;
+  return Math.floor(t / refillMs) * refillMs;
 }
 
 /**
@@ -9321,6 +9381,7 @@ function refreshUiAfterSharedWorldApply() {
   syncMainSeedPickedStateFromLoadedExtraSeeds();
   updateWellImage();
   updateWellCard();
+  refreshWellUpgradeCardUi();
   updateSeedPosition();
   updateBucketPosition();
   updateApples();
@@ -13723,7 +13784,7 @@ function useBucket() {
   // ????? ??????? ????????????Q?????? ????????(??????? ?? ??????????????? ???).
   if (
     nearWellPour &&
-    getWell().water < maxWellWater &&
+    getWell().water < getWellMaxWater(getWell()) &&
     !wateringTarget
   ) {
     getWell().water += 1;
@@ -13769,7 +13830,7 @@ function useBucket() {
   }
 
   // ?????????????????????????? ????????? ?????????? ????? + ???????????????????
-  if (nearWellPour && getWell().water >= maxWellWater) {
+  if (nearWellPour && getWell().water >= getWellMaxWater(getWell())) {
     triggerWaterSplash();
     flashPlantProximityWarning(
       "\uC6B0\uBB3C\uC774 \uAC00\uB4DD\uCC28\uC2B5\uB2C8\uB2E4."
@@ -14243,14 +14304,22 @@ function loadWellState() {
   const loaded = loadWellStateFromStorage({
     wellWaterKey,
     lastWellRefillKey,
+    wellUpgradeLevelKey,
+    wellDonationKrwKey,
     maxWellWater,
     defaultWellWater: maxWellWater,
-    defaultLastWellRefillAt: Date.now()
+    defaultLastWellRefillAt: Date.now(),
+    getMaxWellWaterForLevel: function (level) {
+      return getWellMaxWater({ upgradeLevel: level });
+    }
   });
   getWell().water = loaded.wellWater;
   getWell().lastRefillAt = loaded.lastWellRefillAt;
+  getWell().upgradeLevel = loaded.upgradeLevel || 0;
+  getWell().donationKrw = loaded.donationKrw || 0;
 
   refillWellIfNeeded();
+  refreshWellUpgradeCardUi();
 }
 
 function saveWellState() {
@@ -14258,8 +14327,12 @@ function saveWellState() {
   saveWellStateToStorage({
     wellWaterKey,
     lastWellRefillKey,
+    wellUpgradeLevelKey,
+    wellDonationKrwKey,
     wellWater: getWell().water,
-    lastWellRefillAt: getWell().lastRefillAt
+    lastWellRefillAt: getWell().lastRefillAt,
+    upgradeLevel: getWell().upgradeLevel,
+    donationKrw: getWell().donationKrw
   });
   markWorldDirty();
 }
@@ -16748,14 +16821,13 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
 
   const nextList = [];
   if (iAmAuthority) {
-    const activeBounds = getActiveButterflyBounds();
     butterflyState.list.forEach(function (butterfly) {
       if (incomingById[butterfly.id]) {
         const raw = incomingById[butterfly.id];
         if (
           !Number.isFinite(Number(butterfly.x)) ||
           !Number.isFinite(Number(butterfly.y)) ||
-          isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds)
+          isUnsetButterflyCoord(butterfly.x, butterfly.y)
         ) {
           const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
           butterfly.x = nextPoint.x;
@@ -16809,7 +16881,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       const needsPosition =
         !existing ||
-        isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds) ||
+        isUnsetButterflyCoord(butterfly.x, butterfly.y) ||
         !Number.isFinite(Number(butterfly.lastPathX)) ||
         !Number.isFinite(Number(butterfly.lastPathY));
       if (needsPosition) {

@@ -101,35 +101,33 @@ export function createModule(d) {
   });
   }
 
-  function isLegacyCornerButterflyCoord(x, y, bounds) {
+  function isLegacyCornerButterflyCoord(x, y) {
   const nx = Number(x);
   const ny = Number(y);
   if (!Number.isFinite(nx) || !Number.isFinite(ny)) return true;
+  // 저장/동기화 스냅샷에 좌표가 없을 때 흔한 (0,0)·좌상단 근처 값만 거른다.
   if (nx === 0 && ny === 0) return true;
-  if (nx <= bounds.left + 4 && ny <= bounds.top + 4) return true;
-  const legacyTop = Math.max(bounds.top, d.butterflyBoundsTop) + 36;
-  if (nx <= d.butterflyBoundsLeft + 4 && ny <= legacyTop) return true;
+  if (nx < 2 && ny < 2) return true;
   return false;
   }
 
-  function isUnsetButterflyCoord(x, y, bounds) {
-  return isLegacyCornerButterflyCoord(x, y, bounds);
+  function isUnsetButterflyCoord(x, y) {
+  return isLegacyCornerButterflyCoord(x, y);
   }
 
   function shouldRelocateButterfliesInBounds() {
   if (!d.butterflyState.list.length) return false;
-  if (d.areButterfliesClusteredInActiveBounds()) return true;
-  const bounds = d.getActiveButterflyBounds();
+  if (areButterfliesClusteredInActiveBounds()) return true;
   return d.butterflyState.list.some(function (butterfly) {
     if (!butterfly) return false;
-    return d.isLegacyCornerButterflyCoord(butterfly.x, butterfly.y, bounds);
+    return isUnsetButterflyCoord(butterfly.x, butterfly.y);
   });
   }
 
   function areButterfliesClusteredInActiveBounds() {
   const list = d.butterflyState.list;
   if (!list.length) return false;
-  const bounds = d.getActiveButterflyBounds();
+  const bounds = getActiveButterflyBounds();
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -140,7 +138,7 @@ export function createModule(d) {
     if (!butterfly) return;
     const x = Number(butterfly.x);
     const y = Number(butterfly.y);
-    if (d.isUnsetButterflyCoord(x, y, bounds)) return;
+    if (isUnsetButterflyCoord(x, y)) return;
     validCount += 1;
     minX = Math.min(minX, x);
     maxX = Math.max(maxX, x);
@@ -155,8 +153,8 @@ export function createModule(d) {
   }
 
   function clampButterflyPointToActiveBounds(x, y) {
-  const bounds = d.getActiveButterflyBounds();
-  if (d.isUnsetButterflyCoord(x, y, bounds)) {
+  const bounds = getActiveButterflyBounds();
+  if (isUnsetButterflyCoord(x, y)) {
     return d.butterflyMotion.pickSpawnPoint();
   }
   return {
@@ -221,20 +219,13 @@ export function createModule(d) {
   }
 
   function getActiveButterflyBounds() {
-  const base = d.getDefaultButterflyBounds();
-  if (!d.isWorldDocumentEntry()) return base;
-  const stage = d.getPlantFogWorldStageFromScore(d.getTotalPlantIndexScore());
-  if (stage < 3 || stage >= 5) return base;
-  const clearRect = d.getPlantFogClearRectWorldPx(stage);
-  const pad = Math.max(8, Math.ceil(d.BUTTERFLY_SIZE * 0.75));
-  const bounds = {
-    left: clearRect.left + pad,
-    right: clearRect.right - pad,
-    top: clearRect.top + pad,
-    bottom: clearRect.bottom - pad
-  };
-  if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return base;
-  return bounds;
+  return d.getButterflyFlyBoundsWorldPx({
+    worldEntry: d.isWorldDocumentEntry(),
+    plantFogStage: d.isWorldDocumentEntry()
+      ? d.getPlantFogWorldStageFromScore(d.getTotalPlantIndexScore())
+      : 1,
+    butterflySize: d.BUTTERFLY_SIZE
+  });
   }
 
   function resetButterflyPathFields(butterfly, x, y) {
@@ -247,9 +238,8 @@ export function createModule(d) {
   butterfly._renderY = y;
   }
 
-  function ensureButterflyReadyForSimulation(butterfly, bounds) {
+  function ensureButterflyReadyForSimulation(butterfly) {
   if (!butterfly) return false;
-  const flyBounds = bounds || d.getActiveButterflyBounds();
   let changed = false;
   const x = Number(butterfly.x);
   const y = Number(butterfly.y);
@@ -258,7 +248,7 @@ export function createModule(d) {
   if (
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
-    isUnsetButterflyCoord(x, y, flyBounds)
+    isUnsetButterflyCoord(x, y)
   ) {
     const spawn = d.butterflyMotion.pickSpawnPoint();
     resetButterflyPathFields(butterfly, spawn.x, spawn.y);
@@ -273,14 +263,13 @@ export function createModule(d) {
   return changed;
   }
 
-  function repairButterflyMotionFromNetwork(butterfly, raw, bounds) {
+  function repairButterflyMotionFromNetwork(butterfly, raw) {
   if (!butterfly) return false;
-  const flyBounds = bounds || d.getActiveButterflyBounds();
   let changed = false;
   if (
     !Number.isFinite(Number(butterfly.x)) ||
     !Number.isFinite(Number(butterfly.y)) ||
-    isUnsetButterflyCoord(butterfly.x, butterfly.y, flyBounds)
+    isUnsetButterflyCoord(butterfly.x, butterfly.y)
   ) {
     const nextPoint = raw
       ? clampButterflyPointToActiveBounds(raw.x, raw.y)
@@ -301,10 +290,10 @@ export function createModule(d) {
   }
 
   function spreadButterfliesWithinActiveBounds() {
-  if (!d.shouldRelocateButterfliesInBounds()) return false;
+  if (!shouldRelocateButterfliesInBounds()) return false;
   const list = d.butterflyState.list;
   if (!list.length) return false;
-  const bounds = d.getActiveButterflyBounds();
+  const bounds = getActiveButterflyBounds();
   const width = Math.max(1, bounds.right - bounds.left);
   const height = Math.max(1, bounds.bottom - bounds.top);
   const count = list.length;
@@ -356,12 +345,7 @@ export function createModule(d) {
   }
 
   function getDefaultButterflyBounds() {
-  return {
-    left: d.butterflyBoundsLeft,
-    right: d.butterflyBoundsRight,
-    top: d.butterflyBoundsTop,
-    bottom: d.butterflyBoundsBottom
-  };
+  return d.getDefaultButterflyFlyBoundsWorldPx();
   }
 
   function getLocalPlayerBodyHeight() {
@@ -480,14 +464,14 @@ export function createModule(d) {
 
   function keepButterfliesInsideActiveBounds() {
   let changed = false;
-  const bounds = d.getActiveButterflyBounds();
+  const bounds = getActiveButterflyBounds();
   d.butterflyState.list.forEach(function (butterfly) {
     if (!butterfly) return;
     const beforeX = Number(butterfly.x);
     const beforeY = Number(butterfly.y);
-    const next = d.isUnsetButterflyCoord(butterfly.x, butterfly.y, bounds)
+    const next = isUnsetButterflyCoord(butterfly.x, butterfly.y)
       ? d.butterflyMotion.pickSpawnPoint()
-      : d.clampButterflyPointToActiveBounds(butterfly.x, butterfly.y);
+      : clampButterflyPointToActiveBounds(butterfly.x, butterfly.y);
     butterfly.x = next.x;
     butterfly.y = next.y;
     if (
@@ -623,9 +607,8 @@ export function createModule(d) {
   // ??? ????????????? ????2?????????????????
   // Local flight sim — always run when butterflies exist on screen.
   if (d.butterflyState.list.length > 0) {
-    const activeBounds = d.getActiveButterflyBounds();
     d.butterflyState.list.forEach(function (butterfly) {
-      if (ensureButterflyReadyForSimulation(butterfly, activeBounds)) {
+      if (ensureButterflyReadyForSimulation(butterfly)) {
         d.lastButterflyStateChangeAt = now;
         d.markWorldDirty();
       }
@@ -665,7 +648,7 @@ export function createModule(d) {
   // Render from locally simulated butterfly.x/y.
   const aliveIds = {};
   let catchTarget = null;
-  const renderBounds = d.getActiveButterflyBounds();
+  const renderBounds = getActiveButterflyBounds();
   d.butterflyState.list.forEach(function (butterfly) {
     if (!butterfly || butterfly.id == null) return;
     aliveIds[butterfly.id] = true;

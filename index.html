@@ -70,6 +70,9 @@
             <div class="tree-apple" data-apple-id="apple-3"></div>
             <div class="tree-apple" data-apple-id="apple-4"></div>
             <div class="tree-apple" data-apple-id="apple-5"></div>
+            <div class="tree-apple" data-apple-id="apple-6"></div>
+            <div class="tree-apple" data-apple-id="apple-7"></div>
+            <div class="tree-apple" data-apple-id="apple-8"></div>
           </div>
           <div class="big-tree-trunk"></div>
           <div class="big-tree-roots"></div>
@@ -183,6 +186,34 @@
       <div id="well-water-text">3/3</div>
       <div class="well-water-bar">
         <div id="well-water-fill"></div>
+      </div>
+      <div class="well-card-upgrade">
+        <div class="well-donation-label">
+          <span>강화 기부</span>
+          <span id="well-donation-text">0원 / 100원</span>
+        </div>
+        <div class="well-donation-bar">
+          <div id="well-donation-fill"></div>
+        </div>
+        <button type="button" id="well-donation-open-btn" class="well-donation-open-btn">우물 강화 기부</button>
+      </div>
+    </div>
+  </div>
+  <div id="well-donation-overlay" class="well-donation-overlay" style="display: none" aria-hidden="true">
+    <div class="well-donation-panel" role="dialog" aria-labelledby="well-donation-title">
+      <h2 id="well-donation-title">우물 강화 기부</h2>
+      <p id="well-donation-goal-text" class="well-donation-meta">강화 목표: 100원</p>
+      <p id="well-donation-balance-text" class="well-donation-meta">보유 금액: 0원</p>
+      <div class="well-donation-amounts" aria-label="기부 금액 선택">
+        <button type="button" class="well-donation-amount" data-amount="10">10원</button>
+        <button type="button" class="well-donation-amount" data-amount="25">25원</button>
+        <button type="button" class="well-donation-amount" data-amount="50">50원</button>
+        <button type="button" class="well-donation-amount" data-amount="100">100원</button>
+      </div>
+      <p id="well-donation-selected-text" class="well-donation-selected">기부 금액: 10원</p>
+      <div class="well-donation-actions">
+        <button type="button" id="well-donation-confirm" class="well-donation-confirm">기부</button>
+        <button type="button" id="well-donation-cancel" class="well-donation-cancel">취소</button>
       </div>
     </div>
   </div>

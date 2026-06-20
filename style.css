@@ -971,11 +971,11 @@ body:not(.is-game-ready) .viewport {
 
 .tree-apple {
   position: absolute;
-  width: 7.04%;
-  height: 8.47%;
+  width: 4.93%;
+  height: 5.93%;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, #ffb0a5 0 2px, transparent 3px),
+    radial-gradient(circle at 35% 30%, #ffb0a5 0 1.5px, transparent 2px),
     #df2222;
   border: 1px solid #8c1111;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
@@ -985,10 +985,10 @@ body:not(.is-game-ready) .viewport {
 .tree-apple::before {
   content: "";
   position: absolute;
-  left: 4px;
-  top: -4px;
-  width: 2px;
-  height: 5px;
+  left: 35%;
+  top: -35%;
+  width: 22%;
+  height: 55%;
   background: #603714;
   border-radius: 999px;
 }
@@ -1016,6 +1016,21 @@ body:not(.is-game-ready) .viewport {
 .tree-apple:nth-of-type(11) {
   left: 67.61%;
   top: 70.34%;
+}
+
+.tree-apple:nth-of-type(12) {
+  left: 29.58%;
+  top: 23.73%;
+}
+
+.tree-apple:nth-of-type(13) {
+  left: 69.01%;
+  top: 32.2%;
+}
+
+.tree-apple:nth-of-type(14) {
+  left: 47.89%;
+  top: 49.15%;
 }
 
 .world-npc {
@@ -3323,7 +3338,8 @@ body.ovc-page-tutorial #multiplayer-status {
   align-items: center;
   gap: 18px;
   width: 270px;
-  height: 115px;
+  min-height: 115px;
+  height: auto;
   padding: 18px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -3361,6 +3377,142 @@ body.ovc-page-tutorial #multiplayer-status {
   width: 100%;
   height: 100%;
   background: #2f9fff;
+}
+
+.well-card-upgrade {
+  margin-top: 10px;
+}
+
+.well-donation-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #234;
+  font: 600 12px/1.2 Arial, sans-serif;
+}
+
+.well-donation-bar {
+  width: 154px;
+  height: 14px;
+  overflow: hidden;
+  background: #efe6c8;
+  border: 1px solid rgba(120, 90, 20, 0.35);
+  border-radius: 999px;
+}
+
+#well-donation-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #e8b923, #f5d547);
+}
+
+.well-donation-open-btn {
+  margin-top: 8px;
+  width: 154px;
+  padding: 6px 8px;
+  border: 1px solid rgba(20, 70, 100, 0.35);
+  border-radius: 6px;
+  background: #eef8ff;
+  color: #124;
+  font: 700 12px/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.well-donation-open-btn:hover {
+  background: #dff0ff;
+}
+
+.well-donation-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  z-index: 120;
+}
+
+.well-donation-panel {
+  width: min(92vw, 320px);
+  padding: 18px 16px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+.well-donation-panel h2 {
+  margin: 0 0 10px;
+  color: #111;
+  font: 700 18px/1.2 Arial, sans-serif;
+}
+
+.well-donation-meta {
+  margin: 0 0 6px;
+  color: #333;
+  font: 600 13px/1.35 Arial, sans-serif;
+}
+
+.well-donation-amounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.well-donation-amount {
+  padding: 8px 6px;
+  border: 1px solid rgba(20, 70, 100, 0.28);
+  border-radius: 8px;
+  background: #f7fbff;
+  color: #124;
+  font: 700 13px/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.well-donation-amount.is-selected {
+  border-color: #2f9fff;
+  background: #e8f4ff;
+  box-shadow: inset 0 0 0 1px #2f9fff;
+}
+
+.well-donation-amount:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.well-donation-selected {
+  margin: 0 0 12px;
+  color: #222;
+  font: 700 14px/1.3 Arial, sans-serif;
+  text-align: center;
+}
+
+.well-donation-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.well-donation-confirm,
+.well-donation-cancel {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font: 700 14px/1.2 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.well-donation-confirm {
+  border: 1px solid rgba(20, 90, 40, 0.35);
+  background: #dff5e4;
+  color: #124;
+}
+
+.well-donation-cancel {
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: #f3f3f3;
+  color: #333;
 }
 
 #seed-card {

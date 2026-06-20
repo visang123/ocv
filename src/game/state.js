@@ -3,6 +3,7 @@ import {
   WORLD_LOOSE_SEED_Y,
   BIG_TREE_X,
   BIG_TREE_Y,
+  TREE_APPLE_SIZE,
   SIGN_START_X,
   SIGN_START_Y,
   GUIDE_BOOK_START_X,
@@ -27,7 +28,9 @@ export function createWellState(maxWellWaterValue) {
   return {
     water: maxWellWaterValue,
     lastRefillAt: Date.now(),
-    lastStateChangeAt: 0
+    lastStateChangeAt: 0,
+    upgradeLevel: 0,
+    donationKrw: 0
   };
 }
 
@@ -111,13 +114,28 @@ export function createPlantState() {
 }
 
 export function createDefaultTreeApples() {
-  return [
-    { id: "apple-1", x: BIG_TREE_X + 31, y: BIG_TREE_Y + 45, size: 10 },
-    { id: "apple-2", x: BIG_TREE_X + 76, y: BIG_TREE_Y + 21, size: 10 },
-    { id: "apple-3", x: BIG_TREE_X + 112, y: BIG_TREE_Y + 52, size: 10 },
-    { id: "apple-4", x: BIG_TREE_X + 54, y: BIG_TREE_Y + 82, size: 10 },
-    { id: "apple-5", x: BIG_TREE_X + 96, y: BIG_TREE_Y + 83, size: 10 }
+  const layout = [
+    [31, 45],
+    [76, 21],
+    [112, 52],
+    [54, 82],
+    [96, 83],
+    [42, 28],
+    [98, 38],
+    [68, 58]
   ];
+  return layout.map(function (pos, index) {
+    const localX = pos[0];
+    const localY = pos[1];
+    return {
+      id: "apple-" + (index + 1),
+      localX,
+      localY,
+      x: BIG_TREE_X + localX,
+      y: BIG_TREE_Y + localY,
+      size: TREE_APPLE_SIZE
+    };
+  });
 }
 
 export function createPlayerState(initialX = 100) {

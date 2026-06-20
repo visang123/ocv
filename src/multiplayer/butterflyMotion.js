@@ -262,17 +262,10 @@ export function createButterflyMotionController(config) {
       if (Number.isFinite(Number(raw.x)) && Number.isFinite(Number(raw.y))) {
         const px = Number(raw.x);
         const py = Number(raw.y);
-        if (px === 0 && py === 0) {
+        if (px === 0 && py === 0 || (px < 2 && py < 2)) {
           point = pickSpawnPoint();
         } else {
           point = clampPoint({ x: px, y: py }, bounds);
-          const legacyTop = Math.max(bounds.top, config.bounds.top) + 36;
-          if (
-            (px <= bounds.left + 4 && py <= bounds.top + 4) ||
-            (px <= config.bounds.left + 4 && py <= legacyTop)
-          ) {
-            point = pickSpawnPoint();
-          }
         }
       } else {
         point = pickSpawnPoint();

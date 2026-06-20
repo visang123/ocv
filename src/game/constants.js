@@ -113,6 +113,9 @@ export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
 /** 잎·가지·사과 영역 높이(디자인 px) — 줄기 상단까지 */
 export const BIG_TREE_CANOPY_DESIGN_HEIGHT = 118;
+/** 나무 사과 기본 크기(월드 px) — 예전 10px의 2/3 */
+export const TREE_APPLE_SIZE = Math.round((10 * 2) / 3);
+export const TREE_APPLE_COUNT = 8;
 export const NPC_WIDTH = Math.round(13 * 1.7);
 export const NPC_HEIGHT = Math.round(26 * 1.7);
 
@@ -396,6 +399,42 @@ export const butterflyBoundsLeft = 24;
 export const butterflyBoundsRight = 936;
 export const butterflyBoundsTop = 24;
 export const butterflyBoundsBottom = GROUND_WORLD_HEIGHT - 16;
+
+/** 기본 나비 비행 구역(땅 좌표, 좌상단 원점). */
+export function getDefaultButterflyFlyBoundsWorldPx() {
+  return {
+    left: butterflyBoundsLeft,
+    right: butterflyBoundsRight,
+    top: butterflyBoundsTop,
+    bottom: butterflyBoundsBottom
+  };
+}
+
+/**
+ * 나비 비행 구역 — 기본 bounds ∩ (월드일 때) 식물 안개 맑은 구역.
+ * 튜토리얼·비월드는 기본 bounds만 사용.
+ */
+export function getButterflyFlyBoundsWorldPx(options) {
+  const opts = options || {};
+  const base = getDefaultButterflyFlyBoundsWorldPx();
+  if (!opts.worldEntry) return base;
+
+  const stage = Math.max(1, Math.min(5, Math.floor(Number(opts.plantFogStage)) || 1));
+  // 나비는 식물지수 250(월드 3)부터 — 그 미만이면 기본 bounds(실제로는 스폰 잠금).
+  if (stage < 3) return base;
+
+  const pad = Math.max(8, Math.ceil((Number(opts.butterflySize) || BUTTERFLY_SIZE) * 0.75));
+  const clear = getPlantFogClearRectWorldPx(stage);
+  const bounds = {
+    left: Math.max(base.left, clear.left + pad),
+    right: Math.min(base.right, clear.right - pad),
+    top: Math.max(base.top, clear.top + pad),
+    bottom: Math.min(base.bottom, clear.bottom - pad)
+  };
+  if (bounds.right <= bounds.left + 1 || bounds.bottom <= bounds.top + 1) return base;
+  return bounds;
+}
+
 export const pickupDistance = 28;
 /** 양동이 줍기 — 플레이어 발↔양동이 중심 거리(px) */
 export const bucketPickupDistance = 12;
@@ -498,6 +537,8 @@ export const cactusLevel5GrowMs = 1 * HOUR_MS;
 
 export const wellWaterKey = "wellWaterV3";
 export const lastWellRefillKey = "lastWellRefillAtV3";
+export const wellUpgradeLevelKey = "wellUpgradeLevelV1";
+export const wellDonationKrwKey = "wellDonationKrwV1";
 export const seedCreatedAtKey = "seedCreatedAtV1";
 export const seedPlantedStateKey = "seedPlantedStateV1";
 export const hasGuideBookKey = "hasGuideBookV1";
@@ -531,6 +572,8 @@ export const appStorageKeys = [
   "lastWellRefillAtV2",
   wellWaterKey,
   lastWellRefillKey,
+  wellUpgradeLevelKey,
+  wellDonationKrwKey,
   seedCreatedAtKey,
   seedPlantedStateKey,
   hasGuideBookKey,
