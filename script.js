@@ -159,6 +159,7 @@ import {
   wellPourDistance,
   wellCardDistance,
   plantWaterDistance,
+  plantHoverPickRadiusWorld,
   maxWellWater,
   wellRefillMs,
   seedDryMs,
@@ -221,7 +222,10 @@ import {
   appStorageKeysSharedWorldReset
 } from "./src/game/constants.js";
 import {
+  entitySpanOnGround,
   getPlantGrowthMeterWorldPosition,
+  getPlantSpotCenterX,
+  getPlantSpotFootY,
   getPlantWaterNeededWorldPosition
 } from "./src/game/plant-ui-layout.js?v=20260620g";
 import {
@@ -1324,7 +1328,7 @@ const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
 const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
 /** 월드 돌 채굴 소요 시간 */
 const WORLD_ROCK_MINE_MS = 60 * 1000;
-const ROCK_MINING_STATUS_TEXT = "\uB3CC \uCE98\uB294\uC911...";
+const ROCK_MINING_STATUS_TEXT = "\uB3CC \uCE90\uB294\uC911";
 const ROCK_MINING_CANCEL_LABEL = "e: \uCDE8\uC18C";
 /** ??? ?????????: rock_pickup ?????????? ??????? ????????? ??????ms(??? ??????? REMOTE_ACTION_STATUS_HOLD_MS) */
 const WORLD_ROCK_REMOTE_STATUS_TAIL_MS = 0;
@@ -3359,6 +3363,12 @@ adminDevPlantIndexPlusButton.type = "button";
 adminDevPlantIndexPlusButton.textContent = "+";
 adminDevPlantIndexPlusButton.setAttribute("aria-hidden", "true");
 document.body.appendChild(adminDevPlantIndexPlusButton);
+const adminDevBucketSpawnButton = document.createElement("button");
+adminDevBucketSpawnButton.id = "admin-dev-bucket-spawn-button";
+adminDevBucketSpawnButton.type = "button";
+adminDevBucketSpawnButton.textContent = "B";
+adminDevBucketSpawnButton.setAttribute("aria-hidden", "true");
+document.body.appendChild(adminDevBucketSpawnButton);
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
 magicPowderInventory.id = "magic-powder-inventory";
@@ -3398,6 +3408,10 @@ adminDevPlantIndexPlusButton.addEventListener("click", function () {
   updatePlantProgressGauge();
   markWorldDirty();
   syncWorldState(true);
+});
+adminDevBucketSpawnButton.addEventListener("click", function () {
+  ensureAdminDevBagUnlocked();
+  spawnWorldBucketAtRandomWalkablePosition();
 });
 const controlsButton = document.createElement("button");
 controlsButton.id = "controls-button";
@@ -7496,41 +7510,77 @@ function applyWorldExtraBucketsFromSharedSnapshot(raw) {
   });
 }
 
-/** ???? ????: ?? ????????? ????????? ???????? ????? ????? */
-function spawnWorldBucketBelowTradeMaster() {
-  if (!ground || !isWorldDocumentEntry()) return;
+function spawnWorldExtraBucketAt(x, y, isFull) {
+  if (!ground || !isWorldDocumentEntry()) return false;
   if (!Array.isArray(getApple().worldExtraBuckets)) getApple().worldExtraBuckets = [];
-  const bucketSz = getBucketSize();
-  const baseX = TRADE_MASTER_START_X + Math.max(0, Math.floor((NPC_WIDTH - bucketSz.width) / 2));
-  const baseY = TRADE_MASTER_START_Y + NPC_HEIGHT + 3;
-  const stack = getApple().worldExtraBuckets.length;
   const entry = {
     id: "world-bucket-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
-    x: baseX + stack * 5,
-    y: baseY,
-    isFull: false
+    x: Number(x) || 0,
+    y: Number(y) || 0,
+    isFull: Boolean(isFull)
   };
   getApple().worldExtraBuckets.push(entry);
-  const el = document.createElement("img");
-  el.className = "world-extra-bucket";
-  el.dataset.bucketId = entry.id;
-  el.src = IMG_BUCKET_EMPTY;
-  el.alt = "";
-  el.setAttribute("aria-hidden", "true");
-  el.draggable = false;
-  const insertBeforeEl = getWorldExtraBucketInsertBeforeEl();
-  if (insertBeforeEl) {
-    ground.insertBefore(el, insertBeforeEl);
-  } else {
-    ground.appendChild(el);
-  }
-  entry._el = el;
+  rebuildWorldExtraBucketDom();
   notePendingLocalExtraBucketSpawn(entry.id);
-  updateWorldExtraBuckets();
   markWorldDirty();
   holdLocalAppleStateAgainstStaleSnapshot(3000);
   saveAppleState();
   syncWorldState(true);
+  return true;
+}
+
+function getWalkableGroundRectForBucketSpawn() {
+  if (getTotalPlantIndexScore() >= PLANT_INDEX_SCORE_CAP) {
+    return { left: 0, top: 0, right: WORLD_WIDTH, bottom: GROUND_WORLD_HEIGHT };
+  }
+  const rect = getPlantFogClearRectForMovementClamp();
+  if (rect) return rect;
+  return getPlantFogClearRectWorldPx(
+    getPlantFogWorldStageFromScore(getTotalPlantIndexScore())
+  );
+}
+
+function pickRandomWalkableBucketSpawnPosition() {
+  const rect = getWalkableGroundRectForBucketSpawn();
+  const bucketSz = getBucketSize();
+  const w = bucketSz.width;
+  const h = bucketSz.height;
+  const margin = 2;
+  const xMin = Math.max(margin, Math.ceil(rect.left) + margin);
+  const xMax = Math.min(WORLD_WIDTH - w - margin, Math.floor(rect.right) - w - margin);
+  const yMin = Math.max(margin, Math.ceil(rect.top) + margin);
+  const yMax = Math.min(GROUND_WORLD_HEIGHT - h - margin, Math.floor(rect.bottom) - h - margin);
+  if (xMax < xMin || yMax < yMin) return null;
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const preferredX = xMin + Math.floor(Math.random() * (xMax - xMin + 1));
+    const preferredY = yMin + Math.floor(Math.random() * (yMax - yMin + 1));
+    const resolved = resolveGroundBucketDropPosition(preferredX, preferredY);
+    if (
+      resolved.x >= xMin - 1 &&
+      resolved.x <= xMax + 1 &&
+      resolved.y >= yMin - 1 &&
+      resolved.y <= yMax + 1
+    ) {
+      return resolved;
+    }
+  }
+  return null;
+}
+
+function spawnWorldBucketAtRandomWalkablePosition() {
+  const pos = pickRandomWalkableBucketSpawnPosition();
+  if (!pos) return false;
+  return spawnWorldExtraBucketAt(pos.x, pos.y, false);
+}
+
+/** ???? ????: ?? ????????? ????????? ???????? ????? ????? */
+function spawnWorldBucketBelowTradeMaster() {
+  const bucketSz = getBucketSize();
+  const baseX = TRADE_MASTER_START_X + Math.max(0, Math.floor((NPC_WIDTH - bucketSz.width) / 2));
+  const baseY = TRADE_MASTER_START_Y + NPC_HEIGHT + 3;
+  const stack = getApple().worldExtraBuckets.length;
+  spawnWorldExtraBucketAt(baseX + stack * 5, baseY, false);
 }
 
 
@@ -10152,14 +10202,58 @@ function isPlantEligibleForWorldHover(plant) {
   return true;
 }
 
-/** ????????? ???(??????) ??? ????????????? ???? ?????? ???? ??? */
+function getPlantProximityRectWorld(plant) {
+  const visual = getPlantPrimaryVisualRectWorld(plant);
+  if (visual) return visual;
+  const anchor = getPlantWorldAnchorXY(plant);
+  if (!anchor) return null;
+  return {
+    left: anchor.x,
+    top: anchor.y,
+    right: anchor.x + PLANT_SPOT_WIDTH,
+    bottom: anchor.y + PLANT_SPOT_HEIGHT
+  };
+}
+
+function getPlayerDistanceToPlantVisual(plant) {
+  const rect = getPlantProximityRectWorld(plant);
+  if (!rect) return Infinity;
+  const box = getPlayerBox();
+  if (!box) return Infinity;
+  const playerCenterX = box.left + box.width / 2;
+  const playerCenterY = box.top + box.height / 2;
+  const nearestX = Math.max(rect.left, Math.min(playerCenterX, rect.right));
+  const nearestY = Math.max(rect.top, Math.min(playerCenterY, rect.bottom));
+  return Math.hypot(playerCenterX - nearestX, playerCenterY - nearestY);
+}
+
+function isClientPointerOverPlant(clientX, clientY, plant) {
+  if (!plant) return false;
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  if (!pxy) return false;
+  const rects = getPlantVisibleHoverRectsWorld(plant);
+  for (let i = 0; i < rects.length; i += 1) {
+    if (isWorldPointInsideRect(pxy.x, pxy.y, rects[i])) return true;
+  }
+  return false;
+}
+
+function isPlayerNearPlantForWorldSign(plant) {
+  return getPlayerDistanceToPlantVisual(plant) < plantHoverPickRadiusWorld;
+}
+
+function canShowPlantWorldSignNow() {
+  return Boolean(hasSpawnedCharacter && !isCharacterSelecting && !isTradeExchangeOpen());
+}
+
+/** 이름·골드 안내 — 식물 위 포인터 호버 또는 캐릭터가 식물 가까이 */
 function pickPlantForProximityHover() {
   let best = null;
   let bestDist = Infinity;
   function consider(plant) {
     if (!isPlantEligibleForWorldHover(plant)) return;
-    const distance = getPlayerDistanceToPlant(plant);
-    if (distance >= plantWaterDistance || distance >= bestDist) return;
+    const distance = getPlayerDistanceToPlantVisual(plant);
+    if (distance >= plantHoverPickRadiusWorld || distance >= bestDist) return;
     bestDist = distance;
     best = plant;
   }
@@ -10212,11 +10306,25 @@ function pickCraftFurnitureHoverTarget(clientX, clientY) {
   return matches[0];
 }
 
-/** 포인터 아래 식물 우선, 없으면 근접 식물 */
+/** 포인터 아래 식물 우선, 없으면 캐릭터 근접 식물(둘 다 해당할 때만) */
 function pickPlantHoverTarget(clientX, clientY) {
+  if (!canShowPlantWorldSignNow()) return null;
+
   const pointerPlant = pickPlantForHoverFromPointerClient(clientX, clientY);
-  if (pointerPlant) return pointerPlant;
-  return pickPlantForProximityHover();
+  if (
+    pointerPlant &&
+    isPlantEligibleForWorldHover(pointerPlant) &&
+    isClientPointerOverPlant(clientX, clientY, pointerPlant)
+  ) {
+    return pointerPlant;
+  }
+
+  const nearPlant = pickPlantForProximityHover();
+  if (nearPlant && isPlayerNearPlantForWorldSign(nearPlant)) {
+    return nearPlant;
+  }
+
+  return null;
 }
 
 function isPlantOccluderFadedForHover(plant) {
@@ -10389,6 +10497,10 @@ function syncWorldNpcHoverLabelPosition(anchorEl) {
 
 function refreshPlantHoverAfterPlayerMove() {
   if (!plantHoverLabel) return;
+  if (!canShowPlantWorldSignNow()) {
+    if (currentPlantHoverTarget) hidePlantHoverLabel();
+    return;
+  }
   if (hasLastPlantHoverPointer) {
     syncPlantHoverFromPointerClient(
       lastPlantHoverPointerClientX,
@@ -10397,7 +10509,7 @@ function refreshPlantHoverAfterPlayerMove() {
     return;
   }
   const plant = pickPlantForProximityHover();
-  if (plant) {
+  if (plant && isPlayerNearPlantForWorldSign(plant)) {
     if (plant !== currentPlantHoverTarget) {
       currentPlantHoverTarget = plant;
       showPlantHoverSignForPlant(plant);
@@ -10413,6 +10525,11 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   lastPlantHoverPointerClientX = clientX;
   lastPlantHoverPointerClientY = clientY;
   hasLastPlantHoverPointer = true;
+
+  if (!canShowPlantWorldSignNow()) {
+    hidePlantHoverLabel();
+    return;
+  }
 
   const uiShortcut = pickUiShortcutHoverTarget(clientX, clientY);
   if (uiShortcut) {
@@ -10542,8 +10659,8 @@ function getSproutSizeForStage(stage, plant) {
  * 4?5???? PNG bbox ???(MATURE_SPRITE_ANCHORS)?????.
  */
 function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stage, plant) {
-  const spotCenterX = plantBaseX + PLANT_SPOT_WIDTH / 2;
-  const spotFootY = plantBaseY + PLANT_SPOT_HEIGHT;
+  const spotCenterX = getPlantSpotCenterX(plantBaseX);
+  const spotFootY = getPlantSpotFootY(plantBaseY);
   const matureAnchor =
     plant && stage >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), stage) : null;
   const sproutAnchor =
@@ -10571,8 +10688,8 @@ function getPlantHoverAnchorWorld(plant) {
   const px = plant.spotX != null ? plant.spotX : plant.x;
   const py = plant.spotY != null ? plant.spotY : plant.y;
   return {
-    cxWorld: px + PLANT_SPOT_WIDTH / 2,
-    cyWorld: py + PLANT_SPOT_HEIGHT / 2
+    cxWorld: getPlantSpotCenterX(px),
+    cyWorld: py + entitySpanOnGround(PLANT_SPOT_HEIGHT) / 2
   };
 }
 
