@@ -390,7 +390,10 @@
         .eq("id", accountId)
         .maybeSingle();
 
-      if (error) return true;
+      if (error) {
+        if (isMissingSessionTokenColumnError(error)) return true;
+        return true;
+      }
       if (!data) return false;
       if (!data.session_token) return true;
       return data.session_token === sessionToken;
@@ -520,6 +523,18 @@
     }
   }
 
+  function isMissingSessionTokenColumnError(error) {
+    if (!error) return false;
+    var message = String((error && error.message) || error || "");
+    return (
+      message.indexOf("session_token") !== -1 &&
+      (message.indexOf("schema cache") !== -1 ||
+        message.indexOf("does not exist") !== -1 ||
+        message.indexOf("Could not find") !== -1 ||
+        message.indexOf("column") !== -1)
+    );
+  }
+
   async function getAccount(accountId) {
     const supabaseClient = getClient();
     if (!supabaseClient) {
@@ -527,15 +542,25 @@
       return data.account || null;
     }
 
+    const baseSelect = "id, name, color, created_at, tutorial_done";
+
     try {
-      const { data, error } = await supabaseClient
+      let result = await supabaseClient
         .from(config.accountsTable)
-        .select("id, name, color, created_at, tutorial_done, session_token")
+        .select(baseSelect + ", session_token")
         .eq("id", accountId)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return data || null;
+      if (result.error && isMissingSessionTokenColumnError(result.error)) {
+        result = await supabaseClient
+          .from(config.accountsTable)
+          .select(baseSelect)
+          .eq("id", accountId)
+          .maybeSingle();
+      }
+
+      if (result.error) throw new Error(result.error.message);
+      return result.data || null;
     } catch (error) {
       throw normalizeOnlineError(error);
     }
@@ -738,7 +763,9 @@
       error &&
       typeof error.message === "string" &&
       error.message.includes("session_token") &&
-      error.message.includes("schema cache")
+      (error.message.includes("schema cache") ||
+        error.message.includes("does not exist") ||
+        error.message.includes("Could not find"))
     ) {
       return new Error("Supabase에 session_token 컬럼이 아직 없습니다. SQL Editor에서 supabase-schema.sql을 다시 실행해주세요.");
     }
