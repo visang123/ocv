@@ -1,10 +1,12 @@
 /** Shared world row serialize / apply (Supabase world_state) */
+import { TREE_APPLE_COUNT } from "../../game/constants.js";
 import { parseMainPlantFromSnapshot, resolveSnapshotSavedAt, dedupeExtraSeedsPreferInventory } from "../../game/worldSnapshot.js";
 import { syncServerClockOffset as syncServerClockOffsetCore } from "../../game/timeSync.js";
 import {
   applyPriorPlantGoldIfPreferred,
   ensurePlantGoldFields
 } from "../../game/plant-gold.js";
+import { ensureTreeAppleTargetCount } from "../../game/storage.js";
 
 export function createModule(d) {
   function flushPassiveSimulationBeforeSharedSnapshot() {
@@ -57,6 +59,8 @@ export function createModule(d) {
     savedBy: d.currentSessionId,
     resetToken: d.pendingWorldResetToken || d.lastAppliedWorldResetToken || "",
     plantIndexBonus,
+    lastWorldRockPickupAt: Number(d.getSeedWorld().lastWorldRockPickupAt) || 0,
+    lastWorldRockRespawnAt: Number(d.getSeedWorld().lastWorldRockRespawnAt) || 0,
     bucket: {
       x: snapshotBucketX,
       y: snapshotBucketY,
@@ -65,7 +69,9 @@ export function createModule(d) {
     },
     well: {
       water: d.getWell().water,
-      lastRefillAt: d.getWell().lastRefillAt
+      lastRefillAt: d.getWell().lastRefillAt,
+      upgradeLevel: Math.max(0, Math.floor(Number(d.getWell().upgradeLevel) || 0)),
+      donationKrw: Math.max(0, Math.floor(Number(d.getWell().donationKrw) || 0))
     },
     seed: {
       x: d.getWorldItems().seedX,
@@ -266,6 +272,9 @@ export function createModule(d) {
   if (d.isSharedWorldSyncPausedForTutorial()) return;
   if (!snapshot || typeof snapshot !== "object") return;
   const plantBonusChanged = d.ingestSharedPlantIndexBonus(snapshot);
+  if (d.isWorldDocumentEntry()) {
+    d.mergeSharedRockRespawnTimestamps(snapshot);
+  }
   if (snapshot.savedBy === d.currentSessionId) {
     if (plantBonusChanged) d.updatePlantProgressGauge();
     return;
@@ -404,7 +413,28 @@ export function createModule(d) {
 /** ?????????? ????????????? ???? ???????? ??? ??d.appStorageKeysSharedWorldReset???? ?????????????? ?????. local??????? */
     // is ahead of the snapshot savedAt (clock skew or any local saveAppleState).
     if (snapshot.well) {
-      d.getWell().water = Math.max(0, Math.min(d.maxWellWater, Number(snapshot.well.water) || 0));
+      const effectiveMaxWellWater =
+        typeof d.getWellMaxWater === "function"
+          ? d.getWellMaxWater({
+              upgradeLevel: Math.max(
+                0,
+                Math.floor(Number(snapshot.well.upgradeLevel ?? d.getWell().upgradeLevel) || 0)
+              )
+            })
+          : d.maxWellWater;
+      if (Object.prototype.hasOwnProperty.call(snapshot.well, "upgradeLevel")) {
+        d.getWell().upgradeLevel = Math.max(
+          0,
+          Math.floor(Number(snapshot.well.upgradeLevel) || 0)
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(snapshot.well, "donationKrw")) {
+        d.getWell().donationKrw = Math.max(
+          0,
+          Math.floor(Number(snapshot.well.donationKrw) || 0)
+        );
+      }
+      d.getWell().water = Math.max(0, Math.min(effectiveMaxWellWater, Number(snapshot.well.water) || 0));
       d.getWell().lastRefillAt = Number(snapshot.well.lastRefillAt) || Date.now();
       d.refillWellIfNeeded();
       if (snapshotSavedAt) {
@@ -564,6 +594,7 @@ export function createModule(d) {
       d.getApple().apples = Array.isArray(snapshot.apples.apples)
         ? snapshot.apples.apples.map(d.parseTreeAppleFromSnapshot)
         : d.getApple().apples;
+      ensureTreeAppleTargetCount(d.getApple().apples, TREE_APPLE_COUNT);
       if (d.usesWorldLooseSeedMode()) {
         const wls = snapshot.apples.worldLooseSeed;
         if (wls && typeof wls === "object") {
@@ -806,11 +837,14 @@ export function createModule(d) {
           }
         }
         if (Array.isArray(sp)) {
+          const remoteIds = sp
+            .map(String)
+            .filter(function (id) {
+              return id.trim() !== "";
+            });
           const merged = new Set(d.getApple().worldRockPickedIds.map(String));
-          sp.forEach(function (id) {
-            if (id != null && String(id).trim() !== "") {
-              merged.add(String(id));
-            }
+          remoteIds.forEach(function (id) {
+            merged.add(id);
           });
           d.getApple().worldRockPickedIds = Array.from(merged);
         }

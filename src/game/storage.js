@@ -3,11 +3,36 @@ import {
   WORLD_LOOSE_SEED_Y,
   WORLD_LOOSE_ROCK_COUNT,
   WORLD_ROCK_SIZE,
+  MAP_VISUAL_SCALE,
   hasGuideBookKey,
   worldBagFloorPickedAccountKey
 } from "./constants.js";
+import { createDefaultTreeApples } from "./state.js";
 
 let storagePrefix = "";
+
+/** 저장·스냅샷에 5개만 남아 있을 때 기본 8개 레이아웃으로 보충 */
+export function ensureTreeAppleTargetCount(apples, targetCount) {
+  const target = Math.max(1, Number(targetCount) || 8);
+  if (!Array.isArray(apples) || apples.length >= target) return apples;
+  const defaultsById = Object.create(null);
+  createDefaultTreeApples().forEach(function (apple) {
+    defaultsById[apple.id] = apple;
+  });
+  for (let i = apples.length; i < target; i += 1) {
+    const def = defaultsById["apple-" + (i + 1)];
+    if (!def) continue;
+    apples.push({
+      id: def.id,
+      localX: def.localX,
+      localY: def.localY,
+      x: def.x,
+      y: def.y,
+      size: def.size
+    });
+  }
+  return apples;
+}
 
 export function setStoragePrefix(prefix) {
   storagePrefix = prefix || "";
@@ -150,14 +175,36 @@ export function setStoredFlag(key, enabled) {
 export function loadWellStateFromStorage(config) {
   const savedWaterRaw = getStoredValue(config.wellWaterKey);
   const savedRefillAtRaw = getStoredValue(config.lastWellRefillKey);
+  const savedUpgradeLevelRaw = config.wellUpgradeLevelKey
+    ? getStoredValue(config.wellUpgradeLevelKey)
+    : null;
+  const savedDonationKrwRaw = config.wellDonationKrwKey
+    ? getStoredValue(config.wellDonationKrwKey)
+    : null;
   const savedWater = Number(savedWaterRaw);
   const savedRefillAt = Number(savedRefillAtRaw);
+  const savedUpgradeLevel = Number(savedUpgradeLevelRaw);
+  const savedDonationKrw = Number(savedDonationKrwRaw);
+
+  let upgradeLevel = 0;
+  let donationKrw = 0;
+  if (savedUpgradeLevelRaw !== null && Number.isFinite(savedUpgradeLevel) && savedUpgradeLevel >= 0) {
+    upgradeLevel = Math.floor(savedUpgradeLevel);
+  }
+  if (savedDonationKrwRaw !== null && Number.isFinite(savedDonationKrw) && savedDonationKrw >= 0) {
+    donationKrw = Math.floor(savedDonationKrw);
+  }
+
+  const effectiveMaxWellWater =
+    typeof config.getMaxWellWaterForLevel === "function"
+      ? config.getMaxWellWaterForLevel(upgradeLevel)
+      : config.maxWellWater;
 
   let wellWater = config.defaultWellWater;
   let lastWellRefillAt = config.defaultLastWellRefillAt;
 
   if (savedWaterRaw !== null && Number.isFinite(savedWater)) {
-    wellWater = Math.max(0, Math.min(config.maxWellWater, savedWater));
+    wellWater = Math.max(0, Math.min(effectiveMaxWellWater, savedWater));
   }
 
   if (
@@ -170,13 +217,21 @@ export function loadWellStateFromStorage(config) {
 
   return {
     wellWater,
-    lastWellRefillAt
+    lastWellRefillAt,
+    upgradeLevel,
+    donationKrw
   };
 }
 
 export function saveWellStateToStorage(config) {
   setStoredValue(config.wellWaterKey, String(config.wellWater));
   setStoredValue(config.lastWellRefillKey, String(config.lastWellRefillAt));
+  if (config.wellUpgradeLevelKey) {
+    setStoredValue(config.wellUpgradeLevelKey, String(Math.max(0, Math.floor(Number(config.upgradeLevel) || 0))));
+  }
+  if (config.wellDonationKrwKey) {
+    setStoredValue(config.wellDonationKrwKey, String(Math.max(0, Math.floor(Number(config.donationKrw) || 0))));
+  }
 }
 
 export function loadSeedStateFromStorage(config) {
@@ -437,7 +492,7 @@ export function loadAppleStateFromStorage(config) {
       hasSavedState: false,
       parseFailed: false,
       appleCount: 0,
-      apples: config.createRandomApples(5),
+      apples: config.createRandomApples(config.treeAppleCount),
       pickedAppleIds: [],
       nextAppleSeedOffset: 0,
       lastAppleSpawnAt: config.now,
@@ -452,6 +507,8 @@ export function loadAppleStateFromStorage(config) {
       },
       worldRocks: rocksEmpty.worldRocks,
       worldRockPickedIds: rocksEmpty.worldRockPickedIds,
+      lastWorldRockPickupAt: 0,
+      lastWorldRockRespawnAt: 0,
       worldExtraBuckets: []
     };
   }
@@ -466,12 +523,14 @@ export function loadAppleStateFromStorage(config) {
             id: String(appleData.id),
             localX,
             localY,
-            x: config.bigTreeX + localX,
-            y: config.bigTreeY + localY,
-            size: 10
+            x: config.bigTreeX + localX / MAP_VISUAL_SCALE,
+            y: config.bigTreeY + localY / MAP_VISUAL_SCALE,
+            size: config.treeAppleSize
           };
         })
-      : config.createRandomApples(5);
+      : config.createRandomApples(config.treeAppleCount);
+
+    ensureTreeAppleTargetCount(apples, config.treeAppleCount);
 
     const pickedAppleIds = Array.isArray(saved.pickedAppleIds)
       ? saved.pickedAppleIds.filter(function (id) {
@@ -624,6 +683,8 @@ export function loadAppleStateFromStorage(config) {
       worldLooseSeed,
       worldRocks: worldRockParts.worldRocks,
       worldRockPickedIds: worldRockParts.worldRockPickedIds,
+      lastWorldRockPickupAt: Math.max(0, Number(saved.lastWorldRockPickupAt) || 0),
+      lastWorldRockRespawnAt: Math.max(0, Number(saved.lastWorldRockRespawnAt) || 0),
       worldExtraBuckets: normalizeSavedWorldExtraBuckets(saved),
       placedCraftFurniture: Array.isArray(saved.placedCraftFurniture) ? saved.placedCraftFurniture : []
     };
@@ -636,7 +697,7 @@ export function loadAppleStateFromStorage(config) {
       appleCount: 0,
       seedCount: 0,
       overgrowthSeedCount: 0,
-      apples: config.createRandomApples(5),
+      apples: config.createRandomApples(config.treeAppleCount),
       pickedAppleIds: [],
       nextAppleSeedOffset: 0,
       lastAppleSpawnAt: config.now,
@@ -649,6 +710,8 @@ export function loadAppleStateFromStorage(config) {
       },
       worldRocks: rocksCatch.worldRocks,
       worldRockPickedIds: rocksCatch.worldRockPickedIds,
+      lastWorldRockPickupAt: 0,
+      lastWorldRockRespawnAt: 0,
       worldExtraBuckets: [],
       placedCraftFurniture: []
     };
@@ -768,6 +831,8 @@ export function saveAppleStateToStorage(config) {
         };
       }),
       worldRockPickedIds: Array.isArray(config.worldRockPickedIds) ? config.worldRockPickedIds : [],
+      lastWorldRockPickupAt: Math.max(0, Number(config.lastWorldRockPickupAt) || 0),
+      lastWorldRockRespawnAt: Math.max(0, Number(config.lastWorldRockRespawnAt) || 0),
       worldExtraBuckets: (config.worldExtraBuckets || []).map(function (bucket) {
         return {
           id: String(bucket.id),
