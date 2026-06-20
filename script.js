@@ -459,7 +459,7 @@ import {
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
 import { initScriptNetwork } from "./src/script/network/index.js?v=20260620i";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620i";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620j";
 import { initScriptView } from "./src/script/view/index.js?v=20260620i";
 import {
   showAppLoadingScreen,
@@ -559,6 +559,11 @@ import {
   getWellMaxWater,
   getWellRefillMs
 } from "./src/game/well-upgrade.js?v=20260620a";
+import {
+  createDeterministicWorldRocks,
+  pickDeterministicRockRespawnPosition,
+  getSharedWorldRockRoomSeed
+} from "./src/game/world-rocks.js?v=20260620a";
 import {
   playerMoneyKrwKey,
   formatPlayerMoneyKrw,
@@ -7671,6 +7676,41 @@ function spawnWorldBucketBelowTradeMaster() {
 
 
 
+function getWorldRockSpawnDeps() {
+  return {
+    WORLD_WIDTH,
+    WORLD_LOOSE_ROCK_COUNT,
+    WORLD_ROCK_SIZE,
+    WORLD_ROCK_SPAWN_X_MARGIN,
+    WORLD_ROCK_SPAWN_Y_MIN,
+    WORLD_ROCK_SPAWN_Y_MAX,
+    collectWorldRockAvoidZones,
+    worldRockOverlapsAnyAvoidRect,
+    worldRockRect
+  };
+}
+
+function createInitialWorldRocks(ctx) {
+  if (isWorldServerSyncAvailable()) {
+    return createDeterministicWorldRocks(
+      ctx,
+      getSharedWorldRockRoomSeed(),
+      getWorldRockSpawnDeps()
+    );
+  }
+  return createRandomWorldRocks(ctx);
+}
+
+function pickSharedWorldRockRespawnPosition(rockId, respawnAt, ctx, existingRocks) {
+  return pickDeterministicRockRespawnPosition(
+    rockId,
+    respawnAt,
+    ctx,
+    existingRocks,
+    getWorldRockSpawnDeps()
+  );
+}
+
 function loadAppleState() {
   const loaded = loadAppleStateFromStorage({
     appleStateKey,
@@ -7680,7 +7720,7 @@ function loadAppleState() {
     defaultSeedLabel: "\uC528\uC557",
     createRandomApples,
     createRandomApple,
-    createRandomWorldRocks,
+    createInitialWorldRocks,
     treeAppleCount: TREE_APPLE_COUNT,
     treeAppleSize: TREE_APPLE_SIZE,
     plantSpotForRocks:
@@ -7792,12 +7832,14 @@ function ensureWorldRocksForWorldEntry() {
     rebuildWorldRockDom();
     return;
   }
-  getApple().worldRocks = createRandomWorldRocks(buildWorldRockSpawnContext());
+  getApple().worldRocks = createInitialWorldRocks(buildWorldRockSpawnContext());
   if (!Array.isArray(getApple().worldRockPickedIds)) {
     getApple().worldRockPickedIds = [];
   }
   rebuildWorldRockDom();
-  markWorldDirty();
+  if (!isWorldServerSyncAvailable() || hasHydratedSharedWorldFromServer) {
+    markWorldDirty();
+  }
 }
 
 
@@ -8122,6 +8164,7 @@ function buildLayerDeps() {
     butterflyFrameCount,
     butterflyFrameMs,
     butterflyMaxAlive,
+    BUTTERFLY_SIZE,
     butterflyMotion,
     get butterflyRenderById() { return butterflyRenderById; },
     set butterflyRenderById(v) { butterflyRenderById = v; },
@@ -8317,6 +8360,7 @@ function buildLayerDeps() {
     maxWellWater,
     getWellMaxWater,
     getWellRefillMs,
+    pickSharedWorldRockRespawnPosition,
     movePlayerVerticallyInTree,
     multiplayerChannel,
     multiplayerRoomSessionButterflyStateLastSeen,

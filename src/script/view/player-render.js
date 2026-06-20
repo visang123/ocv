@@ -248,7 +248,8 @@ export function createModule(d) {
   );
   const rockMiningRockId = String(d.getPlayer().rockMiningRockId || "");
   const rockMiningActive = rockMiningRockId !== "";
-  const statusAnchorY = rockMiningActive ? playerBox.top - 22 : playerBox.top + 26;
+  const statusAnchorY = rockMiningActive ? playerBox.top + 18 : playerBox.top + 26;
+  const statusTransformY = rockMiningActive ? "-40%" : "-100%";
   const yWorld = d.toScreenY(statusAnchorY);
 
   if (rockMiningActive && typeof d.syncRockMiningStatusUi === "function") {
@@ -265,14 +266,14 @@ export function createModule(d) {
   if (d.isPlayerTimedActionBusy() || rockMiningActive) {
     d.playerStatus.style.display = rockMiningActive ? "flex" : "block";
     d.playerStatus.style.transform =
-      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
+      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, " + statusTransformY + ")";
     return;
   }
 
   if (Date.now() < d.plantProximityWarnUntil) {
     d.playerStatus.style.display = "block";
     d.playerStatus.style.transform =
-      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, -100%)";
+      "translate(" + clampedX + "px, " + yWorld + "px) translate(-50%, " + statusTransformY + ")";
     return;
   }
 

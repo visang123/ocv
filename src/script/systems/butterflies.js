@@ -189,6 +189,11 @@ export function createModule(d) {
   return butterfly;
   }
 
+  function butterflySizeWorld() {
+  const size = Number(d.BUTTERFLY_SIZE);
+  return Number.isFinite(size) && size > 0 ? size : 10;
+  }
+
   function ensureButterflyRenderEntry(butterfly) {
   let entry = d.butterflyRenderById[butterfly.id];
   if (entry && entry.element && entry.element.isConnected) return entry;
@@ -202,8 +207,8 @@ export function createModule(d) {
   sprite.className = "butterfly-sprite";
   element.appendChild(sprite);
   d.ground.appendChild(element);
-  d.setWorldSize(element, d.BUTTERFLY_SIZE, d.BUTTERFLY_SIZE);
-  d.setInstantHoverTip(element, null);
+  setWorldSize(element, butterflySizeWorld(), butterflySizeWorld());
+  setInstantHoverTip(element, null);
   entry = {
     element,
     sprite,
@@ -224,7 +229,7 @@ export function createModule(d) {
     plantFogStage: d.isWorldDocumentEntry()
       ? d.getPlantFogWorldStageFromScore(d.getTotalPlantIndexScore())
       : 1,
-    butterflySize: d.BUTTERFLY_SIZE
+    butterflySize: butterflySizeWorld()
   });
   }
 
@@ -322,11 +327,12 @@ export function createModule(d) {
   }
 
   function getButterflyCatchDistanceAtWorldCenter(cx, cy) {
+  const size = butterflySizeWorld();
   return d.getCenterDistance(
-    cx - d.BUTTERFLY_SIZE / 2,
-    cy - d.BUTTERFLY_SIZE / 2,
-    d.BUTTERFLY_SIZE,
-    d.BUTTERFLY_SIZE
+    cx - size / 2,
+    cy - size / 2,
+    size,
+    size
   );
   }
 
@@ -613,7 +619,7 @@ export function createModule(d) {
         d.markWorldDirty();
       }
     });
-    if (d.spreadButterfliesWithinActiveBounds()) {
+    if (spreadButterfliesWithinActiveBounds()) {
       d.lastButterflyStateChangeAt = now;
       d.markWorldDirty();
     }
@@ -627,7 +633,7 @@ export function createModule(d) {
           : now;
       d.butterflyState.list.forEach(function (butterfly) {
         if (!butterfly || butterfly.id == null) return;
-        d.simulateButterflyAuthorityStep(butterfly, stepNow);
+        simulateButterflyAuthorityStep(butterfly, stepNow);
       });
     }
     if (
@@ -649,32 +655,29 @@ export function createModule(d) {
   const aliveIds = {};
   let catchTarget = null;
   const renderBounds = getActiveButterflyBounds();
+  const halfSize = butterflySizeWorld() / 2;
   d.butterflyState.list.forEach(function (butterfly) {
     if (!butterfly || butterfly.id == null) return;
     aliveIds[butterfly.id] = true;
-    const entry = d.ensureButterflyRenderEntry(butterfly);
+    const entry = ensureButterflyRenderEntry(butterfly);
     const drawX = d.getNumericButterflyValue(butterfly.x, renderBounds.left);
     const drawY = d.getNumericButterflyValue(butterfly.y, renderBounds.top);
     butterfly.x = drawX;
     butterfly.y = drawY;
     butterfly._catchProbeCx = drawX;
     butterfly._catchProbeCy = drawY;
-    const catchDist = d.getButterflyCatchDistanceAtWorldCenter(drawX, drawY);
+    const catchDist = getButterflyCatchDistanceAtWorldCenter(drawX, drawY);
     if (catchDist <= d.butterflyCatchDistance) {
       if (!catchTarget || catchDist < catchTarget.distance) {
         catchTarget = { butterfly: butterfly, distance: catchDist };
       }
     }
     const motionX = drawX;
-    d.setWorldPosition(
-      entry.element,
-      drawX - d.BUTTERFLY_SIZE / 2,
-      drawY - d.BUTTERFLY_SIZE / 2
-    );
-    d.applyButterflySpriteFrame(
+    setWorldPosition(entry.element, drawX - halfSize, drawY - halfSize);
+    applyButterflySpriteFrame(
       entry,
       butterfly.color,
-      d.getButterflyAnimationFrame(now, butterfly)
+      getButterflyAnimationFrame(now, butterfly)
     );
     const prevMotionX = Number(entry.lastMotionX);
     const hasPrevMotionX = Number.isFinite(prevMotionX);
@@ -697,15 +700,15 @@ export function createModule(d) {
         entry.facingMomentumX = 0;
       }
     }
-    d.applyButterflyFacing(entry, Boolean(facingRight));
+    applyButterflyFacing(entry, Boolean(facingRight));
     entry.lastMotionX = motionX;
-    d.applyButterflyCatchable(
+    applyButterflyCatchable(
       entry,
       Boolean(catchTarget && catchTarget.butterfly.id === butterfly.id)
     );
   });
   Object.keys(d.butterflyRenderById).forEach(function (id) {
-    if (!aliveIds[id]) d.removeButterflyRenderEntry(id);
+    if (!aliveIds[id]) removeButterflyRenderEntry(id);
   });
   }
 
