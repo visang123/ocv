@@ -79,6 +79,7 @@ import {
   SPROUT_HEIGHT,
   BIG_TREE_WIDTH,
   BIG_TREE_HEIGHT,
+  BIG_TREE_CANOPY_DESIGN_HEIGHT,
   NPC_WIDTH,
   NPC_HEIGHT,
   BIG_TREE_X,
@@ -1138,18 +1139,6 @@ function setWorldMapSize(element, width, height) {
   } else {
     element.style.height = "";
   }
-}
-
-function syncBigTreeSceneScale() {
-  if (!bigTree || !ground) return;
-  const scene = bigTree.querySelector(".big-tree-scene");
-  if (!scene) return;
-  const cw = bigTree.clientWidth;
-  const ch = bigTree.clientHeight;
-  if (cw <= 0 || ch <= 0) return;
-  const sx = cw / BIG_TREE_WIDTH;
-  const sy = ch / BIG_TREE_HEIGHT;
-  scene.style.transform = "scale(" + sx + "," + sy + ")";
 }
 
 function syncWorldPlantFogVisuals() {
@@ -8170,6 +8159,7 @@ function buildLayerDeps() {
     BIG_TREE_Y,
     BIG_TREE_WIDTH,
     BIG_TREE_HEIGHT,
+    BIG_TREE_CANOPY_DESIGN_HEIGHT,
     TREE_CANOPY_LEFT,
     TREE_CANOPY_RIGHT,
     TREE_CANOPY_TOP,
@@ -16758,8 +16748,29 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
 
   const nextList = [];
   if (iAmAuthority) {
+    const activeBounds = getActiveButterflyBounds();
     butterflyState.list.forEach(function (butterfly) {
       if (incomingById[butterfly.id]) {
+        const raw = incomingById[butterfly.id];
+        if (
+          !Number.isFinite(Number(butterfly.x)) ||
+          !Number.isFinite(Number(butterfly.y)) ||
+          isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds)
+        ) {
+          const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
+          butterfly.x = nextPoint.x;
+          butterfly.y = nextPoint.y;
+          butterfly.lastPathX = nextPoint.x;
+          butterfly.lastPathY = nextPoint.y;
+          delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
+        } else if (
+          !Number.isFinite(Number(butterfly.lastPathX)) ||
+          !Number.isFinite(Number(butterfly.lastPathY))
+        ) {
+          butterfly.lastPathX = butterfly.x;
+          butterfly.lastPathY = butterfly.y;
+          delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
+        }
         nextList.push(butterfly);
         delete incomingById[butterfly.id];
       } else {
@@ -16776,6 +16787,7 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
         color: raw.color,
         spawn
       });
+      if (!butterfly) return;
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       butterfly.spawnedAt = getNumericButterflyValue(raw.spawnedAt, Date.now());
       nextList.push(butterfly);
@@ -16797,13 +16809,16 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
       const needsPosition =
         !existing ||
-        isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds);
+        isUnsetButterflyCoord(butterfly.x, butterfly.y, activeBounds) ||
+        !Number.isFinite(Number(butterfly.lastPathX)) ||
+        !Number.isFinite(Number(butterfly.lastPathY));
       if (needsPosition) {
         const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
         butterfly.x = nextPoint.x;
         butterfly.y = nextPoint.y;
         butterfly.lastPathX = nextPoint.x;
         butterfly.lastPathY = nextPoint.y;
+        delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
       }
       nextList.push(butterfly);
     });
@@ -16958,7 +16973,6 @@ function setup() {
     );
   }
   setWorldMapSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
-  syncBigTreeSceneScale();
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
   if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);

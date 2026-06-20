@@ -111,6 +111,8 @@ export const SPROUT_WIDTH = 5;
 export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
+/** 잎·가지·사과 영역 높이(디자인 px) — 줄기 상단까지 */
+export const BIG_TREE_CANOPY_DESIGN_HEIGHT = 118;
 export const NPC_WIDTH = Math.round(13 * 1.7);
 export const NPC_HEIGHT = Math.round(26 * 1.7);
 
