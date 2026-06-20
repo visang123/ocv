@@ -2663,9 +2663,6 @@ document.addEventListener("keydown", function (event) {
       tryTalkToPlantMaster();
       return;
     }
-    const bucketPick = getNearestGroundBucketPickInfo();
-    const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
-    if (getWorldItems().hasGuideBook && tryPickupNearestWorldRock(bucketDistance)) return;
     if (getWorldItems().hasGuideBook && tryCatchButterfly()) return;
     if (isPlayerGameplayBlockedByNpcDialogue()) return;
     useHeldItem();
@@ -8417,6 +8414,7 @@ function buildLayerDeps() {
     get suppressPlantWaterDecayUntilSim() { return suppressPlantWaterDecayUntilSim; },
     set suppressPlantWaterDecayUntilSim(v) { suppressPlantWaterDecayUntilSim = v; },
     syncWorldState,
+    syncSharedWorldPlantStateNow,
     teardownWorldBagDropDom,
     treeClimbSpeed,
     treeFallSpeed,
@@ -9242,6 +9240,10 @@ function simulateButterflyAuthorityStep(butterfly, now) { return _systemsApi ? _
 function snapPlayerToCraftChair(chair) { return _systemsApi ? _systemsApi.snapPlayerToCraftChair(chair) : undefined; }
 function standUpFromChair() { return _systemsApi ? _systemsApi.standUpFromChair() : undefined; }
 function syncWorldState(forceSave, options) { return _systemsApi ? _systemsApi.syncWorldState(forceSave, options) : undefined; }
+function syncSharedWorldPlantStateNow() {
+  if (!isWorldServerSyncAvailable()) return;
+  syncWorldState(true, { skipPrefetch: true });
+}
 function teardownWorldBagDropDom(drop) { return _systemsApi ? _systemsApi.teardownWorldBagDropDom(drop) : undefined; }
 function tickPlayerHealth(nowMs) { return _systemsApi ? _systemsApi.tickPlayerHealth(nowMs) : undefined; }
 function tickPlayerPosition() {
@@ -11749,8 +11751,7 @@ function startPlanting() {
       holdLocalPlantStateAgainstStaleSnapshot(3000);
       saveSeedState();
       saveAppleState();
-      markWorldDirty();
-      syncWorldState(true);
+      syncSharedWorldPlantStateNow();
       onboardingNotifyMainPlantPlanted();
       return;
     }
@@ -11793,6 +11794,7 @@ function startPlanting() {
     updateNpcPosition();
     holdLocalPlantStateAgainstStaleSnapshot(3000);
     saveSeedState();
+    syncSharedWorldPlantStateNow();
     onboardingNotifyMainPlantPlanted();
   }, plantActionMs);
 }
@@ -11838,6 +11840,7 @@ function startPlantingExtraSeed() {
     holdLocalPlantStateAgainstStaleSnapshot(3000);
     holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
+    syncSharedWorldPlantStateNow();
   }, plantActionMs);
 }
 
@@ -11945,8 +11948,7 @@ function plantWorldSeedCount() {
     updateSeedInventory();
     holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
-    markWorldDirty();
-    syncWorldState(true);
+    syncSharedWorldPlantStateNow();
   }, plantActionMs);
 }
 
@@ -12056,8 +12058,7 @@ function plantWorldOvergrowthSeedCount() {
     updateSeedInventory();
     holdLocalAppleStateAgainstStaleSnapshot(3000);
     saveAppleState();
-    markWorldDirty();
-    syncWorldState(true);
+    syncSharedWorldPlantStateNow();
   }, plantActionMs);
 }
 
@@ -12501,7 +12502,6 @@ function performInteractActionCore() {
   if (isNearBucket() && tryPickSharedBucket(bucketDistance, bucketPick)) return;
   if (pickApple()) return;
   if (tryPickupNearestWorldRock(bucketDistance)) return;
-  if (tryCatchButterfly()) return;
   pickUpNearestItem();
 }
 
