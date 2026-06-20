@@ -81,6 +81,9 @@ function resolveNextPage() {
 }
 
 function redirectToGame() {
+  try {
+    sessionStorage.setItem("ovcLoginHandoffV1", String(Date.now()));
+  } catch (eHandoff) {}
   const target = new URL("./" + resolveNextPage(), location.href);
   target.searchParams.set("v", CACHE_BUST);
   target.searchParams.set("t", String(Date.now()));

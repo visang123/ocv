@@ -358,8 +358,10 @@ function finalizeSuccessfulLogin(account) {
     sessionStorage.setItem(ovcSessionUserNameKey, account.name);
     if (account.session_token) {
       sessionStorage.setItem(ovcSessionTokenKey, account.session_token);
+      localStorage.setItem(currentSessionTokenKey, account.session_token);
     } else {
       sessionStorage.removeItem(ovcSessionTokenKey);
+      localStorage.removeItem(currentSessionTokenKey);
     }
   } catch (eSess) {}
   ovcMigrateUnscopedTutorialFlagsToUserScope(userId);
@@ -374,9 +376,6 @@ function finalizeSuccessfulLogin(account) {
     localStorage.removeItem(scopedKey);
   }
   persistColorChoiceState(account);
-  if (account.session_token) {
-    localStorage.setItem(currentSessionTokenKey, account.session_token);
-  }
   if (userId && account && accountTutorialDoneTruthy(account)) {
     hydrateScopedTutorialProgressForUser(userId);
   }

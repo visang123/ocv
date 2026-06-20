@@ -3,7 +3,7 @@ import {
   toScreenY as toScreenYUtil,
   setWorldSize as setWorldSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js?v=20260620d";
+} from "./src/world/transform.js?v=20260620e";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -428,9 +428,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620d";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620d";
-import { initScriptView } from "./src/script/view/index.js?v=20260620d";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620e";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620e";
+import { initScriptView } from "./src/script/view/index.js?v=20260620e";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -695,8 +695,8 @@ function getEffectiveOvcSessionToken() {
   return "";
 }
 
-const localLoginUserId = (getStoredValue(currentUserIdKey) || "").trim();
-const localLoginUserName = (getStoredValue(currentUserKey) || "").trim();
+const localLoginUserId = (localStorage.getItem(currentUserIdKey) || "").trim();
+const localLoginUserName = (localStorage.getItem(currentUserKey) || "").trim();
 const tabSessionUserId = readOvcTabSessionUserId();
 const tabSessionUserName = readOvcTabSessionUserName();
 const currentUserId = tabSessionUserId ? tabSessionUserId : localLoginUserId;
@@ -2138,7 +2138,7 @@ showAppLoadingScreen(LOADING_TEXT_DEFAULT);
 
 
 const accountLeaderTokenSessionKey = "ovcMyLeaderTokenV1";
-const OVC_LOGIN_HANDOFF_GRACE_MS = 15000;
+const OVC_LOGIN_HANDOFF_GRACE_MS = 45000;
 
 function getAccountSessionLeaderStorageKey() {
   return "ovcAccountSessionLeaderV1:" + currentUserId;
@@ -14496,9 +14496,21 @@ function buildCharacterColorGrid() {
 }
 
 function openCharacterSelectIfNeeded() {
-  if (!currentUserId || !currentUserName) {
+  if (!currentUserId) {
     window.location.replace("ovc-login.html?v=20260509a");
     return;
+  }
+  if (!currentUserName) {
+    try {
+      const recoveredName = (localStorage.getItem(currentUserKey) || "").trim();
+      if (!recoveredName) {
+        window.location.replace("ovc-login.html?v=20260509a");
+        return;
+      }
+    } catch (eNameRecover) {
+      window.location.replace("ovc-login.html?v=20260509a");
+      return;
+    }
   }
 
   playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
@@ -15824,25 +15836,24 @@ async function validateCurrentAccount() {
     if (typeof window.OVCOnline.validateSession === "function") {
       const storedToken = getEffectiveOvcSessionToken();
       if (!storedToken) {
+        if (typeof window.OVCOnline.getAccount === "function") {
+          const account = await window.OVCOnline.getAccount(currentUserId);
+          if (account) return;
+        }
         if (window.OVCOnline.isConfigured && window.OVCOnline.isConfigured()) {
           showOnlineDebugMessage(
             "\uC774 \uCC3D\uC758 \uB85C\uADF8\uC778 \uC815\uBCF4\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694."
           );
           setTimeout(logout, 800);
-          return;
-        }
-        if (typeof window.OVCOnline.getAccount === "function") {
-          const account = await window.OVCOnline.getAccount(currentUserId);
-          if (!account) {
-            showOnlineDebugMessage("\uACC4\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB85C\uADF8\uC544\uC6C3\uD569\uB2C8\uB2E4.");
-            setTimeout(logout, 800);
-            return;
-          }
         }
         return;
       }
       const isValid = await window.OVCOnline.validateSession(currentUserId, storedToken);
       if (!isValid) {
+        if (typeof window.OVCOnline.getAccount === "function") {
+          const account = await window.OVCOnline.getAccount(currentUserId);
+          if (account && !account.session_token) return;
+        }
         showOnlineDebugMessage(
           "\uB2E4\uB978 \uCC3D\uC5D0\uC11C \uB85C\uADF8\uC778\uB418\uC5B4 \uC774 \uCC3D\uC758 \uC138\uC158\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694."
         );

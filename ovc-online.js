@@ -132,6 +132,83 @@
       .join("");
   }
 
+  const ACCOUNT_AUTH_SESSION_ACTIVE_MS = 70000;
+  const ACCOUNT_AUTH_PRESENCE_ID_PREFIX = "auth-account-";
+
+  function accountAuthPresenceId(accountId) {
+    return ACCOUNT_AUTH_PRESENCE_ID_PREFIX + String(accountId || "").trim();
+  }
+
+  async function readAccountAuthSessionUpdatedAt(accountId) {
+    const id = accountAuthPresenceId(accountId);
+    if (!id || id === ACCOUNT_AUTH_PRESENCE_ID_PREFIX) return 0;
+    const supabaseClient = getClient();
+    if (!supabaseClient) return 0;
+    try {
+      const { data, error } = await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .select("updated_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (error || !data || !data.updated_at) return 0;
+      const parsed = Date.parse(String(data.updated_at));
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  async function hasActiveAccountAuthSession(accountId) {
+    const uid = String(accountId || "").trim();
+    if (!uid) return false;
+    const updatedAt = await readAccountAuthSessionUpdatedAt(uid);
+    if (!updatedAt) return false;
+    return Date.now() - updatedAt < ACCOUNT_AUTH_SESSION_ACTIVE_MS;
+  }
+
+  async function claimAccountAuthSession(accountId, name) {
+    const uid = String(accountId || "").trim();
+    if (!uid) return;
+    const supabaseClient = getClient();
+    if (!supabaseClient) return;
+    const payload = {
+      id: accountAuthPresenceId(uid),
+      room: String(config.multiplayerRoom || "ovc-main-room"),
+      account_id: uid,
+      name: String(name || "OVC"),
+      color: "#ffffff",
+      x: 0,
+      depth: 0,
+      jump_y: 0,
+      updated_at: new Date().toISOString()
+    };
+    await withNetworkRetry(async function () {
+      const { error } = await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .upsert(payload, { onConflict: "id" });
+      if (error) throw normalizeOnlineError(new Error(error.message || String(error)));
+    }, { attempts: 2, baseDelayMs: 120 });
+  }
+
+  async function touchAccountAuthSession(accountId, name) {
+    return claimAccountAuthSession(accountId, name);
+  }
+
+  async function clearAccountAuthSession(accountId) {
+    const uid = String(accountId || "").trim();
+    if (!uid) return;
+    const supabaseClient = getClient();
+    if (!supabaseClient) return;
+    try {
+      await supabaseClient
+        .from(config.presenceTable || "ovc_presence")
+        .delete()
+        .eq("id", accountAuthPresenceId(uid));
+    } catch (err) {
+      // Best effort on logout/tab close.
+    }
+  }
+
   async function loginViaSupabaseRest(normalizedName, password) {
     const passwordHash = await sha256Hex(password);
     const base = config.supabaseUrl.trim().replace(/\/$/, "");
@@ -169,6 +246,11 @@
     }
 
     const data = rows[0];
+    if (await hasActiveAccountAuthSession(data.id)) {
+      throw new Error(
+        "이미 다른 창에서 이 계정으로 접속 중입니다. 해당 창을 닫거나 로그아웃한 뒤 다시 시도하세요."
+      );
+    }
     const sessionToken = generateSessionToken();
     try {
       const patchUrl = base + "/rest/v1/" + tableSeg + "?id=eq." + encodeURIComponent(String(data.id));
@@ -259,6 +341,12 @@
       if (error) throw new Error(error.message);
       if (!data) throw new Error("이름 또는 비밀번호가 맞지 않습니다.");
 
+      if (await hasActiveAccountAuthSession(data.id)) {
+        throw new Error(
+          "이미 다른 창에서 이 계정으로 접속 중입니다. 해당 창을 닫거나 로그아웃한 뒤 다시 시도하세요."
+        );
+      }
+
       const sessionToken = generateSessionToken();
       const { error: updateError } = await supabaseClient
         .from(config.accountsTable)
@@ -304,6 +392,7 @@
 
       if (error) return true;
       if (!data) return false;
+      if (!data.session_token) return true;
       return data.session_token === sessionToken;
     } catch (error) {
       return true;
@@ -441,7 +530,7 @@
     try {
       const { data, error } = await supabaseClient
         .from(config.accountsTable)
-        .select("id, name, color, created_at, tutorial_done")
+        .select("id, name, color, created_at, tutorial_done, session_token")
         .eq("id", accountId)
         .maybeSingle();
 
@@ -694,6 +783,10 @@
     getAccount,
     createPresenceChannel,
     validateSession,
+    hasActiveAccountAuthSession,
+    claimAccountAuthSession,
+    touchAccountAuthSession,
+    clearAccountAuthSession,
     savePresence,
     listPresence,
     removePresence,
