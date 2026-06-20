@@ -2,18 +2,24 @@ import {
   MAP_VISUAL_SCALE,
   PLANT_GROWTH_METER_HEIGHT,
   PLANT_GROWTH_METER_WIDTH,
+  PLANT_SPOT_HEIGHT,
   PLANT_SPOT_WIDTH,
   PLANT_UI_GAP_ABOVE_SOIL,
   WATER_NEEDED_SIZE
 } from "./constants.js";
 
 /** setWorldSize entity span → setWorldPosition ground coordinate span */
-function entitySpanOnGround(entitySize) {
+export function entitySpanOnGround(entitySize) {
   return entitySize / MAP_VISUAL_SCALE;
 }
 
 export function getPlantSpotCenterX(spotX) {
   return spotX + entitySpanOnGround(PLANT_SPOT_WIDTH) / 2;
+}
+
+/** spot(흙) 하단 — 새싹 발밑 앵커 */
+export function getPlantSpotFootY(spotY) {
+  return spotY + entitySpanOnGround(PLANT_SPOT_HEIGHT);
 }
 
 /** 심은 흙(spot) 바로 위 — 첫 물주기 물방울 */

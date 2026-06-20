@@ -3,7 +3,7 @@ import {
   toScreenY as toScreenYUtil,
   setWorldSize as setWorldSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js?v=20260620g";
+} from "./src/world/transform.js?v=20260620i";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -227,7 +227,7 @@ import {
   getPlantSpotCenterX,
   getPlantSpotFootY,
   getPlantWaterNeededWorldPosition
-} from "./src/game/plant-ui-layout.js?v=20260620g";
+} from "./src/game/plant-ui-layout.js?v=20260620i";
 import {
   tickPlantGold,
   getPlantGoldKrw,
@@ -440,9 +440,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620g";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620g";
-import { initScriptView } from "./src/script/view/index.js?v=20260620g";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620i";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620i";
+import { initScriptView } from "./src/script/view/index.js?v=20260620i";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
@@ -524,7 +524,7 @@ import {
   canDragBagItemToTradeCounter,
   tryDropBagItemOnTradeCounter,
   returnTradeCounterStackToInventory
-} from "./src/game/trade-master-ui.js?v=20260531a";
+} from "./src/game/trade-master-ui.js?v=20260531b";
 import {
   bindPlantMasterSeedShop,
   cancelPlantMasterSeedShopOnPlayerHealthDepleted,
@@ -1729,6 +1729,25 @@ function completeWorldRockPickup(rock) {
   }
   onboardingHookTutorialRockPicked();
   return true;
+}
+
+function mergeSharedRockRespawnTimestamps(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const snapPickup = Math.max(0, Number(snapshot.lastWorldRockPickupAt) || 0);
+  const snapRespawn = Math.max(0, Number(snapshot.lastWorldRockRespawnAt) || 0);
+  if (snapPickup > 0) {
+    getSeedWorld().lastWorldRockPickupAt = Math.max(
+      Number(getSeedWorld().lastWorldRockPickupAt) || 0,
+      snapPickup
+    );
+    lastLocalWorldRockPickupAt = Math.max(lastLocalWorldRockPickupAt, snapPickup);
+  }
+  if (snapRespawn > 0) {
+    getSeedWorld().lastWorldRockRespawnAt = Math.max(
+      Number(getSeedWorld().lastWorldRockRespawnAt) || 0,
+      snapRespawn
+    );
+  }
 }
 
 function finishLocalRockMining() {
@@ -7633,6 +7652,13 @@ function loadAppleState() {
         return arr.indexOf(id) === idx;
       })
     : [];
+  const loadedRockPickupAt = Math.max(0, Number(loaded.lastWorldRockPickupAt) || 0);
+  const loadedRockRespawnAt = Math.max(0, Number(loaded.lastWorldRockRespawnAt) || 0);
+  getSeedWorld().lastWorldRockPickupAt = loadedRockPickupAt;
+  getSeedWorld().lastWorldRockRespawnAt = loadedRockRespawnAt;
+  if (loadedRockPickupAt > 0) {
+    lastLocalWorldRockPickupAt = loadedRockPickupAt;
+  }
   ensureWorldLooseSeedShape();
   if (usesWorldLooseSeedMode()) {
     let migrateInvToCount = 0;
@@ -7667,6 +7693,8 @@ function loadAppleState() {
         worldLooseSeed: getApple().worldLooseSeed,
         worldRocks: getApple().worldRocks,
         worldRockPickedIds: getApple().worldRockPickedIds,
+        lastWorldRockPickupAt: Number(getSeedWorld().lastWorldRockPickupAt) || 0,
+        lastWorldRockRespawnAt: Number(getSeedWorld().lastWorldRockRespawnAt) || 0,
         worldExtraBuckets: getApple().worldExtraBuckets,
         placedCraftFurniture: serializePlacedCraftFurnitureForSnapshot(placedCraftFurniture)
       });
@@ -7901,6 +7929,7 @@ function buildNetworkDeps() {
     mainDrySeedHandledKey,
     markWorldDirty,
     maxWellWater,
+    mergeSharedRockRespawnTimestamps,
     mergeWorldBagDropsFromSnapshot,
     get multiplayerChannel() { return multiplayerChannel; },
     set multiplayerChannel(v) { multiplayerChannel = v; },
@@ -8375,6 +8404,7 @@ function buildLayerDeps() {
     WORLD_LOOSE_ROCK_COUNT,
     WORLD_LOOSE_SEED_X,
     WORLD_LOOSE_SEED_Y,
+    WORLD_ROCK_RESPAWN_INTERVAL_MS,
     WORLD_ROCK_SIZE,
     WORLD_ROCK_SPAWN_X_MARGIN,
     WORLD_ROCK_SPAWN_Y_MIN,

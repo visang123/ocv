@@ -2,7 +2,7 @@
 import {
   getPlantGrowthMeterWorldPosition,
   getPlantWaterNeededWorldPosition
-} from "../../game/plant-ui-layout.js?v=20260620g";
+} from "../../game/plant-ui-layout.js?v=20260620i";
 
 export function createModule(d) {
   function applyPlantHoverVisuals(plant) {
