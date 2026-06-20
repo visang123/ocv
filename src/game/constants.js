@@ -102,6 +102,11 @@ export const WELL_SIZE = 38;
 export const PLANT_SPOT_WIDTH = 14;
 export const PLANT_SPOT_HEIGHT = 7;
 export const WATER_NEEDED_SIZE = 8;
+/** spot 중앙 정렬 성장 게이지 (월드 단위 — setWorldSize와 동일) */
+export const PLANT_GROWTH_METER_WIDTH = 42;
+export const PLANT_GROWTH_METER_HEIGHT = 8;
+/** 흙(spot) 상단과 UI(게이지·물방울) 사이 간격 */
+export const PLANT_UI_GAP_ABOVE_SOIL = 2;
 export const SPROUT_WIDTH = 5;
 export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
@@ -112,7 +117,8 @@ export const NPC_HEIGHT = Math.round(26 * 1.7);
 /** Right-anchored tree, shifted left (several × tree width) from the original corner. */
 export const BIG_TREE_X =
   WORLD_WIDTH - BIG_TREE_WIDTH - 8 - Math.round(BIG_TREE_WIDTH * 3.35);
-export const BIG_TREE_Y = -BIG_TREE_HEIGHT + 10;
+/** Trunk/roots sit on ground line (world y=0); #big-tree box bottom aligns with surface. */
+export const BIG_TREE_Y = -BIG_TREE_HEIGHT;
 export const TREE_TRUNK_X = BIG_TREE_X + 58;
 export const TREE_TRUNK_WIDTH = 30;
 export const TREE_TRUNK_TOP = BIG_TREE_Y + 72;
@@ -228,6 +234,43 @@ export const cactusMatureDryAfterEmptyMs = 35 * MINUTE_MS;
 /** 1·2·3단계 새싹 PNG(고해상도)에 맞춘 월드 기본 크기 */
 export const SPROUT_STAGE_WIDTHS = [7, 10, 15];
 export const SPROUT_STAGE_HEIGHTS = [8, 15, 26];
+
+/**
+ * 1·2·3단계 새싹 PNG 앵커(불투명 bbox 기준 소스 픽셀).
+ * centerX·footY로 spot 중앙·땅 발밑에 맞춤.
+ */
+export const SPROUT_STAGE_ANCHORS = [
+  { srcW: 508, srcH: 420, centerX: 255.5, footY: 416 },
+  { srcW: 420, srcH: 504, centerX: 210, footY: 500 },
+  { srcW: 420, srcH: 855, centerX: 207, footY: 852 }
+];
+
+/** @param {number} stage 1~3 */
+export function getSproutStageAnchor(stage) {
+  const st = Math.floor(Number(stage)) || 0;
+  if (st < 1 || st > 3) return null;
+  return SPROUT_STAGE_ANCHORS[st - 1] || null;
+}
+
+/**
+ * spot 중앙·발밑 기준 스프라이트 좌상단(월드 좌표).
+ * MAP_VISUAL_SCALE>1일 때 위치 스케일과 객체 화면 크기 불일치를 보정.
+ */
+export function getAnchoredSpriteWorldPosition(
+  spotCenterX,
+  spotFootY,
+  sproutSize,
+  anchor,
+  mapVisualScale
+) {
+  const mapScale = Math.max(1, Number(mapVisualScale) || 1);
+  return {
+    x: spotCenterX - (anchor.centerX / anchor.srcW) * sproutSize.width / mapScale,
+    y:
+      spotFootY -
+      (anchor.footY / anchor.srcH) * sproutSize.height / mapScale
+  };
+}
 /** 4·5단계 풀 — 3단계 베이스(인덱스 2)에 곱해 월드에서 더 크게 그림 */
 export const grassStage4WorldScale = 2.95;
 export const grassStage5WorldScale = 3.55;

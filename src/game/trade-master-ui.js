@@ -462,7 +462,7 @@ function layoutTradeSpeechBubble() {
       headTop,
       host.tradeMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
-    ) -
+    ) +
     host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   host.setSpeechBubbleTransform(
     host.tradeMasterBubble,

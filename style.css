@@ -1041,16 +1041,19 @@ body:not(.is-game-ready) .viewport {
   z-index: 35;
   display: none;
   min-width: 16px;
-  max-width: 92px;
+  max-width: 118px;
   padding: 1px 4px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   color: #111;
-  font: 700 4px/1.18 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+  font: 700 4px/1.22 "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
   text-align: center;
-  white-space: nowrap;
+  width: max-content;
+  box-sizing: border-box;
+  white-space: pre-line;
   word-break: keep-all;
+  overflow-wrap: normal;
   user-select: none;
   pointer-events: none;
 }
@@ -1076,17 +1079,19 @@ body:not(.is-game-ready) .viewport {
   z-index: 29;
   display: none;
   min-width: 15px;
-  max-width: 92px;
+  max-width: 118px;
   padding: 1px 4px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   color: #111;
-  font: 700 4px/1.18 Arial, sans-serif;
+  font: 700 4px/1.22 Arial, sans-serif;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: max-content;
+  box-sizing: border-box;
+  white-space: pre-line;
+  word-break: keep-all;
+  overflow-wrap: normal;
   user-select: none;
   pointer-events: none;
 }
@@ -2869,15 +2874,14 @@ body:not(.is-game-ready) .viewport {
   left: 0;
   top: 0;
   display: none;
-  width: 42px;
-  height: 6px;
   padding: 1px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(50, 120, 50, 0.35);
   border-radius: 999px;
   user-select: none;
   pointer-events: none;
-  /* JS depth sync 전 fallback — 식물 스프라이트(#sprout z-index:3)보다 위 */
+  /* JS setWorldSize로 크기 지정 — spot·물방울과 동일 월드 좌표계 */
   z-index: 5;
 }
 

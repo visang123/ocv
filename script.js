@@ -72,6 +72,8 @@ import {
   WELL_SIZE,
   PLANT_SPOT_WIDTH,
   PLANT_SPOT_HEIGHT,
+  PLANT_GROWTH_METER_WIDTH,
+  PLANT_GROWTH_METER_HEIGHT,
   WATER_NEEDED_SIZE,
   SPROUT_WIDTH,
   SPROUT_HEIGHT,
@@ -147,6 +149,8 @@ import {
   grassStage4WorldScale,
   grassStage5WorldScale,
   getMatureSpriteAnchor,
+  getSproutStageAnchor,
+  getAnchoredSpriteWorldPosition,
   pickupDistance,
   bucketPickupDistance,
   guideInteractDistance,
@@ -216,6 +220,10 @@ import {
   appStorageKeys,
   appStorageKeysSharedWorldReset
 } from "./src/game/constants.js";
+import {
+  getPlantGrowthMeterWorldPosition,
+  getPlantWaterNeededWorldPosition
+} from "./src/game/plant-ui-layout.js";
 import {
   tickPlantGold,
   getPlantGoldKrw,
@@ -7711,6 +7719,8 @@ function buildNetworkDeps() {
     WORLD_ROCK_SPAWN_Y_MAX,
     WORLD_WIDTH,
     PLANT_SPOT_WIDTH,
+    PLANT_GROWTH_METER_HEIGHT,
+    PLANT_GROWTH_METER_WIDTH,
     WATER_NEEDED_SIZE,
     accountDisplayNameForUi,
     addBucketTrace,
@@ -8287,6 +8297,8 @@ function buildLayerDeps() {
     PLANT_FOG_BUTTERFLY_MIN_SCORE,
     PLANT_SPOT_HEIGHT,
     PLANT_SPOT_WIDTH,
+    PLANT_GROWTH_METER_HEIGHT,
+    PLANT_GROWTH_METER_WIDTH,
     PLAYER_BASE_IMAGE_SRC,
     PLAYER_HEIGHT,
     PLAYER_MAX_HEALTH,
@@ -8544,6 +8556,7 @@ function buildLayerDeps() {
     recoverWorldMainSeedIfOnboardingStuck,
     refreshPlantHoverAfterPlayerMove,
     refreshPlantOccluderFade,
+    syncAllPlantDepthStacking,
     remoteBucketUpdateAtById,
     remotePlayerHeldBucketById,
     remotePlayers,
@@ -9253,11 +9266,8 @@ function refreshUiAfterSharedWorldApply() {
 function refreshSharedWaterIndicators() {
   if (getPlant().isSeedPlanted && shouldShowFirstWaterNeededDroplet(getPlant())) {
     waterNeeded.style.display = "block";
-    setWorldPosition(
-      waterNeeded,
-      getPlant().spotX + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
-      getPlant().spotY - WATER_NEEDED_SIZE - 2
-    );
+    const waterPos = getPlantWaterNeededWorldPosition(getPlant().spotX, getPlant().spotY);
+    setWorldPosition(waterNeeded, waterPos.x, waterPos.y);
   } else {
     waterNeeded.style.display = "none";
   }
@@ -9266,11 +9276,8 @@ function refreshSharedWaterIndicators() {
     if (!plant.waterNeededElement) return;
     if (shouldShowFirstWaterNeededDroplet(plant)) {
       plant.waterNeededElement.style.display = "block";
-      setWorldPosition(
-        plant.waterNeededElement,
-        plant.x + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
-        plant.y - WATER_NEEDED_SIZE - 2
-      );
+      const waterPos = getPlantWaterNeededWorldPosition(plant.x, plant.y);
+      setWorldPosition(plant.waterNeededElement, waterPos.x, waterPos.y);
     } else {
       plant.waterNeededElement.style.display = "none";
     }
@@ -9580,11 +9587,15 @@ function updateExtraSeedsAndPlants() {
     plant.spotElement.src = getPlantSoilSrc(plant);
     setWorldPosition(plant.spotElement, plant.x, plant.y);
     plant.spotElement.style.display = shouldHideSeparateSoilUnderBigGrass(plant) ? "none" : "block";
+    const showWater = shouldShowFirstWaterNeededDroplet(plant);
+    const meterPos = getPlantGrowthMeterWorldPosition(plant.x, plant.y, {
+      stackAboveWater: showWater
+    });
     updatePlantGrowthMeter(
       plant.growthMeterElement,
       plant.growthMeterFill,
-      plant.x,
-      plant.y,
+      meterPos.x,
+      meterPos.y,
       getPlantGrowthRatio(plant, now),
       getPlantSecondGrowthRatio(plant, now)
     );
@@ -9595,13 +9606,10 @@ function updateExtraSeedsAndPlants() {
     const sproutSize = getSproutSizeForStage(stage, plant);
     plant.sproutElement.style.display = isSproutGrown ? "block" : "none";
     plant.sproutElement.classList.toggle("is-big", stage >= 2);
-    plant.waterNeededElement.style.display = shouldShowFirstWaterNeededDroplet(plant) ? "block" : "none";
+    plant.waterNeededElement.style.display = showWater ? "block" : "none";
     if (plant.waterNeededElement.style.display === "block") {
-      setWorldPosition(
-        plant.waterNeededElement,
-        plant.x + PLANT_SPOT_WIDTH / 2 - WATER_NEEDED_SIZE / 2,
-        plant.y - WATER_NEEDED_SIZE - 2
-      );
+      const waterPos = getPlantWaterNeededWorldPosition(plant.x, plant.y);
+      setWorldPosition(plant.waterNeededElement, waterPos.x, waterPos.y);
     }
     if (!isSproutGrown) return;
     const sproutSrc = getSproutImageForPlant(plant, stage);
@@ -10039,12 +10047,15 @@ function getPlantDepthZIndex(sortY) {
   );
 }
 
-function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl, growthMeterEl) {
+function applyPlantDepthZIndexToElements(plant, spotEl, sproutEl, growthMeterEl, waterNeededEl) {
   const z = getPlantDepthZIndex(getPlantDepthSortY(plant));
   if (spotEl) spotEl.style.zIndex = String(z);
   if (sproutEl) sproutEl.style.zIndex = String(z + 1);
   if (growthMeterEl) {
     growthMeterEl.style.zIndex = String(z + 2);
+  }
+  if (waterNeededEl) {
+    waterNeededEl.style.zIndex = String(z + 3);
   }
 }
 
@@ -10054,7 +10065,8 @@ function syncAllPlantDepthStacking() {
       getPlant(),
       plantSpot,
       sprout,
-      mainPlantGrowthMeter && mainPlantGrowthMeter.element
+      mainPlantGrowthMeter && mainPlantGrowthMeter.element,
+      waterNeeded
     );
   }
   getApple().extraPlants.forEach(function (plant) {
@@ -10063,7 +10075,8 @@ function syncAllPlantDepthStacking() {
       plant,
       plant.spotElement,
       plant.sproutElement,
-      plant.growthMeterElement
+      plant.growthMeterElement,
+      plant.waterNeededElement
     );
   });
 }
@@ -10529,25 +10542,27 @@ function getSproutSizeForStage(stage, plant) {
  * 4?5???? PNG bbox ???(MATURE_SPRITE_ANCHORS)?????.
  */
 function getSproutWorldPositionForPlant(plantBaseX, plantBaseY, sproutSize, stage, plant) {
+  const spotCenterX = plantBaseX + PLANT_SPOT_WIDTH / 2;
+  const spotFootY = plantBaseY + PLANT_SPOT_HEIGHT;
   const matureAnchor =
     plant && stage >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), stage) : null;
-  if (matureAnchor) {
-    const spotCenterX = plantBaseX + PLANT_SPOT_WIDTH / 2;
-    const spotFootY = plantBaseY + PLANT_SPOT_HEIGHT;
-    return {
-      x: spotCenterX - (matureAnchor.centerX / matureAnchor.srcW) * sproutSize.width,
-      y: spotFootY - (matureAnchor.footY / matureAnchor.srcH) * sproutSize.height
-    };
+  const sproutAnchor =
+    !matureAnchor && stage >= 1 && stage <= 3 ? getSproutStageAnchor(stage) : null;
+  const anchor = matureAnchor || sproutAnchor;
+
+  if (anchor) {
+    return getAnchoredSpriteWorldPosition(
+      spotCenterX,
+      spotFootY,
+      sproutSize,
+      anchor,
+      MAP_VISUAL_SCALE
+    );
   }
-  let footInset = 7;
-  if (stage >= 5) {
-    footInset = 24;
-  } else if (stage >= 4) {
-    footInset = 16;
-  }
+
   return {
-    x: plantBaseX + PLANT_SPOT_WIDTH / 2 - sproutSize.width / 2,
-    y: plantBaseY - sproutSize.height + footInset
+    x: spotCenterX - sproutSize.width / (2 * MAP_VISUAL_SCALE),
+    y: spotFootY - sproutSize.height / MAP_VISUAL_SCALE
   };
 }
 
@@ -11013,6 +11028,7 @@ function ensureExtraPlantElements(plant) {
   const growthMeter = createPlantGrowthMeter();
   plant.growthMeterElement = growthMeter.element;
   plant.growthMeterFill = growthMeter.fill;
+  setWorldSize(plant.growthMeterElement, PLANT_GROWTH_METER_WIDTH, PLANT_GROWTH_METER_HEIGHT);
 }
 
 function createPlantGrowthMeter() {
@@ -14053,7 +14069,8 @@ function updateSproutPosition() {
     getPlant(),
     plantSpot,
     sprout,
-    mainPlantGrowthMeter && mainPlantGrowthMeter.element
+    mainPlantGrowthMeter && mainPlantGrowthMeter.element,
+    waterNeeded
   );
   updateNpcPosition();
 }
@@ -16759,6 +16776,9 @@ function setup() {
     if (plant.spotElement) setWorldSize(plant.spotElement, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
     if (plant.waterNeededElement) setWorldSize(plant.waterNeededElement, WATER_NEEDED_SIZE);
     if (plant.sproutElement) setWorldSize(plant.sproutElement, SPROUT_WIDTH, SPROUT_HEIGHT);
+    if (plant.growthMeterElement) {
+      setWorldSize(plant.growthMeterElement, PLANT_GROWTH_METER_WIDTH, PLANT_GROWTH_METER_HEIGHT);
+    }
   });
   setWorldSize(bucket, BUCKET_SIZE);
   setWorldSize(playerBucketOverlay, BUCKET_SIZE);
@@ -16766,7 +16786,14 @@ function setup() {
   setWorldSize(plantSpot, PLANT_SPOT_WIDTH, PLANT_SPOT_HEIGHT);
   setWorldSize(waterNeeded, WATER_NEEDED_SIZE);
   setWorldSize(sprout, SPROUT_WIDTH, SPROUT_HEIGHT);
-  setWorldSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
+  if (mainPlantGrowthMeter && mainPlantGrowthMeter.element) {
+    setWorldSize(
+      mainPlantGrowthMeter.element,
+      PLANT_GROWTH_METER_WIDTH,
+      PLANT_GROWTH_METER_HEIGHT
+    );
+  }
+  setWorldMapSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
   if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);

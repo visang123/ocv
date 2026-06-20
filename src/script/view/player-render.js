@@ -91,9 +91,11 @@ export function createModule(d) {
   if (d.playerAlert.style.display !== "block") return;
 
   if (d.playerAlert.classList.contains("is-butterfly-catch")) {
-    const playerRenderedHeight = d.player.offsetHeight || d.PLAYER_HEIGHT;
+    const playerBodyLogicH = d.groundScreenPxToWorldY(
+      d.player.offsetHeight || d.PLAYER_HEIGHT
+    );
     const playerWorldTop =
-      d.GROUND_WORLD_HEIGHT - playerRenderedHeight - d.getPlayer().depth + d.getPlayer().jumpY;
+      d.GROUND_WORLD_HEIGHT - playerBodyLogicH - d.getPlayer().depth + d.getPlayer().jumpY;
     const alertWidth = d.playerAlert.offsetWidth || 36;
     const alertWorldY = d.speechBubbleTopWorldYFromHead(
       playerWorldTop,
@@ -118,10 +120,14 @@ export function createModule(d) {
 
   function updatePlayerBubblePosition() {
   const playerWorldLeft = d.getPlayer().x;
-  const playerRenderedHeight = d.player.offsetHeight || d.PLAYER_HEIGHT;
+  const playerBodyLogicH = d.groundScreenPxToWorldY(
+    d.player.offsetHeight || d.PLAYER_HEIGHT
+  );
   const playerWorldTop =
-    d.GROUND_WORLD_HEIGHT - playerRenderedHeight - d.getPlayer().depth + d.getPlayer().jumpY;
-  const bw = d.playerBubble.offsetWidth || 36;
+    d.GROUND_WORLD_HEIGHT - playerBodyLogicH - d.getPlayer().depth + d.getPlayer().jumpY;
+  d.playerBubble.style.width = "";
+  void d.playerBubble.offsetWidth;
+  const bw = d.playerBubble.offsetWidth || d.playerBubble.scrollWidth || 36;
   const bubbleWorldY =
     d.speechBubbleTopWorldYFromHead(playerWorldTop, d.playerBubble) -
     d.PLAYER_SPEECH_BUBBLE_CLEAR_NAME_WORLD;
