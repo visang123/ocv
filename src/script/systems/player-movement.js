@@ -239,10 +239,10 @@ export function createModule(d) {
   const footY = d.getPlayerFootY();
   const rootsTop =
     d.BIG_TREE_Y +
-    d.BIG_TREE_HEIGHT +
+    d.BIG_TREE_RENDER_HEIGHT +
     d.TREE_CSS_ROOTS_BOTTOM_EXTEND -
     d.TREE_CSS_ROOTS_HEIGHT;
-  const rootsBottom = d.BIG_TREE_Y + d.BIG_TREE_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  const rootsBottom = d.BIG_TREE_Y + d.BIG_TREE_RENDER_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
   const feetInset = 5;
   const feetRect = {
     left: d.getPlayer().x + feetInset,
@@ -252,8 +252,11 @@ export function createModule(d) {
   };
   const hPad = 1;
   const rootsRect = {
-    left: d.BIG_TREE_X + d.TREE_CSS_ROOTS_LEFT - hPad,
-    right: d.BIG_TREE_X + d.TREE_CSS_ROOTS_LEFT + d.TREE_CSS_ROOTS_WIDTH + hPad,
+    left: d.BIG_TREE_X + d.TREE_CSS_ROOTS_LEFT / d.MAP_VISUAL_SCALE - hPad,
+    right:
+      d.BIG_TREE_X +
+      (d.TREE_CSS_ROOTS_LEFT + d.TREE_CSS_ROOTS_WIDTH) / d.MAP_VISUAL_SCALE +
+      hPad,
     top: rootsTop,
     bottom: rootsBottom
   };

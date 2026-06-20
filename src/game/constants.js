@@ -111,6 +111,9 @@ export const SPROUT_WIDTH = 5;
 export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
+/** setWorldSize로 그릴 때 실제 월드 높이(= BIG_TREE_HEIGHT / MAP_VISUAL_SCALE) */
+export const BIG_TREE_RENDER_WIDTH = BIG_TREE_WIDTH / MAP_VISUAL_SCALE;
+export const BIG_TREE_RENDER_HEIGHT = BIG_TREE_HEIGHT / MAP_VISUAL_SCALE;
 /** 잎·가지·사과 영역 높이(디자인 px) */
 export const BIG_TREE_CANOPY_DESIGN_HEIGHT = 108;
 /** 나무 사과 기본 크기(월드 px) — 예전 10px의 2/3 */
@@ -122,16 +125,16 @@ export const NPC_HEIGHT = Math.round(26 * 1.7);
 /** Right-anchored tree, shifted left (several × tree width) from the original corner. */
 export const BIG_TREE_X =
   WORLD_WIDTH - BIG_TREE_WIDTH - 8 - Math.round(BIG_TREE_WIDTH * 3.35);
-/** Trunk/roots sit on ground line (world y=0); #big-tree box bottom aligns with surface. */
-export const BIG_TREE_Y = -BIG_TREE_HEIGHT;
-export const TREE_TRUNK_X = BIG_TREE_X + 58;
-export const TREE_TRUNK_WIDTH = 30;
-export const TREE_TRUNK_TOP = BIG_TREE_Y + 72;
+/** Trunk/roots sit on ground line (world y=0); visual bottom aligns with surface. */
+export const BIG_TREE_Y = -BIG_TREE_RENDER_HEIGHT;
+export const TREE_TRUNK_X = BIG_TREE_X + 58 / MAP_VISUAL_SCALE;
+export const TREE_TRUNK_WIDTH = 30 / MAP_VISUAL_SCALE;
+export const TREE_TRUNK_TOP = BIG_TREE_Y + 72 / MAP_VISUAL_SCALE;
 export const TREE_CLIMB_DISTANCE = 7;
-export const TREE_CANOPY_LEFT = BIG_TREE_X + 6;
-export const TREE_CANOPY_RIGHT = BIG_TREE_X + BIG_TREE_WIDTH - 6;
-export const TREE_CANOPY_TOP = BIG_TREE_Y + 8;
-export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108;
+export const TREE_CANOPY_LEFT = BIG_TREE_X + 6 / MAP_VISUAL_SCALE;
+export const TREE_CANOPY_RIGHT = BIG_TREE_X + BIG_TREE_RENDER_WIDTH - 6 / MAP_VISUAL_SCALE;
+export const TREE_CANOPY_TOP = BIG_TREE_Y + 8 / MAP_VISUAL_SCALE;
+export const TREE_CANOPY_BOTTOM = BIG_TREE_Y + 108 / MAP_VISUAL_SCALE;
 
 export const WELL_START_X = 405;
 export const WELL_START_Y = 190;

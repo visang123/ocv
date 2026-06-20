@@ -3,6 +3,7 @@ import {
   WORLD_LOOSE_SEED_Y,
   BIG_TREE_X,
   BIG_TREE_Y,
+  MAP_VISUAL_SCALE,
   TREE_APPLE_SIZE,
   SIGN_START_X,
   SIGN_START_Y,
@@ -131,8 +132,8 @@ export function createDefaultTreeApples() {
       id: "apple-" + (index + 1),
       localX,
       localY,
-      x: BIG_TREE_X + localX,
-      y: BIG_TREE_Y + localY,
+      x: BIG_TREE_X + localX / MAP_VISUAL_SCALE,
+      y: BIG_TREE_Y + localY / MAP_VISUAL_SCALE,
       size: TREE_APPLE_SIZE
     };
   });

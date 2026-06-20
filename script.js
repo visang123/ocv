@@ -81,6 +81,7 @@ import {
   SPROUT_HEIGHT,
   BIG_TREE_WIDTH,
   BIG_TREE_HEIGHT,
+  BIG_TREE_RENDER_HEIGHT,
   BIG_TREE_CANOPY_DESIGN_HEIGHT,
   TREE_APPLE_SIZE,
   TREE_APPLE_COUNT,
@@ -1171,8 +1172,12 @@ function syncBigTreeSceneScale() {
   let cw = bigTree.clientWidth;
   let ch = bigTree.clientHeight;
   if (cw <= 0 || ch <= 0) {
-    cw = toScreenXUtil(BIG_TREE_WIDTH, ground, WORLD_WIDTH);
-    ch = toScreenYUtil(BIG_TREE_HEIGHT, ground, GROUND_WORLD_HEIGHT);
+    cw =
+      (BIG_TREE_WIDTH * ground.clientWidth) /
+      (WORLD_WIDTH * MAP_VISUAL_SCALE);
+    ch =
+      (BIG_TREE_HEIGHT * ground.clientHeight) /
+      (GROUND_WORLD_HEIGHT * MAP_VISUAL_SCALE);
   }
   if (cw <= 0 || ch <= 0) return;
   scene.style.transform =
@@ -5210,7 +5215,7 @@ function scheduleOnboardingNpcGuideEscHint() {
 
 function isPlayerNearTutorialTreeArea() {
   const cx = BIG_TREE_X + BIG_TREE_WIDTH / 2;
-  const cy = BIG_TREE_Y + BIG_TREE_HEIGHT / 2;
+  const cy = BIG_TREE_Y + BIG_TREE_RENDER_HEIGHT / 2;
   const px = getPlayer().x + PLAYER_WIDTH / 2;
   const py = getPlayerFootY() - (player.offsetHeight || PLAYER_HEIGHT) / 2;
   return Math.hypot(px - cx, py - cy) < 100;
@@ -8222,6 +8227,7 @@ function buildLayerDeps() {
     BIG_TREE_Y,
     BIG_TREE_WIDTH,
     BIG_TREE_HEIGHT,
+    BIG_TREE_RENDER_HEIGHT,
     BIG_TREE_CANOPY_DESIGN_HEIGHT,
     TREE_APPLE_SIZE,
     TREE_APPLE_COUNT,
@@ -13653,7 +13659,7 @@ function isPlantSpotOverlappingTreeNoPlantZone(plantX, plantY) {
   const trunkRight = TREE_TRUNK_X + TREE_TRUNK_WIDTH + TREE_CLIMB_DISTANCE - trunkInset;
   /** ????????? ?????????????(??????trunkBottom???????????? ???????? x????? y????? ??? ???????? */
   const trunkVisualTop = TREE_TRUNK_TOP - 22;
-  const trunkFeetBottom = BIG_TREE_Y + BIG_TREE_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  const trunkFeetBottom = BIG_TREE_Y + BIG_TREE_RENDER_HEIGHT + TREE_CSS_ROOTS_BOTTOM_EXTEND;
   if (overlap(trunkLeft, trunkVisualTop, trunkRight, trunkFeetBottom)) {
     return true;
   }
@@ -17059,7 +17065,7 @@ function setup() {
       PLANT_GROWTH_METER_HEIGHT
     );
   }
-  setWorldMapSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
+  setWorldSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
   syncBigTreeSceneScale();
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
