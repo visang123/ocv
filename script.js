@@ -1164,6 +1164,21 @@ function setWorldMapSize(element, width, height) {
   }
 }
 
+function syncBigTreeSceneScale() {
+  if (!bigTree || !ground) return;
+  const scene = bigTree.querySelector(".big-tree-scene");
+  if (!scene) return;
+  let cw = bigTree.clientWidth;
+  let ch = bigTree.clientHeight;
+  if (cw <= 0 || ch <= 0) {
+    cw = toScreenXUtil(BIG_TREE_WIDTH, ground, WORLD_WIDTH);
+    ch = toScreenYUtil(BIG_TREE_HEIGHT, ground, GROUND_WORLD_HEIGHT);
+  }
+  if (cw <= 0 || ch <= 0) return;
+  scene.style.transform =
+    "scale(" + cw / BIG_TREE_WIDTH + "," + ch / BIG_TREE_HEIGHT + ")";
+}
+
 function syncWorldPlantFogVisuals() {
   const tutorialPlantIndexFog =
     isMainGameTutorialInProgress() &&
@@ -17045,6 +17060,7 @@ function setup() {
     );
   }
   setWorldMapSize(bigTree, BIG_TREE_WIDTH, BIG_TREE_HEIGHT);
+  syncBigTreeSceneScale();
   setWorldSize(plantMaster, NPC_WIDTH, NPC_HEIGHT);
   if (tradeMaster) setWorldSize(tradeMaster, NPC_WIDTH, NPC_HEIGHT);
   if (alchemyMaster) setWorldSize(alchemyMaster, NPC_WIDTH, NPC_HEIGHT);

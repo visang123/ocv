@@ -111,8 +111,8 @@ export const SPROUT_WIDTH = 5;
 export const SPROUT_HEIGHT = 6;
 export const BIG_TREE_WIDTH = 142;
 export const BIG_TREE_HEIGHT = 190;
-/** 잎·가지·사과 영역 높이(디자인 px) — 줄기 상단까지 */
-export const BIG_TREE_CANOPY_DESIGN_HEIGHT = 118;
+/** 잎·가지·사과 영역 높이(디자인 px) */
+export const BIG_TREE_CANOPY_DESIGN_HEIGHT = 108;
 /** 나무 사과 기본 크기(월드 px) — 예전 10px의 2/3 */
 export const TREE_APPLE_SIZE = Math.round((10 * 2) / 3);
 export const TREE_APPLE_COUNT = 8;
