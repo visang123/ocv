@@ -1,4 +1,8 @@
 /** View — 식물·수분 카드·호버 UI. */
+import {
+  getPlantGrowthMeterWorldPosition,
+  getPlantWaterNeededWorldPosition
+} from "../../game/plant-ui-layout.js?v=20260620f";
 
 export function createModule(d) {
   function applyPlantHoverVisuals(plant) {
@@ -438,11 +442,17 @@ export function createModule(d) {
     ? 1
     : Math.min(1, elapsed / d.getPlantFirstGrowthDurationMs(d.getPlant()));
   const secondGrowthRatio = d.getPlantSecondGrowthRatio(d.getPlant(), now);
+  const showWater = shouldShowFirstWaterNeededDroplet(d.getPlant());
+  const meterPos = getPlantGrowthMeterWorldPosition(
+    d.getPlant().spotX,
+    d.getPlant().spotY,
+    { stackAboveWater: showWater }
+  );
   updatePlantGrowthMeter(
     d.mainPlantGrowthMeter.element,
     d.mainPlantGrowthMeter.fill,
-    d.getPlant().spotX,
-    d.getPlant().spotY,
+    meterPos.x,
+    meterPos.y,
     growthRatio,
     secondGrowthRatio
   );
@@ -483,7 +493,8 @@ export function createModule(d) {
 
   element.style.display = "block";
   fill.style.width = Math.round(ratio * 100) + "%";
-  d.setWorldPosition(element, x + d.PLANT_SPOT_WIDTH / 2 - 21, y - 24);
+  d.setWorldSize(element, d.PLANT_GROWTH_METER_WIDTH, d.PLANT_GROWTH_METER_HEIGHT);
+  d.setWorldPosition(element, x, y);
   }
 
   function updatePlantProgressGauge() {
@@ -666,11 +677,8 @@ export function createModule(d) {
     d.sprout.style.display = "none";
   } else if (shouldShowFirstWaterNeededDroplet(d.getPlant())) {
     d.waterNeeded.style.display = "block";
-    d.setWorldPosition(
-      d.waterNeeded,
-      d.getPlant().spotX + d.PLANT_SPOT_WIDTH / 2 - d.WATER_NEEDED_SIZE / 2,
-      d.getPlant().spotY - d.WATER_NEEDED_SIZE - 2
-    );
+    const waterPos = getPlantWaterNeededWorldPosition(d.getPlant().spotX, d.getPlant().spotY);
+    d.setWorldPosition(d.waterNeeded, waterPos.x, waterPos.y);
   } else {
     d.waterNeeded.style.display = "none";
   }
@@ -678,6 +686,7 @@ export function createModule(d) {
   d.ensureGrassOrdinalIfNeeded(d.getPlant());
   updatePlantCard();
   updatePlantGrowth();
+  d.syncAllPlantDepthStacking();
   if (!mainSoilRotten) {
     d.plantSpot.style.display = shouldHideSeparateSoilUnderBigGrass(d.getPlant()) ? "none" : "block";
   } else {

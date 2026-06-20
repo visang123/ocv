@@ -3,7 +3,7 @@ import {
   toScreenY as toScreenYUtil,
   setWorldSize as setWorldSizeUtil,
   setWorldPosition as setWorldPositionUtil
-} from "./src/world/transform.js?v=20260620e";
+} from "./src/world/transform.js?v=20260620f";
 import {
   getCenterDistance as getCenterDistanceUtil,
   isOverlappingRect
@@ -223,7 +223,7 @@ import {
 import {
   getPlantGrowthMeterWorldPosition,
   getPlantWaterNeededWorldPosition
-} from "./src/game/plant-ui-layout.js";
+} from "./src/game/plant-ui-layout.js?v=20260620f";
 import {
   tickPlantGold,
   getPlantGoldKrw,
@@ -436,9 +436,9 @@ import {
 } from "./src/app/ovc-page-entry.js";
 import { createMovementTutorial } from "./src/game/movementTutorial.js";
 import { createGameLoop, attachCoreRuntimeTimers } from "./src/script/core-main.js";
-import { initScriptNetwork } from "./src/script/network/index.js?v=20260620e";
-import { initScriptSystems } from "./src/script/systems/index.js?v=20260620e";
-import { initScriptView } from "./src/script/view/index.js?v=20260620e";
+import { initScriptNetwork } from "./src/script/network/index.js?v=20260620f";
+import { initScriptSystems } from "./src/script/systems/index.js?v=20260620f";
+import { initScriptView } from "./src/script/view/index.js?v=20260620f";
 import {
   showAppLoadingScreen,
   hideAppLoadingScreen,
