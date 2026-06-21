@@ -650,32 +650,33 @@ export function createModule(d) {
       }
     }
   }
-  // ???? ???? ?????? ????? ????????????????? sessionId)???????. ??????????
-  // ??? ????????????? ????2?????????????????
-  // Local flight sim — always run when butterflies exist on screen.
+  // Local flight sim — authority (or offline) runs motion; others follow broadcasts.
+  const runLocalButterflyMotion = shouldRunButterflyMotionSimulation(wallNow, onlineAvailable);
   if (d.butterflyState.list.length > 0) {
-    d.butterflyState.list.forEach(function (butterfly) {
-      if (ensureButterflyReadyForSimulation(butterfly)) {
+    if (runLocalButterflyMotion) {
+      d.butterflyState.list.forEach(function (butterfly) {
+        if (ensureButterflyReadyForSimulation(butterfly)) {
+          d.lastButterflyStateChangeAt = now;
+          d.markWorldDirty();
+        }
+      });
+      if (spreadButterfliesWithinActiveBounds()) {
         d.lastButterflyStateChangeAt = now;
         d.markWorldDirty();
       }
-    });
-    if (spreadButterfliesWithinActiveBounds()) {
-      d.lastButterflyStateChangeAt = now;
-      d.markWorldDirty();
-    }
-    const motionStepCount =
-      wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
-    const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
-    for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
-      const stepNow =
-        motionStepCount > 1
-          ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
-          : now;
-      d.butterflyState.list.forEach(function (butterfly) {
-        if (!butterfly || butterfly.id == null) return;
-        simulateButterflyAuthorityStep(butterfly, stepNow);
-      });
+      const motionStepCount =
+        wallDelta > 48 ? Math.min(24, Math.max(1, Math.round(wallDelta / 16))) : 1;
+      const motionStartNow = motionStepCount > 1 ? now - wallDelta : now;
+      for (let motionStep = 0; motionStep < motionStepCount; motionStep += 1) {
+        const stepNow =
+          motionStepCount > 1
+            ? Math.round(motionStartNow + (wallDelta * (motionStep + 1)) / motionStepCount)
+            : now;
+        d.butterflyState.list.forEach(function (butterfly) {
+          if (!butterfly || butterfly.id == null) return;
+          simulateButterflyAuthorityStep(butterfly, stepNow);
+        });
+      }
     }
     if (
       onlineAvailable &&

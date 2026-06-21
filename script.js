@@ -18,6 +18,14 @@ import {
   scheduleWorldLooseRespawnAfterPickup
 } from "./src/game/groundSeed.js";
 import {
+  countActiveRockMinersForRock,
+  advanceRockMiningWork,
+  getRockMiningGaugeProgress,
+  initRockMiningOnJoin,
+  mergeRockMiningFieldsFromSnapshot,
+  resetRockMiningState
+} from "./src/game/rock-mining.js";
+import {
   readTutorialSessionFloorBagPicked,
   writeTutorialSessionFloorBagPicked,
   clearTutorialSessionFloorBagPicked,
@@ -131,6 +139,7 @@ import {
   WORLD_LOOSE_SEED_Y,
   WORLD_HUB_GROUND_SEED_ENABLED,
   WORLD_LOOSE_ROCK_COUNT,
+  WORLD_ROCK_MINE_MS,
   WORLD_ROCK_RESPAWN_INTERVAL_MS,
   WORLD_ROCK_SIZE,
   WORLD_ROCK_SPAWN_X_MARGIN,
@@ -1376,8 +1385,6 @@ const REMOTE_ACTION_STATUS_HOLD_MS = 1800;
 const REMOTE_BUTTERFLY_CATCH_ACTION_MS = 1000;
 /** ????????presence???????? ????? ????? ??(????? rock_pickup ???? ??hold ????) */
 const WORLD_ROCK_PICKUP_ACTION_MS = 1000;
-/** 월드 돌 채굴 소요 시간 */
-const WORLD_ROCK_MINE_MS = 60 * 1000;
 const ROCK_MINING_STATUS_TEXT = "\uB3CC \uCE90\uB294\uC911";
 const ROCK_MINING_CANCEL_LABEL = "e: \uCDE8\uC18C";
 /** ??? ?????????: rock_pickup ?????????? ??????? ????????? ??????ms(??? ??????? REMOTE_ACTION_STATUS_HOLD_MS) */
@@ -1576,6 +1583,8 @@ function clearCraftFurnitureInstalling() {
 /** @type {{ rockId: string, startedAt: number } | null} */
 let localRockMining = null;
 let rockMiningFinishTimeoutId = 0;
+let lastRockMiningProgressSyncAt = 0;
+const ROCK_MINING_PROGRESS_SYNC_MS = 2000;
 
 function getLocalRockMining() {
   const player = getPlayer();
@@ -1683,26 +1692,32 @@ function ensureRockMineGaugeElements(rock) {
   return gauge;
 }
 
+function getRockMiningContext() {
+  return {
+    getLocalRockMining: getLocalRockMining,
+    remotePlayers: remotePlayers
+  };
+}
+
+function countRockMinersForRock(rockId) {
+  return countActiveRockMinersForRock(rockId, getRockMiningContext());
+}
+
 function collectActiveRockMiningSessionsByRock(nowMs) {
   const byRock = Object.create(null);
-  const durationMs = Math.max(1, Number(WORLD_ROCK_MINE_MS) || 60000);
   const now = Number(nowMs) || Date.now();
-  const local = getLocalRockMining();
-  if (local && local.rockId && local.startedAt) {
-    if (now - local.startedAt < durationMs) {
-      byRock[String(local.rockId)] = { startedAt: local.startedAt, durationMs: durationMs };
-    }
-  }
-  Object.keys(remotePlayers).forEach(function (remoteId) {
-    const rp = remotePlayers[remoteId];
-    if (!rp) return;
-    const rockId = String(rp.rockMiningRockId || "");
-    const startedAt = Number(rp.rockMiningStartedAt) || 0;
-    if (!rockId || !startedAt || now - startedAt >= durationMs) return;
-    const prev = byRock[rockId];
-    if (!prev || startedAt < prev.startedAt) {
-      byRock[rockId] = { startedAt: startedAt, durationMs: durationMs };
-    }
+  if (!Array.isArray(getApple().worldRocks)) return byRock;
+  getApple().worldRocks.forEach(function (rock) {
+    if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return;
+    const rockId = String(rock.id);
+    const miners = countRockMinersForRock(rockId);
+    if (miners <= 0) return;
+    const progress = getRockMiningGaugeProgress(rock, miners, now, WORLD_ROCK_MINE_MS);
+    if (progress <= 0) return;
+    byRock[rockId] = {
+      progress: progress,
+      miners: miners
+    };
   });
   return byRock;
 }
@@ -1731,52 +1746,98 @@ function updateRockMineGaugeDom() {
     if (!gauge || !fill) return;
     gauge.style.display = "block";
     rock._el.classList.add("is-rock-mining-gauge-active");
-    const progress = Math.max(
-      0,
-      Math.min(1, (now - session.startedAt) / session.durationMs)
-    );
+    const progress = Math.max(0, Math.min(1, Number(session.progress) || 0));
     fill.style.width = Math.round(progress * 100) + "%";
   });
 }
 
-function isRockBeingMinedByOther(rockId, nowMs) {
-  const id = String(rockId || "");
-  if (!id) return false;
-  const now = Number(nowMs) || Date.now();
-  return Object.keys(remotePlayers).some(function (remoteId) {
-    const rp = remotePlayers[remoteId];
-    if (!rp) return false;
-    const miningRockId = String(rp.rockMiningRockId || "");
-    const startedAt = Number(rp.rockMiningStartedAt) || 0;
-    if (!miningRockId || miningRockId !== id || !startedAt) return false;
-    return now - startedAt < WORLD_ROCK_MINE_MS;
-  });
-}
-
-function completeWorldRockPickup(rock) {
+function completeRockMiningYield(rock) {
   if (!rock || rock.id == null || rock.id === "") return false;
-  if (getApple().worldRockPickedIds.includes(rock.id)) return false;
-  getApple().worldRockPickedIds.push(rock.id);
-  rockInventoryCount += 1;
+  const rockId = String(rock.id);
+  if (getApple().worldRockPickedIds.includes(rockId)) return false;
+
+  getApple().worldRockPickedIds.push(rockId);
+  resetRockMiningState(rock);
+
+  const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+  const dropX = Number(rock.x) + (sz - BAG_DROP_WORLD_SIZE) / 2;
+  const dropY = Number(rock.y) + (sz - BAG_DROP_WORLD_SIZE) / 2;
+  spawnWorldBagDropAt("rock", 1, dropX, dropY);
+
   lastLocalWorldRockPickupAt = Date.now();
   getSeedWorld().lastWorldRockPickupAt = lastLocalWorldRockPickupAt;
   getSeedWorld().lastWorldRockRespawnAt = lastLocalWorldRockPickupAt;
-  flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
+  flashPlantProximityWarning("\uB3CC \uCE98\uAE30 \uC644\uB8CC");
   plantProximityWarnUntil = lastLocalWorldRockPickupAt + WORLD_ROCK_PICKUP_ACTION_MS;
-  saveRockInventoryCount();
+
+  if (isLocalRockMining() && String(getPlayer().rockMiningRockId) === rockId) {
+    clearLocalRockMining();
+  }
+
   saveAppleState();
   holdLocalAppleStateAgainstStaleSnapshot(1200);
   updateWorldRocks();
   updateRockMineGaugeDom();
-  updateBagInventorySlots();
   markWorldDirty();
   if (isWorldDocumentEntry()) {
-    broadcastWorldRockPickup(rock.id);
+    broadcastWorldRockPickup(rockId);
     syncWorldState(true);
     sendMultiplayerPresence(true);
   }
-  onboardingHookTutorialRockPicked();
   return true;
+}
+
+function startRockMining(rock) {
+  if (!rock || rock.id == null || rock.id === "") return false;
+  if (isLocalRockMining()) return false;
+  const rockId = String(rock.id);
+  if (getApple().worldRockPickedIds.includes(rockId)) return false;
+
+  initRockMiningOnJoin(rock, Date.now());
+  localRockMining = { rockId: rockId, startedAt: Date.now() };
+  getPlayer().rockMiningRockId = rockId;
+  getPlayer().rockMiningStartedAt = localRockMining.startedAt;
+  resetInputKeys(keys);
+  syncRockMiningStatusUi(true);
+  updatePlayerStatus();
+  sendMultiplayerPresence(true);
+  updateRockMineGaugeDom();
+  return true;
+}
+
+function tickLocalRockMining(nowMs) {
+  const now = Number(nowMs) || Date.now();
+  if (!Array.isArray(getApple().worldRocks)) return;
+
+  let dirty = false;
+  getApple().worldRocks.forEach(function (rock) {
+    if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return;
+    const rockId = String(rock.id);
+    const miners = countRockMinersForRock(rockId);
+    if (miners <= 0) return;
+    const result = advanceRockMiningWork(rock, miners, now, WORLD_ROCK_MINE_MS);
+    if (result.advanced) dirty = true;
+    if (result.completed) {
+      completeRockMiningYield(rock);
+    }
+  });
+
+  if (isLocalRockMining()) {
+    syncRockMiningStatusUi(true);
+    resetInputKeys(keys);
+  }
+  updateRockMineGaugeDom();
+  if (dirty) {
+    saveAppleState();
+    if (
+      isWorldDocumentEntry() &&
+      isWorldServerSyncAvailable() &&
+      now - lastRockMiningProgressSyncAt >= ROCK_MINING_PROGRESS_SYNC_MS
+    ) {
+      lastRockMiningProgressSyncAt = now;
+      syncWorldState(true);
+    }
+  }
 }
 
 function mergeSharedRockRespawnTimestamps(snapshot) {
@@ -1795,69 +1856,6 @@ function mergeSharedRockRespawnTimestamps(snapshot) {
       Number(getSeedWorld().lastWorldRockRespawnAt) || 0,
       snapRespawn
     );
-  }
-}
-
-function finishLocalRockMining() {
-  if (!isLocalRockMining()) return;
-  const rockId = String(getPlayer().rockMiningRockId || "");
-  clearLocalRockMining();
-  if (!rockId) return;
-  const rock = getApple().worldRocks.find(function (candidate) {
-    return candidate && String(candidate.id) === rockId;
-  });
-  if (!rock || getApple().worldRockPickedIds.includes(rockId)) return;
-  const counts = getBagInventoryCountsByKey();
-  if (
-    !canBagInventoryFitItems(
-      getBagInventoryItemOrderForChecks(),
-      counts,
-      { rock: 1 },
-      BAG_INVENTORY_SLOT_COUNT
-    )
-  ) {
-    showBagInventoryFullFailMessage();
-    return;
-  }
-  completeWorldRockPickup(rock);
-}
-
-function startRockMining(rock) {
-  if (!rock || rock.id == null || rock.id === "") return false;
-  if (isLocalRockMining()) return false;
-  const rockId = String(rock.id);
-  if (isRockBeingMinedByOther(rockId)) {
-    flashPlantProximityWarning("\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uAC00 \uCE98\uACE0 \uC788\uC5B4\uC694.");
-    return false;
-  }
-  localRockMining = { rockId: rockId, startedAt: Date.now() };
-  getPlayer().rockMiningRockId = rockId;
-  getPlayer().rockMiningStartedAt = localRockMining.startedAt;
-  resetInputKeys(keys);
-  syncRockMiningStatusUi(true);
-  updatePlayerStatus();
-  sendMultiplayerPresence(true);
-  if (rockMiningFinishTimeoutId) {
-    window.clearTimeout(rockMiningFinishTimeoutId);
-  }
-  rockMiningFinishTimeoutId = window.setTimeout(function () {
-    rockMiningFinishTimeoutId = 0;
-    finishLocalRockMining();
-  }, WORLD_ROCK_MINE_MS);
-  updateRockMineGaugeDom();
-  return true;
-}
-
-function tickLocalRockMining(nowMs) {
-  if (!isLocalRockMining()) return;
-  const now = Number(nowMs) || Date.now();
-  const startedAt = Number(getPlayer().rockMiningStartedAt) || 0;
-  const elapsed = now - startedAt;
-  syncRockMiningStatusUi(true);
-  resetInputKeys(keys);
-  updateRockMineGaugeDom();
-  if (elapsed >= WORLD_ROCK_MINE_MS) {
-    finishLocalRockMining();
   }
 }
 
@@ -1942,6 +1940,7 @@ let serverClockOffsetMs = 0;
 let lastServerClockSyncAt = 0;
 /** Until true, do not push local world to Supabase (avoids wiping shared plants before first pull). */
 let hasHydratedSharedWorldFromServer = false;
+let pendingDeferredSharedWorldHydrate = false;
 let ovcBootstrapFinished = false;
 let pendingWorldResetToken = "";
 /** ????? ?????????? ???? ???????? ????? ??appStorageKeysSharedWorldReset???? ?????????????? ?????. local?? ?? */
@@ -4708,6 +4707,15 @@ function isSharedWorldSyncPausedForTutorial() {
   return !getStoredFlag(onboardingFlowDoneKey);
 }
 
+/** Online world row is authoritative; skip per-device spatial state until poll hydrates. */
+function shouldDeferSharedWorldFromLocalStorage() {
+  return (
+    isWorldDocumentEntry() &&
+    isWorldServerSyncAvailable() &&
+    !isSharedWorldSyncPausedForTutorial()
+  );
+}
+
 /** index ????? + ????????? + ???? ????? ??? ????????? ?????????? ?????extraPlants???? ???? */
 function isSharedWorldMultiPlantMode() {
   if (!isWorldDocumentEntry()) return false;
@@ -6692,18 +6700,6 @@ function tryPickupWorldRock(rock) {
     flashOnboardingOrderHint("");
     return false;
   }
-  const counts = getBagInventoryCountsByKey();
-  if (
-    !canBagInventoryFitItems(
-      getBagInventoryItemOrderForChecks(),
-      counts,
-      { rock: 1 },
-      BAG_INVENTORY_SLOT_COUNT
-    )
-  ) {
-    showBagInventoryFullFailMessage();
-    return false;
-  }
   if (isLocalRockMining()) return false;
   return startRockMining(rock);
 }
@@ -7119,6 +7115,13 @@ function spawnWorldBagDropAt(itemKey, amount, x, y) {
   return drop;
 }
 
+function onWorldBagDropItemPicked(itemKey) {
+  if (normalizeBagItemKey(itemKey) !== "rock") return;
+  onboardingHookTutorialRockPicked();
+  flashPlantProximityWarning("\uB3CC \uC218\uC9D1");
+  plantProximityWarnUntil = Date.now() + WORLD_ROCK_PICKUP_ACTION_MS;
+  updateBagInventorySlots();
+}
 
 function tryPickWorldBagDrop(bucketDistance) {
   if (!canUseBagInventoryGameplay()) return false;
@@ -7146,6 +7149,7 @@ function tryPickWorldBagDrop(bucketDistance) {
   teardownWorldBagDropDom(getApple().worldBagDrops[idx]);
   getApple().worldBagDrops.splice(idx, 1);
   addBagItemsForTrade(itemKey, count);
+  onWorldBagDropItemPicked(itemKey);
   const now = Date.now();
   lastWorldBagDropChangeAt = now;
   getApple().lastStateChangeAt = Math.max(getApple().lastStateChangeAt, now);
@@ -7766,6 +7770,20 @@ function loadAppleState() {
   if (loadedRockPickupAt > 0) {
     lastLocalWorldRockPickupAt = loadedRockPickupAt;
   }
+  if (shouldDeferSharedWorldFromLocalStorage()) {
+    getApple().extraPlants = [];
+    getApple().extraSeeds = (getApple().extraSeeds || []).filter(function (seed) {
+      return seed && seed.inInventory;
+    });
+    getApple().pickedIds = [];
+    placedCraftFurniture = [];
+    getApple().worldExtraBuckets = [];
+    getApple().worldRockPickedIds = [];
+    getApple().worldRocks = [];
+    getSeedWorld().lastWorldRockPickupAt = 0;
+    getSeedWorld().lastWorldRockRespawnAt = 0;
+    pendingDeferredSharedWorldHydrate = true;
+  }
   ensureWorldLooseSeedShape();
   if (usesWorldLooseSeedMode()) {
     let migrateInvToCount = 0;
@@ -7976,6 +7994,8 @@ function buildNetworkDeps() {
     handleWorldSadBroadcast,
     get hasHydratedSharedWorldFromServer() { return hasHydratedSharedWorldFromServer; },
     set hasHydratedSharedWorldFromServer(v) { hasHydratedSharedWorldFromServer = v; },
+    get pendingDeferredSharedWorldHydrate() { return pendingDeferredSharedWorldHydrate; },
+    set pendingDeferredSharedWorldHydrate(v) { pendingDeferredSharedWorldHydrate = v; },
     hasPickedMainSeedInCurrentRoom,
     hasSpawnedCharacter,
     get ignoreSnapshotInventorySeedsUntil() { return ignoreSnapshotInventorySeedsUntil; },
@@ -8086,6 +8106,8 @@ function buildNetworkDeps() {
     sanitizeSharedPlantHydrationAfterRemoteSnapshot,
     sanitizeWorldLooseModeExtraSeeds,
     savePlayerPosition,
+    saveAppleState,
+    saveSeedState,
     scheduleMultiplayerReconnect,
     seedCreatedAtKey,
     selectedPlayerColor,
@@ -12723,6 +12745,7 @@ function tryPickWorldBagDropAtWorldPoint(wx, wy) {
   teardownWorldBagDropDom(getApple().worldBagDrops[idx]);
   getApple().worldBagDrops.splice(idx, 1);
   addBagItemsForTrade(itemKey, count);
+  onWorldBagDropItemPicked(itemKey);
   const now = Date.now();
   lastWorldBagDropChangeAt = now;
   getApple().lastStateChangeAt = Math.max(getApple().lastStateChangeAt, now);
@@ -14606,9 +14629,16 @@ function loadSeedState() {
     defaultNpcY: NPC_START_Y
   });
   getPlant().seedCreatedAt = loaded.seedCreatedAt;
-  applyLoadedPlantState(loaded.planted);
-  getNpc().x = loaded.planted.npcX;
-  getNpc().y = loaded.planted.npcY;
+  const deferSharedWorld = shouldDeferSharedWorldFromLocalStorage();
+  if (deferSharedWorld) {
+    getNpc().x = NPC_START_X;
+    getNpc().y = NPC_START_Y;
+    plantSpot.style.display = "none";
+  } else {
+    applyLoadedPlantState(loaded.planted);
+    getNpc().x = loaded.planted.npcX;
+    getNpc().y = loaded.planted.npcY;
+  }
   const legacyDefaultNpcX = SEED_START_X + 18;
   let npcLayoutNeedsPersist = false;
   if (getNpc().x === legacyDefaultNpcX) {
@@ -14637,7 +14667,7 @@ function loadSeedState() {
     saveSeedState();
   }
 
-  if (getPlant().isSeedPlanted) {
+  if (!deferSharedWorld && getPlant().isSeedPlanted) {
     getInventory().heldItem = null;
     plantSpot.style.display = "block";
     setWorldPosition(plantSpot, getPlant().spotX, getPlant().spotY);
@@ -16949,19 +16979,12 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
       };
       butterfly.color = raw.color || butterfly.color;
       butterfly.dirX = Number(raw.dirX) > 0 ? 1 : -1;
-      const needsPosition =
-        !existing ||
-        isUnsetButterflyCoord(butterfly.x, butterfly.y) ||
-        !Number.isFinite(Number(butterfly.lastPathX)) ||
-        !Number.isFinite(Number(butterfly.lastPathY));
-      if (needsPosition) {
-        const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
-        butterfly.x = nextPoint.x;
-        butterfly.y = nextPoint.y;
-        butterfly.lastPathX = nextPoint.x;
-        butterfly.lastPathY = nextPoint.y;
-        delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
-      }
+      const nextPoint = clampButterflyPointToActiveBounds(raw.x, raw.y);
+      butterfly.x = nextPoint.x;
+      butterfly.y = nextPoint.y;
+      butterfly.lastPathX = nextPoint.x;
+      butterfly.lastPathY = nextPoint.y;
+      delete butterflyAuthorityWaypointById[String(butterfly.id || "")];
       nextList.push(butterfly);
     });
     // Drop any local butterflies the authority no longer reports.
@@ -16991,7 +17014,11 @@ function applyButterflySnapshot(snapshotButterflies, networkSampleAtMs) {
     butterflyState.lastSpawnAt =
       Number.isFinite(prevN) && prevN > 0 ? prevN : Date.now();
   }
-  if (butterflyState.list.length > 0 && shouldRelocateButterfliesInBounds()) {
+  if (
+    isButterflyAuthority() &&
+    butterflyState.list.length > 0 &&
+    shouldRelocateButterfliesInBounds()
+  ) {
     spreadButterfliesWithinActiveBounds();
     pruneButterflyAuthorityWaypointsToList();
   }

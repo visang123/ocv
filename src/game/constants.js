@@ -343,6 +343,8 @@ export const WORLD_LOOSE_SEED_Y = SEED_START_Y;
 export const WORLD_LOOSE_ROCK_COUNT = 40;
 /** 맵에 보이는 돌이 이 수보다 적으면 1분마다 1개 리스폰 */
 export const WORLD_ROCK_RESPAWN_INTERVAL_MS = 60 * 1000;
+/** 1명이 돌을 캘 때 걸리는 시간(ms) — 인원 수만큼 속도가 빨라짐 */
+export const WORLD_ROCK_MINE_MS = 2 * 60 * 1000;
 export const WORLD_ROCK_SIZE = 14;
 /** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) — 가장자리만 남기고 땅 전체에 분포 */
 export const WORLD_ROCK_SPAWN_X_MARGIN = 3;
