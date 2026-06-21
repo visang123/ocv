@@ -1,8 +1,7 @@
 /** 월드 돌 협력 채굴 — 인원 수에 비례한 속도·누적 작업량 */
 
-import { WORLD_ROCK_MINE_MS } from "./constants.js";
-
-export { WORLD_ROCK_MINE_MS };
+/** 1명 기준 채굴 시간(ms) — constants.js WORLD_ROCK_MINE_MS 와 동일 */
+export const WORLD_ROCK_MINE_MS = 2 * 60 * 1000;
 
 export function ensureRockMiningState(rock) {
   if (!rock) return;
