@@ -212,13 +212,21 @@
       <h2 id="well-donation-title">우물 강화 기부</h2>
       <p id="well-donation-goal-text" class="well-donation-meta">강화 목표: 100원</p>
       <p id="well-donation-balance-text" class="well-donation-meta">보유 금액: 0원</p>
-      <div class="well-donation-amounts" aria-label="기부 금액 선택">
-        <button type="button" class="well-donation-amount" data-amount="10">10원</button>
-        <button type="button" class="well-donation-amount" data-amount="25">25원</button>
-        <button type="button" class="well-donation-amount" data-amount="50">50원</button>
-        <button type="button" class="well-donation-amount" data-amount="100">100원</button>
-      </div>
-      <p id="well-donation-selected-text" class="well-donation-selected">기부 금액: 10원</p>
+      <label class="well-donation-amount-field" for="well-donation-amount-input">
+        <span class="well-donation-amount-label">기부 금액 (0~1000원)</span>
+        <input
+          type="number"
+          id="well-donation-amount-input"
+          class="well-donation-amount-input"
+          min="0"
+          max="1000"
+          step="1"
+          inputmode="numeric"
+          value="0"
+        />
+      </label>
+      <p id="well-donation-hint-text" class="well-donation-hint" hidden></p>
+      <p id="well-donation-selected-text" class="well-donation-selected">기부 금액: 0원</p>
       <div class="well-donation-actions">
         <button type="button" id="well-donation-confirm" class="well-donation-confirm">기부</button>
         <button type="button" id="well-donation-cancel" class="well-donation-cancel">취소</button>
