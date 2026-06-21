@@ -545,19 +545,11 @@
     const baseSelect = "id, name, color, created_at, tutorial_done";
 
     try {
-      let result = await supabaseClient
+      const result = await supabaseClient
         .from(config.accountsTable)
-        .select(baseSelect + ", session_token")
+        .select(baseSelect)
         .eq("id", accountId)
         .maybeSingle();
-
-      if (result.error && isMissingSessionTokenColumnError(result.error)) {
-        result = await supabaseClient
-          .from(config.accountsTable)
-          .select(baseSelect)
-          .eq("id", accountId)
-          .maybeSingle();
-      }
 
       if (result.error) throw new Error(result.error.message);
       return result.data || null;
