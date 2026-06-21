@@ -119,6 +119,8 @@ import {
   SPAWN_PORTAL_HEIGHT,
   SPAWN_PORTAL_X,
   SPAWN_PORTAL_Y,
+  SPAWN_PLAYER_X,
+  SPAWN_PLAYER_DEPTH,
   SEED_START_X,
   SEED_START_Y,
   GUIDE_BOOK_START_X,
@@ -325,6 +327,8 @@ import {
   wellDonationOverlay,
   wellDonationGoalText,
   wellDonationBalanceText,
+  wellDonationAmountInput,
+  wellDonationHintText,
   wellDonationSelectedText,
   wellDonationConfirmBtn,
   wellDonationCancelBtn,
@@ -608,7 +612,10 @@ import {
   getCraftFurnitureWorldLabel,
   getCraftFurnitureInstallDurationMs,
   getCraftFurnitureInstallPresenceAction,
-  getCraftFurnitureInstallStatusText
+  getCraftFurnitureInstallStatusText,
+  mergePlacedCraftFurnitureFromSnapshot,
+  upsertPlacedCraftFurnitureEntry,
+  CRAFT_FURNITURE_LOCAL_PENDING_MS
 } from "./src/game/craft-furniture-world.js";
 import {
   PLAYER_MAX_HEALTH,
@@ -1632,6 +1639,9 @@ function ensureRockMiningStatusUi() {
 
 function syncRockMiningStatusUi(active) {
   if (!playerStatus) return;
+  if (localPlayerRoot) {
+    localPlayerRoot.classList.toggle("is-local-rock-mining", Boolean(active));
+  }
   if (!active) {
     playerStatus.classList.remove("is-rock-mining");
     const label = playerStatus.querySelector(".player-status__label");
@@ -1648,9 +1658,31 @@ function syncRockMiningStatusUi(active) {
   playerStatus.classList.add("is-rock-mining");
 }
 
+function findWorldRockById(rockId) {
+  const id = String(rockId || "");
+  if (!id || !Array.isArray(getApple().worldRocks)) return null;
+  for (let i = 0; i < getApple().worldRocks.length; i += 1) {
+    const rock = getApple().worldRocks[i];
+    if (rock && String(rock.id) === id) return rock;
+  }
+  return null;
+}
+
+function resetRockMiningStateIfNoMiners(rockId) {
+  if (countRockMinersForRock(rockId) > 0) return false;
+  const rock = findWorldRockById(rockId);
+  if (!rock) return false;
+  resetRockMiningState(rock);
+  return true;
+}
+
 function cancelLocalRockMining() {
   if (!isLocalRockMining()) return;
+  const rockId = String(getPlayer().rockMiningRockId || "");
   clearLocalRockMining();
+  if (resetRockMiningStateIfNoMiners(rockId)) {
+    saveAppleState();
+  }
   updateRockMineGaugeDom();
 }
 
@@ -1713,7 +1745,6 @@ function collectActiveRockMiningSessionsByRock(nowMs) {
     const miners = countRockMinersForRock(rockId);
     if (miners <= 0) return;
     const progress = getRockMiningGaugeProgress(rock, miners, now, WORLD_ROCK_MINE_MS);
-    if (progress <= 0) return;
     byRock[rockId] = {
       progress: progress,
       miners: miners
@@ -1737,6 +1768,10 @@ function updateRockMineGaugeDom() {
     }
     const session = sessionsByRock[rockId];
     if (!session) {
+      if (rock._mineGaugeFillEl) {
+        rock._mineGaugeFillEl.style.width = "0%";
+        rock._mineGaugeFillEl.style.transform = "";
+      }
       if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
       rock._el.classList.remove("is-rock-mining-gauge-active");
       return;
@@ -1747,7 +1782,8 @@ function updateRockMineGaugeDom() {
     gauge.style.display = "block";
     rock._el.classList.add("is-rock-mining-gauge-active");
     const progress = Math.max(0, Math.min(1, Number(session.progress) || 0));
-    fill.style.width = Math.round(progress * 100) + "%";
+    fill.style.transform = "";
+    fill.style.width = (progress * 100).toFixed(2) + "%";
   });
 }
 
@@ -1814,7 +1850,13 @@ function tickLocalRockMining(nowMs) {
     if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return;
     const rockId = String(rock.id);
     const miners = countRockMinersForRock(rockId);
-    if (miners <= 0) return;
+    if (miners <= 0) {
+      if ((Number(rock.miningWorkMs) || 0) > 0) {
+        resetRockMiningState(rock);
+        dirty = true;
+      }
+      return;
+    }
     const result = advanceRockMiningWork(rock, miners, now, WORLD_ROCK_MINE_MS);
     if (result.advanced) dirty = true;
     if (result.completed) {
@@ -2072,8 +2114,8 @@ const spawnPortalWidth = SPAWN_PORTAL_WIDTH;
 const spawnPortalHeight = SPAWN_PORTAL_HEIGHT;
 const spawnPortalX = SPAWN_PORTAL_X;
 const spawnPortalY = SPAWN_PORTAL_Y;
-const spawnPlayerX = spawnPortalX + spawnPortalWidth / 2 - PLAYER_WIDTH / 2;
-const spawnPlayerDepth = 0;
+const spawnPlayerX = SPAWN_PLAYER_X;
+const spawnPlayerDepth = SPAWN_PLAYER_DEPTH;
 /** ??? ???? ???? ???????????? ??????????? ???? ???????????? ????? ?????) */
 const TREE_DEPTH_CLAMP_MAX_STEP = 4;
 /**
@@ -2450,6 +2492,23 @@ function accountDisplayNameForUi() {
     }
   } catch (eStore) {}
   return (currentUserName || "").trim();
+}
+
+const ADMIN_UI_ALLOWED_DISPLAY_NAME = "\uC870\uCC44\uC724";
+
+function isAdminUiAllowedForCurrentPlayer() {
+  return nameForIngameUiDisplay(accountDisplayNameForUi()) === ADMIN_UI_ALLOWED_DISPLAY_NAME;
+}
+
+function syncAdminUiVisibility() {
+  const allowed = isAdminUiAllowedForCurrentPlayer();
+  document.body.classList.toggle("is-admin-user", allowed);
+  if (adminOpenButton) {
+    adminOpenButton.setAttribute("aria-hidden", allowed ? "false" : "true");
+  }
+  if (!allowed && adminOverlay && adminOverlay.classList.contains("is-open")) {
+    closeAdminPanel();
+  }
 }
 
 
@@ -3020,10 +3079,8 @@ if (bagInventoryPanel) {
       return;
     }
     if (isMagicPowderBagType(kind)) {
-      if (!getMagicPowderBagCount(kind)) return;
       event.preventDefault();
       event.stopPropagation();
-      tryUseMagicPowderBagType(kind);
     }
   });
 }
@@ -3121,6 +3178,8 @@ bindWellUpgradeUi({
   donationOverlay: wellDonationOverlay,
   donationGoalText: wellDonationGoalText,
   donationBalanceText: wellDonationBalanceText,
+  donationAmountInput: wellDonationAmountInput,
+  donationHintText: wellDonationHintText,
   donationSelectedText: wellDonationSelectedText,
   donationConfirmBtn: wellDonationConfirmBtn,
   donationCancelBtn: wellDonationCancelBtn,
@@ -3454,6 +3513,7 @@ adminDevBucketSpawnButton.type = "button";
 adminDevBucketSpawnButton.textContent = "B";
 adminDevBucketSpawnButton.setAttribute("aria-hidden", "true");
 document.body.appendChild(adminDevBucketSpawnButton);
+syncAdminUiVisibility();
 const mainPlantGrowthMeter = createPlantGrowthMeter();
 const magicPowderInventory = document.createElement("button");
 magicPowderInventory.id = "magic-powder-inventory";
@@ -3699,6 +3759,7 @@ changeColorButton.addEventListener("click", function () {
 });
 
 adminOpenButton.addEventListener("dblclick", function () {
+  if (!isAdminUiAllowedForCurrentPlayer()) return;
   openAdminPanel();
 });
 
@@ -6775,36 +6836,55 @@ function commitPlacedCraftFurnitureEntry(kind, placement) {
     height: placement.height
   };
   assignCraftFurnitureIdentity(entry, getPlanterOwnerId(), getPlanterDisplayName());
-  placedCraftFurniture.push(entry);
-  refreshCraftFurnitureIdentityOrdinals(placedCraftFurniture);
+  placedCraftFurniture = upsertPlacedCraftFurnitureEntry(placedCraftFurniture, entry);
 
-  if (isWorldDocumentEntry() && ground) {
-    const spec = getCraftFurnitureWorldSpec(kind);
-    if (spec) {
-      const insertBeforeEl = getCraftFurnitureInsertBeforeEl();
-      const el = document.createElement("img");
-      el.className =
-        "world-craft-furniture world-craft-furniture--" +
-        kind.replace(/^craft/, "").toLowerCase();
-      el.src = spec.src;
-      el.alt = "";
-      el.draggable = false;
-      el.setAttribute("aria-hidden", "true");
-      if (insertBeforeEl) {
-        ground.insertBefore(el, insertBeforeEl);
-      } else {
-        ground.appendChild(el);
-      }
-      entry._el = el;
-      setWorldSize(el, entry.width, entry.height);
-      setWorldPosition(el, entry.x, entry.y);
-    }
+  if (isWorldDocumentEntry()) {
+    rebuildPlacedCraftFurnitureDom();
   }
 
-  holdLocalAppleStateAgainstStaleSnapshot(3000);
+  holdLocalAppleStateAgainstStaleSnapshot(CRAFT_FURNITURE_LOCAL_PENDING_MS);
   saveAppleState();
   markWorldDirty();
-  syncWorldState(true);
+  broadcastWorldCraftFurniturePlaced(entry);
+  syncWorldState(true, { skipPrefetch: true });
+}
+
+function broadcastWorldCraftFurniturePlaced(entry) {
+  if (!isWorldDocumentEntry()) return;
+  if (!multiplayerChannel || !currentSessionId || !entry) return;
+  const serialized = serializePlacedCraftFurnitureForSnapshot([entry])[0];
+  if (!serialized) return;
+  const at = Date.now();
+  const eventId = makeSyncEventId("world_craft_furniture_placed", String(serialized.id), at);
+  consumeSyncEventId(eventId, at);
+  Promise.resolve(
+    multiplayerChannel.send({
+      type: "broadcast",
+      event: "world_craft_furniture_placed",
+      payload: {
+        from: currentSessionId,
+        eventId: eventId,
+        at: at,
+        furniture: serialized
+      }
+    })
+  ).catch(function () {
+    // poll/syncWorldState still persists placement for polling clients.
+  });
+}
+
+function handleRemoteWorldCraftFurniturePlacedBroadcast(payload) {
+  if (!isWorldDocumentEntry()) return;
+  if (!payload || payload.from === currentSessionId) return;
+  const now = Date.now();
+  if (!consumeSyncEventId(payload.eventId, now)) return;
+  const evtAt = Math.max(0, Number(payload.at) || 0);
+  if (evtAt > 0 && Math.abs(now - evtAt) > SYNC_EVENT_DEDUPE_TTL_MS) return;
+  const raw = payload.furniture;
+  if (!raw || typeof raw !== "object") return;
+  placedCraftFurniture = upsertPlacedCraftFurnitureEntry(placedCraftFurniture, raw);
+  rebuildPlacedCraftFurnitureDom();
+  saveAppleState({ skipWorldDirty: true });
 }
 
 function finishCraftFurnitureInstall() {
@@ -7446,6 +7526,10 @@ async function finishBagInventoryDrag(event) {
     if (dropResult === "discard") await tryDiscardBagItemFromDrag(itemKey);
     return;
   }
+  if (dragMode === "magicPowder") {
+    tryUseMagicPowderBagTypeAt(event.clientX, event.clientY, itemKey);
+    return;
+  }
   if (!isPointerOutsideBagInventoryPanel(event.clientX, event.clientY)) return;
   if (!canDiscardBagItemNow(itemKey)) return;
   const counts = getBagInventoryCountsByKey();
@@ -7987,6 +8071,7 @@ function buildNetworkDeps() {
     handleRemoteButterflyStateBroadcast,
     handleRemoteWorldBagDropBroadcast,
     handleRemoteWorldBagDropPickupBroadcast,
+    handleRemoteWorldCraftFurniturePlacedBroadcast,
     handleWorldChatBroadcast,
     handleWorldHeartBroadcast,
     handleRemoteWorldLooseSeedPickupBroadcast,
@@ -8637,6 +8722,7 @@ function buildLayerDeps() {
     getLocalExtraSeedOwnerSessionId,
     getLocalExtraSeedOwnerUserId,
     getMagicPowderBagCount,
+    getMagicPowderDropTargetAt,
     getMagicPowderInventoryHoverTip,
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
@@ -9288,9 +9374,6 @@ function updateWorldBagDropDom(forceRebuild) { return _systemsApi ? _systemsApi.
 function updateWorldRocks() { return _systemsApi ? _systemsApi.updateWorldRocks() : undefined; }
 function updateWorldRockMineGauges() {
   updateRockMineGaugeDom();
-  if (_systemsApi && _systemsApi.updateWorldRockMineGauges) {
-    return _systemsApi.updateWorldRockMineGauges();
-  }
 }
 function worldRockOverlapsAnyAvoidRect(rockRect, zones) { return _systemsApi ? _systemsApi.worldRockOverlapsAnyAvoidRect(rockRect, zones) : undefined; }
 function worldRockRect(x, y, size) { return _systemsApi ? _systemsApi.worldRockRect(x, y, size) : undefined; }
@@ -10713,6 +10796,22 @@ function syncPlantHoverFromPointerClient(clientX, clientY) {
   lastPlantHoverPointerClientX = clientX;
   lastPlantHoverPointerClientY = clientY;
   hasLastPlantHoverPointer = true;
+
+  if (
+    bagInventoryDragState &&
+    bagInventoryDragState.dragging &&
+    bagInventoryDragState.mode === "magicPowder"
+  ) {
+    if (_viewApi && typeof _viewApi.syncMagicPowderDragPlantHighlight === "function") {
+      _viewApi.syncMagicPowderDragPlantHighlight(
+        clientX,
+        clientY,
+        bagInventoryDragState.itemKey
+      );
+    }
+    hidePlantHoverLabel();
+    return;
+  }
 
   if (!canShowPlantWorldSignNow()) {
     hidePlantHoverLabel();
@@ -12407,7 +12506,7 @@ function getPlantWorldLabel(plant) {
 
 function clearPlantHoverRing() {
   if (!plantHoverRing) return;
-  plantHoverRing.classList.remove("is-visible", "is-needs-water");
+  plantHoverRing.classList.remove("is-visible", "is-needs-water", "is-magic-powder-target");
   plantHoverRing.style.display = "none";
 }
 
@@ -14030,13 +14129,47 @@ function getMagicPowderInventoryHoverTip(bagType) {
   if (!isMagicPowderBagTypeUsableNow(bagType)) {
     return baseTip;
   }
-  const target = getNearestPlantForMagicPowder();
-  const plantLabel =
-    target && target.plant ? String(getPlantWorldLabel(target.plant) || "").trim() : "";
-  if (!plantLabel) {
-    return baseTip ? baseTip + " \u00B7 \uC0AC\uC6A9 click" : "\uC0AC\uC6A9 click";
+  return "\uB4DC\uB798\uADF8\uC564 \uB4DC\uB86D\uC73C\uB85C \uC2DD\uBB3C\uC5D0 \uC0AC\uC6A9";
+}
+
+function canPlantReceiveMagicPowderBagType(plant, bagType) {
+  if (!plant || plant.status === "dry" || plant.status === "rotten") return false;
+  if (!getNextPowderTargetTier(plant) || isPowderUpgradeInProgress(plant)) return false;
+  if (getPlayerDistanceToPlant(plant) > MAGIC_POWDER_USE_DISTANCE) return false;
+  return isMagicPowderBagType(normalizeMagicPowderBagType(bagType));
+}
+
+function getMagicPowderDropTargetAt(clientX, clientY, bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
+  if (isOnboardingLinearGateActive()) return null;
+  if (!isMagicPowderBagType(bagType) || getMagicPowderBagCount(bagType) <= 0) return null;
+
+  const pointerPlant = pickPlantForHoverFromPointerClient(clientX, clientY);
+  if (
+    pointerPlant &&
+    isClientPointerOverPlant(clientX, clientY, pointerPlant) &&
+    canPlantReceiveMagicPowderBagType(pointerPlant, bagType)
+  ) {
+    return {
+      type: pointerPlant === getPlant() ? "main" : "extra",
+      plant: pointerPlant
+    };
   }
-  return baseTip + " \u00B7 " + plantLabel + "\uC5D0 \uC0AC\uC6A9 (click)";
+
+  let nearest = null;
+  function consider(plant, type) {
+    if (!canPlantReceiveMagicPowderBagType(plant, bagType)) return;
+    if (!isClientPointerOverPlant(clientX, clientY, plant)) return;
+    const distance = getPlayerDistanceToPlant(plant);
+    if (!nearest || distance < nearest.distance) {
+      nearest = { type: type, plant: plant, distance: distance };
+    }
+  }
+  if (getPlant().isSeedPlanted) consider(getPlant(), "main");
+  getApple().extraPlants.forEach(function (plant) {
+    consider(plant, "extra");
+  });
+  return nearest;
 }
 
 /** ????? ???? ????????? ?????????????????? ??????) */
@@ -14044,19 +14177,8 @@ function isMagicPowderUsableNow() {
   return isMagicPowderBagTypeUsableNow("magicPowder");
 }
 
-function tryUseMagicPowderBagType(bagType) {
-  bagType = normalizeMagicPowderBagType(bagType);
-  if (isPlayerGameplayBlockedByNpcDialogue()) return false;
-  if (isOnboardingLinearGateActive()) {
-    flashOnboardingOrderHint("");
-    return false;
-  }
-  if (!isMagicPowderBagType(bagType) || getMagicPowderBagCount(bagType) <= 0) return false;
-  const target = getNearestPlantForMagicPowder();
-  if (!target) return false;
-  if (!applyMagicPowderToPlant(target.plant, bagType)) return false;
-  if (!consumeMagicPowderBagItem(bagType)) return false;
-
+function finalizeMagicPowderAppliedToTarget(target, bagType) {
+  if (!target || !target.plant) return false;
   if (target.type === "main") {
     saveSeedState();
     holdLocalPlantStateAgainstStaleSnapshot(1600);
@@ -14071,6 +14193,36 @@ function tryUseMagicPowderBagType(bagType) {
   updatePlantState();
   updateExtraSeedsAndPlants();
   return true;
+}
+
+function tryUseMagicPowderBagTypeAt(clientX, clientY, bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
+  if (isPlayerGameplayBlockedByNpcDialogue()) return false;
+  if (isOnboardingLinearGateActive()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
+  if (!isMagicPowderBagType(bagType) || getMagicPowderBagCount(bagType) <= 0) return false;
+  const target = getMagicPowderDropTargetAt(clientX, clientY, bagType);
+  if (!target) return false;
+  if (!applyMagicPowderToPlant(target.plant, bagType)) return false;
+  if (!consumeMagicPowderBagItem(bagType)) return false;
+  return finalizeMagicPowderAppliedToTarget(target, bagType);
+}
+
+function tryUseMagicPowderBagType(bagType) {
+  bagType = normalizeMagicPowderBagType(bagType);
+  if (isPlayerGameplayBlockedByNpcDialogue()) return false;
+  if (isOnboardingLinearGateActive()) {
+    flashOnboardingOrderHint("");
+    return false;
+  }
+  if (!isMagicPowderBagType(bagType) || getMagicPowderBagCount(bagType) <= 0) return false;
+  const target = getNearestPlantForMagicPowder();
+  if (!target) return false;
+  if (!applyMagicPowderToPlant(target.plant, bagType)) return false;
+  if (!consumeMagicPowderBagItem(bagType)) return false;
+  return finalizeMagicPowderAppliedToTarget(target, bagType);
 }
 
 function tryUseMagicPowder() {
@@ -14854,6 +15006,7 @@ function openCharacterSelectIfNeeded() {
   }
 
   playerName.textContent = nameForIngameUiDisplay(accountDisplayNameForUi());
+  syncAdminUiVisibility();
 
   if (hasSpawnedCharacter) {
     syncLocalPlayerVisibility();
@@ -16090,6 +16243,7 @@ function getOnlinePlayerCount() {
 }
 
 function openAdminPanel() {
+  if (!isAdminUiAllowedForCurrentPlayer()) return;
   adminOverlay.classList.add("is-open");
   adminOverlay.setAttribute("aria-hidden", "false");
   loadAdminAccounts();

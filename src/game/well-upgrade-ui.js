@@ -11,9 +11,9 @@ import {
 /** @type {Record<string, unknown> | null} */
 let host = null;
 let modalOpen = false;
-let selectedAmountKrw = 10;
 
-const DONATION_AMOUNT_PRESETS = [10, 25, 50, 100];
+export const WELL_DONATION_AMOUNT_MIN_KRW = 0;
+export const WELL_DONATION_AMOUNT_MAX_KRW = 1000;
 
 function getPlayerMoneyKrw() {
   return typeof host.getPlayerMoneyKrw === "function" ? host.getPlayerMoneyKrw() : 0;
@@ -23,25 +23,51 @@ function getWell() {
   return typeof host.getWell === "function" ? host.getWell() : null;
 }
 
-function setSelectedAmountKrw(next) {
-  selectedAmountKrw = Math.max(1, Math.floor(Number(next) || 0));
+function clampDonationAmountKrw(raw) {
+  const n = Math.floor(Number(raw) || 0);
+  return Math.max(
+    WELL_DONATION_AMOUNT_MIN_KRW,
+    Math.min(WELL_DONATION_AMOUNT_MAX_KRW, n)
+  );
 }
 
-function refreshDonationAmountButtons() {
-  if (!host || !host.donationOverlay) return;
+function readDonationAmountFromInput() {
+  if (!host || !host.donationAmountInput) return 0;
+  return clampDonationAmountKrw(host.donationAmountInput.value);
+}
+
+function syncDonationAmountInputValue(amountKrw) {
+  if (!host || !host.donationAmountInput) return;
+  const clamped = clampDonationAmountKrw(amountKrw);
+  host.donationAmountInput.value = String(clamped);
+}
+
+function showPlayerAlertMessage(message) {
+  if (typeof host.showPlayerAlert === "function") {
+    host.showPlayerAlert({ message: message });
+  }
+}
+
+function refreshDonationAmountField() {
+  if (!host) return;
+  const amount = readDonationAmountFromInput();
   const money = getPlayerMoneyKrw();
-  host.donationOverlay.querySelectorAll(".well-donation-amount").forEach(function (btn) {
-    const amount = Math.max(0, Math.floor(Number(btn.dataset.amount) || 0));
-    btn.classList.toggle("is-selected", amount === selectedAmountKrw);
-    btn.disabled = amount <= 0 || money < amount;
-  });
   if (host.donationSelectedText) {
     host.donationSelectedText.textContent =
-      "\uAE30\uBD80 \uAE08\uC561: " + formatPlayerMoneyKrw(selectedAmountKrw);
+      "\uAE30\uBD80 \uAE08\uC561: " + formatPlayerMoneyKrw(amount);
+  }
+  if (host.donationHintText) {
+    if (amount > 0 && money < amount) {
+      host.donationHintText.textContent =
+        "\uBCF4\uC720 \uAE08\uC561\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4.";
+      host.donationHintText.hidden = false;
+    } else {
+      host.donationHintText.textContent = "";
+      host.donationHintText.hidden = true;
+    }
   }
   if (host.donationConfirmBtn) {
-    host.donationConfirmBtn.disabled =
-      selectedAmountKrw <= 0 || money < selectedAmountKrw;
+    host.donationConfirmBtn.disabled = amount <= 0;
   }
 }
 
@@ -66,7 +92,7 @@ function refreshDonationModalUi() {
     host.donationBalanceText.textContent =
       "\uBCF4\uC720 \uAE08\uC561: " + formatPlayerMoneyKrw(money);
   }
-  refreshDonationAmountButtons();
+  refreshDonationAmountField();
 }
 
 export function refreshWellUpgradeCardUi() {
@@ -99,35 +125,39 @@ function openWellDonationModal() {
   if (!host || !host.donationOverlay) return;
   modalOpen = true;
   const money = getPlayerMoneyKrw();
-  const firstAffordable =
-    DONATION_AMOUNT_PRESETS.find(function (amount) {
-      return money >= amount;
-    }) || DONATION_AMOUNT_PRESETS[0];
-  setSelectedAmountKrw(firstAffordable);
+  const defaultAmount =
+    money > 0 ? Math.min(money, 100, WELL_DONATION_AMOUNT_MAX_KRW) : 0;
+  syncDonationAmountInputValue(defaultAmount);
   refreshDonationModalUi();
   host.donationOverlay.style.display = "flex";
   host.donationOverlay.setAttribute("aria-hidden", "false");
+  if (host.donationAmountInput && typeof host.donationAmountInput.focus === "function") {
+    host.donationAmountInput.focus();
+    host.donationAmountInput.select();
+  }
 }
 
-function onDonationAmountClick(event) {
+function onDonationAmountInput() {
   if (!modalOpen) return;
-  const btn =
-    event.target instanceof Element ? event.target.closest(".well-donation-amount") : null;
-  if (!btn || btn.disabled) return;
-  setSelectedAmountKrw(btn.dataset.amount);
-  refreshDonationAmountButtons();
+  syncDonationAmountInputValue(readDonationAmountFromInput());
+  refreshDonationAmountField();
 }
 
 function onDonationConfirmClick() {
   if (!modalOpen || !host) return;
   const well = getWell();
   if (!well) return;
-  const amount = selectedAmountKrw;
+  const amount = readDonationAmountFromInput();
   const money = getPlayerMoneyKrw();
-  if (amount <= 0 || money < amount) {
-    if (typeof host.showPlayerAlert === "function") {
-      host.showPlayerAlert({ message: "\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4." });
-    }
+  syncDonationAmountInputValue(amount);
+
+  if (amount <= 0) {
+    showPlayerAlertMessage("1\uC6D0 \uC774\uC0C1 \uAE30\uBD80\uD560 \uAE08\uC561\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
+    refreshDonationModalUi();
+    return;
+  }
+  if (money < amount) {
+    showPlayerAlertMessage("\uB3C8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4.");
     refreshDonationModalUi();
     return;
   }
@@ -183,8 +213,9 @@ export function bindWellUpgradeUi(h) {
   if (host.donationOpenBtn) {
     host.donationOpenBtn.addEventListener("click", onDonationOpenClick);
   }
-  if (host.donationOverlay) {
-    host.donationOverlay.addEventListener("click", onDonationAmountClick);
+  if (host.donationAmountInput) {
+    host.donationAmountInput.addEventListener("input", onDonationAmountInput);
+    host.donationAmountInput.addEventListener("change", onDonationAmountInput);
   }
   if (host.donationConfirmBtn) {
     host.donationConfirmBtn.addEventListener("click", onDonationConfirmClick);

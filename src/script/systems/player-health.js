@@ -25,6 +25,7 @@ export function createModule(d) {
     isInsideEnteredCraftHouse: d.isPlayerInsideEnteredCraftHouse(),
     isPlanting: Boolean(d.getPlant().isPlanting),
     isEating: Boolean(d.getApple().isEating),
+    isRockMining: Boolean(String(d.getPlayer().rockMiningRockId || "")),
     isTradeExchangeOpen: d.isTradeExchangeOpen(),
     isAlchemyCraftOpen: d.isAlchemyCraftOpen(),
     isPlantMasterSeedShopOpen:

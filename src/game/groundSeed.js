@@ -7,6 +7,7 @@
  *
  * World hub (index + 온보딩 완료)
  * - 땅의 `#seed`는 숨김. 공유 슬롯은 appleState.worldLooseSeed 한 개뿐.
+ * - WORLD_HUB_GROUND_SEED_ENABLED=false 이면 바닥 씨앗 없음(줍기·리스폰도 없음).
  * - 좌표는 constants의 WORLD_LOOSE_SEED_* (= SEED_START와 동일하게 유지할 것).
  * - 줍기 → seedCount만 증가, nextSpawnAt으로 리스폰. extraSeeds 인벤 슬롯 없음.
  *
@@ -15,6 +16,7 @@
  */
 
 import {
+  WORLD_HUB_GROUND_SEED_ENABLED,
   WORLD_LOOSE_SEED_ID,
   WORLD_LOOSE_SEED_RESPAWN_MS,
   WORLD_LOOSE_SEED_X,
@@ -92,6 +94,7 @@ export function reconcileWorldLoosePickupLock(worldLooseSeed, lockUntilMs, nowMs
 }
 
 export function canPickWorldLooseSeedAt(worldLooseSeed, lockUntilMs, nowMs) {
+  if (!WORLD_HUB_GROUND_SEED_ENABLED) return false;
   if (!isWorldLooseSpawnReady(nowMs, worldLooseSeed && worldLooseSeed.nextSpawnAt)) {
     return false;
   }

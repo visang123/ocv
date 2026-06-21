@@ -1,12 +1,22 @@
 /** Shared world row serialize / apply (Supabase world_state) */
 import { TREE_APPLE_COUNT } from "../../game/constants.js";
-import { parseMainPlantFromSnapshot, resolveSnapshotSavedAt, dedupeExtraSeedsPreferInventory } from "../../game/worldSnapshot.js";
+import {
+  parseExtraPlantFromSnapshot,
+  parseMainPlantFromSnapshot,
+  resolveSnapshotSavedAt,
+  dedupeExtraSeedsPreferInventory
+} from "../../game/worldSnapshot.js";
 import { syncServerClockOffset as syncServerClockOffsetCore } from "../../game/timeSync.js";
 import {
   applyPriorPlantGoldIfPreferred,
   ensurePlantGoldFields
 } from "../../game/plant-gold.js";
 import { ensureTreeAppleTargetCount } from "../../game/storage.js";
+import {
+  mergeRockMiningFieldsFromSnapshot,
+  serializeRockMiningFields
+} from "../../game/rock-mining.js";
+import { mergePlacedCraftFurnitureFromSnapshot } from "../../game/craft-furniture-world.js";
 
 export function createModule(d) {
   function flushPassiveSimulationBeforeSharedSnapshot() {
@@ -213,7 +223,8 @@ export function createModule(d) {
               id: String(rock.id),
               x: Number(rock.x),
               y: Number(rock.y),
-              size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : d.WORLD_ROCK_SIZE
+              size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : d.WORLD_ROCK_SIZE,
+              ...serializeRockMiningFields(rock)
             };
           })
         : undefined,
@@ -275,7 +286,7 @@ export function createModule(d) {
   if (d.isWorldDocumentEntry()) {
     d.mergeSharedRockRespawnTimestamps(snapshot);
   }
-  if (snapshot.savedBy === d.currentSessionId) {
+  if (snapshot.savedBy === d.currentSessionId && !d.pendingDeferredSharedWorldHydrate) {
     if (plantBonusChanged) d.updatePlantProgressGauge();
     return;
   }
@@ -445,7 +456,8 @@ export function createModule(d) {
     // Snapshot apply rule (mainPlant):
     // - apply by default (server row is authoritative),
     // - but defer during short local action locks to avoid flicker/rollback.
-    const shouldApplyMainPlantSnapshot = Boolean(snapshot.mainPlant) && !shouldDeferRemotePlantApply;
+    const shouldApplyMainPlantSnapshot =
+      Boolean(snapshot.mainPlant) && !shouldDeferRemotePlantApply;
     if (shouldApplyMainPlantSnapshot) {
       let incomingPlant = parseMainPlantFromSnapshot(snapshot.mainPlant);
       const snapAt = snapshotSavedAt || 0;
@@ -530,7 +542,80 @@ export function createModule(d) {
     // Snapshot apply rule (apples/extra seeds/plants):
     // - defer during local apples lock window,
     // - then resume full merge on subsequent polls.
-    if (snapshot.apples && !shouldDeferRemoteAppleApply) {
+    if (snapshot.apples) {
+      if (
+        d.isWorldDocumentEntry() &&
+        (hasServerRowTime || !shouldDeferRemoteAppleApply)
+      ) {
+        const snapApplesForRocks = snapshot.apples;
+        const sr = snapApplesForRocks.worldRocks;
+        const sp = snapApplesForRocks.worldRockPickedIds;
+        if (Array.isArray(sr) && sr.length === d.WORLD_LOOSE_ROCK_COUNT) {
+          const m = d.WORLD_ROCK_SPAWN_X_MARGIN;
+          const xMax = d.WORLD_WIDTH - m - d.WORLD_ROCK_SIZE;
+          const rocksOk = sr.every(function (r) {
+            if (!r || typeof r.id !== "string") return false;
+            const x = Number(r.x);
+            const y = Number(r.y);
+            const sz = Number(r.size);
+            return (
+              Number.isFinite(x) &&
+              Number.isFinite(y) &&
+              Number(sz) === d.WORLD_ROCK_SIZE &&
+              x >= m &&
+              x <= xMax &&
+              y >= d.WORLD_ROCK_SPAWN_Y_MIN &&
+              y <= d.WORLD_ROCK_SPAWN_Y_MAX
+            );
+          });
+          if (rocksOk) {
+            const priorRockById = {};
+            d.getApple().worldRocks.forEach(function (rock) {
+              if (rock && rock.id != null) {
+                priorRockById[String(rock.id)] = rock;
+              }
+            });
+            d.getApple().worldRocks = sr.map(function (r) {
+              const id = String(r.id);
+              const prev = priorRockById[id];
+              const next = {
+                id: id,
+                x: Number(r.x),
+                y: Number(r.y),
+                size: d.WORLD_ROCK_SIZE
+              };
+              if (prev && prev._el) {
+                next._el = prev._el;
+              }
+              mergeRockMiningFieldsFromSnapshot(next, r);
+              if (prev) {
+                mergeRockMiningFieldsFromSnapshot(next, prev);
+              }
+              return next;
+            });
+            d.updateWorldRocks();
+          }
+        }
+        if (Array.isArray(sp)) {
+          const remoteIds = sp
+            .map(String)
+            .filter(function (id) {
+              return id.trim() !== "";
+            });
+          if (hasServerRowTime) {
+            d.getApple().worldRockPickedIds = remoteIds.slice();
+          } else {
+            const merged = new Set(d.getApple().worldRockPickedIds.map(String));
+            remoteIds.forEach(function (id) {
+              merged.add(id);
+            });
+            d.getApple().worldRockPickedIds = Array.from(merged);
+          }
+        }
+      }
+    }
+
+    if (snapshot.apples && (!shouldDeferRemoteAppleApply || hasServerRowTime)) {
       const priorExtraSeeds = d.getApple().extraSeeds.slice();
       const priorExtraPlants = d.getApple().extraPlants.slice();
       const priorWorldLooseNextSpawnAt =
@@ -551,7 +636,7 @@ export function createModule(d) {
         (!snapshotAppleTime ||
           d.getApple().lastStateChangeAt + 2000 > snapshotAppleTime);
       let shouldMergePendingPlants = seedPendingFromRecentLocalEdit;
-      if (!shouldMergePendingPlants) {
+      if (!shouldMergePendingPlants && !hasServerRowTime) {
         const snapMissingLocalPlant = priorExtraPlants.some(function (p) {
           if (!p || p.id == null || p.removed) return false;
           return !snapshotPlantIdsEarly[String(p.id)];
@@ -658,7 +743,7 @@ export function createModule(d) {
           });
         }
         let shouldMergePendingSeeds = seedPendingFromRecentLocalEdit;
-        if (!shouldMergePendingSeeds) {
+        if (!shouldMergePendingSeeds && !hasServerRowTime) {
           const snapMissingLocalOwnedGroundSeed = priorExtraSeeds.some(function (s) {
             if (!s || s.id == null) return false;
             if (Boolean(s.inInventory) || Boolean(s.planted)) return false;
@@ -703,13 +788,27 @@ export function createModule(d) {
           }
         }
       }
-      const incomingExtraPlants = shouldDeferRemotePlantApply
-        ? priorExtraPlants.slice()
-        : Array.isArray(snapshot.apples.extraPlants)
-          ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
-          : [];
+      const snapshotExtraPlants = Array.isArray(snapshot.apples.extraPlants)
+        ? snapshot.apples.extraPlants.map(parseExtraPlantFromSnapshot)
+        : [];
+      let incomingExtraPlants;
+      if (shouldDeferRemotePlantApply) {
+        const snapIdsDuringLock = Object.create(null);
+        snapshotExtraPlants.forEach(function (p) {
+          if (p && p.id != null) snapIdsDuringLock[String(p.id)] = true;
+        });
+        const localPendingPlants = priorExtraPlants.filter(function (p) {
+          if (!p || p.id == null || p.removed) return false;
+          return !snapIdsDuringLock[String(p.id)];
+        });
+        incomingExtraPlants = snapshotExtraPlants.concat(localPendingPlants);
+      } else if (hasServerRowTime) {
+        incomingExtraPlants = snapshotExtraPlants;
+      } else {
+        incomingExtraPlants = snapshotExtraPlants;
+      }
       let nextExtraPlants = incomingExtraPlants;
-      if (shouldMergePendingPlants) {
+      if (!shouldDeferRemotePlantApply && !hasServerRowTime && shouldMergePendingPlants) {
         const pendingLocalPlants = priorExtraPlants.filter(function (p) {
           if (!p || p.id == null) return false;
           return !snapshotPlantIdsEarly[String(p.id)];
@@ -793,65 +892,12 @@ export function createModule(d) {
       });
       if (d.isWorldDocumentEntry()) {
         const snapApples = snapshot.apples;
-        const sr = snapApples.worldRocks;
-        const sp = snapApples.worldRockPickedIds;
-        if (!shouldDeferRemoteAppleApply && Array.isArray(sr) && sr.length === d.WORLD_LOOSE_ROCK_COUNT) {
-          const m = d.WORLD_ROCK_SPAWN_X_MARGIN;
-          const xMax = d.WORLD_WIDTH - m - d.WORLD_ROCK_SIZE;
-          const rocksOk = sr.every(function (r) {
-            if (!r || typeof r.id !== "string") return false;
-            const x = Number(r.x);
-            const y = Number(r.y);
-            const sz = Number(r.size);
-            return (
-              Number.isFinite(x) &&
-              Number.isFinite(y) &&
-              Number(sz) === d.WORLD_ROCK_SIZE &&
-              x >= m &&
-              x <= xMax &&
-              y >= d.WORLD_ROCK_SPAWN_Y_MIN &&
-              y <= d.WORLD_ROCK_SPAWN_Y_MAX
+        if (!shouldDeferRemoteAppleApply && snapApples) {
+          if (Object.prototype.hasOwnProperty.call(snapApples, "placedCraftFurniture")) {
+            d.placedCraftFurniture = mergePlacedCraftFurnitureFromSnapshot(
+              d.placedCraftFurniture,
+              snapApples.placedCraftFurniture
             );
-          });
-          if (rocksOk) {
-            const priorRockById = {};
-            d.getApple().worldRocks.forEach(function (rock) {
-              if (rock && rock.id != null) {
-                priorRockById[String(rock.id)] = rock;
-              }
-            });
-            d.getApple().worldRocks = sr.map(function (r) {
-              const id = String(r.id);
-              const prev = priorRockById[id];
-              const next = {
-                id: id,
-                x: Number(r.x),
-                y: Number(r.y),
-                size: d.WORLD_ROCK_SIZE
-              };
-              if (prev && prev._el) {
-                next._el = prev._el;
-              }
-              return next;
-            });
-          }
-        }
-        if (Array.isArray(sp)) {
-          const remoteIds = sp
-            .map(String)
-            .filter(function (id) {
-              return id.trim() !== "";
-            });
-          const merged = new Set(d.getApple().worldRockPickedIds.map(String));
-          remoteIds.forEach(function (id) {
-            merged.add(id);
-          });
-          d.getApple().worldRockPickedIds = Array.from(merged);
-        }
-        if (!shouldDeferRemoteAppleApply) {
-          const snapFurniture = snapApples.placedCraftFurniture;
-          if (Array.isArray(snapFurniture)) {
-            d.placedCraftFurniture = d.parsePlacedCraftFurnitureFromSnapshot(snapFurniture);
             d.rebuildPlacedCraftFurnitureDom();
           }
         }
@@ -884,6 +930,13 @@ export function createModule(d) {
     }
 
     d.refreshUiAfterSharedWorldApply();
+    if (typeof d.saveAppleState === "function") {
+      d.saveAppleState({ skipWorldDirty: true });
+    }
+    if (typeof d.saveSeedState === "function") {
+      d.saveSeedState({ bumpMergeGuard: false, skipWorldDirty: true });
+    }
+    d.pendingDeferredSharedWorldHydrate = false;
   } finally {
     d.isApplyingWorldState = false;
   }

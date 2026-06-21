@@ -40,12 +40,12 @@ const CRAFT_FURNITURE_WORLD = {
   }
 };
 
-/** 집 입장 판정: 스프라이트 하단 중앙 문/발판만 (투명 여백 제외) */
+/** 집 입장 판정: 문·현관 발판 (하단 돌 기단·투명 여백 제외) */
 export const CRAFT_HOUSE_TOUCH_INSETS = {
-  left: 32,
-  right: 32,
-  top: 52,
-  bottom: 0
+  left: 22,
+  right: 46,
+  top: 34,
+  bottom: 6
 };
 
 export function getCraftHouseTouchRect(entry) {
@@ -230,6 +230,67 @@ export function parsePlacedCraftFurnitureFromSnapshot(raw) {
   );
   refreshCraftFurnitureIdentityOrdinals(parsed);
   return parsed;
+}
+
+/** 서버 저장 전 로컬 설치분이 스냅샷 폴링으로 지워지지 않도록 유지(ms) */
+export const CRAFT_FURNITURE_LOCAL_PENDING_MS = 15000;
+
+/**
+ * id 기준 병합 — 최근 placedAt 우선, 아직 서버에 없는 로컬 설치분은 pending 동안 유지.
+ * @param {Array} localList
+ * @param {Array|undefined|null} incoming
+ */
+export function mergePlacedCraftFurnitureFromSnapshot(localList, incoming) {
+  const local = sanitizePlacedCraftFurniture(Array.isArray(localList) ? localList : []);
+  if (!Array.isArray(incoming)) {
+    return local.slice();
+  }
+  const remote = sanitizePlacedCraftFurniture(incoming);
+  const byId = Object.create(null);
+  remote.forEach(function (entry) {
+    byId[String(entry.id)] = entry;
+  });
+  const now = Date.now();
+  local.forEach(function (entry) {
+    const id = String(entry.id);
+    const prev = byId[id];
+    const placedAt = Number(entry.placedAt) || 0;
+    if (!prev) {
+      if (placedAt > 0 && now - placedAt < CRAFT_FURNITURE_LOCAL_PENDING_MS) {
+        byId[id] = entry;
+      }
+      return;
+    }
+    const prevAt = Number(prev.placedAt) || 0;
+    if (placedAt >= prevAt) {
+      byId[id] = entry;
+    }
+  });
+  const merged = Object.keys(byId).map(function (id) {
+    return byId[id];
+  });
+  refreshCraftFurnitureIdentityOrdinals(merged);
+  return merged;
+}
+
+export function upsertPlacedCraftFurnitureEntry(list, rawEntry) {
+  const parsed = sanitizePlacedCraftFurniture([rawEntry]);
+  const entry = parsed[0];
+  if (!entry) return Array.isArray(list) ? list.slice() : [];
+  const next = Array.isArray(list) ? list.slice() : [];
+  const id = String(entry.id);
+  const idx = next.findIndex(function (item) {
+    return item && String(item.id) === id;
+  });
+  if (idx >= 0) {
+    const prevEl = next[idx]._el;
+    next[idx] = entry;
+    if (prevEl) next[idx]._el = prevEl;
+  } else {
+    next.push(entry);
+  }
+  refreshCraftFurnitureIdentityOrdinals(next);
+  return next;
 }
 
 export function computeCraftFurniturePlacement(kind, centerX, footY) {

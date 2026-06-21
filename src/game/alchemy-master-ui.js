@@ -81,6 +81,21 @@ function isAlchemyCraftOverlayVisible() {
   );
 }
 
+function getAlchemyCraftPanelEl() {
+  if (!host || !host.alchemyCraftOverlay) return null;
+  return host.alchemyCraftOverlay.querySelector(".alchemy-craft-panel");
+}
+
+function setAlchemyCraftFocus(active) {
+  if (!host) return;
+  [host.worldBagInventory, host.bagInventoryPanel, getAlchemyCraftPanelEl()].forEach(
+    function (el) {
+      if (!el) return;
+      el.classList.toggle("is-alchemy-craft-focus", active);
+    }
+  );
+}
+
 function reconcileAlchemyCraftOpenState() {
   if (!craftOpen) return;
   if (!isAlchemyCraftOverlayVisible()) {
@@ -90,14 +105,7 @@ function reconcileAlchemyCraftOpenState() {
     requirementsVisible = false;
     requirementSlotDefs = [];
     requirementSlotFills = [];
-    if (host) {
-      if (host.worldBagInventory) {
-        host.worldBagInventory.classList.remove("is-alchemy-craft-focus");
-      }
-      if (host.bagInventoryPanel) {
-        host.bagInventoryPanel.classList.remove("is-alchemy-craft-focus");
-      }
-    }
+    setAlchemyCraftFocus(false);
   }
 }
 
@@ -345,11 +353,6 @@ export function addInventoryItemsToAlchemySlots(itemKey, preferredSlotIndex) {
   return addedAny;
 }
 
-function getAlchemyCraftPanelEl() {
-  if (!host || !host.alchemyCraftOverlay) return null;
-  return host.alchemyCraftOverlay.querySelector(".alchemy-craft-panel");
-}
-
 /** @param {Element | null | undefined} targetEl */
 export function tryDropBagItemOnAlchemyRequirement(itemKey, targetEl) {
   if (!itemKey || !(targetEl instanceof Element) || !host) return false;
@@ -433,7 +436,7 @@ function layoutAlchemySpeechBubble() {
       headTop,
       host.alchemyMasterBubble,
       host.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD
-    ) -
+    ) +
     host.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   host.setSpeechBubbleTransform(
     host.alchemyMasterBubble,
@@ -531,8 +534,7 @@ export function openAlchemyCraftPanel() {
   }
   host.setBagInventoryPanelOpen(true);
   host.updateBagInventorySlots();
-  if (host.worldBagInventory) host.worldBagInventory.classList.add("is-alchemy-craft-focus");
-  if (host.bagInventoryPanel) host.bagInventoryPanel.classList.add("is-alchemy-craft-focus");
+  setAlchemyCraftFocus(true);
   renderAlchemyCraftProducts();
   renderAlchemyRequirementSlots();
   updateAlchemyCraftConfirmButton();
@@ -552,8 +554,7 @@ export function closeAlchemyCraftPanel(options) {
     host.alchemyCraftOverlay.style.display = "none";
     host.alchemyCraftOverlay.setAttribute("aria-hidden", "true");
   }
-  if (host.worldBagInventory) host.worldBagInventory.classList.remove("is-alchemy-craft-focus");
-  if (host.bagInventoryPanel) host.bagInventoryPanel.classList.remove("is-alchemy-craft-focus");
+  setAlchemyCraftFocus(false);
   if (!keepInventory) host.setBagInventoryPanelOpen(false);
   renderAlchemyRequirementSlots();
 }

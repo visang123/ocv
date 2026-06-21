@@ -1,4 +1,6 @@
 /** Systems — 사과/우물/바위/가방 드롭 등 월드 리스폰·리필. */
+import { resetRockMiningState } from "../../game/rock-mining.js";
+
 export function createModule(d) {
   function addPlantWorldRockAvoidZone(zones, plant, pad) {
   const px = Number(plant && (plant.x != null ? plant.x : plant.spotX));
@@ -156,19 +158,19 @@ export function createModule(d) {
   const trunkLeft = d.TREE_TRUNK_X - d.TREE_CLIMB_DISTANCE + trunkInset;
   const trunkW = d.TREE_TRUNK_WIDTH + 2 * d.TREE_CLIMB_DISTANCE - 2 * trunkInset;
   const trunkTop = d.TREE_TRUNK_TOP - 22;
-  const trunkBottom = d.BIG_TREE_Y + d.BIG_TREE_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  const trunkBottom = d.BIG_TREE_Y + d.BIG_TREE_RENDER_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
   zones.push(d.expandWorldRockAvoidRect(trunkLeft, trunkTop, trunkW, trunkBottom - trunkTop, p));
   const rootsTop =
     d.BIG_TREE_Y +
-    d.BIG_TREE_HEIGHT +
+    d.BIG_TREE_RENDER_HEIGHT +
     d.TREE_CSS_ROOTS_BOTTOM_EXTEND -
     d.TREE_CSS_ROOTS_HEIGHT;
-  const rootsBottom = d.BIG_TREE_Y + d.BIG_TREE_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
+  const rootsBottom = d.BIG_TREE_Y + d.BIG_TREE_RENDER_HEIGHT + d.TREE_CSS_ROOTS_BOTTOM_EXTEND;
   zones.push(
     d.expandWorldRockAvoidRect(
-      d.BIG_TREE_X + d.TREE_CSS_ROOTS_LEFT,
+      d.BIG_TREE_X + d.TREE_CSS_ROOTS_LEFT / d.MAP_VISUAL_SCALE,
       rootsTop,
-      d.TREE_CSS_ROOTS_WIDTH,
+      d.TREE_CSS_ROOTS_WIDTH / d.MAP_VISUAL_SCALE,
       rootsBottom - rootsTop,
       p
     )
@@ -215,7 +217,7 @@ export function createModule(d) {
   }
 
   function createRandomApple(id) {
-  const size = 10;
+  const size = d.TREE_APPLE_SIZE;
   let localX = 18 + Math.floor(Math.random() * 104);
   let localY = 16 + Math.floor(Math.random() * 76);
   let attempts = 0;
@@ -230,8 +232,8 @@ export function createModule(d) {
     id,
     localX,
     localY,
-    x: d.BIG_TREE_X + localX,
-    y: d.BIG_TREE_Y + localY,
+    x: d.BIG_TREE_X + localX / d.MAP_VISUAL_SCALE,
+    y: d.BIG_TREE_Y + localY / d.MAP_VISUAL_SCALE,
     size
   };
   }
@@ -437,16 +439,19 @@ export function createModule(d) {
 
   function refillWellIfNeeded() {
   const now = Date.now();
-  const elapsedRefills = Math.floor((now - d.getWell().lastRefillAt) / d.wellRefillMs);
+  const refillMs = typeof d.getWellRefillMs === "function" ? d.getWellRefillMs(d.getWell()) : d.wellRefillMs;
+  const effectiveMaxWellWater =
+    typeof d.getWellMaxWater === "function" ? d.getWellMaxWater(d.getWell()) : d.maxWellWater;
+  const elapsedRefills = Math.floor((now - d.getWell().lastRefillAt) / refillMs);
 
   if (elapsedRefills > 0) {
     const previousWater = d.getWell().water;
-    d.getWell().water = Math.min(d.maxWellWater, d.getWell().water + elapsedRefills);
+    d.getWell().water = Math.min(effectiveMaxWellWater, d.getWell().water + elapsedRefills);
     // Advance the refill anchor deterministically so every client computes the
     // same getWell().water from the same lastRefillAt. Using "now" here would
     // diverge across clients (clock skew) and the resulting saves would
     // flip-flop the visible water amount as snapshots overwrote each other.
-    d.getWell().lastRefillAt += elapsedRefills * d.wellRefillMs;
+    d.getWell().lastRefillAt += elapsedRefills * refillMs;
 
     if (previousWater !== d.getWell().water) {
       // Auto-refill is deterministic from lastRefillAt, so we keep it local-only
@@ -456,8 +461,12 @@ export function createModule(d) {
       d.saveWellStateToStorage({
         wellWaterKey: d.wellWaterKey,
         lastWellRefillKey: d.lastWellRefillKey,
+        wellUpgradeLevelKey: d.wellUpgradeLevelKey,
+        wellDonationKrwKey: d.wellDonationKrwKey,
         wellWater: d.getWell().water,
-        lastWellRefillAt: d.getWell().lastRefillAt
+        lastWellRefillAt: d.getWell().lastRefillAt,
+        upgradeLevel: d.getWell().upgradeLevel,
+        donationKrw: d.getWell().donationKrw
       });
     }
   }
@@ -532,7 +541,8 @@ export function createModule(d) {
   d.saveAppleState();
   }
 
-  function saveAppleState() {
+  function saveAppleState(opts) {
+  opts = opts || {};
   d.getApple().lastStateChangeAt = Date.now();
   d.ensureWorldLooseSeedShape();
   d.saveAppleStateToStorage({
@@ -549,6 +559,8 @@ export function createModule(d) {
     worldLooseSeed: d.getApple().worldLooseSeed,
     worldRocks: d.getApple().worldRocks,
     worldRockPickedIds: d.getApple().worldRockPickedIds,
+    lastWorldRockPickupAt: Number(d.getSeedWorld().lastWorldRockPickupAt) || 0,
+    lastWorldRockRespawnAt: Number(d.getSeedWorld().lastWorldRockRespawnAt) || 0,
     worldExtraBuckets: (d.getApple().worldExtraBuckets || []).map(function (bucket) {
       return {
         id: String(bucket.id || ""),
@@ -559,7 +571,25 @@ export function createModule(d) {
     }),
     placedCraftFurniture: d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
   });
-  d.markWorldDirty();
+  if (!opts.skipWorldDirty) d.markWorldDirty();
+  }
+
+  function mergeSharedRockRespawnTimestamps(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const snapPickup = Math.max(0, Number(snapshot.lastWorldRockPickupAt) || 0);
+  const snapRespawn = Math.max(0, Number(snapshot.lastWorldRockRespawnAt) || 0);
+  if (snapPickup > 0) {
+    d.getSeedWorld().lastWorldRockPickupAt = Math.max(
+      Number(d.getSeedWorld().lastWorldRockPickupAt) || 0,
+      snapPickup
+    );
+  }
+  if (snapRespawn > 0) {
+    d.getSeedWorld().lastWorldRockRespawnAt = Math.max(
+      Number(d.getSeedWorld().lastWorldRockRespawnAt) || 0,
+      snapRespawn
+    );
+  }
   }
 
   function setWorldPosition(element, x, y) {
@@ -634,9 +664,6 @@ export function createModule(d) {
   if (d.getUnpickedWorldRockCount() >= d.WORLD_LOOSE_ROCK_COUNT) return false;
 
   const size = d.WORLD_ROCK_SIZE;
-  const pos = d.pickRandomWorldRockSpawnPosition(size, d.buildWorldRockSpawnContext(), d.getApple().worldRocks);
-  if (!pos) return false;
-
   const pickedSet = new Set(d.getApple().worldRockPickedIds.map(String));
   let rock = d.getApple().worldRocks.find(function (r) {
     return r && pickedSet.has(String(r.id));
@@ -645,17 +672,30 @@ export function createModule(d) {
   if (!rock) {
     if (d.getApple().worldRocks.length >= d.WORLD_LOOSE_ROCK_COUNT) return false;
     rock = {
-      id: "ground-rock-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6),
-      x: pos.x,
-      y: pos.y,
+      id: "ground-rock-" + (d.getApple().worldRocks.length + 1),
+      x: 0,
+      y: 0,
       size: size
     };
     d.getApple().worldRocks.push(rock);
   }
 
+  const respawnAt = Number(d.getSeedWorld().lastWorldRockRespawnAt) || Date.now();
+  const pos =
+    typeof d.pickSharedWorldRockRespawnPosition === "function" && d.isWorldServerSyncAvailable()
+      ? d.pickSharedWorldRockRespawnPosition(
+          rock.id,
+          respawnAt,
+          d.buildWorldRockSpawnContext(),
+          d.getApple().worldRocks
+        )
+      : d.pickRandomWorldRockSpawnPosition(size, d.buildWorldRockSpawnContext(), d.getApple().worldRocks);
+  if (!pos) return false;
+
   rock.x = pos.x;
   rock.y = pos.y;
   rock.size = size;
+  resetRockMiningState(rock);
   d.getApple().worldRockPickedIds = d.getApple().worldRockPickedIds.filter(function (id) {
     return String(id) !== String(rock.id);
   });
@@ -682,20 +722,28 @@ export function createModule(d) {
   d.updateWorldRocks();
   d.saveAppleState();
   d.markWorldDirty();
+  if (d.isWorldServerSyncAvailable()) {
+    d.syncWorldState(true);
+  }
   return true;
   }
 
   function updateWellCard() {
   const isVisible = d.isNearWellForCard();
-  const waterRatio = d.getWell().water / d.maxWellWater;
+  const effectiveMaxWellWater =
+    typeof d.getWellMaxWater === "function" ? d.getWellMaxWater(d.getWell()) : d.maxWellWater;
+  const waterRatio = effectiveMaxWellWater > 0 ? d.getWell().water / effectiveMaxWellWater : 0;
   const wellImage = d.getWell().water > 0 ? d.IMG_WELL : d.IMG_WELL_EMPTY;
 
   d.wellCard.style.display = isVisible ? "flex" : "none";
   if (wellImage && d.wellCardImage) {
     d.wellCardImage.src = wellImage;
   }
-  d.wellWaterText.textContent = d.getWell().water + "/" + d.maxWellWater;
+  d.wellWaterText.textContent = d.getWell().water + "/" + effectiveMaxWellWater;
   d.wellWaterFill.style.width = waterRatio * 100 + "%";
+  if (typeof d.refreshWellUpgradeCardUi === "function") {
+    d.refreshWellUpgradeCardUi();
+  }
   }
 
   function updateWellImage() {
@@ -775,93 +823,6 @@ export function createModule(d) {
   });
   }
 
-  function ensureRockMineGaugeEl(rock) {
-    if (!rock || !rock._el) return null;
-    if (rock._mineGaugeEl && rock._mineGaugeEl.isConnected) return rock._mineGaugeEl;
-    const gauge = document.createElement("div");
-    gauge.className = "world-rock-mine-gauge";
-    gauge.setAttribute("aria-hidden", "true");
-    const track = document.createElement("div");
-    track.className = "world-rock-mine-gauge__track";
-    const fill = document.createElement("div");
-    fill.className = "world-rock-mine-gauge__fill";
-    track.appendChild(fill);
-    gauge.appendChild(track);
-    rock._el.appendChild(gauge);
-    rock._mineGaugeEl = gauge;
-    rock._mineGaugeFillEl = fill;
-    return gauge;
-  }
-
-  function collectRockMiningSessionsByRock(now) {
-    const byRock = Object.create(null);
-    const durationMs = Math.max(1, Number(d.WORLD_ROCK_MINE_MS) || 60000);
-    const local = d.getLocalRockMining && d.getLocalRockMining();
-    if (local && local.rockId && local.startedAt) {
-      const elapsed = now - local.startedAt;
-      if (elapsed < durationMs) {
-        byRock[String(local.rockId)] = { startedAt: local.startedAt, durationMs: durationMs };
-      }
-    }
-    const remotePlayers = d.remotePlayers || {};
-    Object.keys(remotePlayers).forEach(function (remoteId) {
-      const rp = remotePlayers[remoteId];
-      if (!rp) return;
-      const rockId = String(rp.rockMiningRockId || "");
-      const startedAt = Number(rp.rockMiningStartedAt) || 0;
-      if (!rockId || !startedAt) return;
-      if (now - startedAt >= durationMs) return;
-      const prev = byRock[rockId];
-      if (!prev || startedAt < prev.startedAt) {
-        byRock[rockId] = { startedAt: startedAt, durationMs: durationMs };
-      }
-    });
-    return byRock;
-  }
-
-  function updateWorldRockMineGauges() {
-    const tutorialRockDom =
-      d.isMainGameTutorialInProgress() &&
-      Array.isArray(d.getApple().worldRocks) &&
-      d.getApple().worldRocks.some(function (rock) {
-        return rock && String(rock.id) === d.TUTORIAL_ONBOARDING_ROCK_ID && rock._el;
-      });
-    if ((!d.isWorldDocumentEntry() && !tutorialRockDom) || !Array.isArray(d.getApple().worldRocks)) return;
-    const now = Date.now();
-    const sessionsByRock = collectRockMiningSessionsByRock(now);
-    d.getApple().worldRocks.forEach(function (rock) {
-      if (!rock || !rock._el) return;
-      const rockId = String(rock.id);
-      const picked = d.getApple().worldRockPickedIds.includes(rock.id);
-      if (picked) {
-        if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
-        return;
-      }
-      const session = sessionsByRock[rockId];
-      if (!session) {
-        if (rock._mineGaugeEl) rock._mineGaugeEl.style.display = "none";
-        return;
-      }
-      const gauge = ensureRockMineGaugeEl(rock);
-      const fill =
-        (rock._mineGaugeFillEl && rock._mineGaugeFillEl.isConnected
-          ? rock._mineGaugeFillEl
-          : gauge
-            ? gauge.querySelector(".world-rock-mine-gauge__fill")
-            : null);
-      if (!gauge || !fill) return;
-      rock._mineGaugeFillEl = fill;
-      gauge.style.display = "block";
-      const progress = Math.max(
-        0,
-        Math.min(1, (now - session.startedAt) / session.durationMs)
-      );
-      fill.style.width = "100%";
-      fill.style.transform = "scaleX(" + progress + ")";
-      fill.style.transformOrigin = "left center";
-    });
-  }
-
   function worldRockOverlapsAnyAvoidRect(rockRect, zones) {
   for (let i = 0; i < zones.length; i += 1) {
     if (d.isOverlappingRect(rockRect, zones[i])) {
@@ -919,7 +880,6 @@ export function createModule(d) {
     updateWellCard,
     updateWellImage,
     updateWorldBagDropDom,
-    updateWorldRockMineGauges,
     updateWorldRocks,
     worldRockOverlapsAnyAvoidRect,
     worldRockRect,

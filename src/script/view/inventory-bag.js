@@ -50,6 +50,9 @@ export function createModule(d) {
   }
 
   function clearBagInventoryDragVisual() {
+  if (typeof d.clearMagicPowderDragPlantHighlight === "function") {
+    d.clearMagicPowderDragPlantHighlight();
+  }
   if (d.bagInventoryDragGhostEl) {
     d.bagInventoryDragGhostEl.remove();
     d.bagInventoryDragGhostEl = null;
@@ -310,6 +313,24 @@ export function createModule(d) {
     slot.setPointerCapture(event.pointerId);
     return;
   }
+  if (
+    d.isMagicPowderBagType(itemKey) &&
+    d.getMagicPowderBagCount(itemKey) > 0
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    d.bagInventoryDragState = {
+      itemKey: itemKey,
+      sourceSlot: slot,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      mode: "magicPowder"
+    };
+    slot.classList.add("is-bag-drag-source");
+    slot.setPointerCapture(event.pointerId);
+    return;
+  }
   if (!canDiscardBagItemNow(itemKey)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -336,6 +357,16 @@ export function createModule(d) {
   if (d.bagInventoryDragGhostEl) {
     d.bagInventoryDragGhostEl.style.left = event.clientX - 24 + "px";
     d.bagInventoryDragGhostEl.style.top = event.clientY - 24 + "px";
+  }
+  if (
+    d.bagInventoryDragState.mode === "magicPowder" &&
+    typeof d.syncMagicPowderDragPlantHighlight === "function"
+  ) {
+    d.syncMagicPowderDragPlantHighlight(
+      event.clientX,
+      event.clientY,
+      d.bagInventoryDragState.itemKey
+    );
   }
   }
 
@@ -473,7 +504,12 @@ export function createModule(d) {
 
     d.playerStatus.textContent = "";
     d.updateSeedInventory();
+    d.holdLocalPlantStateAgainstStaleSnapshot(3000);
+    d.holdLocalAppleStateAgainstStaleSnapshot(3000);
     d.saveAppleState();
+    if (typeof d.syncSharedWorldPlantStateNow === "function") {
+      d.syncSharedWorldPlantStateNow();
+    }
   }, d.plantActionMs);
   }
 

@@ -3,7 +3,7 @@
  * Orchestration lives in script.js `applySharedWorldSnapshot`; parsers live here.
  */
 
-import { BIG_TREE_X, BIG_TREE_Y } from "./constants.js";
+import { BIG_TREE_X, BIG_TREE_Y, MAP_VISUAL_SCALE, TREE_APPLE_SIZE } from "./constants.js";
 
 const DEFAULT_SEED_LABEL = "\uC528\uC557";
 
@@ -237,9 +237,9 @@ export function parseTreeAppleFromSnapshot(apple) {
     id: String(apple.id),
     localX,
     localY,
-    x: BIG_TREE_X + localX,
-    y: BIG_TREE_Y + localY,
-    size: Number(apple.size) || 10
+    x: BIG_TREE_X + localX / MAP_VISUAL_SCALE,
+    y: BIG_TREE_Y + localY / MAP_VISUAL_SCALE,
+    size: Number(apple.size) || TREE_APPLE_SIZE
   };
 }
 

@@ -105,6 +105,10 @@ export function createModule(d) {
       if (channel !== d.multiplayerChannel) return;
       d.handleRemoteWorldBagDropPickupBroadcast(payload.payload || {});
     })
+    .on("broadcast", { event: "world_craft_furniture_placed" }, function (payload) {
+      if (channel !== d.multiplayerChannel) return;
+      d.handleRemoteWorldCraftFurniturePlacedBroadcast(payload.payload || {});
+    })
     .on("broadcast", { event: "world_chat" }, function (payload) {
       if (channel !== d.multiplayerChannel) return;
       d.handleWorldChatBroadcast(payload.payload || {});

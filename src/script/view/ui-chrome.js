@@ -790,7 +790,7 @@ export function createModule(d) {
     case d.ONBOARDING_STEP_BUTTERFLY: {
       d.setOnboardingCalloutVisible(
         true,
-        "날아다니는 나비에 근접하여 E 또는 Q로 잡아 보세요."
+        "날아다니는 나비에 근접하여 Q키로 잡아 보세요."
       );
       Object.keys(d.butterflyRenderById).forEach(function (id) {
         const entry = d.butterflyRenderById[id];

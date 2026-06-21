@@ -2,7 +2,8 @@
 
 export function createModule(d) {
   function createRandomApples(count) {
-  return Array.from({ length: count }, function (_, index) {
+  const total = count != null ? count : d.TREE_APPLE_COUNT;
+  return Array.from({ length: total }, function (_, index) {
     return d.createRandomApple("apple-" + (index + 1));
   });
   }

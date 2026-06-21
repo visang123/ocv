@@ -256,7 +256,6 @@ function buildSystemsDeps() {
     updateWellCard,
     updateWellImage,
     updateWorldBagDropDom,
-    updateWorldRockMineGauges,
     updateWorldRocks,
     WORLD_ROCK_MINE_MS,
     well,

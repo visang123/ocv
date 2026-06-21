@@ -76,6 +76,8 @@ const wellDonationOpenBtn = document.getElementById("well-donation-open-btn");
 const wellDonationOverlay = document.getElementById("well-donation-overlay");
 const wellDonationGoalText = document.getElementById("well-donation-goal-text");
 const wellDonationBalanceText = document.getElementById("well-donation-balance-text");
+const wellDonationAmountInput = document.getElementById("well-donation-amount-input");
+const wellDonationHintText = document.getElementById("well-donation-hint-text");
 const wellDonationSelectedText = document.getElementById("well-donation-selected-text");
 const wellDonationConfirmBtn = document.getElementById("well-donation-confirm");
 const wellDonationCancelBtn = document.getElementById("well-donation-cancel");
@@ -171,6 +173,8 @@ export {
   wellDonationOverlay,
   wellDonationGoalText,
   wellDonationBalanceText,
+  wellDonationAmountInput,
+  wellDonationHintText,
   wellDonationSelectedText,
   wellDonationConfirmBtn,
   wellDonationCancelBtn,

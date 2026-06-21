@@ -393,6 +393,33 @@ body:not(.is-game-ready) .viewport {
   animation: plant-water-hover-ring-pulse 0.7s ease-in-out infinite alternate;
 }
 
+#plant-hover-ring.is-magic-powder-target {
+  border: 3px solid rgba(251, 191, 36, 0.98);
+  box-shadow:
+    0 0 12px rgba(245, 158, 11, 0.85),
+    0 0 28px rgba(251, 191, 36, 0.55),
+    inset 0 0 12px rgba(255, 237, 213, 0.35);
+  animation: magic-powder-plant-target-pulse 0.75s ease-in-out infinite alternate;
+}
+
+@keyframes magic-powder-plant-target-pulse {
+  from {
+    border-color: rgba(251, 191, 36, 0.85);
+    box-shadow:
+      0 0 10px rgba(245, 158, 11, 0.65),
+      0 0 22px rgba(251, 191, 36, 0.4),
+      inset 0 0 8px rgba(255, 237, 213, 0.25);
+  }
+
+  to {
+    border-color: rgba(253, 224, 71, 1);
+    box-shadow:
+      0 0 16px rgba(245, 158, 11, 0.95),
+      0 0 36px rgba(251, 191, 36, 0.65),
+      inset 0 0 14px rgba(255, 247, 237, 0.45);
+  }
+}
+
 #plant-spot.is-plant-water-clickable,
 .extra-plant-spot.is-plant-water-clickable,
 #sprout.is-plant-water-clickable,
@@ -1761,7 +1788,7 @@ body:not(.is-game-ready) .viewport {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.92);
   color: #111;
-  z-index: 230;
+  z-index: 280;
 }
 
 #player-status .player-status__label {
@@ -1908,7 +1935,7 @@ body:not(.is-game-ready) .viewport {
 }
 
 .world-ground-rock.is-rock-mining-gauge-active {
-  z-index: 27;
+  z-index: 275;
 }
 
 .world-rock-mine-gauge {
@@ -1920,7 +1947,7 @@ body:not(.is-game-ready) .viewport {
   width: 72%;
   max-width: 44px;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 .world-rock-mine-gauge__track {
@@ -1937,7 +1964,12 @@ body:not(.is-game-ready) .viewport {
   width: 0%;
   background: linear-gradient(90deg, #8a8a8a, #e2e2e2);
   border-radius: 2px;
-  transition: width 80ms linear;
+}
+
+.remote-player.local-player-avatar.is-local-rock-mining #player-name,
+.remote-player.local-player-avatar.is-local-rock-mining .remote-player-health-root {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .world-craft-furniture {
@@ -3107,6 +3139,22 @@ body.ovc-page-tutorial #multiplayer-status {
   opacity: 0;
 }
 
+body:not(.is-admin-user) #admin-open-button,
+body:not(.is-admin-user) #admin-dev-butterflies-button,
+body:not(.is-admin-user) #admin-dev-rocks-button,
+body:not(.is-admin-user) #admin-dev-seeds-button,
+body:not(.is-admin-user) #admin-dev-apples-button,
+body:not(.is-admin-user) #admin-dev-plant-index-plus-button,
+body:not(.is-admin-user) #admin-dev-bucket-spawn-button {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+body.is-admin-user #admin-open-button {
+  opacity: 0.78;
+  background: #050505;
+}
+
 #network-debug-button {
   position: fixed;
   left: 14px;
@@ -3462,32 +3510,39 @@ body.ovc-page-tutorial #multiplayer-status {
   font: 600 13px/1.35 Arial, sans-serif;
 }
 
-.well-donation-amounts {
+.well-donation-amount-field {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0 8px;
+  gap: 6px;
+  margin: 12px 0 6px;
 }
 
-.well-donation-amount {
-  padding: 8px 6px;
+.well-donation-amount-label {
+  color: #333;
+  font: 600 13px/1.3 Arial, sans-serif;
+}
+
+.well-donation-amount-input {
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid rgba(20, 70, 100, 0.28);
   border-radius: 8px;
   background: #f7fbff;
   color: #124;
-  font: 700 13px/1.2 Arial, sans-serif;
-  cursor: pointer;
+  font: 700 16px/1.2 Arial, sans-serif;
+  box-sizing: border-box;
 }
 
-.well-donation-amount.is-selected {
+.well-donation-amount-input:focus {
+  outline: none;
   border-color: #2f9fff;
-  background: #e8f4ff;
   box-shadow: inset 0 0 0 1px #2f9fff;
 }
 
-.well-donation-amount:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.well-donation-hint {
+  margin: 0 0 6px;
+  color: #b42318;
+  font: 600 12px/1.35 Arial, sans-serif;
+  text-align: center;
 }
 
 .well-donation-selected {
@@ -3495,6 +3550,11 @@ body.ovc-page-tutorial #multiplayer-status {
   color: #222;
   font: 700 14px/1.3 Arial, sans-serif;
   text-align: center;
+}
+
+.well-donation-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .well-donation-actions {
@@ -4442,16 +4502,51 @@ body #world-bag-inventory {
 }
 
 .bag-inventory-slot.is-magic-powder-usable {
-  outline: 2px solid rgba(196, 132, 255, 0.92);
+  cursor: grab;
+  outline: 3px solid rgba(251, 191, 36, 0.95);
   outline-offset: 2px;
+  border-radius: 10px;
   box-shadow:
-    0 0 10px rgba(168, 85, 247, 0.45),
-    0 0 18px rgba(139, 92, 246, 0.28);
+    0 0 0 2px rgba(255, 237, 213, 0.9),
+    0 0 18px rgba(245, 158, 11, 0.7),
+    0 0 34px rgba(251, 191, 36, 0.45);
+  animation: magic-powder-bag-slot-ready 1.1s ease-in-out infinite;
+}
+
+@keyframes magic-powder-bag-slot-ready {
+  0%,
+  100% {
+    outline-color: rgba(251, 191, 36, 0.92);
+    box-shadow:
+      0 0 0 2px rgba(255, 237, 213, 0.85),
+      0 0 16px rgba(245, 158, 11, 0.62),
+      0 0 30px rgba(251, 191, 36, 0.38);
+  }
+
+  50% {
+    outline-color: rgba(253, 224, 71, 1);
+    box-shadow:
+      0 0 0 3px rgba(255, 247, 237, 0.98),
+      0 0 24px rgba(245, 158, 11, 0.88),
+      0 0 42px rgba(251, 191, 36, 0.58);
+  }
 }
 
 .bag-inventory-slot.is-magic-powder-usable .bag-slot-icon--magic-powder,
 .bag-inventory-slot.is-magic-powder-usable .bag-slot-icon--magic-powder-img {
-  filter: drop-shadow(0 0 6px rgba(196, 132, 255, 0.75));
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.85));
+  animation: magic-powder-icon-bob 1.1s ease-in-out infinite;
+}
+
+@keyframes magic-powder-icon-bob {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 .bag-inventory-slot.is-magic-powder-usable[data-ovc-tip]:hover::after {

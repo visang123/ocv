@@ -32,11 +32,19 @@ function isSproutBodyVisible(plant) {
 function getPlantSoilRectWorld(plant, options) {
   if (!plant || options.shouldHideSoil(plant)) return null;
   const spot = getPlantSpotXY(plant);
+  const spanW =
+    typeof options.entitySpanOnGround === "function"
+      ? options.entitySpanOnGround(options.plantSpotWidth)
+      : options.plantSpotWidth;
+  const spanH =
+    typeof options.entitySpanOnGround === "function"
+      ? options.entitySpanOnGround(options.plantSpotHeight)
+      : options.plantSpotHeight;
   return {
     left: spot.x,
     top: spot.y,
-    right: spot.x + options.plantSpotWidth,
-    bottom: spot.y + options.plantSpotHeight
+    right: spot.x + spanW,
+    bottom: spot.y + spanH
   };
 }
 
@@ -46,11 +54,19 @@ function getPlantSproutRectWorld(plant, options) {
   const st = options.getSproutStageFromPlant(plant);
   const sz = options.getSproutSizeForStage(st, plant);
   const pos = options.getSproutWorldPositionForPlant(spot.x, spot.y, sz, st, plant);
+  const spanW =
+    typeof options.entitySpanOnGround === "function"
+      ? options.entitySpanOnGround(sz.width)
+      : sz.width;
+  const spanH =
+    typeof options.entitySpanOnGround === "function"
+      ? options.entitySpanOnGround(sz.height)
+      : sz.height;
   return {
     left: pos.x,
     top: pos.y,
-    right: pos.x + sz.width,
-    bottom: pos.y + sz.height
+    right: pos.x + spanW,
+    bottom: pos.y + spanH
   };
 }
 

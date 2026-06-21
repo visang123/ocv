@@ -10,10 +10,12 @@ export function createModule(d) {
   }
 
   function layoutNpcSpeechBubble() {
-  const bubbleWidth = d.npcBubble.offsetWidth || 48;
+  d.npcBubble.style.width = "";
+  void d.npcBubble.offsetWidth;
+  const bubbleWidth = d.npcBubble.offsetWidth || d.npcBubble.scrollWidth || 48;
   const npcHeadTop = d.getNpcHeadTopWorldY(d.getNpc().y);
   const bubbleWorldY =
-    speechBubbleTopWorldYFromHead(npcHeadTop, d.npcBubble, d.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) -
+    speechBubbleTopWorldYFromHead(npcHeadTop, d.npcBubble, d.NPC_SPEECH_BUBBLE_GAP_ABOVE_HEAD_WORLD) +
     d.NPC_SPEECH_BUBBLE_SHIFT_DOWN_WORLD;
   setNpcBubbleWorldPosition(
     d.getNpc().x + d.NPC_WIDTH / 2 - bubbleWidth / 2,

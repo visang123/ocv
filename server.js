@@ -204,8 +204,19 @@ function handleApi(request, response, requestedPath) {
         writeAccounts(accounts);
       }
 
+      const sessionActiveAt = Number(account.sessionActiveAt) || 0;
+      if (sessionActiveAt && Date.now() - sessionActiveAt < 70000) {
+        sendJson(response, 409, {
+          ok: false,
+          message:
+            "이미 다른 창에서 이 계정으로 접속 중입니다. 해당 창을 닫거나 로그아웃한 뒤 다시 시도하세요."
+        });
+        return;
+      }
+
       const sessionToken = generateSessionToken();
       account.sessionToken = sessionToken;
+      account.sessionActiveAt = Date.now();
       if (!account.password_hash && account.password) {
         account.password_hash = sha256Hex(account.password);
       }
@@ -266,12 +277,18 @@ function handleApi(request, response, requestedPath) {
     readJsonBody(request, response, (body) => {
       const id = String(body.id || "");
       const token = String(body.session_token || "");
-      const account = readAccounts().find((a) => a.id === id);
+      const accounts = readAccounts();
+      const account = accounts.find((a) => a.id === id);
       if (!account) {
         sendJson(response, 200, { ok: true, valid: false });
         return;
       }
-      sendJson(response, 200, { ok: true, valid: account.sessionToken === token });
+      const valid = account.sessionToken === token;
+      if (valid) {
+        account.sessionActiveAt = Date.now();
+        writeAccounts(accounts);
+      }
+      sendJson(response, 200, { ok: true, valid: valid });
     });
     return true;
   }

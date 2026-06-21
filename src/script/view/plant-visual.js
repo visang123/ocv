@@ -5,6 +5,40 @@ import {
 } from "../../game/plant-ui-layout.js?v=20260620i";
 
 export function createModule(d) {
+  function layoutMagicPowderDragTargetRing(plant) {
+  if (!d.plantHoverRing || !plant) return;
+  const bounds = d.getPlantHoverRingWorldBounds(plant);
+  if (!bounds || bounds.size <= 0) {
+    d.clearPlantHoverRing();
+    return;
+  }
+  d.plantHoverRing.classList.add("is-visible", "is-magic-powder-target");
+  d.plantHoverRing.classList.remove("is-needs-water");
+  d.plantHoverRing.style.display = "block";
+  d.plantHoverRing.style.zIndex = String(d.getPlantDepthZIndex(d.getPlantDepthSortY(plant)) + 2);
+  d.setWorldPosition(d.plantHoverRing, bounds.x, bounds.y);
+  d.setWorldSize(d.plantHoverRing, bounds.size, bounds.size);
+  }
+
+  function clearMagicPowderDragPlantHighlight() {
+  if (!d.plantHoverRing) return;
+  if (!d.plantHoverRing.classList.contains("is-magic-powder-target")) return;
+  d.clearPlantHoverRing();
+  }
+
+  function syncMagicPowderDragPlantHighlight(clientX, clientY, bagType) {
+  if (typeof d.getMagicPowderDropTargetAt !== "function") {
+    clearMagicPowderDragPlantHighlight();
+    return;
+  }
+  const target = d.getMagicPowderDropTargetAt(clientX, clientY, bagType);
+  if (!target || !target.plant) {
+    clearMagicPowderDragPlantHighlight();
+    return;
+  }
+  layoutMagicPowderDragTargetRing(target.plant);
+  }
+
   function applyPlantHoverVisuals(plant) {
   d.clearPlantHoverRing();
   if (d.ground) {
@@ -696,6 +730,7 @@ export function createModule(d) {
 
   return {
     applyPlantHoverVisuals,
+    clearMagicPowderDragPlantHighlight,
     clearPlantHoverVisuals,
     ensureSharedPlantVisuals,
     extraPlantFromDomElement,
@@ -715,6 +750,7 @@ export function createModule(d) {
     shouldSkipPlantHoverVisualEmphasis,
     shouldSuppressPlantWaterCardForSelfSustaining,
     showPlantHoverSignForPlant,
+    syncMagicPowderDragPlantHighlight,
     syncPlantCardWaterReadoutVisibility,
     syncPlantHoverWellDockLayout,
     teardownExtraPlantDom,

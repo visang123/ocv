@@ -68,7 +68,7 @@ export function isPlayerIdleForHealth(opts) {
   if (!opts || !opts.hasSpawnedCharacter || opts.isCharacterSelecting) return false;
   if (isPlayerEnteredCraftHouse(opts)) return true;
   if (opts.isSittingOnChair) return false;
-  if (opts.isPlanting || opts.isEating) return false;
+  if (opts.isPlanting || opts.isEating || opts.isRockMining) return false;
   if (opts.isTradeExchangeOpen || opts.isAlchemyCraftOpen || opts.isPlantMasterSeedShopOpen) return false;
   if (opts.isGameplayBlockedByNpcDialogue) return false;
   if (isPlayerMovementKeyActive(opts.keys)) return false;
@@ -115,13 +115,13 @@ function getCraftHousePlayerFeetTouchRect(playerX, footY, playerWidth) {
   const px = Number(playerX);
   const fy = Number(footY);
   const pw = Number(playerWidth) || 25;
-  const feetInsetX = 6;
-  const feetH = 6;
+  const feetInsetX = 5;
+  const feetH = 12;
   return {
     left: px + feetInsetX,
     right: px + pw - feetInsetX,
     top: fy - feetH,
-    bottom: fy
+    bottom: fy + 2
   };
 }
 

@@ -6,6 +6,8 @@
  * @param {object} d — script.js 런타임 바인딩
  */
 export function createWorldPollSync(d) {
+  let pendingForceSaveAfterSync = false;
+
   function applyServerWorldRowTimestamps(row) {
     if (!row || !row.updated_at) return;
     d.lastWorldUpdatedAt = row.updated_at;
@@ -35,6 +37,10 @@ export function createWorldPollSync(d) {
       !window.OVCOnline ||
       typeof window.OVCOnline.saveWorldState !== "function"
     ) {
+      if (forceSave) {
+        d.isWorldDirty = true;
+        pendingForceSaveAfterSync = true;
+      }
       return;
     }
     if (d.isWorldPolling) {
@@ -87,6 +93,7 @@ export function createWorldPollSync(d) {
           );
           d.worldSaveConflictBackoffUntil = Date.now() + 1200;
           d.isWorldDirty = true;
+          d.pendingForceWorldSaveAfterPoll = true;
           pollWorldState(true);
           return;
         }
@@ -101,6 +108,10 @@ export function createWorldPollSync(d) {
       })
       .finally(function () {
         d.isWorldSyncing = false;
+        if (pendingForceSaveAfterSync) {
+          pendingForceSaveAfterSync = false;
+          syncWorldState(true, { skipPrefetch: true });
+        }
       });
   }
 

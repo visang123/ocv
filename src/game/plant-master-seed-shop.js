@@ -48,10 +48,26 @@ function isPlantMasterSeedShopOverlayVisible() {
   );
 }
 
+function getPlantMasterSeedShopPanelEl() {
+  if (!host || !host.seedShopOverlay) return null;
+  return host.seedShopOverlay.querySelector(".plant-master-seed-shop-panel");
+}
+
+function setPlantMasterSeedShopFocus(active) {
+  if (!host) return;
+  [host.worldBagInventory, host.bagInventoryPanel, getPlantMasterSeedShopPanelEl()].forEach(
+    function (el) {
+      if (!el) return;
+      el.classList.toggle("is-trade-exchange-focus", active);
+    }
+  );
+}
+
 function reconcilePlantMasterSeedShopOpenState() {
   if (!shopOpen) return;
   if (!isPlantMasterSeedShopOverlayVisible()) {
     shopOpen = false;
+    setPlantMasterSeedShopFocus(false);
   }
 }
 
@@ -180,6 +196,7 @@ export function openPlantMasterSeedShop() {
   if (typeof host.updateBagPlayerMoneyDisplay === "function") {
     host.updateBagPlayerMoneyDisplay();
   }
+  setPlantMasterSeedShopFocus(true);
   refreshSeedShopUi();
 }
 
@@ -192,6 +209,7 @@ export function closePlantMasterSeedShop(options) {
     host.seedShopOverlay.style.display = "none";
     host.seedShopOverlay.setAttribute("aria-hidden", "true");
   }
+  setPlantMasterSeedShopFocus(false);
   if (!keepInventory && typeof host.setBagInventoryPanelOpen === "function") {
     host.setBagInventoryPanelOpen(false);
   }

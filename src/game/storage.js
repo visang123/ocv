@@ -436,12 +436,14 @@ export function saveSeedStateToStorage(config) {
   setStoredValue(config.seedPlantedStateKey, JSON.stringify(config.plantedState));
 }
 
-function normalizeSavedWorldRocks(saved, createRandomWorldRocks, rockSpawnContext) {
+function normalizeSavedWorldRocks(saved, createInitialWorldRocks, rockSpawnContext) {
+  const createRocks =
+    typeof createInitialWorldRocks === "function" ? createInitialWorldRocks : null;
   if (!saved || !Array.isArray(saved.worldRocks) || saved.worldRocks.length !== WORLD_LOOSE_ROCK_COUNT) {
-    if (typeof createRandomWorldRocks !== "function") {
+    if (!createRocks) {
       return { worldRocks: [], worldRockPickedIds: [] };
     }
-    const fresh = createRandomWorldRocks(rockSpawnContext);
+    const fresh = createRocks(rockSpawnContext);
     return { worldRocks: fresh, worldRockPickedIds: [] };
   }
   const worldRocks = saved.worldRocks.map(function (rockData, index) {
@@ -455,7 +457,9 @@ function normalizeSavedWorldRocks(saved, createRandomWorldRocks, rockSpawnContex
       id: String(rockData.id || fallback.id),
       x: Number.isFinite(Number(rockData.x)) ? Number(rockData.x) : fallback.x,
       y: Number.isFinite(Number(rockData.y)) ? Number(rockData.y) : fallback.y,
-      size: Number.isFinite(Number(rockData.size)) ? Number(rockData.size) : WORLD_ROCK_SIZE
+      size: Number.isFinite(Number(rockData.size)) ? Number(rockData.size) : WORLD_ROCK_SIZE,
+      miningWorkMs: Math.max(0, Math.floor(Number(rockData.miningWorkMs) || 0)),
+      miningLastAdvanceAt: Math.max(0, Math.floor(Number(rockData.miningLastAdvanceAt) || 0))
     };
   });
   const validIds = new Set(worldRocks.map(function (r) {
@@ -487,7 +491,7 @@ export function loadAppleStateFromStorage(config) {
   const savedRaw = getStoredValue(config.appleStateKey);
 
   if (!savedRaw) {
-    const rocksEmpty = normalizeSavedWorldRocks(null, config.createRandomWorldRocks, null);
+    const rocksEmpty = normalizeSavedWorldRocks(null, config.createInitialWorldRocks, null);
     return {
       hasSavedState: false,
       parseFailed: false,
@@ -554,7 +558,7 @@ export function loadAppleStateFromStorage(config) {
             nextSpawnAt: 0
           };
 
-    const worldRockParts = normalizeSavedWorldRocks(saved, config.createRandomWorldRocks, null);
+    const worldRockParts = normalizeSavedWorldRocks(saved, config.createInitialWorldRocks, null);
 
     return {
       hasSavedState: true,
@@ -690,7 +694,7 @@ export function loadAppleStateFromStorage(config) {
     };
   } catch (error) {
     removeStoredValue(config.appleStateKey);
-    const rocksCatch = normalizeSavedWorldRocks(null, config.createRandomWorldRocks, null);
+    const rocksCatch = normalizeSavedWorldRocks(null, config.createInitialWorldRocks, null);
     return {
       hasSavedState: false,
       parseFailed: true,
@@ -827,7 +831,9 @@ export function saveAppleStateToStorage(config) {
           id: rock.id,
           x: Number(rock.x) || 0,
           y: Number(rock.y) || 0,
-          size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : WORLD_ROCK_SIZE
+          size: Number.isFinite(Number(rock.size)) ? Number(rock.size) : WORLD_ROCK_SIZE,
+          miningWorkMs: Math.max(0, Math.floor(Number(rock.miningWorkMs) || 0)),
+          miningLastAdvanceAt: Math.max(0, Math.floor(Number(rock.miningLastAdvanceAt) || 0))
         };
       }),
       worldRockPickedIds: Array.isArray(config.worldRockPickedIds) ? config.worldRockPickedIds : [],

@@ -170,11 +170,13 @@ export function createModule(d) {
 
   function updatePlayerHealthUi() {
   if (!d.playerHealthRoot) return;
+  const rockMiningActive = Boolean(String(d.getPlayer().rockMiningRockId || ""));
   if (
     !d.hasSpawnedCharacter ||
     !d.player ||
     d.player.classList.contains("is-hidden-before-spawn") ||
-    d.isPlayerInsideEnteredCraftHouse()
+    d.isPlayerInsideEnteredCraftHouse() ||
+    rockMiningActive
   ) {
     d.playerHealthRoot.style.display = "none";
     return;
@@ -212,9 +214,11 @@ export function createModule(d) {
 
   function updatePlayerName() {
   if (!d.playerName) return;
+  const rockMiningActive = Boolean(String(d.getPlayer().rockMiningRockId || ""));
   if (
     !d.player ||
-    d.player.classList.contains("is-hidden-before-spawn")
+    d.player.classList.contains("is-hidden-before-spawn") ||
+    rockMiningActive
   ) {
     d.playerName.style.display = "none";
     d.playerName.classList.remove("is-dialogue-layer");
