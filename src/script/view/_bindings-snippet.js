@@ -160,6 +160,8 @@
     getMagicPowderBagCount,
     getMagicPowderDropTargetAt,
     getMagicPowderInventoryHoverTip,
+    getNearestPlantForMagicPowder,
+    hasMagicPowderUsableNearPlant,
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
     getNpcHeadTopWorldY,

@@ -143,6 +143,7 @@ import {
   WORLD_LOOSE_ROCK_COUNT,
   WORLD_ROCK_MINE_MS,
   WORLD_ROCK_RESPAWN_INTERVAL_MS,
+  CRAFT_FURNITURE_LOCAL_PENDING_MS,
   WORLD_ROCK_SIZE,
   WORLD_ROCK_SPAWN_X_MARGIN,
   WORLD_ROCK_SPAWN_Y_MIN,
@@ -208,6 +209,8 @@ import {
   butterflyFlutterAmplitudeY,
   butterflyRespawnMs,
   butterflyCatchDistance,
+  worldRockClickPad,
+  butterflyClickPad,
   butterflyBroadcastMs,
   butterflyBoundsLeft,
   butterflyBoundsRight,
@@ -240,14 +243,14 @@ import {
   everBeenToWorldKey,
   appStorageKeys,
   appStorageKeysSharedWorldReset
-} from "./src/game/constants.js";
+} from "./src/game/constants.js?v=20260621a";
 import {
   entitySpanOnGround,
   getPlantGrowthMeterWorldPosition,
   getPlantSpotCenterX,
   getPlantSpotFootY,
   getPlantWaterNeededWorldPosition
-} from "./src/game/plant-ui-layout.js?v=20260620i";
+} from "./src/game/plant-ui-layout.js?v=20260621b";
 import {
   tickPlantGold,
   getPlantGoldKrw,
@@ -413,7 +416,8 @@ import {
   normalizePlantMatureKind,
   getMatureKindForPowderBagType,
   getColoredPowderCountField,
-  normalizeMagicPowderBagType
+  normalizeMagicPowderBagType,
+  MAGIC_POWDER_BAG_TYPES
 } from "./src/game/magic-powder.js";
 import {
   getPlantIndexPointsForSinglePlant as getPlantIndexPointsForSinglePlantCore,
@@ -614,9 +618,8 @@ import {
   getCraftFurnitureInstallPresenceAction,
   getCraftFurnitureInstallStatusText,
   mergePlacedCraftFurnitureFromSnapshot,
-  upsertPlacedCraftFurnitureEntry,
-  CRAFT_FURNITURE_LOCAL_PENDING_MS
-} from "./src/game/craft-furniture-world.js";
+  upsertPlacedCraftFurnitureEntry
+} from "./src/game/craft-furniture-world.js?v=20260621a";
 import {
   PLAYER_MAX_HEALTH,
   PLAYER_APPLE_HEAL_AMOUNT,
@@ -1797,7 +1800,7 @@ function completeRockMiningYield(rock) {
 
   const sz = Number(rock.size) || WORLD_ROCK_SIZE;
   const dropX = Number(rock.x) + (sz - BAG_DROP_WORLD_SIZE) / 2;
-  const dropY = Number(rock.y) + (sz - BAG_DROP_WORLD_SIZE) / 2;
+  const dropY = Number(rock.y) + sz + 2;
   spawnWorldBagDropAt("rock", 1, dropX, dropY);
 
   lastLocalWorldRockPickupAt = Date.now();
@@ -3330,6 +3333,7 @@ document.addEventListener("pointerup", function (e) {
   if (e.button !== 0) return;
   if (tryScoopWellWaterByPointerClick(e.clientX, e.clientY)) return;
   if (tryWaterPlantByPointerClick(e.clientX, e.clientY)) return;
+  if (tryCancelRockMiningByPointerClick(e.clientX, e.clientY)) return;
   if (isPointerBlockedForWorldInteract(e)) return;
   tryWorldInteractByPointerClick(e.clientX, e.clientY);
 });
@@ -6774,6 +6778,69 @@ function tryPickupNearestWorldRock(bucketDistance) {
   return tryPickupWorldRock(nearestRock.rock);
 }
 
+function canIncludeWorldRocksInClickTargets() {
+  const tutorialRockStep =
+    isOnboardingLinearGateActive() && getOnboarding().flowStep === ONBOARDING_STEP_ROCK;
+  if (!isWorldDocumentEntry() && !tutorialRockStep) return false;
+  if (isWorldDocumentEntry() && !isWorldRockPickupUnlocked()) return false;
+  return true;
+}
+
+function getWorldRockById(rockId) {
+  if (!rockId || !Array.isArray(getApple().worldRocks)) return null;
+  return (
+    getApple().worldRocks.find(function (r) {
+      return r && String(r.id) === String(rockId);
+    }) || null
+  );
+}
+
+function getButterflyById(butterflyId) {
+  if (!butterflyId) return null;
+  return (
+    butterflyState.list.find(function (b) {
+      return b && String(b.id) === String(butterflyId);
+    }) || null
+  );
+}
+
+function isPlayerWithinWorldRockPickupRange(rock) {
+  if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return false;
+  const sz = Number(rock.size) || WORLD_ROCK_SIZE;
+  return getCenterDistance(rock.x, rock.y, sz, sz) <= pickupDistance;
+}
+
+function isPlayerWithinButterflyCatchRange(butterfly) {
+  if (!butterfly) return false;
+  const probe = getButterflyCatchProbeCenter(butterfly);
+  return (
+    getButterflyCatchDistanceAtWorldCenter(probe.cx, probe.cy) <= butterflyCatchDistance
+  );
+}
+
+function shouldDeferButterflyCatchForRockOver(butterfly) {
+  if (isLocalRockMining()) return true;
+  if (!butterfly) return shouldDeferButterflyCatchForNearbyRock();
+  const nearestRock = getNearestPickableWorldRock();
+  if (!nearestRock || nearestRock.distance > pickupDistance) return false;
+  const probe = getButterflyCatchProbeCenter(butterfly);
+  const butterflyDist = getButterflyCatchDistanceAtWorldCenter(probe.cx, probe.cy);
+  if (butterflyDist > butterflyCatchDistance) return true;
+  return nearestRock.distance <= butterflyDist;
+}
+
+function tryCancelRockMiningByPointerClick(clientX, clientY) {
+  if (!isLocalRockMining()) return false;
+  const pxy = groundClientToWorldXY(clientX, clientY);
+  if (!pxy) return false;
+  const target = pickWorldInteractTargetAtWorldPoint(pxy.x, pxy.y);
+  if (!target || target.kind !== "rock") return false;
+  const rockId = target.data && target.data.id;
+  if (!rockId || String(getPlayer().rockMiningRockId) !== String(rockId)) return false;
+  cancelLocalRockMining();
+  return true;
+}
+
 function getNearestPickableWorldRock() {
   const tutorialRockStep =
     isOnboardingLinearGateActive() && getOnboarding().flowStep === ONBOARDING_STEP_ROCK;
@@ -7203,18 +7270,8 @@ function onWorldBagDropItemPicked(itemKey) {
   updateBagInventorySlots();
 }
 
-function tryPickWorldBagDrop(bucketDistance) {
-  if (!canUseBagInventoryGameplay()) return false;
-  ensureWorldBagDropsArray();
-  if (!getApple().worldBagDrops.length) return false;
-  const info = findNearestWorldBagDropPickup(
-    getApple().worldBagDrops,
-    getPlayerCenterX(),
-    getPlayerFootY(),
-    Math.min(pickupDistance, bucketDistance)
-  );
-  if (!info) return false;
-  const drop = info.drop;
+function pickUpWorldBagDropEntry(drop) {
+  if (!drop || !canUseBagInventoryGameplay()) return false;
   const itemKey = normalizeBagItemKey(drop.itemKey);
   const count = Math.max(1, Math.floor(Number(drop.count) || 0));
   if (!canAddBagItemsForTrade({ [itemKey]: count })) {
@@ -7240,6 +7297,20 @@ function tryPickWorldBagDrop(bucketDistance) {
   syncWorldState(true);
   sendMultiplayerPresence(true);
   return true;
+}
+
+function tryPickWorldBagDrop(bucketDistance) {
+  if (!canUseBagInventoryGameplay()) return false;
+  ensureWorldBagDropsArray();
+  if (!getApple().worldBagDrops.length) return false;
+  const info = findNearestWorldBagDropPickup(
+    getApple().worldBagDrops,
+    getPlayerCenterX(),
+    getPlayerFootY(),
+    Math.min(pickupDistance, bucketDistance)
+  );
+  if (!info) return false;
+  return pickUpWorldBagDropEntry(info.drop);
 }
 
 
@@ -7860,7 +7931,6 @@ function loadAppleState() {
       return seed && seed.inInventory;
     });
     getApple().pickedIds = [];
-    placedCraftFurniture = [];
     getApple().worldExtraBuckets = [];
     getApple().worldRockPickedIds = [];
     getApple().worldRocks = [];
@@ -8724,6 +8794,8 @@ function buildLayerDeps() {
     getMagicPowderBagCount,
     getMagicPowderDropTargetAt,
     getMagicPowderInventoryHoverTip,
+    getNearestPlantForMagicPowder,
+    hasMagicPowderUsableNearPlant,
     getMainBucketGroundState,
     getMainDryAfterEmptyMsForPlant,
     getNpcHeadTopWorldY,
@@ -9194,6 +9266,7 @@ function updateBucketPosition() {
 function updateCamera() { return _viewApi ? _viewApi.updateCamera() : undefined; }
 function updateGuideCard() { return _viewApi ? _viewApi.updateGuideCard() : undefined; }
 function updateGuidePages() { return _viewApi ? _viewApi.updateGuidePages() : undefined; }
+function syncMagicPowderProximityPlantHighlight() { return _viewApi ? _viewApi.syncMagicPowderProximityPlantHighlight() : undefined; }
 function updateMagicPowderInventoryUi() { return _viewApi ? _viewApi.updateMagicPowderInventoryUi() : undefined; }
 function updateNpcPosition() { return _viewApi ? _viewApi.updateNpcPosition() : undefined; }
 function updateNpcPrompt() { return _viewApi ? _viewApi.updateNpcPrompt() : undefined; }
@@ -9909,8 +9982,10 @@ function updateExtraSeedsAndPlants() {
     setWorldPosition(plant.spotElement, plant.x, plant.y);
     plant.spotElement.style.display = shouldHideSeparateSoilUnderBigGrass(plant) ? "none" : "block";
     const showWater = shouldShowFirstWaterNeededDroplet(plant);
+    const plantVisualRect = getPlantPrimaryVisualRectWorld(plant);
     const meterPos = getPlantGrowthMeterWorldPosition(plant.x, plant.y, {
-      stackAboveWater: showWater
+      stackAboveWater: showWater,
+      plantVisualTopY: plantVisualRect ? plantVisualRect.top : undefined
     });
     updatePlantGrowthMeter(
       plant.growthMeterElement,
@@ -11632,6 +11707,7 @@ function sitOnCraftChair(chair) {
   getPlayer().sittingChairId = String(chair.id || "");
   syncLocalPlayerPoseVisual();
   snapPlayerToCraftChair(chair);
+  savePlayerPosition(true);
   sendMultiplayerPresence(true);
   return true;
 }
@@ -11692,6 +11768,7 @@ function enterCraftHouse(house) {
   getPlayer().insideCraftHouseId = String(house.id || "");
   syncLocalPlayerInsideCraftHouseVisual();
   updatePlayerHealthUi();
+  savePlayerPosition(true);
   sendMultiplayerPresence(true);
 }
 
@@ -11711,6 +11788,7 @@ function exitCraftHouse() {
   setWorldPosition(localPlayerRoot, getPlayer().x, getPlayerWorldY());
   updatePlayerColorBodyPosition();
   updatePlayerHealthUi();
+  savePlayerPosition(true);
   sendMultiplayerPresence(true);
 }
 
@@ -11768,10 +11846,6 @@ function loadPlayerHealth() {
       }
       getPlayer().healthDrainDebt = 0;
       getPlayer().healthGaugeVisible = parsed.gaugeVisible !== false;
-      getPlayer().insideCraftHouseId = "";
-      getPlayer().outsideCraftHousePose = null;
-      resetPlayerChairSitState();
-      syncLocalPlayerInsideCraftHouseVisual();
       return;
     }
   } catch (e) {}
@@ -11783,10 +11857,6 @@ function loadPlayerHealth() {
   getPlayer().idleRechargeHealTicks = 0;
   getPlayer().healthDrainDebt = 0;
   getPlayer().healthGaugeVisible = true;
-  getPlayer().insideCraftHouseId = "";
-  getPlayer().outsideCraftHousePose = null;
-  resetPlayerChairSitState();
-  syncLocalPlayerInsideCraftHouseVisual();
 }
 
 
@@ -12506,7 +12576,12 @@ function getPlantWorldLabel(plant) {
 
 function clearPlantHoverRing() {
   if (!plantHoverRing) return;
-  plantHoverRing.classList.remove("is-visible", "is-needs-water", "is-magic-powder-target");
+  plantHoverRing.classList.remove(
+    "is-visible",
+    "is-needs-water",
+    "is-magic-powder-ready",
+    "is-magic-powder-target"
+  );
   plantHoverRing.style.display = "none";
 }
 
@@ -12515,16 +12590,8 @@ function clearPlantHoverRing() {
 function getPlantHoverRingWorldBounds(plant) {
   const rect = getPlantPrimaryVisualRectWorld(plant);
   if (!rect) return null;
-  const st = getSproutStageFromPlant(plant);
-  const matureAnchor =
-    plant && st >= 4 ? getMatureSpriteAnchor(normalizePlantMatureKind(plant.matureKind), st) : null;
-  let cx;
-  let cy = (rect.top + rect.bottom) / 2;
-  if (matureAnchor) {
-    cx = getPlantHoverAnchorWorld(plant).cxWorld;
-  } else {
-    cx = (rect.left + rect.right) / 2;
-  }
+  const cx = (rect.left + rect.right) / 2;
+  const cy = (rect.top + rect.bottom) / 2;
   const w = rect.right - rect.left;
   const h = rect.bottom - rect.top;
   const size = Math.max(w, h) * 1.05;
@@ -12770,6 +12837,7 @@ function getGroundBucketPickInfoAtWorldPoint(wx, wy) {
 
 function getWorldInteractTargetPriority(kind) {
   if (kind === "apple") return 120;
+  if (kind === "world-bag-drop") return 110;
   if (kind === "rock") return 80;
   if (kind === "butterfly") return 40;
   return 60;
@@ -12791,11 +12859,12 @@ function tryCatchButterflyAtWorldPoint(wx, wy) {
   let best = null;
   butterflyState.list.forEach(function (butterfly) {
     const probe = getButterflyCatchProbeCenter(butterfly);
+    const pad = butterflyClickPad;
     const rect = worldRectFromXYWH(
-      probe.cx - BUTTERFLY_SIZE / 2,
-      probe.cy - BUTTERFLY_SIZE / 2,
-      BUTTERFLY_SIZE,
-      BUTTERFLY_SIZE
+      probe.cx - BUTTERFLY_SIZE / 2 - pad,
+      probe.cy - BUTTERFLY_SIZE / 2 - pad,
+      BUTTERFLY_SIZE + pad * 2,
+      BUTTERFLY_SIZE + pad * 2
     );
     if (!isWorldPointInsideRect(wx, wy, rect)) return;
     const distance = getButterflyCatchDistanceAtWorldCenter(probe.cx, probe.cy);
@@ -12808,18 +12877,50 @@ function tryCatchButterflyAtWorldPoint(wx, wy) {
   return catchButterflyInstance(best.butterfly);
 }
 
-function tryPickWorldBagDropAtWorldPoint(wx, wy) {
+function tryPickWorldBagDropAtWorldPoint(wx, wy, preferredDropId) {
   if (!canUseBagInventoryGameplay()) return false;
   ensureWorldBagDropsArray();
   if (!getApple().worldBagDrops.length) return false;
+
+  const clickPad = 4;
   let hit = null;
-  getApple().worldBagDrops.forEach(function (drop) {
-    if (!drop) return;
-    const rect = worldRectFromXYWH(drop.x, drop.y, BAG_DROP_WORLD_SIZE, BAG_DROP_WORLD_SIZE);
-    if (!isWorldPointInsideRect(wx, wy, rect)) return;
-    if (!hit || drop.y > hit.y) hit = drop;
-  });
+  const preferredId = String(preferredDropId || "");
+
+  if (preferredId) {
+    hit =
+      getApple().worldBagDrops.find(function (drop) {
+        return drop && String(drop.id) === preferredId;
+      }) || null;
+    if (hit) {
+      const rect = worldRectFromXYWH(
+        hit.x - clickPad,
+        hit.y - clickPad,
+        BAG_DROP_WORLD_SIZE + clickPad * 2,
+        BAG_DROP_WORLD_SIZE + clickPad * 2
+      );
+      if (!isWorldPointInsideRect(wx, wy, rect)) hit = null;
+    }
+  }
+
+  if (!hit) {
+    getApple().worldBagDrops.forEach(function (drop) {
+      if (!drop) return;
+      const rect = worldRectFromXYWH(
+        drop.x - clickPad,
+        drop.y - clickPad,
+        BAG_DROP_WORLD_SIZE + clickPad * 2,
+        BAG_DROP_WORLD_SIZE + clickPad * 2
+      );
+      if (!isWorldPointInsideRect(wx, wy, rect)) return;
+      if (!hit || drop.y > hit.y) hit = drop;
+    });
+  }
+
   if (!hit) return false;
+  if (preferredId) {
+    return pickUpWorldBagDropEntry(hit);
+  }
+
   const bucketPick = getNearestGroundBucketPickInfo();
   const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
   const info = findNearestWorldBagDropPickup(
@@ -12829,32 +12930,7 @@ function tryPickWorldBagDropAtWorldPoint(wx, wy) {
     Math.min(pickupDistance, bucketDistance)
   );
   if (!info) return false;
-  const drop = info.drop;
-  const itemKey = normalizeBagItemKey(drop.itemKey);
-  const count = Math.max(1, Math.floor(Number(drop.count) || 0));
-  if (!canAddBagItemsForTrade({ [itemKey]: count })) {
-    showBagInventoryFullFailMessage();
-    return true;
-  }
-  const dropId = String(drop.id);
-  const idx = getApple().worldBagDrops.findIndex(function (d) {
-    return d && String(d.id) === dropId;
-  });
-  if (idx < 0) return false;
-  teardownWorldBagDropDom(getApple().worldBagDrops[idx]);
-  getApple().worldBagDrops.splice(idx, 1);
-  addBagItemsForTrade(itemKey, count);
-  onWorldBagDropItemPicked(itemKey);
-  const now = Date.now();
-  lastWorldBagDropChangeAt = now;
-  getApple().lastStateChangeAt = Math.max(getApple().lastStateChangeAt, now);
-  holdLocalAppleStateAgainstStaleSnapshot(1200);
-  updateWorldBagDropDom();
-  markWorldDirty();
-  broadcastWorldBagDropPickup(dropId);
-  syncWorldState(true);
-  sendMultiplayerPresence(true);
-  return true;
+  return pickUpWorldBagDropEntry(info.drop);
 }
 
 function pickWorldInteractTargetAtWorldPoint(wx, wy) {
@@ -12873,11 +12949,12 @@ function pickWorldInteractTargetAtWorldPoint(wx, wy) {
       typeof butterfly._catchProbeCy === "number" && Number.isFinite(butterfly._catchProbeCy)
         ? butterfly._catchProbeCy
         : butterfly.y;
+    const pad = butterflyClickPad;
     const rect = worldRectFromXYWH(
-      cx - BUTTERFLY_SIZE / 2,
-      cy - BUTTERFLY_SIZE / 2,
-      BUTTERFLY_SIZE,
-      BUTTERFLY_SIZE
+      cx - BUTTERFLY_SIZE / 2 - pad,
+      cy - BUTTERFLY_SIZE / 2 - pad,
+      BUTTERFLY_SIZE + pad * 2,
+      BUTTERFLY_SIZE + pad * 2
     );
     if (isWorldPointInsideRect(wx, wy, rect)) {
       push("butterfly", cy, { id: butterfly.id });
@@ -12896,7 +12973,13 @@ function pickWorldInteractTargetAtWorldPoint(wx, wy) {
   ensureWorldBagDropsArray();
   getApple().worldBagDrops.forEach(function (drop) {
     if (!drop) return;
-    const rect = worldRectFromXYWH(drop.x, drop.y, BAG_DROP_WORLD_SIZE, BAG_DROP_WORLD_SIZE);
+    const clickPad = 4;
+    const rect = worldRectFromXYWH(
+      drop.x - clickPad,
+      drop.y - clickPad,
+      BAG_DROP_WORLD_SIZE + clickPad * 2,
+      BAG_DROP_WORLD_SIZE + clickPad * 2
+    );
     if (isWorldPointInsideRect(wx, wy, rect)) {
       push("world-bag-drop", drop.y, { id: drop.id });
     }
@@ -12947,11 +13030,17 @@ function pickWorldInteractTargetAtWorldPoint(wx, wy) {
     }
   });
 
-  if (isWorldDocumentEntry() && isWorldRockPickupUnlocked()) {
+  if (canIncludeWorldRocksInClickTargets()) {
     getApple().worldRocks.forEach(function (rock) {
       if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return;
       const sz = Number(rock.size) || WORLD_ROCK_SIZE;
-      const rect = worldRectFromXYWH(rock.x, rock.y, sz, sz);
+      const pad = worldRockClickPad;
+      const rect = worldRectFromXYWH(
+        rock.x - pad,
+        rock.y - pad,
+        sz + pad * 2,
+        sz + pad * 2
+      );
       if (isWorldPointInsideRect(wx, wy, rect)) {
         push("rock", rock.y, { id: rock.id });
       }
@@ -12990,9 +13079,17 @@ function isPlayerNearWorldInteractTarget(target) {
   const bucketDistance = bucketPick ? bucketPick.distance : Infinity;
 
   switch (target.kind) {
-    case "butterfly":
+    case "butterfly": {
+      if (!getWorldItems().hasGuideBook) return false;
+      const butterflyId = target.data && target.data.id;
+      const butterfly = butterflyId ? getButterflyById(butterflyId) : null;
+      if (butterfly) {
+        if (shouldDeferButterflyCatchForRockOver(butterfly)) return false;
+        return isPlayerWithinButterflyCatchRange(butterfly);
+      }
       if (shouldDeferButterflyCatchForNearbyRock()) return false;
       return Boolean(findCatchableButterfly());
+    }
     case "apple": {
       const appleId = target.data && target.data.id;
       return Boolean(
@@ -13013,7 +13110,13 @@ function isPlayerNearWorldInteractTarget(target) {
         })
       );
     }
-    case "world-bag-drop":
+    case "world-bag-drop": {
+      const dropId = target.data && target.data.id;
+      if (dropId) {
+        return getApple().worldBagDrops.some(function (drop) {
+          return drop && String(drop.id) === String(dropId);
+        });
+      }
       return Boolean(
         findNearestWorldBagDropPickup(
           getApple().worldBagDrops,
@@ -13022,6 +13125,7 @@ function isPlayerNearWorldInteractTarget(target) {
           Math.min(pickupDistance, bucketDistance)
         )
       );
+    }
     case "world-bag-floor":
       return isNearWorldBagPickup();
     case "guide-book":
@@ -13043,13 +13147,8 @@ function isPlayerNearWorldInteractTarget(target) {
       return getCenterDistance(extra.x, extra.y, SEED_SIZE, SEED_SIZE) < pickupDistance;
     }
     case "rock": {
-      const rockId = target.data && target.data.id;
-      const rock = getApple().worldRocks.find(function (r) {
-        return r && String(r.id) === String(rockId);
-      });
-      if (!rock || getApple().worldRockPickedIds.includes(rock.id)) return false;
-      const sz = Number(rock.size) || WORLD_ROCK_SIZE;
-      return getCenterDistance(rock.x, rock.y, sz, sz) <= pickupDistance;
+      const rock = getWorldRockById(target.data && target.data.id);
+      return isPlayerWithinWorldRockPickupRange(rock);
     }
     case "bucket":
       {
@@ -13079,11 +13178,16 @@ function tryPerformTargetedWorldInteract(target, wx, wy) {
     case "guide-book":
       return pickUpWorldGuideBookNoHold();
     case "butterfly":
+      if (!getWorldItems().hasGuideBook) return false;
       return tryCatchButterflyAtWorldPoint(wx, wy);
     case "apple":
       return pickApple(target.data && target.data.id);
     case "world-bag-drop":
-      return tryPickWorldBagDropAtWorldPoint(wx, wy);
+      return tryPickWorldBagDropAtWorldPoint(
+        wx,
+        wy,
+        target.data && target.data.id
+      );
     case "bucket":
       return tryPickSharedBucket(bucketDistance, target.data);
     case "seed-main": {
@@ -13149,13 +13253,9 @@ function tryPerformTargetedWorldInteract(target, wx, wy) {
       return true;
     }
     case "rock": {
-      const rockId = target.data && target.data.id;
-      const rock = getApple().worldRocks.find(function (r) {
-        return r && String(r.id) === String(rockId);
-      });
+      const rock = getWorldRockById(target.data && target.data.id);
       if (!rock) return false;
-      const sz = Number(rock.size) || WORLD_ROCK_SIZE;
-      if (getCenterDistance(rock.x, rock.y, sz, sz) > pickupDistance) return false;
+      if (!isPlayerWithinWorldRockPickupRange(rock)) return false;
       if (!canPickupWorldRockPerOnboarding()) {
         flashOnboardingOrderHint("");
         return true;
@@ -13218,12 +13318,13 @@ function tryWorldInteractByPointerClick(clientX, clientY) {
   if (now - getSeedWorld().lastPickupToggleAt < 180) return false;
   getSeedWorld().lastPickupToggleAt = now;
 
+  if (tryPerformTargetedWorldInteract(target, pxy.x, pxy.y)) return true;
+
   if (getInventory().heldItem) {
     performInteractActionCore();
     return true;
   }
 
-  if (tryPerformTargetedWorldInteract(target, pxy.x, pxy.y)) return true;
   performInteractActionCore();
   return true;
 }
@@ -14121,6 +14222,14 @@ function isMagicPowderBagTypeUsableNow(bagType) {
   const nextTier = getNextPowderTargetTier(target.plant);
   if (!nextTier || isPowderUpgradeInProgress(target.plant)) return false;
   return true;
+}
+
+function hasMagicPowderUsableNearPlant() {
+  if (isOnboardingLinearGateActive()) return false;
+  for (let i = 0; i < MAGIC_POWDER_BAG_TYPES.length; i += 1) {
+    if (isMagicPowderBagTypeUsableNow(MAGIC_POWDER_BAG_TYPES[i])) return true;
+  }
+  return false;
 }
 
 function getMagicPowderInventoryHoverTip(bagType) {
@@ -17220,6 +17329,7 @@ const gameLoopHost = {
   updateOnboardingFlowUI,
   updatePlayerAlert,
   updateMagicPowderInventoryUi,
+  syncMagicPowderProximityPlantHighlight,
   updateCamera,
   updatePlayerName,
   updateWorldSocialOverlaysInGameLoop
@@ -17233,15 +17343,73 @@ function savePlayerPosition(forceSave) {
   const now = Date.now();
   if (!forceSave && now - getPlayer().lastPositionSavedAt < 400) return;
 
-  setStoredValue(
-    playerPositionKey,
-    JSON.stringify({
-      x: getPlayer().x,
-      depth: getPlayer().depth,
-      savedAt: now
-    })
-  );
+  const payload = {
+    x: getPlayer().x,
+    depth: getPlayer().depth,
+    savedAt: now
+  };
+  const insideHouseId = String(getPlayer().insideCraftHouseId || "");
+  if (insideHouseId) {
+    payload.insideCraftHouseId = insideHouseId;
+    const outsidePose = getPlayer().outsideCraftHousePose;
+    if (outsidePose && typeof outsidePose === "object") {
+      payload.outsideCraftHousePose = {
+        x: Number(outsidePose.x) || 0,
+        depth: Number(outsidePose.depth) || 0,
+        jumpY: Number(outsidePose.jumpY) || 0
+      };
+    }
+  }
+  const sittingChairId = String(getPlayer().sittingChairId || "");
+  if (sittingChairId) {
+    payload.sittingChairId = sittingChairId;
+  }
+
+  setStoredValue(playerPositionKey, JSON.stringify(payload));
   getPlayer().lastPositionSavedAt = now;
+}
+
+function restoreStoredPlayerIndoorPose(parsed) {
+  if (!parsed || typeof parsed !== "object") return false;
+
+  const insideHouseId = String(parsed.insideCraftHouseId || "");
+  const sittingChairId = String(parsed.sittingChairId || "");
+  if (!insideHouseId && !sittingChairId) return false;
+
+  getPlayer().insideCraftHouseId = "";
+  getPlayer().outsideCraftHousePose = null;
+  resetPlayerChairSitState();
+
+  if (insideHouseId) {
+    const house = getCraftHouseById(insideHouseId);
+    if (!house) return false;
+    const x = Number(parsed.x);
+    const depth = Number(parsed.depth);
+    if (!Number.isFinite(x) || !Number.isFinite(depth)) return false;
+    getPlayer().x = x;
+    getPlayer().depth = depth;
+    getPlayer().jumpY = 0;
+    getPlayer().velocityY = 0;
+    getPlayer().isOnGround = true;
+    getPlayer().insideCraftHouseId = insideHouseId;
+    const outside = parsed.outsideCraftHousePose;
+    if (outside && typeof outside === "object") {
+      getPlayer().outsideCraftHousePose = {
+        x: Number(outside.x) || x,
+        depth: Number(outside.depth) || depth,
+        jumpY: Number(outside.jumpY) || 0
+      };
+    }
+    syncLocalPlayerInsideCraftHouseVisual();
+    return true;
+  }
+
+  const chair = getCraftChairById(sittingChairId);
+  if (!chair || isCraftChairOccupiedByRemotePlayer(chair.id)) return false;
+  getPlayer().sittingChairId = sittingChairId;
+  syncLocalPlayerPoseVisual();
+  snapPlayerToCraftChair(chair);
+  return true;
 }
 
 function loadPlayerPosition() {
@@ -17250,10 +17418,27 @@ function loadPlayerPosition() {
   getPlayer().jumpY = 0;
   getPlayer().velocityY = 0;
   getPlayer().isOnGround = true;
+  getPlayer().insideCraftHouseId = "";
+  getPlayer().outsideCraftHousePose = null;
+  resetPlayerChairSitState();
+
+  let restoredIndoorPose = false;
+  try {
+    const raw = getStoredValue(playerPositionKey);
+    if (raw) {
+      restoredIndoorPose = restoreStoredPlayerIndoorPose(JSON.parse(raw));
+    }
+  } catch (eRestorePose) {}
+
   setWorldPosition(localPlayerRoot, getPlayer().x, getPlayerWorldY());
   updatePlayerColorBodyPosition();
+  if (restoredIndoorPose) {
+    updatePlayerHealthUi();
+  }
   updateCamera();
-  savePlayerPosition(true);
+  if (!restoredIndoorPose) {
+    savePlayerPosition(true);
+  }
 }
 
 function setup() {

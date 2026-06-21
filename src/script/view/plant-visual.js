@@ -1,46 +1,136 @@
 /** View — 식물·수분 카드·호버 UI. */
 import {
+  entitySpanOnGround,
   getPlantGrowthMeterWorldPosition,
   getPlantWaterNeededWorldPosition
-} from "../../game/plant-ui-layout.js?v=20260620i";
+} from "../../game/plant-ui-layout.js?v=20260621b";
 
 export function createModule(d) {
+  function clearMagicPowderPlantDomHighlights() {
+  if (d.plantSpot) {
+    d.plantSpot.classList.remove("is-magic-powder-plant-ready", "is-magic-powder-plant-target");
+  }
+  if (d.sprout) {
+    d.sprout.classList.remove("is-magic-powder-plant-ready", "is-magic-powder-plant-target");
+  }
+  if (d.ground) {
+    d.ground
+      .querySelectorAll(".extra-plant-spot, .extra-sprout")
+      .forEach(function (el) {
+        el.classList.remove("is-magic-powder-plant-ready", "is-magic-powder-plant-target");
+      });
+  }
+  }
+
+  function applyMagicPowderPlantDomHighlight(plant, mode) {
+  if (!plant) return;
+  const cls =
+    mode === "target" ? "is-magic-powder-plant-target" : "is-magic-powder-plant-ready";
+  getPlantHoverDomElements(plant).forEach(function (el) {
+    el.classList.remove("is-magic-powder-plant-ready", "is-magic-powder-plant-target");
+    el.classList.add(cls);
+  });
+  }
+
+  function clearMagicPowderProximityRing() {
+  if (!d.plantHoverRing) return;
+  if (!d.plantHoverRing.classList.contains("is-magic-powder-ready")) return;
+  d.clearPlantHoverRing();
+  }
+
+  function layoutMagicPowderProximityRing(plant) {
+  if (!d.plantHoverRing || !plant) return;
+  if (d.plantHoverRing.classList.contains("is-magic-powder-target")) return;
+  const bounds = d.getPlantHoverRingWorldBounds(plant);
+  if (!bounds || bounds.size <= 0) {
+    clearMagicPowderProximityRing();
+    clearMagicPowderPlantDomHighlights();
+    return;
+  }
+  d.plantHoverRing.classList.add("is-visible", "is-magic-powder-ready");
+  d.plantHoverRing.classList.remove("is-needs-water", "is-magic-powder-target");
+  d.plantHoverRing.style.display = "block";
+  d.plantHoverRing.style.zIndex = String(d.getPlantDepthZIndex(d.getPlantDepthSortY(plant)) + 2);
+  d.setWorldPosition(d.plantHoverRing, bounds.x, bounds.y);
+  d.setWorldSize(d.plantHoverRing, bounds.size, bounds.size);
+  applyMagicPowderPlantDomHighlight(plant, "ready");
+  }
+
   function layoutMagicPowderDragTargetRing(plant) {
   if (!d.plantHoverRing || !plant) return;
   const bounds = d.getPlantHoverRingWorldBounds(plant);
   if (!bounds || bounds.size <= 0) {
     d.clearPlantHoverRing();
+    clearMagicPowderPlantDomHighlights();
     return;
   }
   d.plantHoverRing.classList.add("is-visible", "is-magic-powder-target");
-  d.plantHoverRing.classList.remove("is-needs-water");
+  d.plantHoverRing.classList.remove("is-needs-water", "is-magic-powder-ready");
   d.plantHoverRing.style.display = "block";
-  d.plantHoverRing.style.zIndex = String(d.getPlantDepthZIndex(d.getPlantDepthSortY(plant)) + 2);
+  d.plantHoverRing.style.zIndex = String(d.getPlantDepthZIndex(d.getPlantDepthSortY(plant)) + 3);
   d.setWorldPosition(d.plantHoverRing, bounds.x, bounds.y);
   d.setWorldSize(d.plantHoverRing, bounds.size, bounds.size);
+  applyMagicPowderPlantDomHighlight(plant, "target");
   }
 
   function clearMagicPowderDragPlantHighlight() {
   if (!d.plantHoverRing) return;
   if (!d.plantHoverRing.classList.contains("is-magic-powder-target")) return;
   d.clearPlantHoverRing();
+  clearMagicPowderPlantDomHighlights();
+  }
+
+  function syncMagicPowderProximityPlantHighlight() {
+  if (
+    d.bagInventoryDragState &&
+    d.bagInventoryDragState.dragging &&
+    d.bagInventoryDragState.mode === "magicPowder"
+  ) {
+    return;
+  }
+  if (
+    typeof d.hasMagicPowderUsableNearPlant !== "function" ||
+    !d.hasMagicPowderUsableNearPlant()
+  ) {
+    clearMagicPowderProximityRing();
+    clearMagicPowderPlantDomHighlights();
+    return;
+  }
+  const target =
+    typeof d.getNearestPlantForMagicPowder === "function"
+      ? d.getNearestPlantForMagicPowder()
+      : null;
+  if (!target || !target.plant) {
+    clearMagicPowderProximityRing();
+    clearMagicPowderPlantDomHighlights();
+    return;
+  }
+  layoutMagicPowderProximityRing(target.plant);
   }
 
   function syncMagicPowderDragPlantHighlight(clientX, clientY, bagType) {
   if (typeof d.getMagicPowderDropTargetAt !== "function") {
     clearMagicPowderDragPlantHighlight();
+    syncMagicPowderProximityPlantHighlight();
     return;
   }
   const target = d.getMagicPowderDropTargetAt(clientX, clientY, bagType);
   if (!target || !target.plant) {
     clearMagicPowderDragPlantHighlight();
+    syncMagicPowderProximityPlantHighlight();
     return;
   }
   layoutMagicPowderDragTargetRing(target.plant);
   }
 
   function applyPlantHoverVisuals(plant) {
-  d.clearPlantHoverRing();
+  const magicPowderRingActive =
+    d.plantHoverRing &&
+    (d.plantHoverRing.classList.contains("is-magic-powder-ready") ||
+      d.plantHoverRing.classList.contains("is-magic-powder-target"));
+  if (!magicPowderRingActive) {
+    d.clearPlantHoverRing();
+  }
   if (d.ground) {
     d.ground
       .querySelectorAll(".is-plant-water-clickable")
@@ -72,6 +162,7 @@ export function createModule(d) {
 
   function clearPlantHoverVisuals() {
   d.clearPlantHoverRing();
+  clearMagicPowderPlantDomHighlights();
   d.clearPlantOccluderFade();
   if (d.ground) {
     d.ground
@@ -159,19 +250,23 @@ export function createModule(d) {
     const st = d.getSproutStageFromPlant(plant);
     const sz = d.getSproutSizeForStage(st, plant);
     const pos = d.getSproutWorldPositionForPlant(px, py, sz, st, plant);
+    const spanW = entitySpanOnGround(sz.width);
+    const spanH = entitySpanOnGround(sz.height);
     return {
       left: pos.x,
       top: pos.y,
-      right: pos.x + sz.width,
-      bottom: pos.y + sz.height
+      right: pos.x + spanW,
+      bottom: pos.y + spanH
     };
   }
   if (shouldHideSeparateSoilUnderBigGrass(plant)) return null;
+  const soilW = entitySpanOnGround(d.PLANT_SPOT_WIDTH);
+  const soilH = entitySpanOnGround(d.PLANT_SPOT_HEIGHT);
   return {
     left: px,
     top: py,
-    right: px + d.PLANT_SPOT_WIDTH,
-    bottom: py + d.PLANT_SPOT_HEIGHT
+    right: px + soilW,
+    bottom: py + soilH
   };
   }
 
@@ -477,10 +572,14 @@ export function createModule(d) {
     : Math.min(1, elapsed / d.getPlantFirstGrowthDurationMs(d.getPlant()));
   const secondGrowthRatio = d.getPlantSecondGrowthRatio(d.getPlant(), now);
   const showWater = shouldShowFirstWaterNeededDroplet(d.getPlant());
+  const plantVisualRect = getPlantPrimaryVisualRectWorld(d.getPlant());
   const meterPos = getPlantGrowthMeterWorldPosition(
     d.getPlant().spotX,
     d.getPlant().spotY,
-    { stackAboveWater: showWater }
+    {
+      stackAboveWater: showWater,
+      plantVisualTopY: plantVisualRect ? plantVisualRect.top : undefined
+    }
   );
   updatePlantGrowthMeter(
     d.mainPlantGrowthMeter.element,
@@ -751,6 +850,7 @@ export function createModule(d) {
     shouldSuppressPlantWaterCardForSelfSustaining,
     showPlantHoverSignForPlant,
     syncMagicPowderDragPlantHighlight,
+    syncMagicPowderProximityPlantHighlight,
     syncPlantCardWaterReadoutVisibility,
     syncPlantHoverWellDockLayout,
     teardownExtraPlantDom,

@@ -31,14 +31,25 @@ export function getPlantWaterNeededWorldPosition(spotX, spotY) {
   };
 }
 
-/** 성장 게이지 — spot 중앙 정렬, 물방울과 겹치지 않게 위로 쌓음 */
+/** 성장 게이지 기준 상단 — 보이는 식물 스프라이트 top, 없으면 spot 상단 */
+function resolvePlantGrowthMeterAnchorTopY(spotY, options) {
+  const visualTopY = options && options.plantVisualTopY;
+  if (Number.isFinite(Number(visualTopY))) {
+    return Number(visualTopY);
+  }
+  return spotY;
+}
+
+/** 성장 게이지 — spot 중앙 정렬, 식물 스프라이트 위(또는 spot 위), 물방울과 겹치지 않게 */
 export function getPlantGrowthMeterWorldPosition(spotX, spotY, options) {
   const stackAboveWater = Boolean(options && options.stackAboveWater);
   const meterH = entitySpanOnGround(PLANT_GROWTH_METER_HEIGHT);
   const gap = entitySpanOnGround(PLANT_UI_GAP_ABOVE_SOIL);
   const waterH = entitySpanOnGround(WATER_NEEDED_SIZE);
-  let y = spotY - meterH - gap;
-  if (stackAboveWater) {
+  const anchorTopY = resolvePlantGrowthMeterAnchorTopY(spotY, options);
+  const plantSpriteAboveSoil = anchorTopY < spotY - 0.01;
+  let y = anchorTopY - meterH - gap;
+  if (stackAboveWater && !plantSpriteAboveSoil) {
     y -= waterH + gap;
   }
   const meterW = entitySpanOnGround(PLANT_GROWTH_METER_WIDTH);

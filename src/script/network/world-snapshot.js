@@ -63,6 +63,9 @@ export function createModule(d) {
   const snapshotBucketY = mainBucketSnapshot.y;
   const snapshotBucketIsFull = mainBucketSnapshot.isFull;
   const plantIndexBonus = Math.max(0, Math.floor(Number(d.adminDebugPlantIndexBonus) || 0));
+  const placedCraftFurnitureSnapshot = d.isWorldDocumentEntry()
+    ? d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
+    : undefined;
   return {
     /** ???? ??? ?????????????? ???? ??????????????? `d.rebasePlantModelTimestampsToLocalNow`??refTime???? ???? */
     savedAt: d.getSharedPlantSimulationNow(),
@@ -71,6 +74,7 @@ export function createModule(d) {
     plantIndexBonus,
     lastWorldRockPickupAt: Number(d.getSeedWorld().lastWorldRockPickupAt) || 0,
     lastWorldRockRespawnAt: Number(d.getSeedWorld().lastWorldRockRespawnAt) || 0,
+    placedCraftFurniture: placedCraftFurnitureSnapshot,
     bucket: {
       x: snapshotBucketX,
       y: snapshotBucketY,
@@ -233,9 +237,7 @@ export function createModule(d) {
             ? d.getApple().worldRockPickedIds.map(String)
             : [])
         : undefined,
-      placedCraftFurniture: d.isWorldDocumentEntry()
-        ? d.serializePlacedCraftFurnitureForSnapshot(d.placedCraftFurniture)
-        : undefined,
+      placedCraftFurniture: placedCraftFurnitureSnapshot,
       worldExtraBuckets: d.isWorldDocumentEntry()
         ? d.serializeWorldExtraBucketsForSnapshot(d.getApple().worldExtraBuckets)
         : undefined,
@@ -890,22 +892,31 @@ export function createModule(d) {
           d.getApple().lastSpawnAt = pickedAt;
         }
       });
-      if (d.isWorldDocumentEntry()) {
+      if (d.isWorldDocumentEntry() && !shouldDeferRemoteAppleApply) {
         const snapApples = snapshot.apples;
-        if (!shouldDeferRemoteAppleApply && snapApples) {
-          if (Object.prototype.hasOwnProperty.call(snapApples, "placedCraftFurniture")) {
-            d.placedCraftFurniture = mergePlacedCraftFurnitureFromSnapshot(
-              d.placedCraftFurniture,
-              snapApples.placedCraftFurniture
-            );
-            d.rebuildPlacedCraftFurnitureDom();
+        let snapFurniture = null;
+        if (
+          snapApples &&
+          Object.prototype.hasOwnProperty.call(snapApples, "placedCraftFurniture")
+        ) {
+          snapFurniture = snapApples.placedCraftFurniture;
+        } else if (Object.prototype.hasOwnProperty.call(snapshot, "placedCraftFurniture")) {
+          snapFurniture = snapshot.placedCraftFurniture;
+        }
+        if (snapFurniture != null) {
+          d.placedCraftFurniture = mergePlacedCraftFurnitureFromSnapshot(
+            d.placedCraftFurniture,
+            snapFurniture
+          );
+          d.rebuildPlacedCraftFurnitureDom();
+        }
+        if (snapApples) {
+          if (Array.isArray(snapApples.worldExtraBuckets)) {
+            d.applyWorldExtraBucketsFromSharedSnapshot(snapApples.worldExtraBuckets);
           }
-        }
-        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldExtraBuckets)) {
-          d.applyWorldExtraBucketsFromSharedSnapshot(snapApples.worldExtraBuckets);
-        }
-        if (!shouldDeferRemoteAppleApply && Array.isArray(snapApples.worldBagDrops)) {
-          d.mergeWorldBagDropsFromSnapshot(snapApples.worldBagDrops);
+          if (Array.isArray(snapApples.worldBagDrops)) {
+            d.mergeWorldBagDropsFromSnapshot(snapApples.worldBagDrops);
+          }
         }
       }
       if (snapshotSavedAt) {

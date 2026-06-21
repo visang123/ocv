@@ -1,5 +1,9 @@
 /** In-world craft furniture placement (desk, fence, chair, house). */
 
+import { CRAFT_FURNITURE_LOCAL_PENDING_MS } from "./constants.js";
+
+export { CRAFT_FURNITURE_LOCAL_PENDING_MS };
+
 export const CRAFT_FURNITURE_KINDS = ["craftDesk", "craftFence", "craftChair", "craftHouse"];
 
 /** Bag-use install duration before furniture appears (ms). */
@@ -232,11 +236,8 @@ export function parsePlacedCraftFurnitureFromSnapshot(raw) {
   return parsed;
 }
 
-/** 서버 저장 전 로컬 설치분이 스냅샷 폴링으로 지워지지 않도록 유지(ms) */
-export const CRAFT_FURNITURE_LOCAL_PENDING_MS = 15000;
-
 /**
- * id 기준 병합 — 최근 placedAt 우선, 아직 서버에 없는 로컬 설치분은 pending 동안 유지.
+ * id 기준 병합 — 서버·로컬 합집합, 같은 id는 placedAt이 더 최신인 쪽.
  * @param {Array} localList
  * @param {Array|undefined|null} incoming
  */
@@ -250,15 +251,12 @@ export function mergePlacedCraftFurnitureFromSnapshot(localList, incoming) {
   remote.forEach(function (entry) {
     byId[String(entry.id)] = entry;
   });
-  const now = Date.now();
   local.forEach(function (entry) {
     const id = String(entry.id);
     const prev = byId[id];
     const placedAt = Number(entry.placedAt) || 0;
     if (!prev) {
-      if (placedAt > 0 && now - placedAt < CRAFT_FURNITURE_LOCAL_PENDING_MS) {
-        byId[id] = entry;
-      }
+      byId[id] = entry;
       return;
     }
     const prevAt = Number(prev.placedAt) || 0;

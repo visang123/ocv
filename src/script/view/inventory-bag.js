@@ -61,6 +61,9 @@ export function createModule(d) {
     d.bagInventoryDragState.sourceSlot.classList.remove("is-bag-drag-source");
   }
   d.bagInventoryDragState = null;
+  if (typeof d.syncMagicPowderProximityPlantHighlight === "function") {
+    d.syncMagicPowderProximityPlantHighlight();
+  }
   }
 
   function closeBagInventoryPanel() {

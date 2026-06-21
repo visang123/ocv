@@ -13,6 +13,7 @@ export function runGameLoopRender(host) {
   host.updateOnboardingFlowUI();
   host.updatePlayerAlert();
   host.updateMagicPowderInventoryUi();
+  host.syncMagicPowderProximityPlantHighlight();
   host.updateCamera();
   host.updatePlayerName();
   host.updateWorldSocialOverlaysInGameLoop();

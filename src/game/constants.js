@@ -350,6 +350,8 @@ export const WORLD_LOOSE_ROCK_COUNT = 40;
 export const WORLD_ROCK_RESPAWN_INTERVAL_MS = 60 * 1000;
 /** 1명이 돌을 캘 때 걸리는 시간(ms) — 인원 수만큼 속도가 빨라짐 */
 export const WORLD_ROCK_MINE_MS = 2 * 60 * 1000;
+/** 서버 저장 전 로컬 가구 설치분이 스냅샷 폴링으로 지워지지 않도록 유지(ms) */
+export const CRAFT_FURNITURE_LOCAL_PENDING_MS = 15000;
 export const WORLD_ROCK_SIZE = 14;
 /** 바닥 배치(월드 좌표, GROUND_WORLD_HEIGHT 기준) — 가장자리만 남기고 땅 전체에 분포 */
 export const WORLD_ROCK_SPAWN_X_MARGIN = 3;
@@ -402,6 +404,10 @@ export const butterflyFlutterAmplitudeY = 2.55;
 export const butterflyRespawnMs = 3 * MINUTE_MS;
 /** How close (px, center distance) the player must be to catch a butterfly. */
 export const butterflyCatchDistance = 25;
+/** 클릭 hit box 패딩 — 월드 돌 채굴 시작(E키와 동일 거리, 클릭만 살짝 넓게) */
+export const worldRockClickPad = 4;
+/** 클릭 hit box 패딩 — 나비 잡기(Q키와 동일 거리, 클릭만 살짝 넓게) */
+export const butterflyClickPad = 3;
 /** Authority (lowest sessionId) broadcasts butterfly positions on this cadence. */
 export const butterflyBroadcastMs = 56;
 /** Bounding box (world coords) the butterflies stay within while flying. */

@@ -51,6 +51,9 @@ export function createWorldPollSync(d) {
     if (!forceSave && !d.isWorldDirty) return;
     if (!d.hasHydratedSharedWorldFromServer && d.isWorldServerSyncAvailable()) {
       d.isWorldDirty = true;
+      if (forceSave) {
+        d.pendingForceWorldSaveAfterPoll = true;
+      }
       pollWorldState(true);
       return;
     }
@@ -81,6 +84,9 @@ export function createWorldPollSync(d) {
     )
       .then(function (row) {
         applyServerWorldRowTimestamps(row);
+        if (typeof d.saveAppleState === "function") {
+          d.saveAppleState({ skipWorldDirty: true });
+        }
       })
       .catch(function (error) {
         if (
